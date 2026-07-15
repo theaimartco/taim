@@ -197,3 +197,4 @@ The development of Iced is sponsored by the [Cryptowatch] team at [Kraken.com]
 [our Discord server]: https://discord.gg/3xZJ65GAhd
 [Cryptowatch]: https://cryptowat.ch/charts
 [Kraken.com]: https://kraken.com/
+# vyom-aura
