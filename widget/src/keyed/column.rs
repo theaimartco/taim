@@ -31,7 +31,7 @@ use crate::core::{
 /// ```
 pub struct Column<'a, Key, Message, Theme = crate::Theme, Renderer = crate::Renderer>
 where
-    Key: Copy + PartialEq,
+    Key: Copy + Eq + std::hash::Hash,
 {
     spacing: f32,
     padding: Padding,
@@ -44,7 +44,7 @@ where
 
 impl<'a, Key, Message, Theme, Renderer> Column<'a, Key, Message, Theme, Renderer>
 where
-    Key: Copy + PartialEq,
+    Key: Copy + Eq + std::hash::Hash,
     Renderer: crate::core::Renderer,
 {
     /// Creates an empty [`Column`].
@@ -161,7 +161,7 @@ where
 
 impl<Key, Message, Renderer> Default for Column<'_, Key, Message, Renderer>
 where
-    Key: Copy + PartialEq,
+    Key: Copy + Eq + std::hash::Hash,
     Renderer: crate::core::Renderer,
 {
     fn default() -> Self {
@@ -171,7 +171,7 @@ where
 
 struct State<Key>
 where
-    Key: Copy + PartialEq,
+    Key: Copy + Eq + std::hash::Hash,
 {
     keys: Vec<Key>,
 }
@@ -180,7 +180,7 @@ impl<Key, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
     for Column<'_, Key, Message, Theme, Renderer>
 where
     Renderer: crate::core::Renderer,
-    Key: Copy + PartialEq + 'static,
+    Key: Copy + Eq + std::hash::Hash + 'static,
 {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<State<Key>>()
@@ -199,19 +199,39 @@ where
 
         let state = state.downcast_mut::<State<Key>>();
 
-        tree::diff_children_custom_with_search(
-            children,
-            &mut self.children,
+        // Pair each existing `Tree` with the key it was built from (the
+        // two are parallel vectors on `Tree`/`State`, since `Tree` itself
+        // has no notion of a key), reconcile by key -- see
+        // `iced_runtime::reconcile` for why this finds every surviving
+        // item regardless of reordering, unlike the previous
+        // boundary-only heuristic -- then split the result back into the
+        // parallel shape `Tree`/`State` require.
+        let current = state
+            .keys
+            .drain(..)
+            .zip(children.drain(..))
+            .collect::<Vec<_>>();
+
+        let mut new_items = self
+            .keys
+            .iter()
+            .copied()
+            .zip(self.children.iter_mut())
+            .collect::<Vec<_>>();
+
+        let reconciled = iced_runtime::reconcile::reconcile(
+            current,
+            &mut new_items,
             |tree, child| child.as_widget_mut().diff(tree),
-            |index| {
-                self.keys.get(index).or_else(|| self.keys.last()).copied()
-                    != Some(state.keys[index])
-            },
             |child| Tree::new(child.as_widget()),
         );
 
-        if state.keys != self.keys {
-            state.keys.clone_from(&self.keys);
+        state.keys.reserve(reconciled.len());
+        children.reserve(reconciled.len());
+
+        for (key, tree) in reconciled {
+            state.keys.push(key);
+            children.push(tree);
         }
 
         if self.width.is_fit() || self.height.is_fit() {
@@ -359,7 +379,7 @@ where
 impl<'a, Key, Message, Theme, Renderer> From<Column<'a, Key, Message, Theme, Renderer>>
     for Element<'a, Message, Theme, Renderer>
 where
-    Key: Copy + PartialEq + 'static,
+    Key: Copy + Eq + std::hash::Hash + 'static,
     Message: 'a,
     Theme: 'a,
     Renderer: crate::core::Renderer + 'a,

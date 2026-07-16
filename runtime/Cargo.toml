@@ -11,8 +11,11 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-selector = ["dep:iced_selector"]
 image = ["iced_core/image"]
+# Enables phase counters in `diagnostics`. Disabled by default so
+# instrumentation compiles out entirely in production release builds
+# (phase.md Phase 2 design constraint); see docs/architecture/feature-policy.md.
+profiling = []
 
 [lints]
 workspace = true
@@ -21,11 +24,9 @@ workspace = true
 bytes.workspace = true
 iced_core.workspace = true
 iced_futures.workspace = true
+rustc-hash.workspace = true
 
 thiserror.workspace = true
 
 sipper.workspace = true
 sipper.optional = true
-
-iced_selector.workspace = true
-iced_selector.optional = true
