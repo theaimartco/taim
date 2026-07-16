@@ -15,6 +15,7 @@ pub mod diagnostics;
 pub mod font;
 pub mod hit_test;
 pub mod image;
+pub mod invalidation;
 pub mod keyboard;
 pub mod reconcile;
 pub mod semantics;
