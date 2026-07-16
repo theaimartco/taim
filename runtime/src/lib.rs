@@ -17,6 +17,7 @@ pub mod hit_test;
 pub mod image;
 pub mod keyboard;
 pub mod reconcile;
+pub mod semantics;
 pub mod system;
 pub mod task;
 pub mod user_interface;
