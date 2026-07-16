@@ -1,6 +1,6 @@
 //! Store internal widget state in a state tree to ensure continuity.
 use crate::layout;
-use crate::{Rectangle, Transformation, Widget};
+use crate::{Rectangle, Transformation, Widget, semantics};
 
 use std::any::{self, Any};
 use std::borrow::{Borrow, BorrowMut};
@@ -60,6 +60,17 @@ pub struct Tree {
     /// Consumed by [`Tree::layout_with_cache`]; `None` until a caller
     /// uses that method at least once.
     cached_layout: Option<(layout::Limits, layout::Node)>,
+
+    /// This node's own (non-recursive) [`semantics::Node`] from its last
+    /// computation, if any.
+    ///
+    /// Doubly-optional: the outer `None` means "never computed" (so
+    /// [`Tree::semantics_with_cache`] must call `compute`); the inner
+    /// `None` is itself a valid, cacheable answer -- "this node was
+    /// computed and legitimately reports no semantics" -- which must be
+    /// distinguished from "not computed yet" or a widget with no
+    /// semantics would recompute on every call despite being clean.
+    cached_semantics: Option<Option<semantics::Node>>,
 }
 
 impl Tree {
@@ -75,6 +86,7 @@ impl Tree {
             cached_transform: None,
             cached_clip: None,
             cached_layout: None,
+            cached_semantics: None,
         }
     }
 
@@ -125,6 +137,7 @@ impl Tree {
             cached_transform: None,
             cached_clip: None,
             cached_layout: None,
+            cached_semantics: None,
         }
     }
 
@@ -253,6 +266,45 @@ impl Tree {
 
         self.cached_layout = Some((limits, node.clone()));
         self.dirty.remove(DirtyFlags::LAYOUT);
+
+        node
+    }
+
+    /// Computes this node's own, non-recursive [`semantics::Node`],
+    /// reusing the last computed result instead of calling `compute` when
+    /// [`DirtyFlags::SEMANTICS`] is not set.
+    ///
+    /// Mirrors [`Tree::layout_with_cache`]'s contract, minus the
+    /// `limits`-equality check: a node's semantics do not vary with
+    /// layout constraints the way its measured size does, so
+    /// [`DirtyFlags::SEMANTICS`] alone determines reuse. A caller (or the
+    /// container assembling a full semantic tree, see
+    /// `iced_runtime::semantics`) is responsible for calling
+    /// [`Tree::mark_dirty`] with [`DirtyFlags::SEMANTICS`] whenever
+    /// something that would change this node's own reported semantics
+    /// changes (its label, value, state, ...); [`Tree`] cannot detect
+    /// that on its own, which is why a fresh [`Tree`] starts with
+    /// [`DirtyFlags::SEMANTICS`] already set.
+    ///
+    /// This method never recurses into children -- composing a full
+    /// subtree from per-node results is `iced_runtime::semantics`'s job,
+    /// exactly as `hit_test`'s `Hoverable` adapter composes a path from
+    /// per-node `contains` checks rather than `Tree` walking children
+    /// itself.
+    pub fn semantics_with_cache(
+        &mut self,
+        compute: impl FnOnce(&mut Self) -> Option<semantics::Node>,
+    ) -> Option<semantics::Node> {
+        if !self.dirty.contains(DirtyFlags::SEMANTICS)
+            && let Some(cached) = &self.cached_semantics
+        {
+            return cached.clone();
+        }
+
+        let node = compute(self);
+
+        self.cached_semantics = Some(node.clone());
+        self.dirty.remove(DirtyFlags::SEMANTICS);
 
         node
     }
@@ -697,5 +749,118 @@ mod layout_cache_tests {
             5.0,
             "the cached node's own position is preserved"
         );
+    }
+}
+
+#[cfg(test)]
+mod semantics_cache_tests {
+    use super::*;
+    use crate::widget::Id;
+    use crate::{Point, Rectangle, Size};
+
+    fn node_named(name: &str) -> Option<semantics::Node> {
+        Some(
+            semantics::Node::new(
+                Id::unique(),
+                Rectangle::new(Point::ORIGIN, Size::new(10.0, 10.0)),
+                semantics::Role::StaticText,
+            )
+            .with_name(name),
+        )
+    }
+
+    #[test]
+    fn a_dirty_node_always_recomputes() {
+        let mut tree = Tree::empty();
+        let mut calls = 0;
+
+        let node = tree.semantics_with_cache(|_| {
+            calls += 1;
+            node_named("a")
+        });
+
+        assert_eq!(
+            calls, 1,
+            "a fresh tree starts SEMANTICS-dirty, so this must compute"
+        );
+        assert_eq!(node.and_then(|n| n.name), Some("a".into()));
+    }
+
+    #[test]
+    fn a_clean_node_reuses_the_cached_result() {
+        let mut tree = Tree::empty();
+
+        let _ = tree.semantics_with_cache(|_| node_named("a"));
+        assert!(
+            !tree.dirty().contains(DirtyFlags::SEMANTICS),
+            "the first call clears SEMANTICS"
+        );
+
+        let mut calls = 0;
+        let node = tree.semantics_with_cache(|_| {
+            calls += 1;
+            node_named("b")
+        });
+
+        assert_eq!(calls, 0, "a clean node must not recompute");
+        assert_eq!(
+            node.and_then(|n| n.name),
+            Some("a".into()),
+            "the reused node must be the originally cached one, not a fresh \"b\" one"
+        );
+    }
+
+    #[test]
+    fn marking_semantics_dirty_forces_a_recompute() {
+        let mut tree = Tree::empty();
+
+        let _ = tree.semantics_with_cache(|_| node_named("a"));
+        tree.mark_dirty(DirtyFlags::SEMANTICS);
+
+        let mut calls = 0;
+        let node = tree.semantics_with_cache(|_| {
+            calls += 1;
+            node_named("b")
+        });
+
+        assert_eq!(calls, 1, "SEMANTICS dirty must force a recompute");
+        assert_eq!(node.and_then(|n| n.name), Some("b".into()));
+    }
+
+    #[test]
+    fn marking_only_layout_dirty_does_not_force_a_semantics_recompute() {
+        let mut tree = Tree::empty();
+
+        let _ = tree.semantics_with_cache(|_| node_named("a"));
+        tree.mark_dirty(DirtyFlags::LAYOUT);
+
+        let mut calls = 0;
+        let node = tree.semantics_with_cache(|_| {
+            calls += 1;
+            node_named("b")
+        });
+
+        assert_eq!(
+            calls, 0,
+            "LAYOUT dirty must not force a SEMANTICS recompute"
+        );
+        assert_eq!(node.and_then(|n| n.name), Some("a".into()));
+    }
+
+    #[test]
+    fn a_node_with_no_semantics_caches_none_without_recomputing() {
+        let mut tree = Tree::empty();
+
+        let _ = tree.semantics_with_cache(|_| None);
+        assert!(!tree.dirty().contains(DirtyFlags::SEMANTICS));
+
+        let mut calls = 0;
+        let node = tree.semantics_with_cache(|_| {
+            calls += 1;
+            node_named("b")
+        });
+
+        assert_eq!(calls, 0, "a clean None result must also be reused as-is");
+        assert_eq!(node, None);
     }
 }
