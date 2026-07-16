@@ -13,6 +13,7 @@ pub mod backend;
 pub mod clipboard;
 pub mod diagnostics;
 pub mod font;
+pub mod hit_test;
 pub mod image;
 pub mod keyboard;
 pub mod reconcile;
