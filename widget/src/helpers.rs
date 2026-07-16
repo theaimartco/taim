@@ -511,7 +511,7 @@ pub fn keyed_column<'a, Key, Message, Theme, Renderer>(
     children: impl IntoIterator<Item = (Key, Element<'a, Message, Theme, Renderer>)>,
 ) -> keyed::Column<'a, Key, Message, Theme, Renderer>
 where
-    Key: Copy + PartialEq,
+    Key: Copy + Eq + std::hash::Hash,
     Renderer: core::Renderer,
 {
     keyed::Column::with_children(children)

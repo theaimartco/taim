@@ -11,9 +11,11 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 pub mod backend;
 pub mod clipboard;
+pub mod diagnostics;
 pub mod font;
 pub mod image;
 pub mod keyboard;
+pub mod reconcile;
 pub mod system;
 pub mod task;
 pub mod user_interface;
