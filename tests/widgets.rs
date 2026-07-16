@@ -5,6 +5,9 @@
 #[path = "widgets/identity.rs"]
 mod identity;
 
+#[path = "widgets/keyed_reconcile.rs"]
+mod keyed_reconcile;
+
 #[path = "widgets/dirty_flags.rs"]
 mod dirty_flags;
 
