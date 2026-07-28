@@ -1,0 +1,106 @@
+# name: CI
+
+# on:
+#   push:
+#     branches: [main, master]
+#   pull_request:
+#   workflow_dispatch:
+
+# env:
+#   CARGO_TERM_COLOR: always
+#   RUST_BACKTRACE: 1
+
+# concurrency:
+#   group: ci-${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
+
+# jobs:
+#   metadata:
+#     name: workspace metadata
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - run: cargo metadata --format-version 1 --no-deps
+#       - run: bash scripts/ci/check-workspace.sh
+
+#   fmt:
+#     name: fmt --check
+#     runs-on: ubuntu-latest
+#     needs: metadata
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#         with:
+#           components: rustfmt
+#       - run: cargo fmt --all -- --check
+
+#   check:
+#     name: check (${{ matrix.features.name }})
+#     runs-on: ubuntu-latest
+#     needs: metadata
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         features:
+#           - name: default
+#             args: --workspace --all-targets
+#           - name: minimal-headless
+#             args: -p aura_core -p aura_runtime -p aura_widget --no-default-features
+#           - name: hot
+#             args: --workspace --all-targets --features hot
+#           - name: all-widgets
+#             args: --workspace --all-targets --features "image,svg,canvas,qr_code,markdown,lazy,advanced"
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - uses: Swatinem/rust-cache@v2
+#       - name: Install Linux GUI/Wayland/X11 dev packages
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+#       - run: cargo check ${{ matrix.features.args }}
+
+#   clippy:
+#     name: clippy
+#     runs-on: ubuntu-latest
+#     needs: metadata
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#         with:
+#           components: clippy
+#       - uses: Swatinem/rust-cache@v2
+#       - name: Install Linux GUI/Wayland/X11 dev packages
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+#       - run: cargo clippy --workspace --all-targets -- -D warnings
+
+#   test:
+#     name: test
+#     runs-on: ubuntu-latest
+#     needs: [fmt, check, clippy]
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - uses: Swatinem/rust-cache@v2
+#       - name: Install Linux GUI/Wayland/X11 dev packages
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+#       - run: cargo test --workspace
+
+#   release-build:
+#     name: release build
+#     runs-on: ubuntu-latest
+#     needs: [fmt, check, clippy]
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - uses: Swatinem/rust-cache@v2
+#       - name: Install Linux GUI/Wayland/X11 dev packages
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+#       - run: cargo build --workspace --release

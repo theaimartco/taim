@@ -1,6 +1,6 @@
 [package]
-name = "iced_core"
-description = "The essential ideas of iced"
+name = "aura_core"
+description = "The essential ideas of aura"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -21,6 +21,7 @@ basic-shaping = []
 advanced-shaping = []
 
 [dependencies]
+aura-motion = { workspace = true, features = ["std"] }
 bitflags.workspace = true
 bytes.workspace = true
 glam.workspace = true
@@ -29,6 +30,7 @@ log.workspace = true
 num-traits.workspace = true
 raw-window-handle.workspace = true
 rustc-hash.workspace = true
+smallvec.workspace = true
 smol_str.workspace = true
 thiserror.workspace = true
 web-time.workspace = true

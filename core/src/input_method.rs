@@ -3,6 +3,50 @@ use crate::{Pixels, Rectangle};
 
 use std::ops::Range;
 
+/// The surrounding-text disclosure policy for an input method session.
+///
+/// Secure fields must return [`Self::Redacted`], rather than bullets or a
+/// length-preserving mask: either representation still discloses information
+/// to an input method, accessibility bridge, log, or platform service.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SurroundingText {
+    /// Text and selection that may safely be supplied to an IME.
+    Visible {
+        /// UTF-8 text around the cursor.
+        content: String,
+        /// Valid UTF-8 byte selection in `content`.
+        selection: Range<usize>,
+    },
+    /// No surrounding text may leave the widget boundary.
+    Redacted,
+}
+
+impl SurroundingText {
+    /// Creates an IME disclosure value for a field.
+    pub fn for_field(content: &str, selection: Range<usize>, secure: bool) -> Self {
+        if secure {
+            Self::Redacted
+        } else {
+            Self::Visible {
+                content: content.to_owned(),
+                selection,
+            }
+        }
+    }
+
+    /// Returns whether text content may be exposed to a platform API.
+    pub const fn is_redacted(&self) -> bool {
+        matches!(self, Self::Redacted)
+    }
+}
+
+/// Candidate-window geometry requested by an IME.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CandidateRect {
+    /// The logical rectangle the platform should keep visible.
+    pub bounds: Rectangle,
+}
+
 /// The input method strategy of a widget.
 #[derive(Debug, Clone, PartialEq)]
 pub enum InputMethod<T = String> {
@@ -86,8 +130,8 @@ pub enum Purpose {
 impl InputMethod {
     /// Merges two [`InputMethod`] strategies, prioritizing the first one when both open:
     /// ```
-    /// # use iced_core::input_method::{InputMethod, Purpose, Preedit};
-    /// # use iced_core::{Point, Rectangle, Size};
+    /// # use aura_core::input_method::{InputMethod, Purpose, Preedit};
+    /// # use aura_core::{Point, Rectangle, Size};
     ///
     /// let open = InputMethod::Enabled {
     ///     cursor: Rectangle::new(Point::ORIGIN, Size::UNIT),

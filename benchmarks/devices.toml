@@ -1,0 +1,58 @@
+# Named reference hardware for benchmark reports.
+#
+# `aura_bench --device <name>` records the given name verbatim into the
+# report's `environment.device` field (see tools/aura_bench/src/report.rs).
+# It does not read this file; the file exists so a device name in a report
+# can be looked up here for the hardware/display/OS/driver/power-mode
+# context phase.md requires ("store raw samples, median-of-runs summary,
+# commit, compiler, GPU driver, build flags, power mode, and hardware ID").
+#
+# Add a `[[device]]` entry whenever a report is checked into
+# `benchmarks/baseline/` under a new device name. Do not compare reports
+# across different `[[device]]` entries (or an entry and an unregistered
+# ad hoc machine) -- see docs/performance/methodology.md.
+
+[[device]]
+name = "dev-workstation-01"
+description = "Development workstation used to produce the Phase 1 baseline reports"
+cpu = "12th Gen Intel(R) Core(TM) i7-12700H"
+gpu = "integrated (Intel Iris Xe / Vulkan via Mesa)"
+memory_gib = 16
+display = "unspecified (headless run; no physical display attached to the benchmark)"
+os = "Linux (Ubuntu-based), kernel 7.0"
+compositor = "none (headless)"
+refresh_rate_hz = 60
+power_mode = "powersave (CPU governor unpinned; scripts/perf/run-baseline.sh warns about this and does not change it)"
+notes = """
+This is a development machine, not a locked-down reference device.
+Numbers recorded against this entry establish that the harness itself is
+reproducible (phase.md's <= 5% P95 drift gate) for most scenes; they are
+not a claim about VYOM target hardware performance. A real VYOM
+reference phone/tablet/desktop/watch profile must be added here before
+any phase makes a hardware-specific performance claim (see phase.md
+section 8).
+
+Known limitation: with the governor at `powersave`, the `text_heavy`
+scene's P95 was observed to vary by up to ~30% across repeated runs
+(P50 stayed stable within 0.5%), exceeding the 5% exit-gate threshold.
+The other six scenes stayed within 0.35-2.70%. See
+docs/performance/methodology.md's "Known limitation" section for the
+full analysis. Do not treat `text_heavy` reports from this device as a
+locked baseline until re-measured with a pinned governor.
+"""
+
+# Template for adding a real target device. Copy this block, fill in every
+# field, and remove this comment once populated.
+#
+# [[device]]
+# name = ""
+# description = ""
+# cpu = ""
+# gpu = ""
+# memory_gib = 0
+# display = ""
+# os = ""
+# compositor = ""
+# refresh_rate_hz = 60
+# power_mode = ""
+# notes = ""

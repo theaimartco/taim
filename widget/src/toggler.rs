@@ -2,10 +2,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 //! #
-//! use iced::widget::toggler;
+//! use aura::widget::toggler;
 //!
 //! struct State {
 //!    is_checked: bool,
@@ -49,10 +49,10 @@ use crate::core::{
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::toggler;
+/// use aura::widget::toggler;
 ///
 /// struct State {
 ///    is_checked: bool,
@@ -359,6 +359,38 @@ where
         {
             shell.request_redraw();
         }
+    }
+
+    fn semantics(&self, tree: &Tree, layout: Layout<'_>) -> Option<crate::core::semantics::Node> {
+        use crate::core::semantics::{Actions, Node, Role, State as SemanticState};
+
+        let enabled = self.on_toggle.is_some();
+
+        let mut flags = if enabled {
+            SemanticState::FOCUSABLE
+        } else {
+            SemanticState::DISABLED
+        };
+
+        if self.is_toggled {
+            flags |= SemanticState::CHECKED;
+        }
+
+        // A toggler is a switch, which platform accessibility APIs model
+        // as a checkbox: two states, one control. The visual difference is
+        // real; the semantic one is not.
+        let node = Node::new(tree.id().clone(), layout.bounds(), Role::Checkbox)
+            .with_state(flags)
+            .with_actions(if enabled {
+                Actions::ACTIVATE | Actions::FOCUS
+            } else {
+                Actions::empty()
+            });
+
+        Some(match &self.label {
+            Some(label) => node.with_name(label.as_ref()),
+            None => node,
+        })
     }
 
     fn mouse_interaction(

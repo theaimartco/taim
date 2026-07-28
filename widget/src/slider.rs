@@ -2,10 +2,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 //! #
-//! use iced::widget::slider;
+//! use aura::widget::slider;
 //!
 //! struct State {
 //!    value: f32,
@@ -58,10 +58,10 @@ use std::ops::RangeInclusive;
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::slider;
+/// use aura::widget::slider;
 ///
 /// struct State {
 ///    value: f32,
@@ -497,6 +497,30 @@ where
             },
             style.handle.background,
         );
+    }
+
+    fn semantics(&self, tree: &Tree, layout: Layout<'_>) -> Option<core::semantics::Node> {
+        use core::semantics::{
+            Actions, Node, Role, State as SemanticState, Value as SemanticValue,
+        };
+
+        Some(
+            Node::new(tree.id().clone(), layout.bounds(), Role::Slider)
+                .with_state(SemanticState::FOCUSABLE)
+                // A slider must offer stepping as well as direct setting:
+                // INCREMENT/DECREMENT are how a keyboard, a switch device,
+                // or a screen reader's own gestures move it at all.
+                .with_actions(
+                    Actions::FOCUS | Actions::SET_VALUE | Actions::INCREMENT | Actions::DECREMENT,
+                )
+                // The range travels with the value: "70" means nothing to
+                // a screen reader without knowing it is 70 out of 100.
+                .with_value(SemanticValue::Number {
+                    current: self.value.as_(),
+                    min: (*self.range.start()).as_(),
+                    max: (*self.range.end()).as_(),
+                }),
+        )
     }
 
     fn mouse_interaction(

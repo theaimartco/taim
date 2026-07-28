@@ -3,8 +3,23 @@ use crate::core::layout;
 use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
-use crate::core::widget::{Operation, Tree};
+use crate::core::widget::visit;
+use crate::core::widget::{self, Operation, Tree};
 use crate::core::{Element, Event, Layout, Length, Rectangle, Shell, Size, Vector, Widget};
+
+/// The internal, per-instance state of a [`Stack`]: a bounded cache of
+/// the base layer's own measurement, keyed on the [`layout::Limits`] the
+/// whole [`Stack`] is asked to resolve under.
+///
+/// Every non-base layer is measured against `Limits::new(Size::ZERO,
+/// size)`, where `size` is derived entirely from the base layer's
+/// measurement -- so an unchanged base layer measured under unchanged
+/// [`layout::Limits`] means every layer's resulting geometry is
+/// reproducible from the cache without re-running any layer's `layout`.
+#[derive(Debug, Default)]
+struct State {
+    base: layout::Cache,
+}
 
 /// A container that displays children on top of each other.
 ///
@@ -122,8 +137,20 @@ impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
 where
     Renderer: crate::core::Renderer,
 {
+    fn tag(&self) -> widget::tree::Tag {
+        widget::tree::Tag::of::<State>()
+    }
+
+    fn state(&self) -> widget::tree::State {
+        widget::tree::State::new(State::default())
+    }
+
     fn diff(&mut self, tree: &mut Tree) {
         tree.diff_children(&mut self.children);
+
+        // See `Row::diff`'s identical rationale for clearing
+        // unconditionally.
+        tree.state.downcast_mut::<State>().base.clear();
 
         if let Some(base) = self.children.get(self.base_layer) {
             let size = base.as_widget().size();
@@ -152,11 +179,23 @@ where
             return layout::Node::new(limits.resolve(self.width, self.height, Size::ZERO));
         }
 
-        let base = self.children[self.base_layer].as_widget_mut().layout(
-            &mut tree.children[self.base_layer],
-            renderer,
-            &limits,
-        );
+        let fingerprint = layout::cache::Fingerprint::build(|hasher| {
+            hasher.write_usize(self.children.len());
+            self.width.hash_stable(hasher);
+            self.height.hash_stable(hasher);
+        });
+
+        let base_layer = self.base_layer;
+        let base_child = &mut self.children[base_layer];
+        let base_tree = &mut tree.children[base_layer];
+
+        let state = tree.state.downcast_mut::<State>();
+
+        let base = state.base.get_or_insert_with(&limits, fingerprint, || {
+            base_child
+                .as_widget_mut()
+                .layout(base_tree, renderer, &limits)
+        });
 
         let size = limits.resolve(self.width, self.height, base.size());
         let limits = layout::Limits::new(Size::ZERO, size);
@@ -164,20 +203,56 @@ where
         let (under, above) = self.children.split_at_mut(self.base_layer);
         let (tree_under, tree_above) = tree.children.split_at_mut(self.base_layer);
 
+        // Only attach a clip rectangle when this `Stack` actually
+        // requested clipping; an identity clip covering a node's own
+        // bounds asserts nothing a reader couldn't already infer from
+        // `Node::bounds`, and would be misleading busywork rather than
+        // real information.
+        let with_clip = |node: layout::Node| {
+            if self.clip {
+                let bounds = node.bounds();
+
+                node.with_clip(Rectangle::new(bounds.position(), bounds.size()))
+            } else {
+                node
+            }
+        };
+
         let nodes = under
             .iter_mut()
             .zip(tree_under)
-            .map(|(layer, tree)| layer.as_widget_mut().layout(tree, renderer, &limits))
-            .chain(std::iter::once(base))
+            .map(|(layer, tree)| with_clip(layer.as_widget_mut().layout(tree, renderer, &limits)))
+            .chain(std::iter::once(with_clip(base)))
             .chain(
                 above[1..]
                     .iter_mut()
                     .zip(&mut tree_above[1..])
-                    .map(|(layer, tree)| layer.as_widget_mut().layout(tree, renderer, &limits)),
+                    .map(|(layer, tree)| {
+                        with_clip(layer.as_widget_mut().layout(tree, renderer, &limits))
+                    }),
             )
             .collect();
 
         layout::Node::with_children(size, nodes)
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        self.children
+            .iter_mut()
+            .zip(&mut tree.children)
+            .zip(layout.children())
+            .for_each(|((child, state), layout)| {
+                visit(&mut visit::Widgets::new(
+                    child.as_widget_mut(),
+                    state,
+                    layout,
+                ));
+            });
     }
 
     fn operate(

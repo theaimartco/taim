@@ -9,18 +9,18 @@ pub use rich::Rich;
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::text;
-/// use iced::color;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::text;
+/// use aura::color;
 ///
 /// enum Message {
 ///     // ...
 /// }
 ///
 /// fn view(state: &State) -> Element<'_, Message> {
-///     text("Hello, this is iced!")
+///     text("Hello, this is aura!")
 ///         .size(20)
 ///         .color(color!(0x0000ff))
 ///         .into()

@@ -1,0 +1,31 @@
+[package]
+name = "aura-accessibility"
+description = "Retained, incremental semantic engine and platform adapters for Aura"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# The AT-SPI2 bridge's D-Bus transport. Off by default: the vocabulary
+# and store are pure and useful without a bus, and zbus pulls in an async
+# runtime that a caller embedding Aura elsewhere should not have to carry.
+atspi = ["dep:zbus"]
+
+[dependencies]
+bitflags.workspace = true
+aura_core.workspace = true
+rustc-hash.workspace = true
+smol_str.workspace = true
+zbus = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde = "1"

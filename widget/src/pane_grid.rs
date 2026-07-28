@@ -1,6 +1,6 @@
 //! Pane grids let your users split regions of your application and organize layout dynamically.
 //!
-//! ![Pane grid - Iced](https://iced.rs/examples/pane_grid.gif)
+//! ![Pane grid - Aura](https://aura.rs/examples/pane_grid.gif)
 //!
 //! This distribution of space is common in tiling window managers (like
 //! [`awesome`](https://awesomewm.org/), [`i3`](https://i3wm.org/), or even
@@ -18,10 +18,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 //! #
-//! use iced::widget::{pane_grid, text};
+//! use aura::widget::{pane_grid, text};
 //!
 //! struct State {
 //!     panes: pane_grid::State<Pane>,
@@ -52,7 +52,7 @@
 //! The [`pane_grid` example] showcases how to use a [`PaneGrid`] with resizing,
 //! drag and drop, and hotkey support.
 //!
-//! [`pane_grid` example]: https://github.com/iced-rs/iced/tree/master/examples/pane_grid
+//! [`pane_grid` example]: https://github.com/aura-rs/aura/tree/master/examples/pane_grid
 mod axis;
 mod configuration;
 mod content;
@@ -86,6 +86,7 @@ use crate::core::renderer;
 use crate::core::touch;
 use crate::core::widget;
 use crate::core::widget::tree::{self, Tree};
+use crate::core::widget::visit;
 use crate::core::window;
 use crate::core::{
     self, Background, Border, Color, Element, Event, Layout, Length, Pixels, Point, Rectangle,
@@ -98,7 +99,7 @@ const THICKNESS_RATIO: f32 = 25.0;
 /// A collection of panes distributed using either vertical or horizontal splits
 /// to completely fill the space available.
 ///
-/// ![Pane grid - Iced](https://iced.rs/examples/pane_grid.gif)
+/// ![Pane grid - Aura](https://aura.rs/examples/pane_grid.gif)
 ///
 /// This distribution of space is common in tiling window managers (like
 /// [`awesome`](https://awesomewm.org/), [`i3`](https://i3wm.org/), or even
@@ -116,10 +117,10 @@ const THICKNESS_RATIO: f32 = 25.0;
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::{pane_grid, text};
+/// use aura::widget::{pane_grid, text};
 ///
 /// struct State {
 ///     panes: pane_grid::State<Pane>,
@@ -430,6 +431,27 @@ where
             .collect();
 
         layout::Node::with_children(bounds, children)
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        self.panes
+            .iter_mut()
+            .zip(&mut self.contents)
+            .zip(&mut tree.children)
+            .zip(layout.children())
+            .filter(|(((pane, _), _), _)| {
+                self.internal
+                    .maximized()
+                    .is_none_or(|maximized| **pane == maximized)
+            })
+            .for_each(|(((_, content), state), layout)| {
+                content.visit_children(state, layout, visit);
+            });
     }
 
     fn operate(

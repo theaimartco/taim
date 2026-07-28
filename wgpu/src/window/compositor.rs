@@ -7,7 +7,10 @@ use crate::graphics::compositor;
 use crate::graphics::{self, Antialiasing, Shell, Viewport};
 use crate::{Engine, Renderer};
 
-/// A window graphics backend for iced powered by `wgpu`.
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// A window graphics backend for aura powered by `wgpu`.
 pub struct Compositor {
     instance: wgpu::Instance,
     adapter: wgpu::Adapter,
@@ -15,6 +18,7 @@ pub struct Compositor {
     alpha_mode: wgpu::CompositeAlphaMode,
     engine: Engine,
     settings: Settings,
+    device_lost: Arc<AtomicBool>,
 }
 
 /// A compositor error.
@@ -176,7 +180,7 @@ impl Compositor {
         for required_limits in limits {
             let result = adapter
                 .request_device(&wgpu::DeviceDescriptor {
-                    label: Some("iced_wgpu::window::compositor device descriptor"),
+                    label: Some("aura_wgpu::window::compositor device descriptor"),
                     required_features,
                     required_limits: required_limits.clone(),
                     memory_hints: wgpu::MemoryHints::MemoryUsage,
@@ -187,6 +191,17 @@ impl Compositor {
 
             match result {
                 Ok((device, queue)) => {
+                    let device_lost = Arc::new(AtomicBool::new(false));
+
+                    {
+                        let device_lost = device_lost.clone();
+
+                        device.set_device_lost_callback(move |reason, message| {
+                            log::error!("wgpu device lost ({reason:?}): {message}");
+                            device_lost.store(true, Ordering::Relaxed);
+                        });
+                    }
+
                     let engine = Engine::new(
                         &adapter,
                         device,
@@ -203,6 +218,7 @@ impl Compositor {
                         alpha_mode,
                         engine,
                         settings,
+                        device_lost,
                     });
                 }
                 Err(error) => {
@@ -212,6 +228,25 @@ impl Compositor {
         }
 
         Err(Error::RequestDeviceFailed(errors))
+    }
+
+    /// Returns whether the underlying `wgpu::Device` has been lost
+    /// (e.g. a driver crash, an OS-level GPU reset, or a laptop's
+    /// discrete/integrated GPU switch).
+    ///
+    /// A lost device leaves every GPU resource owned by this
+    /// [`Compositor`]'s [`Engine`] (pipelines, buffers, atlases) in an
+    /// unusable state; nothing in this [`Compositor`] currently rebuilds
+    /// them automatically (see `docs/performance/gpu-pipeline.md` for
+    /// why a full rebuild path is a documented follow-up, not yet
+    /// implemented here). Callers that observe `true` should, at
+    /// minimum, stop attempting to `present` frames with this
+    /// [`Compositor`] and surface the condition to the application
+    /// (e.g. by requesting a fresh [`Compositor`] for the affected
+    /// window) rather than continuing to submit work to a device that
+    /// will silently reject it.
+    pub fn is_device_lost(&self) -> bool {
+        self.device_lost.load(Ordering::Relaxed)
     }
 }
 
@@ -327,7 +362,7 @@ impl graphics::Compositor for Compositor {
                 height,
                 alpha_mode: self.alpha_mode,
                 view_formats: vec![],
-                desired_maximum_frame_latency: 1,
+                desired_maximum_frame_latency: self.settings.desired_maximum_frame_latency,
             },
         );
     }
@@ -349,6 +384,51 @@ impl graphics::Compositor for Compositor {
         background_color: Color,
         on_pre_present: impl FnOnce(),
     ) -> Result<(), compositor::SurfaceError> {
+        present(
+            renderer,
+            surface,
+            viewport,
+            background_color,
+            on_pre_present,
+        )
+    }
+
+    fn present_with_damage(
+        &mut self,
+        renderer: &mut Self::Renderer,
+        surface: &mut Self::Surface,
+        viewport: &Viewport,
+        background_color: Color,
+        frame_context: &graphics::FrameContext,
+        on_pre_present: impl FnOnce(),
+    ) -> Result<(), compositor::SurfaceError> {
+        // Log damage statistics at debug level for diagnostics.
+        if let Some(ref damage) = frame_context.damage {
+            if damage.is_full() {
+                log::debug!("Frame damage: FULL surface redraw");
+            } else if damage.is_empty() {
+                log::debug!("Frame damage: empty (no-op)");
+            } else if let Some(rects) = damage.rects() {
+                let surface_area = viewport.logical_size().width * viewport.logical_size().height;
+                let damage_area: f32 = rects.iter().map(crate::core::Rectangle::area).sum();
+                let ratio = if surface_area > 0.0 {
+                    damage_area / surface_area
+                } else {
+                    1.0
+                };
+                log::debug!(
+                    "Frame damage: {} rects, {:.1}% of surface",
+                    rects.len(),
+                    ratio * 100.0,
+                );
+            }
+        }
+
+        // For now, wgpu does not natively expose partial-present /
+        // damage hints in its surface API. We fall back to a full
+        // present, which is always correct. When wgpu gains
+        // `set_damage_region` support, this method will forward the
+        // damage rects to the underlying platform compositor.
         present(
             renderer,
             surface,
@@ -388,6 +468,22 @@ pub struct Settings {
     ///
     /// By default, it is `None`.
     pub antialiasing: Option<Antialiasing>,
+
+    /// The maximum number of frames the presentation engine is allowed
+    /// to queue ahead of the one currently displayed
+    /// (`wgpu::SurfaceConfiguration::desired_maximum_frame_latency`).
+    ///
+    /// By default, `1`: the lowest-latency setting `wgpu` allows, so
+    /// `Surface::get_current_texture` blocks until the previous frame has
+    /// actually left the presentation queue, keeping input-to-photon
+    /// latency as low as this present mode allows. A higher value trades
+    /// some latency for smoother pacing under a CPU/GPU workload whose
+    /// per-frame time varies -- "lower-latency modes require evidence on
+    /// every supported target GPU/compositor" (`phase.md` Phase 6), so
+    /// this crate does not raise it by default without that evidence;
+    /// raising it is left to a caller that has gathered it for their own
+    /// target hardware.
+    pub desired_maximum_frame_latency: u32,
 }
 
 impl Default for Settings {
@@ -397,6 +493,7 @@ impl Default for Settings {
             backends: wgpu::Backends::all(),
             power_preference: backend::PowerPreference::None,
             antialiasing: None,
+            desired_maximum_frame_latency: 1,
         }
     }
 }
@@ -425,6 +522,7 @@ impl From<backend::Settings> for Settings {
             antialiasing: settings.antialiasing.then_some(Antialiasing::MSAAx4),
             backends,
             power_preference: settings.power_preference,
+            desired_maximum_frame_latency: Settings::default().desired_maximum_frame_latency,
         }
     }
 }
@@ -433,7 +531,7 @@ impl From<backend::Settings> for Settings {
 /// configuration, if set.
 ///
 /// The value returned by this function can be changed by setting
-/// the `ICED_PRESENT_MODE` env variable. The possible values are:
+/// the `AURA_PRESENT_MODE` env variable. The possible values are:
 ///
 /// - `vsync` → [`wgpu::PresentMode::AutoVsync`]
 /// - `no_vsync` → [`wgpu::PresentMode::AutoNoVsync`]
@@ -442,7 +540,7 @@ impl From<backend::Settings> for Settings {
 /// - `fifo_relaxed` → [`wgpu::PresentMode::FifoRelaxed`]
 /// - `mailbox` → [`wgpu::PresentMode::Mailbox`]
 pub fn present_mode_from_env() -> Option<wgpu::PresentMode> {
-    let present_mode = std::env::var("ICED_PRESENT_MODE").ok()?;
+    let present_mode = std::env::var("AURA_PRESENT_MODE").ok()?;
 
     match present_mode.to_lowercase().as_str() {
         "vsync" => Some(wgpu::PresentMode::AutoVsync),
@@ -452,5 +550,63 @@ pub fn present_mode_from_env() -> Option<wgpu::PresentMode> {
         "fifo_relaxed" => Some(wgpu::PresentMode::FifoRelaxed),
         "mailbox" => Some(wgpu::PresentMode::Mailbox),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod device_lost_tests {
+    use super::*;
+
+    /// Exercises the flag/callback mechanism `Compositor::request` wires
+    /// up to `wgpu::Device::set_device_lost_callback`, without needing a
+    /// real `wgpu::Device` (which requires a live adapter and cannot be
+    /// constructed in a headless unit test). `Compositor::request`'s own
+    /// closure is a thin, untestable-in-isolation wrapper around exactly
+    /// this store-into-a-shared-flag pattern; this test pins that the
+    /// pattern itself is correct (starts `false`, becomes `true` once
+    /// set, and is visible through a cloned `Arc`, matching how the
+    /// callback closure and `Compositor` each hold their own clone).
+    #[test]
+    fn the_device_lost_flag_starts_false_and_becomes_true_once_set() {
+        let device_lost = Arc::new(AtomicBool::new(false));
+        assert!(!device_lost.load(Ordering::Relaxed));
+
+        let callback_flag = device_lost.clone();
+        let simulate_device_lost_callback = move || {
+            callback_flag.store(true, Ordering::Relaxed);
+        };
+
+        simulate_device_lost_callback();
+
+        assert!(device_lost.load(Ordering::Relaxed));
+    }
+}
+
+#[cfg(test)]
+mod settings_tests {
+    use super::*;
+
+    #[test]
+    fn default_settings_use_the_lowest_latency_frame_queue() {
+        // "FIFO is the safe default" (`phase.md` Phase 6) extends to
+        // this setting too: a fresh `Settings` should not queue frames
+        // ahead of the one currently displayed unless a caller has
+        // opted into that trade-off explicitly.
+        assert_eq!(Settings::default().desired_maximum_frame_latency, 1);
+    }
+
+    #[test]
+    fn converting_from_backend_settings_preserves_the_default_frame_latency() {
+        let converted = Settings::from(backend::Settings {
+            backend: backend::Backend::Best,
+            antialiasing: false,
+            power_preference: backend::PowerPreference::None,
+            vsync: true,
+        });
+
+        assert_eq!(
+            converted.desired_maximum_frame_latency,
+            Settings::default().desired_maximum_frame_latency
+        );
     }
 }

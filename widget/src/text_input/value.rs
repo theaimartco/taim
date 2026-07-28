@@ -2,11 +2,42 @@ use unicode_segmentation::UnicodeSegmentation;
 
 /// The value of a [`TextInput`].
 ///
+/// # Security
+///
+/// A [`Value`] holds whatever the user typed, which may be a password,
+/// a recovery phrase, or other secret. It therefore **never** discloses
+/// its contents through [`std::fmt::Debug`]: a derived `Debug` would dump
+/// the plaintext into every log line, panic message, crash report, and
+/// profiler capture that happened to format a struct containing one --
+/// exactly the "debug logs" disclosure channel `phase.md` Phase 10's
+/// security requirements forbid.
+///
+/// The type cannot know whether the field it belongs to is secure (that
+/// is [`TextInput::secure`](super::TextInput::secure)'s flag, one layer
+/// up), so it must default to denying disclosure. Code that genuinely
+/// needs the content calls [`Value::to_string`] explicitly, which is an
+/// auditable choice at the call site rather than an accident of
+/// formatting.
+///
 /// [`TextInput`]: super::TextInput
 // TODO: Reduce allocations, cache results (?)
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Value {
     graphemes: Vec<String>,
+}
+
+impl std::fmt::Debug for Value {
+    /// Formats without disclosing content *or* length.
+    ///
+    /// Length is deliberately withheld too: this crate already holds that
+    /// "bullets or a length-preserving mask ... still disclose[]
+    /// information" (see
+    /// [`input_method::SurroundingText`](aura_core::input_method::SurroundingText)),
+    /// and a password's length is exactly the kind of thing that
+    /// principle exists to protect. Call [`Value::len`] if you need it.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Value(<redacted>)")
+    }
 }
 
 impl Value {

@@ -2,10 +2,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } }
+//! # mod aura { pub mod widget { pub use aura_widget::*; } }
 //! # pub type State = ();
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-//! use iced::widget::image;
+//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+//! use aura::widget::image;
 //!
 //! enum Message {
 //!     // ...
@@ -15,7 +15,7 @@
 //!     image("ferris.png").into()
 //! }
 //! ```
-//! <img src="https://github.com/iced-rs/iced/blob/9712b319bb7a32848001b96bd84977430f14b623/examples/resources/ferris.png?raw=true" width="300">
+//! <img src="https://github.com/aura-rs/aura/blob/9712b319bb7a32848001b96bd84977430f14b623/examples/resources/ferris.png?raw=true" width="300">
 pub mod viewer;
 pub use viewer::Viewer;
 
@@ -40,10 +40,10 @@ pub fn viewer<Handle>(handle: Handle) -> Viewer<Handle> {
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::image;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::image;
 ///
 /// enum Message {
 ///     // ...
@@ -53,7 +53,7 @@ pub fn viewer<Handle>(handle: Handle) -> Viewer<Handle> {
 ///     image("ferris.png").into()
 /// }
 /// ```
-/// <img src="https://github.com/iced-rs/iced/blob/9712b319bb7a32848001b96bd84977430f14b623/examples/resources/ferris.png?raw=true" width="300">
+/// <img src="https://github.com/aura-rs/aura/blob/9712b319bb7a32848001b96bd84977430f14b623/examples/resources/ferris.png?raw=true" width="300">
 pub struct Image<Handle = image::Handle> {
     handle: Handle,
     width: Length,

@@ -1,0 +1,83 @@
+# name: Perf smoke
+
+# # Phase 0 scope: prove the existing `benches/` targets still build and run
+# # to completion, and retain their raw output as an artifact. This is
+# # intentionally NOT a regression gate yet -- phase.md Phase 1 introduces
+# # `tools/aura_bench`, `benchmarks/devices.toml`, and the methodology
+# # needed before any PR-blocking performance comparison is trustworthy.
+# # Doing that here, on a shared hosted runner with no locked-down hardware,
+# # would produce noisy numbers nobody should trust (roadmap rule 1: measure
+# # first, on reproducible hardware).
+
+# on:
+#   push:
+#     branches: [main, master]
+#   pull_request:
+#   workflow_dispatch:
+
+# env:
+#   CARGO_TERM_COLOR: always
+
+# concurrency:
+#   group: perf-${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
+
+# jobs:
+#   cpu-bench-smoke:
+#     name: cpu bench (smoke, no GPU required)
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - uses: Swatinem/rust-cache@v2
+#       - name: Install Linux GUI/X11 dev packages
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+
+#       # `--test` runs each benchmark once for correctness, without the
+#       # full statistical sampling `cargo bench` performs. That full run
+#       # is what Phase 1's `scripts/perf/run-baseline.sh` will drive on
+#       # locked reference hardware; this job only proves the harness
+#       # itself is not broken.
+#       - name: Run cpu bench in smoke (--test) mode
+#         run: cargo bench --bench cpu --features canvas -- --test
+#         continue-on-error: false
+
+#       - name: Save raw bench output
+#         if: always()
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: cpu-bench-smoke-${{ github.sha }}
+#           path: target/criterion/
+#           retention-days: 14
+#           if-no-files-found: ignore
+
+#   gpu-bench-smoke:
+#     name: wgpu bench (smoke, best-effort -- no GPU on hosted runners)
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - uses: Swatinem/rust-cache@v2
+#       - name: Install Linux GUI/Vulkan dev packages
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev mesa-vulkan-drivers vulkan-tools
+
+#       # GitHub-hosted Linux runners have no GPU, so this is expected to
+#       # fail with "no suitable wgpu adapter found" until a self-hosted,
+#       # GPU-backed runner is wired up. It is kept non-blocking rather than
+#       # removed so the failure mode is visible and not silently ignored.
+#       - name: Run wgpu bench in smoke (--test) mode
+#         run: cargo bench --bench wgpu --features canvas -- --test
+#         continue-on-error: true
+
+#       - name: Save raw bench output
+#         if: always()
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: wgpu-bench-smoke-${{ github.sha }}
+#           path: target/criterion/
+#           retention-days: 14
+#           if-no-files-found: ignore

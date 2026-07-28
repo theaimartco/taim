@@ -1,5 +1,5 @@
 //! Store images.
-use iced_core::Size;
+use aura_core::Size;
 
 use std::fmt::Debug;
 

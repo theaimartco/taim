@@ -14,6 +14,7 @@ use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
 use crate::core::widget::tree::{self, Tree};
+use crate::core::widget::visit;
 use crate::core::widget::{self, Widget};
 use crate::core::{self, Event, Length, Rectangle, Shell, Size, Vector};
 
@@ -148,6 +149,21 @@ where
                 .as_widget_mut()
                 .layout(&mut tree.children[0], renderer, limits)
         })
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        self.with_element_mut(|element| {
+            visit(&mut visit::Widgets::new(
+                element.as_widget_mut(),
+                &mut tree.children[0],
+                layout,
+            ));
+        });
     }
 
     fn operate(

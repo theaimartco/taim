@@ -255,7 +255,12 @@ impl Layer {
         if !self.pending_meshes.is_empty() {
             self.triangles.push(triangle::Item::Group {
                 transformation: Transformation::IDENTITY,
-                meshes: self.pending_meshes.drain(..).collect(),
+                // `mem::take` moves the already-populated `Vec` out
+                // directly, leaving a fresh (non-allocating) empty one
+                // behind, instead of `drain(..).collect()`'s extra
+                // allocation and element-by-element copy into a second
+                // `Vec` every time this flushes.
+                meshes: std::mem::take(&mut self.pending_meshes),
             });
         }
     }
@@ -264,7 +269,7 @@ impl Layer {
         if !self.pending_text.is_empty() {
             self.text.push(text::Item::Group {
                 transformation: Transformation::IDENTITY,
-                text: self.pending_text.drain(..).collect(),
+                text: std::mem::take(&mut self.pending_text),
             });
         }
     }
@@ -368,6 +373,11 @@ impl Default for Layer {
             triangles: triangle::Batch::default(),
             primitives: primitive::Batch::default(),
             text: text::Batch::default(),
+            // `image::Batch` is `Vec<Image>` with the `image`/`svg`
+            // features enabled, and a unit struct otherwise (see
+            // `wgpu/src/image/null.rs`); `Batch::default()` is required
+            // to build against both shapes.
+            #[allow(clippy::default_constructed_unit_structs)]
             images: image::Batch::default(),
             pending_meshes: Vec::new(),
             pending_text: Vec::new(),

@@ -1,8 +1,8 @@
-//! A windowing shell for Iced, on top of [`winit`].
+//! A windowing shell for Aura, on top of [`winit`].
 //!
-//! ![The native path of the Iced ecosystem](https://github.com/iced-rs/iced/blob/0525d76ff94e828b7b21634fa94a747022001c83/docs/graphs/native.png?raw=true)
+//! ![The native path of the Aura ecosystem](https://github.com/aura-rs/aura/blob/0525d76ff94e828b7b21634fa94a747022001c83/docs/graphs/native.png?raw=true)
 //!
-//! `iced_winit` offers some convenient abstractions on top of [`iced_runtime`]
+//! `aura_winit` offers some convenient abstractions on top of [`aura_runtime`]
 //! to quickstart development when using [`winit`].
 //!
 //! It exposes a renderer-agnostic [`Program`] trait that can be implemented
@@ -11,16 +11,16 @@
 //! Additionally, a [`conversion`] module is available for users that decide to
 //! implement a custom event loop.
 //!
-//! [`iced_runtime`]: https://github.com/iced-rs/iced/tree/master/runtime
+//! [`aura_runtime`]: https://github.com/aura-rs/aura/tree/master/runtime
 //! [`winit`]: https://github.com/rust-windowing/winit
 //! [`conversion`]: crate::conversion
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/iced-rs/iced/9ab6923e943f784985e9ef9ca28b10278297225d/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/aura-rs/aura/9ab6923e943f784985e9ef9ca28b10278297225d/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-pub use iced_debug as debug;
-pub use iced_program as program;
-pub use iced_runtime as runtime;
+pub use aura_debug as debug;
+pub use aura_program as program;
+pub use aura_runtime as runtime;
 pub use program::core;
 pub use program::graphics;
 pub use runtime::futures;
@@ -37,13 +37,15 @@ pub use clipboard::Clipboard;
 pub use error::Error;
 pub use proxy::Proxy;
 
+#[cfg(feature = "hinting")]
+use crate::core::Renderer;
 use crate::core::backend;
 use crate::core::mouse;
 use crate::core::renderer;
 use crate::core::theme;
 use crate::core::time::Instant;
 use crate::core::widget::operation;
-use crate::core::{Point, Renderer, Size};
+use crate::core::{Point, Size};
 use crate::futures::futures::channel::mpsc;
 use crate::futures::futures::channel::oneshot;
 use crate::futures::futures::task;
@@ -695,8 +697,11 @@ async fn run_instance<P>(
                         let now = Instant::now();
 
                         for (_id, window) in window_manager.iter_mut() {
+                            window.scheduler.tick(now);
+
                             if let Some(redraw_at) = window.redraw_at
                                 && redraw_at <= now
+                                && window.scheduler.should_produce_frame(now)
                             {
                                 window.raw.request_redraw();
                                 window.redraw_at = None;
@@ -757,6 +762,15 @@ async fn run_instance<P>(
                         let mut logical_size = window.state.logical_size();
 
                         if physical_size.width == 0 || physical_size.height == 0 {
+                            continue;
+                        }
+
+                        // A `RedrawRequested` event may still be in the
+                        // OS's queue from before an `Occluded(true)` was
+                        // processed; honoring it anyway would submit
+                        // work for a surface the scheduler has already
+                        // been told to stop producing frames for.
+                        if !window.scheduler.should_produce_frame(Instant::now()) {
                             continue;
                         }
 
@@ -917,12 +931,19 @@ async fn run_instance<P>(
                             input_method,
                             mouse_interaction,
                             clipboard: clipboard_requests,
+                            is_animating,
                             ..
                         } = state
                         {
                             window.request_redraw(redraw_request);
                             window.request_input_method(input_method);
                             window.update_mouse(mouse_interaction);
+
+                            if is_animating {
+                                window.scheduler.request_animation();
+                            } else {
+                                window.scheduler.stop_animating();
+                            }
 
                             run_clipboard(&mut proxy, &mut clipboard, clipboard_requests, id);
                         }
@@ -935,6 +956,8 @@ async fn run_instance<P>(
 
                         window.draw_preedit();
 
+                        window.scheduler.submit(Instant::now());
+
                         let present_span = debug::present(id);
                         match current_compositor.present(
                             &mut window.renderer,
@@ -945,6 +968,16 @@ async fn run_instance<P>(
                         ) {
                             Ok(()) => {
                                 present_span.finish();
+
+                                // No real async presentation-feedback
+                                // source is wired yet (see
+                                // `docs/architecture/frame-scheduling.md`),
+                                // so a successful synchronous `present`
+                                // is treated as its own feedback,
+                                // recovering the scheduler immediately
+                                // rather than waiting out
+                                // `FEEDBACK_TIMEOUT` for no reason.
+                                window.scheduler.feedback_received();
                             }
                             Err(error) => match error {
                                 compositor::SurfaceError::OutOfMemory => {
@@ -954,6 +987,7 @@ async fn run_instance<P>(
                                 compositor::SurfaceError::Outdated
                                 | compositor::SurfaceError::Lost => {
                                     present_span.finish();
+                                    window.scheduler.feedback_received();
 
                                     // Reconfigure surface and try redrawing
                                     let physical_size = window.state.physical_size();
@@ -977,10 +1011,18 @@ async fn run_instance<P>(
                                 compositor::SurfaceError::Occluded => {
                                     present_span.finish();
 
-                                    // Do nothing and wait for window to become visible again
+                                    // The compositor backend itself
+                                    // observed occlusion (distinct from
+                                    // winit's own `WindowEvent::Occluded`,
+                                    // which may not fire on every
+                                    // platform): stop scheduling here
+                                    // too, so both signals lead to the
+                                    // same suspended state.
+                                    window.scheduler.suspend();
                                 }
                                 _ => {
                                     present_span.finish();
+                                    window.scheduler.feedback_received();
 
                                     log::warn!("Error {error:?} when presenting surface.");
 
@@ -1013,8 +1055,19 @@ async fn run_instance<P>(
                         };
 
                         match window_event {
-                            winit::event::WindowEvent::Resized(_)
-                            | winit::event::WindowEvent::Occluded(false) => {
+                            winit::event::WindowEvent::Resized(_) => {
+                                window.raw.request_redraw();
+                            }
+                            winit::event::WindowEvent::Occluded(true) => {
+                                // "Stop producing frames for fully
+                                // occluded/suspended surfaces" (`phase.md`
+                                // Phase 6): no further redraw is requested
+                                // or submitted while occluded, regardless
+                                // of what was pending.
+                                window.scheduler.suspend();
+                            }
+                            winit::event::WindowEvent::Occluded(false) => {
+                                window.scheduler.resume();
                                 window.raw.request_redraw();
                             }
                             winit::event::WindowEvent::ThemeChanged(theme) => {
@@ -1111,12 +1164,19 @@ async fn run_instance<P>(
                                     redraw_request: _redraw_request,
                                     mouse_interaction,
                                     clipboard: clipboard_requests,
+                                    is_animating,
                                     ..
                                 } => {
                                     window.update_mouse(mouse_interaction);
 
                                     #[cfg(not(feature = "unconditional-rendering"))]
                                     window.request_redraw(_redraw_request);
+
+                                    if is_animating {
+                                        window.scheduler.request_animation();
+                                    } else {
+                                        window.scheduler.stop_animating();
+                                    }
 
                                     run_clipboard(
                                         &mut proxy,

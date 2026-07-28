@@ -1,6 +1,6 @@
 [package]
-name = "iced_program"
-description = "The definition of an iced program"
+name = "aura_program"
+description = "The definition of an aura program"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -19,5 +19,5 @@ debug = []
 time-travel = []
 
 [dependencies]
-iced_graphics.workspace = true
-iced_runtime.workspace = true
+aura_graphics.workspace = true
+aura_runtime.workspace = true

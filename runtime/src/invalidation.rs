@@ -15,7 +15,7 @@
 //!   container's own `Widget::layout`/`Widget::semantics`
 //!   implementation's responsibility to decide, same as today).
 //! - [`Aggregator`] merges [`damage::Request`]s the way
-//!   [`iced_core::Shell::request_damage`] already collects them, except
+//!   [`aura_core::Shell::request_damage`] already collects them, except
 //!   bounded: once more than [`Aggregator::MAX_REGIONS`] distinct areas
 //!   have accumulated, it gives up trying to track them individually and
 //!   reports [`damage::Region::Full`] instead. Unbounded per-region
@@ -59,7 +59,7 @@ pub fn propagate(root: &mut Tree, path: &[usize]) {
 /// falling back to [`damage::Region::Full`] once more than
 /// [`Aggregator::MAX_REGIONS`] distinct areas have been recorded.
 ///
-/// This mirrors [`iced_core::Shell::damage_requests`]' accumulation
+/// This mirrors [`aura_core::Shell::damage_requests`]' accumulation
 /// (append-only, one entry per widget-reported request) but adds the
 /// bound that vocabulary deliberately left to a later phase: `Shell`
 /// itself does no merging or capping, by design (Phase 2's "define the
@@ -71,6 +71,16 @@ pub fn propagate(root: &mut Tree, path: &[usize]) {
 pub struct Aggregator {
     merged: Option<damage::Region>,
     area_count: usize,
+    /// Every cause that contributed.
+    ///
+    /// Kept because `Region` cannot carry it: a first version of this type
+    /// read `request.region` and dropped `request.cause` on the floor, so
+    /// a full redraw arrived at the caller with no reason attached — the
+    /// one case where the reason matters most, and the one case where
+    /// something is definitely wrong.
+    causes: damage::Causes,
+    /// Why precision was abandoned, if it was.
+    fallback: Option<damage::Fallback>,
 }
 
 impl Aggregator {
@@ -91,6 +101,8 @@ impl Aggregator {
         Self {
             merged: None,
             area_count: 0,
+            causes: damage::Causes::empty(),
+            fallback: None,
         }
     }
 
@@ -113,8 +125,22 @@ impl Aggregator {
     }
 
     fn record_with(&mut self, request: damage::Request, counters: Option<&Counters>) {
+        // Recorded for every request, including ones that change nothing
+        // about the region: a frame that was already `Full` still had
+        // reasons, and dropping them once the region saturated would make
+        // the busiest frames the least explicable.
+        self.causes |= damage::Causes::of(request.cause);
+
         match request.region {
             damage::Region::Full => {
+                // The *first* full request wins the explanation. A later
+                // one did not cause the fallback -- the region was already
+                // full -- and overwriting would name whichever widget
+                // happened to run last.
+                if self.fallback.is_none() {
+                    self.fallback = Some(damage::Fallback::Requested(request.cause));
+                }
+
                 self.merged = Some(damage::Region::Full);
             }
             area @ damage::Region::Area(_) => {
@@ -124,6 +150,9 @@ impl Aggregator {
 
                 if self.area_count >= Self::MAX_REGIONS {
                     self.merged = Some(damage::Region::Full);
+                    self.fallback = Some(damage::Fallback::Overflow {
+                        areas: self.area_count,
+                    });
 
                     if let Some(counters) = counters {
                         counters.increment(diagnostics::Phase::DamageFallback);
@@ -143,7 +172,7 @@ impl Aggregator {
 
     /// Records every [`damage::Request`] in `requests`, as a convenience
     /// over calling [`Aggregator::record`] in a loop (e.g. directly on
-    /// [`iced_core::Shell::damage_requests`]'s output).
+    /// [`aura_core::Shell::damage_requests`]'s output).
     pub fn record_all<'a>(&mut self, requests: impl IntoIterator<Item = &'a damage::Request>) {
         for request in requests {
             self.record(*request);
@@ -154,6 +183,25 @@ impl Aggregator {
     /// been recorded yet.
     pub fn region(&self) -> Option<damage::Region> {
         self.merged
+    }
+
+    /// Returns the merged damage *and why*, or `None` if nothing has been
+    /// recorded yet.
+    ///
+    /// Prefer this to [`Aggregator::region`] anywhere the answer might be
+    /// [`damage::Region::Full`]. "Redraw everything" is not a finding;
+    /// "redraw everything because 64 scattered areas overflowed" is.
+    pub fn attribution(&self) -> Option<damage::Attribution> {
+        Some(damage::Attribution {
+            region: self.merged?,
+            causes: self.causes,
+            fallback: self.fallback,
+        })
+    }
+
+    /// Every cause recorded so far.
+    pub fn causes(&self) -> damage::Causes {
+        self.causes
     }
 }
 

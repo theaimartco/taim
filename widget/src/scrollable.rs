@@ -2,10 +2,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } }
+//! # mod aura { pub mod widget { pub use aura_widget::*; } }
 //! # pub type State = ();
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-//! use iced::widget::{column, scrollable, space};
+//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+//! use aura::widget::{column, scrollable, space};
 //!
 //! enum Message {
 //!     // ...
@@ -33,6 +33,7 @@ use crate::core::touch;
 use crate::core::widget;
 use crate::core::widget::operation::{self, Operation};
 use crate::core::widget::tree::{self, Tree};
+use crate::core::widget::visit;
 use crate::core::window;
 use crate::core::{
     self, Background, Color, Element, Event, InputMethod, Layout, Length, Padding, Pixels, Point,
@@ -46,10 +47,10 @@ pub use operation::scrollable::{AbsoluteOffset, RelativeOffset};
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{column, scrollable, space};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{column, scrollable, space};
 ///
 /// enum Message {
 ///     // ...
@@ -512,6 +513,19 @@ where
         }
     }
 
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        visit(&mut visit::Widgets::new(
+            self.content.as_widget_mut(),
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+        ));
+    }
+
     fn operate(
         &mut self,
         tree: &mut Tree,
@@ -804,14 +818,25 @@ where
                         mouse::ScrollDelta::Pixels { x, y } => -Vector::new(x, y),
                     };
 
-                    state.scroll(self.direction.align(delta), bounds, content_bounds);
+                    let aligned_delta = self.direction.align(delta);
+                    let could_move = state.can_scroll(aligned_delta, bounds, content_bounds);
+
+                    state.scroll(aligned_delta, bounds, content_bounds);
 
                     let has_scrolled =
                         notify_scroll(state, &self.on_scroll, bounds, content_bounds, shell);
 
+                    // A scrollable already at the boundary in the
+                    // requested direction lets the event bubble up to an
+                    // ancestor scrollable instead of capturing it, even
+                    // mid-transaction -- otherwise a nested scrollable
+                    // that has reached its limit would keep starving its
+                    // parent of wheel events for the rest of the
+                    // transaction window, despite having nothing left to
+                    // do with them itself.
                     let in_transaction = state.last_scrolled.is_some();
 
-                    if has_scrolled || in_transaction {
+                    if has_scrolled || (in_transaction && could_move) {
                         shell.capture_event();
                     }
                 }
@@ -836,6 +861,15 @@ where
                     if matches!(state.interaction, Interaction::TouchScrolling(_))
                         || (!mouse_over_y_scrollbar && !mouse_over_x_scrollbar) =>
                 {
+                    // A `FingerMoved` that this scrollable cannot act on
+                    // (already at its boundary in the dragged direction)
+                    // releases the event to an ancestor scrollable
+                    // instead of capturing it -- the same bubble-up rule
+                    // `WheelScrolled` follows above, so dragging past a
+                    // nested scrollable's limit naturally continues
+                    // scrolling its parent rather than getting stuck.
+                    let mut should_capture = true;
+
                     match event {
                         touch::Event::FingerPressed { .. } => {
                             let Some(position) = cursor_over_scrollable else {
@@ -860,11 +894,14 @@ where
                                 scroll_box_touched_at.y - cursor_position.y,
                             );
 
-                            state.scroll(self.direction.align(delta), bounds, content_bounds);
+                            let aligned_delta = self.direction.align(delta);
+                            should_capture =
+                                state.can_scroll(aligned_delta, bounds, content_bounds);
+
+                            state.scroll(aligned_delta, bounds, content_bounds);
 
                             state.interaction = Interaction::TouchScrolling(cursor_position);
 
-                            // TODO: bubble up touch movements if not consumed.
                             let _ = notify_scroll(
                                 state,
                                 &self.on_scroll,
@@ -876,7 +913,9 @@ where
                         _ => {}
                     }
 
-                    shell.capture_event();
+                    if should_capture {
+                        shell.capture_event();
+                    }
                 }
                 Event::Mouse(mouse::Event::CursorMoved { position }) => {
                     if let Interaction::AutoScrolling {
@@ -1539,6 +1578,10 @@ impl operation::Scrollable for State {
     fn scroll_by(&mut self, offset: AbsoluteOffset, bounds: Rectangle, content_bounds: Rectangle) {
         State::scroll_by(self, offset, bounds, content_bounds);
     }
+
+    fn adjust_offset(&mut self, delta: Vector, bounds: Rectangle, content_bounds: Rectangle) {
+        State::adjust_offset(self, delta, bounds, content_bounds);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1620,6 +1663,28 @@ impl Viewport {
     pub fn content_bounds(&self) -> Rectangle {
         self.content_bounds
     }
+
+    /// Returns the currently visible region, expressed in the content's
+    /// own local coordinate space (i.e. `(0, 0)` is the content's own
+    /// top-left corner, regardless of where the [`Scrollable`] itself
+    /// sits on screen).
+    ///
+    /// This is the primitive a virtualizing child (e.g. a
+    /// `virtual_list`) needs to decide which of its rows are actually
+    /// visible: it can intersect its own row geometry against this
+    /// [`Rectangle`] without needing to know anything about the
+    /// [`Scrollable`] wrapping it, or about screen-space coordinates at
+    /// all.
+    pub fn visible_bounds(&self) -> Rectangle {
+        let AbsoluteOffset { x, y } = self.absolute_offset();
+
+        Rectangle {
+            x,
+            y,
+            width: self.bounds.width,
+            height: self.bounds.height,
+        }
+    }
 }
 
 impl State {
@@ -1641,6 +1706,35 @@ impl State {
                     .clamp(0.0, content_bounds.width - bounds.width),
             );
         }
+    }
+
+    /// Returns `true` if applying `delta` via [`State::scroll`] would
+    /// actually change the current offset in at least one axis, given
+    /// `bounds` and `content_bounds`.
+    ///
+    /// This is the hook a nested [`Scrollable`] uses to decide whether a
+    /// wheel/touch event that it cannot act on (because it is already at
+    /// the boundary in the requested direction) should still be treated
+    /// as "handled" -- an event this method reports as unable to move
+    /// anything should be released to an ancestor scrollable instead of
+    /// being captured, so scrolling past a nested scrollable's limit
+    /// naturally continues scrolling its parent.
+    fn can_scroll(&self, delta: Vector<f32>, bounds: Rectangle, content_bounds: Rectangle) -> bool {
+        let can_scroll_y = bounds.height < content_bounds.height && {
+            let current = self.offset_y.absolute(bounds.height, content_bounds.height);
+            let max = content_bounds.height - bounds.height;
+
+            (delta.y < 0.0 && current > 0.0) || (delta.y > 0.0 && current < max)
+        };
+
+        let can_scroll_x = bounds.width < content_bounds.width && {
+            let current = self.offset_x.absolute(bounds.width, content_bounds.width);
+            let max = content_bounds.width - bounds.width;
+
+            (delta.x < 0.0 && current > 0.0) || (delta.x > 0.0 && current < max)
+        };
+
+        can_scroll_y || can_scroll_x
     }
 
     fn scroll_y_to(&mut self, percentage: f32, bounds: Rectangle, content_bounds: Rectangle) {
@@ -1676,6 +1770,25 @@ impl State {
     /// Scroll by the provided [`AbsoluteOffset`].
     fn scroll_by(&mut self, offset: AbsoluteOffset, bounds: Rectangle, content_bounds: Rectangle) {
         self.scroll(Vector::new(offset.x, offset.y), bounds, content_bounds);
+    }
+
+    /// Shifts the current offset by `delta` without going through
+    /// [`State::scroll`]'s user-scroll semantics: unlike
+    /// [`State::scroll_by`] (a wheel/touch-shaped movement subject to the
+    /// same clamping a real scroll gesture would see), this always
+    /// normalizes to [`Offset::Absolute`] first, so a
+    /// [`Offset::Relative`] (percentage-based) offset -- which would
+    /// otherwise silently reinterpret the same percentage against the
+    /// new `content_bounds`, producing a different pixel position than
+    /// intended -- is pinned to its current pixel position before the
+    /// correction is applied.
+    fn adjust_offset(&mut self, delta: Vector, bounds: Rectangle, content_bounds: Rectangle) {
+        self.offset_x =
+            Offset::Absolute(self.offset_x.absolute(bounds.width, content_bounds.width));
+        self.offset_y =
+            Offset::Absolute(self.offset_y.absolute(bounds.height, content_bounds.height));
+
+        self.scroll(delta, bounds, content_bounds);
     }
 
     /// Unsnaps the current scroll position, if snapped, given the bounds of the

@@ -1,5 +1,6 @@
 //! Store internal widget state in a state tree to ensure continuity.
 use crate::layout;
+use crate::widget::Id;
 use crate::{Rectangle, Transformation, Widget, semantics};
 
 use std::any::{self, Any};
@@ -71,6 +72,27 @@ pub struct Tree {
     /// distinguished from "not computed yet" or a widget with no
     /// semantics would recompute on every call despite being clean.
     cached_semantics: Option<Option<semantics::Node>>,
+
+    /// This node's stable identity, for the lifetime of the [`Tree`].
+    ///
+    /// Minted once, when the node is created, and never regenerated:
+    /// reconciliation (`diff_children_custom`) reuses existing [`Tree`]
+    /// nodes in place rather than rebuilding them, so this survives
+    /// ordinary view reconstruction exactly as a widget's own [`State`]
+    /// does.
+    ///
+    /// That is precisely the guarantee `phase.md` Phase 13 requires --
+    /// "semantic IDs remain stable across ordinary view reconstruction" --
+    /// and it is why a widget can report semantics at all: an
+    /// [`aura_core::semantics::Node`] must carry an identity, and a
+    /// freshly-generated one per frame would make every node look new to
+    /// an assistive technology on every repaint.
+    ///
+    /// A node whose position in the tree changes such that reconciliation
+    /// cannot match it (a keyed list reordering without keys, say) gets a
+    /// new [`Tree`] and therefore a new identity -- which is correct: it
+    /// is, as far as the framework can tell, a different widget.
+    id: Id,
 }
 
 impl Tree {
@@ -87,6 +109,7 @@ impl Tree {
             cached_clip: None,
             cached_layout: None,
             cached_semantics: None,
+            id: Id::unique(),
         }
     }
 
@@ -138,6 +161,7 @@ impl Tree {
             cached_clip: None,
             cached_layout: None,
             cached_semantics: None,
+            id: Id::unique(),
         }
     }
 
@@ -160,6 +184,18 @@ impl Tree {
         }
 
         new.borrow_mut().diff(self);
+    }
+
+    /// Returns this node's stable identity.
+    ///
+    /// Stable for the lifetime of the [`Tree`], which -- because
+    /// reconciliation reuses nodes in place -- means stable across
+    /// ordinary view reconstruction. This is the identity a widget's
+    /// [`Widget::semantics`](crate::Widget::semantics) reports, and what
+    /// lets an assistive technology recognise a control as *the same
+    /// control* between frames.
+    pub fn id(&self) -> &Id {
+        &self.id
     }
 
     /// Returns the current [`Revision`] of this [`Tree`].
@@ -279,7 +315,7 @@ impl Tree {
     /// layout constraints the way its measured size does, so
     /// [`DirtyFlags::SEMANTICS`] alone determines reuse. A caller (or the
     /// container assembling a full semantic tree, see
-    /// `iced_runtime::semantics`) is responsible for calling
+    /// `aura_runtime::semantics`) is responsible for calling
     /// [`Tree::mark_dirty`] with [`DirtyFlags::SEMANTICS`] whenever
     /// something that would change this node's own reported semantics
     /// changes (its label, value, state, ...); [`Tree`] cannot detect
@@ -287,7 +323,7 @@ impl Tree {
     /// [`DirtyFlags::SEMANTICS`] already set.
     ///
     /// This method never recurses into children -- composing a full
-    /// subtree from per-node results is `iced_runtime::semantics`'s job,
+    /// subtree from per-node results is `aura_runtime::semantics`'s job,
     /// exactly as `hit_test`'s `Hoverable` adapter composes a path from
     /// per-node `contains` checks rather than `Tree` walking children
     /// itself.
@@ -862,5 +898,57 @@ mod semantics_cache_tests {
 
         assert_eq!(calls, 0, "a clean None result must also be reused as-is");
         assert_eq!(node, None);
+    }
+}
+
+#[cfg(test)]
+mod identity_tests {
+    use super::*;
+
+    #[test]
+    fn a_fresh_tree_has_a_unique_identity() {
+        assert_ne!(Tree::empty().id(), Tree::empty().id());
+    }
+
+    #[test]
+    fn identity_survives_reconciliation_of_children() {
+        // The property everything else depends on: `diff_children_custom`
+        // reuses nodes in place, so their identities must persist. If they
+        // did not, every semantic node would look new to an assistive
+        // technology on every repaint.
+        let mut parent = Tree::empty();
+        parent.children = vec![Tree::empty(), Tree::empty()];
+
+        let before: Vec<Id> = parent.children.iter().map(|c| c.id().clone()).collect();
+
+        // Reconcile against the same number of children.
+        let mut new_children = [(), ()];
+        parent.diff_children_custom(&mut new_children, |_, _| {}, |_| Tree::empty());
+
+        let after: Vec<Id> = parent.children.iter().map(|c| c.id().clone()).collect();
+
+        assert_eq!(before, after, "reconciliation must not remint identities");
+    }
+
+    #[test]
+    fn a_newly_grown_child_gets_a_fresh_identity() {
+        let mut parent = Tree::empty();
+        parent.children = vec![Tree::empty()];
+        let existing = parent.children[0].id().clone();
+
+        let mut new_children = [(), ()];
+        parent.diff_children_custom(&mut new_children, |_, _| {}, |_| Tree::empty());
+
+        assert_eq!(parent.children.len(), 2);
+        assert_eq!(
+            parent.children[0].id(),
+            &existing,
+            "the surviving child keeps its identity"
+        );
+        assert_ne!(
+            parent.children[1].id(),
+            &existing,
+            "the new child is genuinely new"
+        );
     }
 }

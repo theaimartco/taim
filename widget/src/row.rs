@@ -4,19 +4,33 @@ use crate::core::layout::{self, Layout};
 use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
-use crate::core::widget::{Operation, Tree};
+use crate::core::widget::visit;
+use crate::core::widget::{self, Operation, Tree};
 use crate::core::{
     Element, Event, Length, Padding, Pixels, Rectangle, Shell, Size, Vector, Widget,
 };
+
+/// The internal, per-instance state of a [`Row`]: a bounded measure
+/// cache keyed on the [`layout::Limits`] it is asked to resolve under.
+///
+/// A fresh [`Row`] (or one whose children changed shape, see
+/// [`Widget::diff`]) starts with an empty cache, so the first `layout`
+/// call after any structural change always computes for real; only a
+/// `layout` call under previously-seen [`layout::Limits`] with an
+/// unchanged set of children can take the fast, cached path.
+#[derive(Debug, Default)]
+struct State {
+    cache: layout::Cache,
+}
 
 /// A container that distributes its contents horizontally.
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{button, row};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{button, row};
 ///
 /// #[derive(Debug, Clone)]
 /// enum Message {
@@ -85,7 +99,7 @@ where
 
     /// Sets the horizontal spacing _between_ elements.
     ///
-    /// Custom margins per element do not exist in iced. You should use this
+    /// Custom margins per element do not exist in aura. You should use this
     /// method instead! While less flexible, it helps you keep spacing between
     /// elements consistent.
     pub fn spacing(mut self, amount: impl Into<Pixels>) -> Self {
@@ -177,8 +191,28 @@ impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
 where
     Renderer: crate::core::Renderer,
 {
+    fn tag(&self) -> widget::tree::Tag {
+        widget::tree::Tag::of::<State>()
+    }
+
+    fn state(&self) -> widget::tree::State {
+        widget::tree::State::new(State::default())
+    }
+
     fn diff(&mut self, tree: &mut Tree) {
         tree.diff_children(&mut self.children);
+
+        // No widget's `diff` currently reports fine-grained "my content
+        // changed in a way that affects measurement" (see
+        // `widget::tree::Tree::layout_with_cache`'s own documentation:
+        // this is unwired even for the single-slot cache it provides).
+        // Until that lands, any `diff` pass is conservatively assumed to
+        // be able to invalidate a child's measurement, so the cache is
+        // cleared here rather than risk serving a stale `Node` for
+        // changed content. This still lets `layout` calls that happen
+        // *without* an intervening `diff` (e.g. `UserInterface::relayout`
+        // re-measuring an otherwise-untouched tree) hit the cache.
+        tree.state.downcast_mut::<State>().cache.clear();
 
         if self.width.is_fit() || self.height.is_fit() {
             for child in &self.children {
@@ -203,18 +237,54 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        layout::flex::resolve(
+        let fingerprint = layout::cache::Fingerprint::build(|hasher| {
+            hasher.write_usize(self.children.len());
+            self.width.hash_stable(hasher);
+            self.height.hash_stable(hasher);
+            hasher.write_u32(self.spacing.to_bits());
+        });
+
+        let state = tree.state.downcast_mut::<State>();
+        let children = &mut self.children;
+        let padding = self.padding;
+        let spacing = self.spacing;
+        let align = self.align;
+        let width = self.width;
+        let height = self.height;
+
+        layout::flex::resolve_cached(
+            &mut state.cache,
+            fingerprint,
             layout::flex::Axis::Horizontal,
             renderer,
             limits,
-            self.width,
-            self.height,
-            self.padding,
-            self.spacing,
-            self.align,
-            &mut self.children,
+            width,
+            height,
+            padding,
+            spacing,
+            align,
+            children,
             &mut tree.children,
         )
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        self.children
+            .iter_mut()
+            .zip(&mut tree.children)
+            .zip(layout.children())
+            .for_each(|((child, state), layout)| {
+                visit(&mut visit::Widgets::new(
+                    child.as_widget_mut(),
+                    state,
+                    layout,
+                ));
+            });
     }
 
     fn operate(
@@ -374,6 +444,14 @@ impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
 where
     Renderer: crate::core::Renderer,
 {
+    fn tag(&self) -> widget::tree::Tag {
+        self.row.tag()
+    }
+
+    fn state(&self) -> widget::tree::State {
+        self.row.state()
+    }
+
     fn diff(&mut self, tree: &mut Tree) {
         self.row.diff(tree);
     }
@@ -490,6 +568,15 @@ where
         let size = limits.resolve(self.row.width, self.row.height, intrinsic_size);
 
         layout::Node::with_children(size.expand(self.row.padding), children)
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        self.row.visit_children(tree, layout, visit);
     }
 
     fn operate(

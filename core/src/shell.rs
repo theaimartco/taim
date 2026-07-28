@@ -1,5 +1,6 @@
-//! Communicate with the iced runtime from widgets.
+//! Communicate with the aura runtime from widgets.
 use crate::clipboard;
+use crate::damage;
 use crate::event;
 use crate::window;
 use crate::{Clipboard, InputMethod, Window};
@@ -22,6 +23,9 @@ pub struct Shell<'a, Message> {
     input_method: InputMethod,
     is_layout_invalid: Option<Diff>,
     are_widgets_invalid: bool,
+    is_semantics_invalid: bool,
+    damage_requests: Vec<damage::Request>,
+    is_animating: bool,
     clipboard: Clipboard,
 }
 
@@ -36,6 +40,9 @@ impl<'a, Message> Shell<'a, Message> {
             redraw_request: window::RedrawRequest::Wait,
             is_layout_invalid: None,
             are_widgets_invalid: false,
+            is_semantics_invalid: false,
+            damage_requests: Vec::new(),
+            is_animating: false,
             input_method: InputMethod::Disabled,
             clipboard: Clipboard {
                 reads: Vec::new(),
@@ -118,6 +125,29 @@ impl<'a, Message> Shell<'a, Message> {
         shell.redraw_request = redraw_request;
     }
 
+    /// Declares that continuous redraws are needed (e.g. an in-progress
+    /// animation), rather than a single one-shot redraw.
+    ///
+    /// This is the "widgets never create independent render loops" rule
+    /// (`phase.md` Phase 6) made explicit: a widget with an active
+    /// animation calls this every time it updates (alongside
+    /// [`Shell::request_redraw`], which it should still call to get the
+    /// next frame scheduled) so a frame scheduler
+    /// (`runtime::frame_scheduler::Scheduler`) can tell "one more frame
+    /// is needed" apart from "frames are needed continuously until this
+    /// stops being called," instead of inferring a loop from the mere
+    /// repetition of one-shot requests.
+    pub fn request_animation(&mut self) {
+        self.is_animating = true;
+    }
+
+    /// Returns whether continuous redraws have been requested on this
+    /// [`Shell`] (see [`Shell::request_animation`]).
+    #[must_use]
+    pub fn is_animating(&self) -> bool {
+        self.is_animating
+    }
+
     /// Requests the runtime to read the clipboard contents expecting the given [`clipboard::Kind`].
     ///
     /// The runtime will produce a [`clipboard::Event::Read`] when the contents have been read.
@@ -197,6 +227,48 @@ impl<'a, Message> Shell<'a, Message> {
         self.are_widgets_invalid = true;
     }
 
+    /// Returns whether the semantic tree of the current application has
+    /// been invalidated.
+    #[must_use]
+    pub fn is_semantics_invalid(&self) -> bool {
+        self.is_semantics_invalid
+    }
+
+    /// Invalidates the current application's semantic tree (see
+    /// [`crate::semantics`]).
+    ///
+    /// The shell will recompute semantics before the next presentation to
+    /// assistive technology. There is no consumer of this yet -- Phase
+    /// 13 is the first phase that reads [`Shell::is_semantics_invalid`];
+    /// until then, calling this only records the request.
+    pub fn invalidate_semantics(&mut self) {
+        self.is_semantics_invalid = true;
+    }
+
+    /// Requests that the given [`damage::Request`] be applied.
+    ///
+    /// Until Phase 4 lands real damage-region tracking, every
+    /// [`damage::Request`] conservatively invalidates the entire redraw
+    /// path (equivalent to calling [`Shell::request_redraw`]) rather
+    /// than attempting to track precise regions -- the request is still
+    /// recorded (see [`Shell::damage_requests`]) so a later phase can
+    /// switch this method's body over to precise tracking without
+    /// changing any widget's call site.
+    pub fn request_damage(&mut self, request: damage::Request) {
+        self.damage_requests.push(request);
+        self.request_redraw();
+    }
+
+    /// Returns every [`damage::Request`] accumulated on this [`Shell`]
+    /// so far.
+    ///
+    /// No runtime consumes this yet; it exists so damage requests are
+    /// not silently dropped once widgets start producing them, ahead of
+    /// Phase 4 wiring a real consumer.
+    pub fn damage_requests(&self) -> &[damage::Request] {
+        &self.damage_requests
+    }
+
     /// Merges the current [`Shell`] with another one by applying the given
     /// function to the messages of the latter.
     ///
@@ -210,6 +282,9 @@ impl<'a, Message> Shell<'a, Message> {
         };
 
         self.are_widgets_invalid = self.are_widgets_invalid || other.are_widgets_invalid;
+        self.is_semantics_invalid = self.is_semantics_invalid || other.is_semantics_invalid;
+        self.is_animating = self.is_animating || other.is_animating;
+        self.damage_requests.append(&mut other.damage_requests);
         self.redraw_request = self.redraw_request.min(other.redraw_request);
         self.event_status = self.event_status.merge(other.event_status);
 
@@ -218,7 +293,7 @@ impl<'a, Message> Shell<'a, Message> {
     }
 }
 
-/// A waker can be used to wake up the iced runtime and, consequently, trigger
+/// A waker can be used to wake up the aura runtime and, consequently, trigger
 /// wake events concurrently from widget logic.
 #[derive(Clone)]
 pub struct Waker {
@@ -238,7 +313,7 @@ impl Waker {
         Self::new(|| {})
     }
 
-    /// Wakes up the iced runtime as soon as possible.
+    /// Wakes up the aura runtime as soon as possible.
     ///
     /// You normally want to call this concurrently (e.g. from a different thread).
     pub fn wake(&self) {
@@ -259,4 +334,121 @@ pub enum Diff {
     Skip,
     /// Performs diffing again before layouting.
     Perform,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::damage::{Cause, Region, Request};
+    use crate::window;
+
+    fn shell(messages: &mut Vec<()>) -> Shell<'_, ()> {
+        Shell::new(&window::Headless, Waker::noop(), messages)
+    }
+
+    #[test]
+    fn a_fresh_shell_has_no_invalid_semantics_or_damage() {
+        let mut messages = Vec::new();
+        let shell = shell(&mut messages);
+
+        assert!(!shell.is_semantics_invalid());
+        assert!(shell.damage_requests().is_empty());
+    }
+
+    #[test]
+    fn invalidate_semantics_sets_the_flag() {
+        let mut messages = Vec::new();
+        let mut shell = shell(&mut messages);
+
+        shell.invalidate_semantics();
+
+        assert!(shell.is_semantics_invalid());
+    }
+
+    #[test]
+    fn request_damage_records_the_request_and_requests_a_redraw() {
+        let mut messages = Vec::new();
+        let mut shell = shell(&mut messages);
+
+        let request = Request::full(Cause::Content);
+        shell.request_damage(request);
+
+        assert_eq!(shell.damage_requests(), &[request]);
+        assert_eq!(shell.redraw_request(), window::RedrawRequest::NextFrame);
+    }
+
+    #[test]
+    fn merge_combines_semantics_invalidation_and_damage_requests() {
+        let mut messages_a = Vec::new();
+        let mut main_shell = shell(&mut messages_a);
+
+        let mut messages_b = Vec::new();
+        let mut other = shell(&mut messages_b);
+        other.invalidate_semantics();
+        other.request_damage(Request::full(Cause::Layout));
+
+        main_shell.merge(other, |message| message);
+
+        assert!(main_shell.is_semantics_invalid());
+        assert_eq!(main_shell.damage_requests().len(), 1);
+        assert_eq!(main_shell.damage_requests()[0].cause, Cause::Layout);
+    }
+
+    #[test]
+    fn request_damage_accepts_an_area_region() {
+        let mut messages = Vec::new();
+        let mut shell = shell(&mut messages);
+
+        let bounds = crate::Rectangle::new(crate::Point::ORIGIN, crate::Size::new(10.0, 10.0));
+        let region = Region::area(bounds).expect("well-formed bounds");
+
+        shell.request_damage(Request::new(region, Cause::Interaction));
+
+        assert_eq!(shell.damage_requests()[0].region, region);
+    }
+
+    #[test]
+    fn a_fresh_shell_is_not_animating() {
+        let mut messages = Vec::new();
+        let shell = shell(&mut messages);
+
+        assert!(!shell.is_animating());
+    }
+
+    #[test]
+    fn request_animation_sets_the_flag() {
+        let mut messages = Vec::new();
+        let mut shell = shell(&mut messages);
+
+        shell.request_animation();
+
+        assert!(shell.is_animating());
+    }
+
+    #[test]
+    fn merge_combines_animation_requests() {
+        let mut messages_a = Vec::new();
+        let mut main_shell = shell(&mut messages_a);
+
+        let mut messages_b = Vec::new();
+        let mut other = shell(&mut messages_b);
+        other.request_animation();
+
+        main_shell.merge(other, |message| message);
+
+        assert!(main_shell.is_animating());
+    }
+
+    #[test]
+    fn merge_without_either_side_animating_stays_not_animating() {
+        let mut messages_a = Vec::new();
+        let mut main_shell = shell(&mut messages_a);
+
+        let mut messages_b = Vec::new();
+        let other = shell(&mut messages_b);
+
+        main_shell.merge(other, |message| message);
+
+        assert!(!main_shell.is_animating());
+    }
 }

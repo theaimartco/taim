@@ -4,22 +4,22 @@
 //! "changing one leaf in a 10,000-node synthetic tree lays out/paints
 //! only the required path/subtree." It builds a synthetic tree of
 //! `Leaf`/`Branch` test widgets that cooperate with
-//! `iced_core::widget::tree::Tree::layout_with_cache` (added in this
+//! `aura_core::widget::tree::Tree::layout_with_cache` (added in this
 //! phase's second commit), instruments every leaf's layout call with a
 //! shared counter, and asserts that re-laying-out the tree after
 //! touching exactly one leaf only re-measures that leaf and its
 //! ancestors -- never a sibling subtree.
 //!
-//! This does **not** prove that iced's shipped, production widgets
+//! This does **not** prove that aura's shipped, production widgets
 //! (`Column`, `Row`, `Container`, ...) get this speedup today -- none of
 //! them call `layout_with_cache` yet, since retrofitting every widget is
 //! out of this phase's scope (see `docs/architecture/widget-lifecycle.md`).
 //! It proves the mechanism itself is correct and safe to adopt.
 
-use iced::advanced::widget::{self, Widget};
-use iced::advanced::{Layout, mouse, renderer};
-use iced::{Element, Length, Point, Rectangle, Size, Theme};
-use iced_renderer::Renderer;
+use aura::advanced::widget::{self, Widget};
+use aura::advanced::{Layout, mouse, renderer};
+use aura::{Element, Length, Point, Rectangle, Size, Theme};
+use aura_renderer::Renderer;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -71,15 +71,15 @@ impl<Message> Widget<Message, Theme, Renderer> for Leaf {
         &mut self,
         tree: &mut widget::Tree,
         _renderer: &Renderer,
-        limits: &iced::advanced::layout::Limits,
-    ) -> iced::advanced::layout::Node {
+        limits: &aura::advanced::layout::Limits,
+    ) -> aura::advanced::layout::Node {
         let counters = self.counters.clone();
         let index = self.index;
         let size = self.size;
 
         tree.layout_with_cache(*limits, move |_tree| {
             counters.record(index);
-            iced::advanced::layout::Node::new(Size::new(size, size))
+            aura::advanced::layout::Node::new(Size::new(size, size))
         })
     }
 
@@ -123,8 +123,8 @@ impl<Message> Widget<Message, Theme, Renderer> for Branch<Message> {
         &mut self,
         tree: &mut widget::Tree,
         renderer: &Renderer,
-        limits: &iced::advanced::layout::Limits,
-    ) -> iced::advanced::layout::Node {
+        limits: &aura::advanced::layout::Limits,
+    ) -> aura::advanced::layout::Node {
         if tree.children.len() != self.children.len() {
             tree.children = self
                 .children
@@ -161,7 +161,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Branch<Message> {
             })
             .collect();
 
-        iced::advanced::layout::Node::with_children(Size::new(width, height), positioned)
+        aura::advanced::layout::Node::with_children(Size::new(width, height), positioned)
     }
 
     fn draw(
@@ -208,9 +208,9 @@ fn build_tree(counters: &LayoutCounters) -> Element<'static, ()> {
 }
 
 fn headless_renderer() -> Renderer {
-    iced_futures::futures::executor::block_on(
-        <Renderer as iced::advanced::renderer::Headless>::new(
-            iced::advanced::renderer::Settings::default(),
+    aura_futures::futures::executor::block_on(
+        <Renderer as aura::advanced::renderer::Headless>::new(
+            aura::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -221,7 +221,7 @@ fn headless_renderer() -> Renderer {
 fn changing_one_leaf_only_recomputes_that_leaf() {
     let counters = LayoutCounters::new(LEAF_COUNT);
     let renderer = headless_renderer();
-    let limits = iced::advanced::layout::Limits::new(Size::ZERO, Size::new(2000.0, 200_000.0));
+    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(2000.0, 200_000.0));
 
     let mut root = build_tree(&counters);
     let mut tree = widget::Tree::new(root.as_widget());
@@ -295,12 +295,12 @@ fn different_limits_recompute_every_leaf_even_when_clean() {
     let mut tree = widget::Tree::new(root.as_widget());
     tree.diff(root.as_widget_mut());
 
-    let limits_a = iced::advanced::layout::Limits::new(Size::ZERO, Size::new(2000.0, 200_000.0));
+    let limits_a = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(2000.0, 200_000.0));
     let _ = root.as_widget_mut().layout(&mut tree, &renderer, &limits_a);
 
     assert_eq!(counters.total_calls(), LEAF_COUNT as u32);
 
-    let limits_b = iced::advanced::layout::Limits::new(Size::ZERO, Size::new(1000.0, 100_000.0));
+    let limits_b = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(1000.0, 100_000.0));
     let _ = root.as_widget_mut().layout(&mut tree, &renderer, &limits_b);
 
     assert_eq!(
@@ -316,7 +316,7 @@ fn different_limits_recompute_every_leaf_even_when_clean() {
 fn a_leaf_marked_dirty_twice_is_only_measured_once_per_layout_pass() {
     let counters = LayoutCounters::new(LEAF_COUNT);
     let renderer = headless_renderer();
-    let limits = iced::advanced::layout::Limits::new(Size::ZERO, Size::new(2000.0, 200_000.0));
+    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(2000.0, 200_000.0));
 
     let mut root = build_tree(&counters);
     let mut tree = widget::Tree::new(root.as_widget());
@@ -330,4 +330,294 @@ fn a_leaf_marked_dirty_twice_is_only_measured_once_per_layout_pass() {
     let _ = root.as_widget_mut().layout(&mut tree, &renderer, &limits);
 
     assert_eq!(counters.calls(0), 2);
+}
+
+// Phase 7 gives `Row`/`Column`/`Stack` their own persistent
+// `layout::Cache` (see `widget/src/row.rs`'s internal `State`), closing
+// part of the gap this file's own module doc called out: unlike Phase
+// 3's `layout_with_cache` (still unused by production containers),
+// these caches are wired into real, shipped widgets. The tests below
+// prove that cache's two-sided contract: a `layout` call repeated
+// without an intervening `diff` must reuse the cached result (skipping
+// every child's own `layout`), while a `diff` -- modeling "content may
+// have changed" -- must force a real recompute even under identical
+// [`aura::advanced::layout::Limits`].
+
+/// A leaf with no caching of its own -- unlike [`Leaf`] (which wraps
+/// [`widget::Tree::layout_with_cache`] and so would mask a container's
+/// own cache behind its own single-slot one), every call to
+/// [`SimpleLeaf::layout`] always increments its counter, making it the
+/// right instrument for testing whether a *container* (`Row`, `Column`,
+/// `Stack`) actually calls a child's `layout` at all, rather than
+/// whether the child itself happens to reuse a result internally.
+struct SimpleLeaf {
+    index: usize,
+    size: f32,
+    counters: LayoutCounters,
+}
+
+impl<Message> Widget<Message, Theme, Renderer> for SimpleLeaf {
+    fn size(&self) -> Size<Length> {
+        Size::new(Length::Fixed(self.size), Length::Fixed(self.size))
+    }
+
+    fn layout(
+        &mut self,
+        _tree: &mut widget::Tree,
+        _renderer: &Renderer,
+        _limits: &aura::advanced::layout::Limits,
+    ) -> aura::advanced::layout::Node {
+        self.counters.record(self.index);
+
+        aura::advanced::layout::Node::new(Size::new(self.size, self.size))
+    }
+
+    fn draw(
+        &self,
+        _tree: &widget::Tree,
+        _renderer: &mut Renderer,
+        _theme: &Theme,
+        _style: &renderer::Style,
+        _layout: Layout<'_>,
+        _cursor: mouse::Cursor,
+        _viewport: &Rectangle,
+    ) {
+    }
+}
+
+fn leaf(index: usize, size: f32, counters: &LayoutCounters) -> Element<'static, ()> {
+    Element::new(SimpleLeaf {
+        index,
+        size,
+        counters: counters.clone(),
+    })
+}
+
+#[test]
+fn a_real_row_reuses_its_cache_across_layout_calls_with_no_diff_in_between() {
+    use aura::widget::row;
+
+    let counters = LayoutCounters::new(3);
+    let renderer = headless_renderer();
+    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
+
+    let mut element: Element<'static, ()> = row((0..3).map(|i| leaf(i, 10.0, &counters))).into();
+
+    let mut tree = widget::Tree::new(element.as_widget());
+    element.as_widget_mut().diff(&mut tree);
+
+    let _ = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &limits);
+    assert_eq!(
+        counters.total_calls(),
+        3,
+        "the first layout pass must measure every child exactly once"
+    );
+
+    let _ = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &limits);
+    assert_eq!(
+        counters.total_calls(),
+        3,
+        "a second layout pass under identical limits, with no diff in between, must be \
+         a cache hit and must not re-measure any child"
+    );
+}
+
+#[test]
+fn a_real_column_reuses_its_cache_across_layout_calls_with_no_diff_in_between() {
+    use aura::widget::column;
+
+    let counters = LayoutCounters::new(3);
+    let renderer = headless_renderer();
+    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
+
+    let mut element: Element<'static, ()> = column((0..3).map(|i| leaf(i, 10.0, &counters))).into();
+
+    let mut tree = widget::Tree::new(element.as_widget());
+    element.as_widget_mut().diff(&mut tree);
+
+    let _ = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &limits);
+    assert_eq!(counters.total_calls(), 3);
+
+    let _ = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &limits);
+    assert_eq!(
+        counters.total_calls(),
+        3,
+        "a second layout pass under identical limits, with no diff in between, must be \
+         a cache hit and must not re-measure any child"
+    );
+}
+
+#[test]
+fn a_row_recomputes_after_diff_even_under_identical_limits() {
+    use aura::widget::row;
+
+    let counters = LayoutCounters::new(3);
+    let renderer = headless_renderer();
+    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
+
+    let mut element: Element<'static, ()> = row((0..3).map(|i| leaf(i, 10.0, &counters))).into();
+
+    let mut tree = widget::Tree::new(element.as_widget());
+    element.as_widget_mut().diff(&mut tree);
+
+    let _ = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &limits);
+    assert_eq!(counters.total_calls(), 3);
+
+    // A `diff` pass -- modeling a `view` re-run where a leaf's content
+    // may have changed -- must invalidate the cache, even though the
+    // `Limits` given to the next `layout` call are byte-for-byte
+    // identical to before.
+    element.as_widget_mut().diff(&mut tree);
+
+    let _ = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &limits);
+    assert_eq!(
+        counters.total_calls(),
+        6,
+        "a diff pass must force every child to be re-measured on the next layout, since \
+         Row/Column cannot yet observe fine-grained per-child content changes (see \
+         Row::diff's own comment) and must conservatively assume any diff could invalidate \
+         the cached measurement"
+    );
+}
+
+#[test]
+fn a_row_recomputes_when_limits_actually_change() {
+    use aura::widget::row;
+
+    let counters = LayoutCounters::new(3);
+    let renderer = headless_renderer();
+
+    let mut element: Element<'static, ()> = row((0..3).map(|i| leaf(i, 10.0, &counters))).into();
+
+    let mut tree = widget::Tree::new(element.as_widget());
+    element.as_widget_mut().diff(&mut tree);
+
+    let limits_a = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
+    let _ = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &limits_a);
+    assert_eq!(counters.total_calls(), 3);
+
+    let limits_b = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(300.0, 300.0));
+    let _ = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &limits_b);
+    assert_eq!(
+        counters.total_calls(),
+        6,
+        "different limits must always recompute, even with no diff in between"
+    );
+}
+
+#[test]
+fn a_row_cache_survives_a_handful_of_recurring_limits_without_thrashing() {
+    use aura::widget::row;
+
+    let counters = LayoutCounters::new(3);
+    let renderer = headless_renderer();
+
+    let mut element: Element<'static, ()> = row((0..3).map(|i| leaf(i, 10.0, &counters))).into();
+
+    let mut tree = widget::Tree::new(element.as_widget());
+    element.as_widget_mut().diff(&mut tree);
+
+    let limits_a = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
+    let limits_b = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(300.0, 300.0));
+
+    // Oscillate between two recurring limits (e.g. a resize settling
+    // back and forth), with no diff in between -- the default capacity
+    // (4) must be enough to keep both cached rather than thrashing to
+    // zero reuse.
+    for _ in 0..5 {
+        let _ = element
+            .as_widget_mut()
+            .layout(&mut tree, &renderer, &limits_a);
+        let _ = element
+            .as_widget_mut()
+            .layout(&mut tree, &renderer, &limits_b);
+    }
+
+    assert_eq!(
+        counters.total_calls(),
+        6,
+        "only the first visit to each of the two recurring limits should ever measure \
+         a child; every later visit to either one must be a cache hit"
+    );
+}
+
+#[test]
+fn a_real_stack_reuses_its_base_layer_cache_across_layout_calls_with_no_diff_in_between() {
+    use aura::widget::stack;
+
+    let counters = LayoutCounters::new(2);
+    let renderer = headless_renderer();
+    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
+
+    let mut element: Element<'static, ()> =
+        stack([leaf(0, 50.0, &counters), leaf(1, 20.0, &counters)]).into();
+
+    let mut tree = widget::Tree::new(element.as_widget());
+    element.as_widget_mut().diff(&mut tree);
+
+    let _ = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &limits);
+    assert_eq!(counters.total_calls(), 2);
+
+    let _ = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &limits);
+    assert_eq!(
+        counters.calls(0),
+        1,
+        "the base layer's own measurement must be served from `Stack`'s cache on a \
+         second layout pass with no diff in between"
+    );
+}
+
+#[test]
+fn a_real_grid_reuses_its_track_cache_across_layout_calls_with_no_diff_in_between() {
+    use aura::widget::grid;
+
+    let counters = LayoutCounters::new(6);
+    let renderer = headless_renderer();
+    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(300.0, 300.0));
+
+    let mut element: Element<'static, ()> = grid((0..6).map(|i| leaf(i, 10.0, &counters)))
+        .columns(3)
+        .into();
+
+    let mut tree = widget::Tree::new(element.as_widget());
+    element.as_widget_mut().diff(&mut tree);
+
+    let first = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &limits);
+    let second = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &limits);
+
+    // `Grid`'s track cache does not skip children's own `layout` calls
+    // (each cell is still measured individually every pass -- only the
+    // track geometry itself, i.e. cells-per-row/cell-size/row-count, is
+    // cached), but repeating the same call under an unchanged `Track`
+    // must still produce byte-identical geometry.
+    assert_eq!(first.size(), second.size());
+    assert_eq!(first.children().len(), second.children().len());
+
+    for (a, b) in first.children().iter().zip(second.children()) {
+        assert_eq!(a.bounds(), b.bounds());
+    }
 }

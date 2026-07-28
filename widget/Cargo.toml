@@ -1,6 +1,6 @@
 [package]
-name = "iced_widget"
-description = "The built-in widgets for iced"
+name = "aura_widget"
+description = "The built-in widgets for aura"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -18,19 +18,31 @@ rustdoc-args = ["--cfg", "docsrs"]
 all-features = true
 
 [features]
+# Makes `aura_design::Theme` a first-class aura theme: every widget with
+# an Aura counterpart resolves its style from Aura's semantic tokens
+# instead of aura's built-in palette. Off by default so an application
+# that only wants upstream aura does not pay for the design system.
+aura = ["dep:aura-design"]
 lazy = ["ouroboros"]
-image = ["iced_renderer/image"]
-svg = ["iced_renderer/svg"]
-canvas = ["iced_renderer/geometry"]
+image = ["aura_renderer/image"]
+svg = ["aura_renderer/svg"]
+canvas = ["aura_renderer/geometry"]
 qr_code = ["canvas", "dep:qrcode"]
-wgpu = ["iced_renderer/wgpu-bare"]
+wgpu = ["aura_renderer/wgpu-bare"]
 markdown = ["dep:pulldown-cmark"]
-highlighter = ["dep:iced_highlighter"]
 advanced = []
+# Declared with no backing dependency: `aura_highlighter` is absent from
+# this checkout (see docs/architecture/path-map.md). Keeping the feature
+# name declared (rather than deleting the `#[cfg(feature = "highlighter")]`
+# call sites in markdown.rs/text_editor.rs) lets syntax highlighting come
+# back by adding the dependency, with no source changes, if a later phase
+# restores an Aura-owned highlighter crate.
+highlighter = []
 
 [dependencies]
-iced_renderer.workspace = true
-iced_runtime.workspace = true
+aura-design = { workspace = true, optional = true }
+aura_renderer.workspace = true
+aura_runtime.workspace = true
 
 num-traits.workspace = true
 log.workspace = true
@@ -46,6 +58,3 @@ qrcode.optional = true
 
 pulldown-cmark.workspace = true
 pulldown-cmark.optional = true
-
-iced_highlighter.workspace = true
-iced_highlighter.optional = true

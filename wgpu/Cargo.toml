@@ -1,6 +1,6 @@
 [package]
-name = "iced_wgpu"
-description = "A renderer for iced on top of wgpu"
+name = "aura_wgpu"
+description = "A renderer for aura on top of wgpu"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -19,18 +19,19 @@ all-features = true
 
 [features]
 default = ["wgpu/default"]
-geometry = ["iced_graphics/geometry", "lyon"]
-image = ["iced_graphics/image", "guillotiere"]
-svg = ["iced_graphics/svg", "resvg", "guillotiere"]
+geometry = ["aura_graphics/geometry", "lyon"]
+image = ["aura_graphics/image", "guillotiere"]
+svg = ["aura_graphics/svg", "resvg", "guillotiere"]
 svg-text = ["svg", "resvg/text", "resvg/system-fonts", "resvg/memmap-fonts"]
 svg-raster-images = ["svg", "resvg/raster-images"]
-web-colors = ["iced_graphics/web-colors"]
+web-colors = ["aura_graphics/web-colors"]
 webgl = ["wgpu/webgl"]
 strict-assertions = []
+profiling = []
 
 [dependencies]
-iced_debug.workspace = true
-iced_graphics.workspace = true
+aura_debug.workspace = true
+aura_graphics.workspace = true
 
 bitflags.workspace = true
 bytemuck.workspace = true

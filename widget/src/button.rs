@@ -2,10 +2,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } }
+//! # mod aura { pub mod widget { pub use aura_widget::*; } }
 //! # pub type State = ();
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-//! use iced::widget::button;
+//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+//! use aura::widget::button;
 //!
 //! #[derive(Clone)]
 //! enum Message {
@@ -25,6 +25,7 @@ use crate::core::theme::palette;
 use crate::core::touch;
 use crate::core::widget::Operation;
 use crate::core::widget::tree::{self, Tree};
+use crate::core::widget::visit;
 use crate::core::window;
 use crate::core::{
     Background, Color, Element, Event, Layout, Length, Padding, Rectangle, Shadow, Shell, Size,
@@ -35,10 +36,10 @@ use crate::core::{
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::button;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::button;
 ///
 /// #[derive(Clone)]
 /// enum Message {
@@ -54,10 +55,10 @@ use crate::core::{
 /// be disabled:
 ///
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::button;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::button;
 ///
 /// #[derive(Clone)]
 /// enum Message {
@@ -238,6 +239,46 @@ where
                 .as_widget_mut()
                 .layout(&mut tree.children[0], renderer, limits)
         })
+    }
+
+    fn semantics(&self, tree: &Tree, layout: Layout<'_>) -> Option<crate::core::semantics::Node> {
+        use crate::core::semantics::{Actions, Node, Role, State as SemanticState};
+
+        // A button with no `on_press` is disabled, not merely inert: it
+        // must advertise no actions at all, or assistive technology would
+        // offer the user something that silently does nothing.
+        let enabled = self.on_press.is_some();
+
+        // The transient `is_pressed` is deliberately *not* reported. A
+        // momentary press is not a state an assistive technology acts on,
+        // and surfacing it would emit a semantic update on every
+        // mouse-down and mouse-up -- pure churn for no benefit.
+        Some(
+            Node::new(tree.id().clone(), layout.bounds(), Role::Button)
+                .with_state(if enabled {
+                    SemanticState::FOCUSABLE
+                } else {
+                    SemanticState::DISABLED
+                })
+                .with_actions(if enabled {
+                    Actions::ACTIVATE | Actions::FOCUS
+                } else {
+                    Actions::empty()
+                }),
+        )
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        visit(&mut visit::Widgets::new(
+            self.content.as_widget_mut(),
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+        ));
     }
 
     fn operate(
@@ -506,8 +547,8 @@ impl Default for Style {
 ///
 /// # Example
 /// ```no_run
-/// # use iced_widget::core::{Color, Background};
-/// # use iced_widget::button::{Catalog, Status, Style};
+/// # use aura_widget::core::{Color, Background};
+/// # use aura_widget::button::{Catalog, Status, Style};
 /// # struct MyTheme;
 /// #[derive(Debug, Default)]
 /// pub enum ButtonClass {

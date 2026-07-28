@@ -5,10 +5,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } }
+//! # mod aura { pub mod widget { pub use aura_widget::*; } }
 //! # pub type State = ();
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-//! use iced::widget::{container, tooltip};
+//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+//! use aura::widget::{container, tooltip};
 //!
 //! enum Message {
 //!     // ...
@@ -31,6 +31,7 @@ use crate::core::overlay;
 use crate::core::renderer;
 use crate::core::text;
 use crate::core::time::{Duration, Instant};
+use crate::core::widget::visit;
 use crate::core::widget::{self, Widget};
 use crate::core::window;
 use crate::core::{Element, Event, Length, Padding, Pixels, Point, Rectangle, Shell, Size, Vector};
@@ -39,10 +40,10 @@ use crate::core::{Element, Event, Length, Padding, Pixels, Point, Rectangle, She
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{container, tooltip};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{container, tooltip};
 ///
 /// enum Message {
 ///     // ...
@@ -332,6 +333,19 @@ where
         } else {
             None
         }
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut widget::Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        visit(&mut visit::Widgets::new(
+            self.content.as_widget_mut(),
+            &mut tree.children[0],
+            layout,
+        ));
     }
 
     fn operate(

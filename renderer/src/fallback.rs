@@ -33,6 +33,16 @@ macro_rules! delegate {
     };
 }
 
+impl<A, B> text::CacheStatistics for Renderer<A, B>
+where
+    A: text::CacheStatistics,
+    B: text::CacheStatistics,
+{
+    fn text_cache_statistics(&self) -> Option<text::cache::Statistics> {
+        delegate!(self, renderer, renderer.text_cache_statistics())
+    }
+}
+
 impl<A, B> core::Renderer for Renderer<A, B>
 where
     A: core::Renderer,
@@ -103,7 +113,7 @@ where
     const SCROLL_DOWN_ICON: char = A::SCROLL_DOWN_ICON;
     const SCROLL_LEFT_ICON: char = A::SCROLL_LEFT_ICON;
     const SCROLL_RIGHT_ICON: char = A::SCROLL_RIGHT_ICON;
-    const ICED_LOGO: char = A::ICED_LOGO;
+    const AURA_LOGO: char = A::AURA_LOGO;
 
     fn default_font(&self) -> Self::Font {
         delegate!(self, renderer, renderer.default_font())
@@ -392,12 +402,12 @@ where
 }
 
 #[cfg(feature = "wgpu-bare")]
-impl<A, B> iced_wgpu::primitive::Renderer for Renderer<A, B>
+impl<A, B> aura_wgpu::primitive::Renderer for Renderer<A, B>
 where
-    A: iced_wgpu::primitive::Renderer,
+    A: aura_wgpu::primitive::Renderer,
     B: core::Renderer,
 {
-    fn draw_primitive(&mut self, bounds: Rectangle, primitive: impl iced_wgpu::Primitive) {
+    fn draw_primitive(&mut self, bounds: Rectangle, primitive: impl aura_wgpu::Primitive) {
         match self {
             Self::Primary(renderer) => {
                 renderer.draw_primitive(bounds, primitive);

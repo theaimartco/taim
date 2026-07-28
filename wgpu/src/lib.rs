@@ -1,24 +1,24 @@
-//! A [`wgpu`] renderer for [Iced].
+//! A [`wgpu`] renderer for [Aura].
 //!
-//! ![The native path of the Iced ecosystem](https://github.com/iced-rs/iced/blob/0525d76ff94e828b7b21634fa94a747022001c83/docs/graphs/native.png?raw=true)
+//! ![The native path of the Aura ecosystem](https://github.com/aura-rs/aura/blob/0525d76ff94e828b7b21634fa94a747022001c83/docs/graphs/native.png?raw=true)
 //!
 //! [`wgpu`] supports most modern graphics backends: Vulkan, Metal, DX11, and
 //! DX12 (OpenGL and WebGL are still WIP). Additionally, it will support the
 //! incoming [WebGPU API].
 //!
-//! Currently, `iced_wgpu` supports the following primitives:
+//! Currently, `aura_wgpu` supports the following primitives:
 //! - Text, which is rendered using [`glyphon`].
 //! - Quads or rectangles, with rounded borders and a solid background color.
 //! - Clip areas, useful to implement scrollables or hide overflowing content.
 //! - Images and SVG, loaded from memory or the file system.
 //! - Meshes of triangles, useful to draw geometry freely.
 //!
-//! [Iced]: https://github.com/iced-rs/iced
+//! [Aura]: https://github.com/aura-rs/aura
 //! [`wgpu`]: https://github.com/gfx-rs/wgpu-rs
 //! [WebGPU API]: https://gpuweb.github.io/gpuweb/
 //! [`glyphon`]: https://github.com/grovesNL/glyphon
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/iced-rs/iced/9ab6923e943f784985e9ef9ca28b10278297225d/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/aura-rs/aura/9ab6923e943f784985e9ef9ca28b10278297225d/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(missing_docs)]
@@ -29,10 +29,15 @@ pub mod window;
 #[cfg(feature = "geometry")]
 pub mod geometry;
 
+pub mod batch;
+pub mod effects;
+
 mod buffer;
 mod color;
 mod engine;
+pub mod metrics;
 mod quad;
+pub mod resource_budget;
 mod text;
 mod triangle;
 
@@ -46,9 +51,9 @@ mod image;
 
 use buffer::Buffer;
 
-use iced_debug as debug;
-pub use iced_graphics as graphics;
-pub use iced_graphics::core;
+use aura_debug as debug;
+pub use aura_graphics as graphics;
+pub use aura_graphics::core;
 
 pub use wgpu;
 
@@ -65,10 +70,10 @@ use crate::graphics::mesh;
 use crate::graphics::text::{Editor, Paragraph};
 use crate::graphics::{Shell, Viewport};
 
-/// A [`wgpu`] graphics renderer for [`iced`].
+/// A [`wgpu`] graphics renderer for [`aura`].
 ///
 /// [`wgpu`]: https://github.com/gfx-rs/wgpu-rs
-/// [`iced`]: https://github.com/iced-rs/iced
+/// [`aura`]: https://github.com/aura-rs/aura
 pub struct Renderer {
     engine: Engine,
     settings: renderer::Settings,
@@ -89,6 +94,8 @@ pub struct Renderer {
     image_cache: std::cell::RefCell<image::Cache>,
 
     staging_belt: wgpu::util::StagingBelt,
+
+    metrics: metrics::Counters,
 }
 
 impl Renderer {
@@ -117,8 +124,22 @@ impl Renderer {
                 buffer::MAX_WRITE_SIZE as u64,
             ),
 
+            metrics: metrics::Counters::new(),
+
             engine,
         }
+    }
+
+    /// Returns this frame's GPU hot-path [`metrics::Counters`] (primitive,
+    /// batch, upload, atlas-miss, pipeline-switch, and draw counts).
+    ///
+    /// Reset at the start of every [`Renderer::draw`] call; read this
+    /// after `draw` returns (and before the next one) to see the counts
+    /// for the frame just recorded. Always reports zero for every metric
+    /// unless the `profiling` feature is enabled (see
+    /// [`metrics::Counters::is_active`]).
+    pub fn metrics(&self) -> &metrics::Counters {
+        &self.metrics
     }
 
     /// Record commands that draw the current primitives to the target texture view.
@@ -131,11 +152,13 @@ impl Renderer {
         target: &wgpu::TextureView,
         viewport: &Viewport,
     ) -> wgpu::CommandEncoder {
+        self.metrics.reset();
+
         let mut encoder =
             self.engine
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("iced_wgpu encoder"),
+                    label: Some("aura_wgpu encoder"),
                 });
 
         self.prepare(&mut encoder, viewport);
@@ -210,7 +233,7 @@ impl Renderer {
         };
 
         let texture = self.engine.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("iced_wgpu.offscreen.source_texture"),
+            label: Some("aura_wgpu.offscreen.source_texture"),
             size: texture_extent,
             mip_level_count: 1,
             sample_count: 1,
@@ -238,7 +261,7 @@ impl Renderer {
         );
 
         let output_buffer = self.engine.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("iced_wgpu.offscreen.output_texture_buffer"),
+            label: Some("aura_wgpu.offscreen.output_texture_buffer"),
             size: (dimensions.padded_bytes_per_row * dimensions.height as usize) as u64,
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -303,6 +326,8 @@ impl Renderer {
 
             if !layer.quads.is_empty() {
                 let prepare_span = debug::prepare(debug::Primitive::Quad);
+                self.metrics.increment(metrics::Metric::Primitive);
+                self.metrics.increment(metrics::Metric::Upload);
 
                 self.quad.prepare(
                     &self.engine.quad_pipeline,
@@ -319,6 +344,8 @@ impl Renderer {
 
             if !layer.triangles.is_empty() {
                 let prepare_span = debug::prepare(debug::Primitive::Triangle);
+                self.metrics.increment(metrics::Metric::Primitive);
+                self.metrics.increment(metrics::Metric::Upload);
 
                 self.triangle.prepare(
                     &self.engine.triangle_pipeline,
@@ -335,6 +362,8 @@ impl Renderer {
 
             if !layer.primitives.is_empty() {
                 let prepare_span = debug::prepare(debug::Primitive::Shader);
+                self.metrics
+                    .increment_by(metrics::Metric::Primitive, layer.primitives.len() as u32);
 
                 let mut primitive_storage = self
                     .engine
@@ -359,6 +388,8 @@ impl Renderer {
             #[cfg(any(feature = "svg", feature = "image"))]
             if !layer.images.is_empty() {
                 let prepare_span = debug::prepare(debug::Primitive::Image);
+                self.metrics.increment(metrics::Metric::Primitive);
+                self.metrics.increment(metrics::Metric::Upload);
 
                 self.image.prepare(
                     &self.engine.image_pipeline,
@@ -376,6 +407,8 @@ impl Renderer {
 
             if !layer.text.is_empty() {
                 let prepare_span = debug::prepare(debug::Primitive::Text);
+                self.metrics.increment(metrics::Metric::Primitive);
+                self.metrics.increment(metrics::Metric::Upload);
 
                 self.text.prepare(
                     &self.engine.text_pipeline,
@@ -404,7 +437,7 @@ impl Renderer {
 
         let mut render_pass =
             ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("iced_wgpu render pass"),
+                label: Some("aura_wgpu render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: frame,
                     depth_slice: None,
@@ -465,6 +498,7 @@ impl Renderer {
                     scissor_rect,
                     &layer.quads,
                     &mut render_pass,
+                    &self.metrics,
                 );
                 render_span.finish();
 
@@ -488,7 +522,7 @@ impl Renderer {
 
                 render_pass =
                     ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("iced_wgpu render pass"),
+                        label: Some("aura_wgpu render pass"),
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                             view: frame,
                             depth_slice: None,
@@ -576,7 +610,7 @@ impl Renderer {
 
                     render_pass =
                         ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                            label: Some("iced_wgpu render pass"),
+                            label: Some("aura_wgpu render pass"),
                             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                                 view: frame,
                                 depth_slice: None,
@@ -718,10 +752,10 @@ impl core::text::Renderer for Renderer {
     type Paragraph = Paragraph;
     type Editor = Editor;
 
-    const ICON_FONT: Font = Font::new("Iced-Icons");
+    const ICON_FONT: Font = Font::new("Aura-Icons");
     const CHECKMARK_ICON: char = '\u{f00c}';
     const ARROW_DOWN_ICON: char = '\u{e800}';
-    const ICED_LOGO: char = '\u{e801}';
+    const AURA_LOGO: char = '\u{e801}';
     const SCROLL_UP_ICON: char = '\u{e802}';
     const SCROLL_DOWN_ICON: char = '\u{e803}';
     const SCROLL_LEFT_ICON: char = '\u{e804}';
@@ -890,6 +924,13 @@ impl graphics::compositor::Default for crate::Renderer {
     type Compositor = window::Compositor;
 }
 
+/// `None`, honestly: this backend shapes glyphs through `cryoglyph`'s
+/// own GPU-side cache, not `graphics::text::Cache` — a different
+/// structure this trait's default answer knows nothing about, not a gap
+/// waiting to be filled in. See [`graphics::text::CacheStatistics`]'s
+/// own documentation.
+impl graphics::text::CacheStatistics for Renderer {}
+
 impl renderer::Headless for Renderer {
     async fn new(settings: renderer::Settings, backend: Option<&str>) -> Option<Self> {
         if backend.is_some_and(|backend| backend != "wgpu") {
@@ -913,7 +954,7 @@ impl renderer::Headless for Renderer {
 
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                label: Some("iced_wgpu [headless]"),
+                label: Some("aura_wgpu [headless]"),
                 required_features: wgpu::Features::empty(),
                 required_limits: wgpu::Limits {
                     max_bind_groups: 2,

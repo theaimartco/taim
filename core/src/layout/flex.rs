@@ -16,12 +16,31 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// NOTICE (Apache License 2.0 section 4(b)): this file was modified from
+// its original `druid` derivation to (1) store per-item bookkeeping and
+// the resulting nodes in stack-allocated `SmallVec`s instead of `Vec`s,
+// avoiding a heap allocation for the common case of a small, fixed
+// number of children, and (2) compute and attach a first-baseline offset
+// to the produced `Node`, derived from its children's own baselines.
+// The multi-pass constraint-solving algorithm itself is unchanged.
 use crate::Element;
 
 use crate::layout::{Limits, Node};
 use crate::length;
 use crate::widget;
 use crate::{Alignment, Length, Padding, Size};
+
+use smallvec::SmallVec;
+
+/// The number of children a [`resolve`] call can lay out without
+/// spilling its bookkeeping storage onto the heap.
+///
+/// Chosen to comfortably cover the common case (a handful of buttons or
+/// fields in a row/column); a container with more children than this
+/// still works correctly, it simply allocates like the previous,
+/// `Vec`-only implementation did unconditionally.
+const INLINE_CHILDREN: usize = 8;
 
 /// The main axis of a flex layout.
 #[derive(Debug)]
@@ -54,6 +73,64 @@ impl Axis {
             Axis::Vertical => (cross, main),
         }
     }
+}
+
+/// [`resolve`], but reusing a cached [`Node`] from `cache` when a prior
+/// call already computed the answer for equal `limits` and `fingerprint`.
+///
+/// This is the "fast path" containers like `Row`/`Column` should call
+/// once they hold a persistent [`layout::Cache`](crate::layout::Cache) in
+/// their widget state: unlike [`resolve`] itself (a pure function with no
+/// memory of its own), a container's `Cache` survives across `layout`
+/// calls in its `Tree`, so an unchanged container measured under
+/// unchanged constraints skips the whole multi-pass solve.
+///
+/// `fingerprint` must fold in anything [`resolve_cached`] cannot see for
+/// itself but that should still invalidate the cache -- most importantly
+/// the identity/count of `items`, since a container whose children
+/// changed cannot reuse a previous measurement no matter how the
+/// [`Limits`] compare. A typical fingerprint combines the child count
+/// with each child's own [`Widget::size`](crate::Widget::size) strategy
+/// (cheap to read, and changes whenever a child's sizing intent does).
+#[allow(clippy::too_many_arguments)]
+pub fn resolve_cached<Message, Theme, Renderer>(
+    cache: &mut super::Cache,
+    fingerprint: super::cache::Fingerprint,
+    axis: Axis,
+    renderer: &Renderer,
+    limits: &Limits,
+    width: Length,
+    height: Length,
+    padding: Padding,
+    spacing: f32,
+    align_items: Alignment,
+    items: &mut [Element<'_, Message, Theme, Renderer>],
+    trees: &mut [widget::Tree],
+) -> Node
+where
+    Renderer: crate::Renderer,
+{
+    // The multi-pass solver below has side effects on `trees` (each
+    // child's own layout cache is populated as a side effect of being
+    // measured), so a cache hit here must still be sound even though
+    // `compute` will not run: children are only skipped when this
+    // container's own result -- which already reflects their last
+    // measurement -- is being reused unchanged, exactly mirroring
+    // `widget::tree::Tree::layout_with_cache`'s same precondition.
+    cache.get_or_insert_with(limits, fingerprint, || {
+        resolve(
+            axis,
+            renderer,
+            limits,
+            width,
+            height,
+            padding,
+            spacing,
+            align_items,
+            items,
+            trees,
+        )
+    })
 }
 
 /// Computes the flex layout with the given axis and limits, applying spacing,
@@ -98,8 +175,8 @@ where
     let mut cross = 0.0;
     let mut available = axis.main(limits.max()) - total_spacing;
 
-    let mut nodes: Vec<Node> = Vec::with_capacity(items.len());
-    nodes.resize(items.len(), Node::default());
+    let mut nodes: SmallVec<[Node; INLINE_CHILDREN]> =
+        smallvec::smallvec![Node::default(); items.len()];
 
     #[derive(Debug, Clone, Copy)]
     struct Meta {
@@ -117,7 +194,7 @@ where
         MainFluid,
     }
 
-    let mut metas = Vec::with_capacity(items.len());
+    let mut metas: SmallVec<[Meta; INLINE_CHILDREN]> = SmallVec::with_capacity(items.len());
 
     // STATIC PASS
     // We lay out non-fluid elements in the main axis.
@@ -484,6 +561,124 @@ where
     };
 
     let size = Size::from(axis.pack(main, cross));
+    let baseline = resolve_baseline(axis, &nodes);
 
-    Node::with_children(size.expand(padding), nodes)
+    let node = Node::with_children(size.expand(padding), nodes.into_vec());
+
+    match baseline {
+        Some(baseline) => node.with_baseline(baseline + padding.top),
+        None => node,
+    }
+}
+
+/// Computes the first-baseline offset (from the top of the produced
+/// [`Node`], before padding is added back in) of a flex container from
+/// its already-positioned children.
+///
+/// - On the [`Axis::Horizontal`] (a row), children sit side by side on
+///   the same line, so the container's baseline is the highest of its
+///   children's own baselines -- the same rule used to align text runs
+///   of different sizes on one typographic line.
+/// - On the [`Axis::Vertical`] (a column), children stack top to bottom,
+///   so only the first child can contribute to a *first*-baseline: any
+///   baseline further down is not reachable without laying out content
+///   above it first.
+///
+/// Returns `None` when no child reports a baseline of its own (the
+/// common case for non-text content), so a container of only
+/// baseline-less children is itself reported as baseline-less rather
+/// than defaulting to some arbitrary line.
+fn resolve_baseline(axis: Axis, nodes: &[Node]) -> Option<f32> {
+    match axis {
+        Axis::Horizontal => nodes
+            .iter()
+            .filter_map(|node| Some(node.bounds().y + node.baseline()?))
+            .fold(None, |acc, baseline| {
+                Some(acc.map_or(baseline, |acc: f32| acc.max(baseline)))
+            }),
+        Axis::Vertical => {
+            let node = nodes.first()?;
+
+            Some(node.bounds().y + node.baseline()?)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Point;
+
+    #[test]
+    fn no_children_have_no_baseline() {
+        assert_eq!(resolve_baseline(Axis::Horizontal, &[]), None);
+        assert_eq!(resolve_baseline(Axis::Vertical, &[]), None);
+    }
+
+    #[test]
+    fn children_without_a_baseline_produce_no_container_baseline() {
+        let nodes = [
+            Node::new(Size::new(10.0, 10.0)),
+            Node::new(Size::new(10.0, 10.0)),
+        ];
+
+        assert_eq!(resolve_baseline(Axis::Horizontal, &nodes), None);
+        assert_eq!(resolve_baseline(Axis::Vertical, &nodes), None);
+    }
+
+    #[test]
+    fn horizontal_baseline_is_the_max_across_children() {
+        let nodes = [
+            Node::new(Size::new(10.0, 20.0))
+                .with_baseline(15.0)
+                .move_to(Point::new(0.0, 0.0)),
+            Node::new(Size::new(10.0, 30.0))
+                .with_baseline(25.0)
+                .move_to(Point::new(10.0, 0.0)),
+        ];
+
+        assert_eq!(resolve_baseline(Axis::Horizontal, &nodes), Some(25.0));
+    }
+
+    #[test]
+    fn horizontal_baseline_accounts_for_child_vertical_position() {
+        let nodes = [
+            Node::new(Size::new(10.0, 20.0))
+                .with_baseline(15.0)
+                .move_to(Point::new(0.0, 5.0)),
+            Node::new(Size::new(10.0, 20.0))
+                .with_baseline(10.0)
+                .move_to(Point::new(10.0, 0.0)),
+        ];
+
+        // First child: 5.0 (y) + 15.0 (baseline) = 20.0
+        // Second child: 0.0 (y) + 10.0 (baseline) = 10.0
+        assert_eq!(resolve_baseline(Axis::Horizontal, &nodes), Some(20.0));
+    }
+
+    #[test]
+    fn vertical_baseline_only_considers_the_first_child() {
+        let nodes = [
+            Node::new(Size::new(10.0, 20.0))
+                .with_baseline(15.0)
+                .move_to(Point::new(0.0, 0.0)),
+            Node::new(Size::new(10.0, 30.0))
+                .with_baseline(25.0)
+                .move_to(Point::new(0.0, 20.0)),
+        ];
+
+        assert_eq!(resolve_baseline(Axis::Vertical, &nodes), Some(15.0));
+    }
+
+    #[test]
+    fn vertical_baseline_is_none_when_the_first_child_has_none_even_if_others_do() {
+        let nodes = [
+            Node::new(Size::new(10.0, 20.0)).move_to(Point::new(0.0, 0.0)),
+            Node::new(Size::new(10.0, 30.0))
+                .with_baseline(25.0)
+                .move_to(Point::new(0.0, 20.0)),
+        ];
+
+        assert_eq!(resolve_baseline(Axis::Vertical, &nodes), None);
+    }
 }

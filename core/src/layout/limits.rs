@@ -10,6 +10,41 @@ pub struct Limits {
     compression: Size<bool>,
 }
 
+/// A compact, normalized, [`Hash`]-and-[`Eq`] representation of a
+/// [`Limits`] value, suitable for use as a cache key.
+///
+/// `f32` implements neither [`Hash`] nor [`Eq`] (`NaN != NaN`, and there
+/// are distinct bit patterns for the same mathematical value, e.g. `-0.0`
+/// vs `0.0`), so [`Limits`] itself cannot be used directly as a hash map
+/// key. [`Key`] fixes both problems by normalizing each component before
+/// taking its bit pattern:
+///
+/// - `-0.0` is folded to `0.0` (they compare equal and must hash equal).
+/// - `NaN` is folded to a single canonical bit pattern (a [`Limits`]
+///   should never legitimately contain `NaN`, but a cache key must not
+///   panic or behave inconsistently if one slips through).
+///
+/// Two [`Limits`] that are [`PartialEq`] always produce the same [`Key`],
+/// and [`Key`] equality is a correct (not just approximate) stand-in for
+/// [`Limits`] equality under this normalization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Key {
+    min: (u32, u32),
+    max: (u32, u32),
+    compression: (bool, bool),
+}
+
+fn normalize_bits(value: f32) -> u32 {
+    if value.is_nan() {
+        f32::NAN.to_bits()
+    } else if value == 0.0 {
+        // Folds `-0.0` and `0.0` to the same bit pattern.
+        0.0f32.to_bits()
+    } else {
+        value.to_bits()
+    }
+}
+
 impl Limits {
     /// No limits
     pub const NONE: Limits = Limits {
@@ -46,6 +81,27 @@ impl Limits {
     /// Returns the compression of the [`Limits`].
     pub fn compression(&self) -> Size<bool> {
         self.compression
+    }
+
+    /// Returns a compact, [`Hash`]-and-[`Eq`] [`Key`] identifying this
+    /// [`Limits`], for use as a cache key (e.g. by
+    /// [`layout::cache`](crate::layout::cache)).
+    ///
+    /// Equal [`Limits`] always produce an equal [`Key`]; this holds even
+    /// across the `-0.0`/`0.0` and `NaN` edge cases that would otherwise
+    /// make a raw bit-for-bit comparison unsound.
+    pub fn key(&self) -> Key {
+        Key {
+            min: (
+                normalize_bits(self.min.width),
+                normalize_bits(self.min.height),
+            ),
+            max: (
+                normalize_bits(self.max.width),
+                normalize_bits(self.max.height),
+            ),
+            compression: (self.compression.width, self.compression.height),
+        }
     }
 
     /// Applies a width constraint to the current [`Limits`].
@@ -211,5 +267,69 @@ impl Limits {
             Length::Fixed(amount) => amount.min(self.max.height).max(self.min.height),
             _ => intrinsic_height.min(self.max.height).max(self.min.height),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    fn hash_of(key: Key) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        key.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    #[test]
+    fn equal_limits_produce_equal_keys() {
+        let a = Limits::new(Size::new(10.0, 20.0), Size::new(100.0, 200.0));
+        let b = Limits::new(Size::new(10.0, 20.0), Size::new(100.0, 200.0));
+
+        assert_eq!(a.key(), b.key());
+        assert_eq!(hash_of(a.key()), hash_of(b.key()));
+    }
+
+    #[test]
+    fn different_limits_produce_different_keys() {
+        let a = Limits::new(Size::new(10.0, 20.0), Size::new(100.0, 200.0));
+        let b = Limits::new(Size::new(11.0, 20.0), Size::new(100.0, 200.0));
+
+        assert_ne!(a.key(), b.key());
+    }
+
+    #[test]
+    fn different_compression_produces_different_keys() {
+        let a =
+            Limits::with_compression(Size::ZERO, Size::new(100.0, 200.0), Size::new(false, false));
+        let b =
+            Limits::with_compression(Size::ZERO, Size::new(100.0, 200.0), Size::new(true, false));
+
+        assert_ne!(a.key(), b.key());
+    }
+
+    #[test]
+    fn negative_zero_and_positive_zero_produce_the_same_key() {
+        let a = Limits::new(Size::new(-0.0, -0.0), Size::new(100.0, 100.0));
+        let b = Limits::new(Size::new(0.0, 0.0), Size::new(100.0, 100.0));
+
+        assert_eq!(a.key(), b.key());
+        assert_eq!(hash_of(a.key()), hash_of(b.key()));
+    }
+
+    #[test]
+    fn nan_does_not_panic_and_is_self_consistent() {
+        let a = Limits::new(Size::new(f32::NAN, 0.0), Size::new(100.0, 100.0));
+        let b = Limits::new(Size::new(f32::NAN, 0.0), Size::new(100.0, 100.0));
+
+        assert_eq!(a.key(), b.key());
+    }
+
+    #[test]
+    fn key_is_stable_across_clones() {
+        let limits = Limits::new(Size::new(5.0, 5.0), Size::new(50.0, 50.0));
+
+        assert_eq!(limits.key(), limits.key());
     }
 }

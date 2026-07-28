@@ -92,14 +92,24 @@ impl State {
         bounds: Rectangle<u32>,
         quads: &Batch,
         render_pass: &mut wgpu::RenderPass<'a>,
+        metrics: &crate::metrics::Counters,
     ) {
         if let Some(layer) = self.layers.get(layer) {
             render_pass.set_scissor_rect(bounds.x, bounds.y, bounds.width, bounds.height);
 
             let mut solid_offset = 0;
             let mut gradient_offset = 0;
+            let mut previous_kind = None;
 
             for (kind, count) in &quads.order {
+                if previous_kind != Some(*kind) {
+                    metrics.increment(crate::metrics::Metric::PipelineSwitch);
+                    previous_kind = Some(*kind);
+                }
+
+                metrics.increment(crate::metrics::Metric::Batch);
+                metrics.increment(crate::metrics::Metric::Draw);
+
                 match kind {
                     Kind::Solid => {
                         pipeline.solid.render(
@@ -134,7 +144,7 @@ impl State {
 impl Pipeline {
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Pipeline {
         let constant_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("iced_wgpu::quad uniforms layout"),
+            label: Some("aura_wgpu::quad uniforms layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::VERTEX,
@@ -168,14 +178,14 @@ pub struct Layer {
 impl Layer {
     pub fn new(device: &wgpu::Device, constant_layout: &wgpu::BindGroupLayout) -> Self {
         let constants_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("iced_wgpu::quad uniforms buffer"),
+            label: Some("aura_wgpu::quad uniforms buffer"),
             size: mem::size_of::<Uniforms>() as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
         let constants = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("iced_wgpu::quad uniforms bind group"),
+            label: Some("aura_wgpu::quad uniforms bind group"),
             layout: constant_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
@@ -345,5 +355,112 @@ impl Default for Uniforms {
             scale: 1.0,
             _padding: [0.0; 3],
         }
+    }
+}
+
+#[cfg(test)]
+mod batching_tests {
+    use super::*;
+    use crate::batch::{self, Batchable};
+    use crate::core::{Background, Color};
+
+    impl Batchable for Kind {
+        type Key = Kind;
+
+        fn batch_key(&self) -> Kind {
+            *self
+        }
+    }
+
+    fn quad() -> Quad {
+        Quad {
+            position: [0.0, 0.0],
+            size: [1.0, 1.0],
+            border_color: color::pack(Color::TRANSPARENT),
+            border_radius: [0.0; 4],
+            border_width: 0.0,
+            shadow_color: color::pack(Color::TRANSPARENT),
+            shadow_offset: [0.0, 0.0],
+            shadow_blur_radius: 0.0,
+            snap: 0,
+        }
+    }
+
+    /// Proves `Batch::add`'s incremental `order` accumulation is
+    /// exactly equivalent to running `batch::group` over the same
+    /// sequence of `Kind`s after the fact -- the ordering-correctness
+    /// oracle `phase.md`'s Phase 5 step 3 asks for, applied to the
+    /// batching this crate's quad rendering already depends on being
+    /// correct (see `wgpu/src/batch.rs`'s module documentation for why
+    /// this crate does not migrate `Batch` itself onto `batch::group`).
+    fn assert_incremental_order_matches_grouping(kinds: &[Kind]) {
+        let mut batch = Batch::default();
+
+        for kind in kinds {
+            let background = match kind {
+                Kind::Solid => Background::Color(Color::BLACK),
+                Kind::Gradient => Background::Gradient(crate::core::Gradient::Linear(
+                    crate::core::gradient::Linear::new(0.0),
+                )),
+            };
+
+            batch.add(quad(), &background);
+        }
+
+        let expected_runs = batch::group(kinds);
+        let actual_order: Vec<(Kind, usize)> = batch.order.clone();
+
+        let actual_runs: Vec<batch::Run<Kind>> = {
+            let mut start = 0;
+            actual_order
+                .iter()
+                .map(|(kind, count)| {
+                    let run = batch::Run {
+                        key: *kind,
+                        start,
+                        end: start + count,
+                    };
+                    start += count;
+                    run
+                })
+                .collect()
+        };
+
+        assert_eq!(
+            actual_runs, expected_runs,
+            "Batch::add's incremental order for {kinds:?} must match batch::group's result"
+        );
+    }
+
+    #[test]
+    fn empty_input_produces_no_runs() {
+        assert_incremental_order_matches_grouping(&[]);
+    }
+
+    #[test]
+    fn all_solid_produces_one_run() {
+        assert_incremental_order_matches_grouping(&[Kind::Solid, Kind::Solid, Kind::Solid]);
+    }
+
+    #[test]
+    fn alternating_kinds_produce_a_run_per_switch_in_order() {
+        assert_incremental_order_matches_grouping(&[
+            Kind::Solid,
+            Kind::Solid,
+            Kind::Gradient,
+            Kind::Solid,
+            Kind::Gradient,
+            Kind::Gradient,
+            Kind::Gradient,
+        ]);
+    }
+
+    #[test]
+    fn a_single_gradient_among_solids_does_not_merge_with_a_later_solid_run() {
+        // The same "non-adjacent same-key items must not merge" property
+        // batch::group's own tests pin, exercised through the real
+        // Batch::add path this test module's other cases prove agrees
+        // with batch::group.
+        assert_incremental_order_matches_grouping(&[Kind::Solid, Kind::Gradient, Kind::Solid]);
     }
 }

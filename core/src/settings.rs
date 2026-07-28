@@ -5,7 +5,7 @@ use crate::{Backend, Font, Pixels};
 
 use std::borrow::Cow;
 
-/// The settings of an iced program.
+/// The settings of an aura program.
 #[derive(Debug, Clone)]
 pub struct Settings {
     /// The identifier of the application.

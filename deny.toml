@@ -1,0 +1,88 @@
+[graph]
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-gnu" },
+    { triple = "x86_64-pc-windows-msvc" },
+    { triple = "x86_64-apple-darwin" },
+    { triple = "aarch64-apple-darwin" },
+    { triple = "wasm32-unknown-unknown" },
+]
+all-features = false
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+# Advisories: known security vulnerabilities and unmaintained crates.
+[advisories]
+version = 2
+yanked = "deny"
+ignore = [
+    # quick-xml v0.39.4, pulled in transitively by `wayland-scanner`
+    # (wayland-client -> smithay-client-toolkit -> winit -> aura_winit),
+    # is used only to parse `wayland-scanner`'s bundled, build-time
+    # Wayland protocol XML -- never attacker-controlled input at runtime.
+    # No path to a fix without an upstream `wayland-scanner`/`winit`
+    # release; re-check when bumping the pinned `winit` revision.
+    "RUSTSEC-2026-0195",
+    # Same quick-xml v0.39.4 / same build-time-only exposure as above;
+    # a second, related advisory (quadratic duplicate-attribute check).
+    "RUSTSEC-2026-0194",
+    # ttf-parser v0.25.1 is marked unmaintained (not a vulnerability),
+    # pulled in transitively via `cosmic-text` -> `fontdb` and via
+    # `ab_glyph` -> `owned_ttf_parser` (sctk-adwaita's window decorations).
+    # Both paths are Phase 5/10 territory (text shaping/rendering);
+    # revisit when this workspace's font stack is touched, not in Phase 0.
+    "RUSTSEC-2026-0192",
+]
+
+# Licenses: only permissive, VYOM-compatible licenses are allowed.
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "MPL-2.0",
+    # OSI-approved and FSF-listed free/libre; used by `clipboard-win` and
+    # `error-code` (Windows clipboard support, via arboard -> aura_winit).
+    "BSL-1.0",
+]
+confidence-threshold = 0.8
+
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = []
+
+# Bans: source and duplicate-version policy.
+[bans]
+multiple-versions = "warn"
+# "warn" rather than "deny": every `aura_*` crate in this workspace
+# depends on its siblings via `{ version = "...", path = "..." }`, and
+# cargo-deny's wildcard check flags that pattern for any crate that is
+# itself published to crates.io (all of them, here), independent of
+# `allow-wildcard-paths`. This is the workspace's normal internal
+# dependency shape, not an unpinned/unreviewed dependency; verified
+# against real output from `cargo deny check bans` during Phase 0.
+wildcards = "warn"
+allow-wildcard-paths = true
+deny = []
+skip = []
+skip-tree = []
+
+# Sources: only crates.io and explicitly allowed git forks are trusted.
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = [
+    "https://github.com/iced-rs/winit.git",
+    "https://github.com/iced-rs/cryoglyph.git",
+]

@@ -18,6 +18,7 @@ use crate::core::time::Instant;
 use crate::core::{Color, InputMethod, Padding, Point, Rectangle, Size, Text, Vector};
 use crate::graphics::Compositor;
 use crate::program::{self, Program};
+use crate::runtime::frame_scheduler::Scheduler;
 
 use winit::dpi::{LogicalPosition, LogicalSize};
 use winit::monitor::MonitorHandle;
@@ -67,7 +68,7 @@ where
         let renderer = compositor.create_renderer(renderer_settings);
 
         let waker = shell::Waker::new(move || {
-            proxy.send_action(iced_runtime::Action::Event {
+            proxy.send_action(aura_runtime::Action::Event {
                 window: id,
                 event: core::Event::Waken,
             });
@@ -87,6 +88,7 @@ where
                 renderer,
                 mouse_interaction: mouse::Interaction::None,
                 redraw_at: None,
+                scheduler: Scheduler::new(),
                 preedit: None,
                 ime_state: None,
             },
@@ -107,10 +109,20 @@ where
             .all(|window| window.redraw_at.is_none())
     }
 
+    /// Returns the earliest instant any non-suspended window's
+    /// [`Scheduler`] wants to be woken up at, or `None` if no window has
+    /// a deadline pending (nothing to redraw, or every window with a
+    /// pending request is currently suspended/occluded).
+    ///
+    /// A suspended window's [`Scheduler::deadline`] is always `None`
+    /// (see its own documentation), so an occluded window with a
+    /// pending redraw request correctly stops contributing to this
+    /// computation -- the event loop does not wake up early just to
+    /// discover, again, that the surface is still occluded.
     pub fn redraw_at(&self) -> Option<Instant> {
         self.entries
             .values()
-            .filter_map(|window| window.redraw_at)
+            .filter_map(|window| window.scheduler.deadline())
             .min()
     }
 
@@ -184,6 +196,14 @@ where
     pub surface_version: u64,
     pub renderer: P::Renderer,
     pub redraw_at: Option<Instant>,
+    /// This window's frame-production state machine (Phase 6):
+    /// [`WindowEvent::Occluded`] and presentation feedback flow through
+    /// it, and [`Window::redraw_at`]/`ControlFlow` computation defers to
+    /// [`Scheduler::should_produce_frame`]/[`Scheduler::deadline`]
+    /// rather than acting on raw redraw requests directly.
+    ///
+    /// [`WindowEvent::Occluded`]: winit::event::WindowEvent::Occluded
+    pub scheduler: Scheduler,
     preedit: Option<Preedit<P::Renderer>>,
     ime_state: Option<(Rectangle, input_method::Purpose)>,
 }
@@ -208,10 +228,12 @@ where
     pub fn request_redraw(&mut self, redraw_request: RedrawRequest) {
         match redraw_request {
             RedrawRequest::NextFrame => {
+                self.scheduler.request_redraw_at(Instant::now());
                 self.raw.request_redraw();
                 self.redraw_at = None;
             }
             RedrawRequest::At(at) => {
+                self.scheduler.request_redraw_at(at);
                 self.redraw_at = Some(at);
             }
             RedrawRequest::Wait => {}

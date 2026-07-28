@@ -1,5 +1,5 @@
 //! Local paint-vs-layout-vs-semantics invalidation tests for
-//! `iced_runtime::invalidation`, against real `iced_core::Widget` state
+//! `aura_runtime::invalidation`, against real `aura_core::Widget` state
 //! trees.
 //!
 //! `runtime/src/invalidation.rs`'s own unit tests cover `propagate` and
@@ -7,16 +7,16 @@
 //! `tests/widgets/dirty_flags.rs` (Phase 2) exercised a hand-rolled
 //! stand-in for propagation, explicitly documented as a placeholder for
 //! Phase 3's real implementation. These tests instead drive the real
-//! `iced_runtime::invalidation::propagate` and confirm each `DirtyFlags`
+//! `aura_runtime::invalidation::propagate` and confirm each `DirtyFlags`
 //! bit stays properly scoped: marking a leaf's `PAINT` dirty must not
 //! spuriously mark its `LAYOUT` or `SEMANTICS`, propagating up the tree
 //! must not touch unrelated siblings, and a leaf's own `layout_with_cache`/
 //! `semantics_with_cache` calls must independently reflect exactly the
 //! flags that were actually cleared.
 
-use iced::advanced::widget::Tree;
-use iced::advanced::widget::tree::DirtyFlags;
-use iced_runtime::invalidation::{Aggregator, propagate};
+use aura::advanced::widget::Tree;
+use aura::advanced::widget::tree::DirtyFlags;
+use aura_runtime::invalidation::{Aggregator, propagate};
 
 fn tree_with_two_children() -> Tree {
     let mut tree = Tree::with_children(vec![Tree::empty(), Tree::empty()]);
@@ -102,9 +102,9 @@ fn layout_with_cache_and_semantics_with_cache_clear_only_their_own_flag() {
     let mut tree = Tree::empty();
     assert_eq!(tree.dirty(), DirtyFlags::all());
 
-    let limits = iced::advanced::layout::Limits::new(iced::Size::ZERO, iced::Size::new(10.0, 10.0));
+    let limits = aura::advanced::layout::Limits::new(aura::Size::ZERO, aura::Size::new(10.0, 10.0));
     let _ = tree.layout_with_cache(limits, |_| {
-        iced::advanced::layout::Node::new(iced::Size::new(10.0, 10.0))
+        aura::advanced::layout::Node::new(aura::Size::new(10.0, 10.0))
     });
 
     assert!(!tree.dirty().contains(DirtyFlags::LAYOUT));
@@ -129,8 +129,8 @@ fn an_aggregator_fed_from_a_propagated_trees_own_bounds_stays_bounded() {
     // every node `propagate` marks PAINT-dirty, record its damage, and
     // confirm the aggregator still reports a bounded, non-`Full` region
     // when the count of touched nodes stays under `Aggregator::MAX_REGIONS`.
-    use iced_core::damage::{Cause, Region, Request};
-    use iced_core::{Point, Rectangle, Size};
+    use aura_core::damage::{Cause, Region, Request};
+    use aura_core::{Point, Rectangle, Size};
 
     let mut tree = tree_with_two_children();
     propagate(&mut tree, &[0]);
