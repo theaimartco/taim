@@ -2,10 +2,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 //! #
-//! use iced::widget::text_input;
+//! use aura::widget::text_input;
 //!
 //! struct State {
 //!    content: String,
@@ -65,10 +65,10 @@ use crate::core::{
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::text_input;
+/// use aura::widget::text_input;
 ///
 /// struct State {
 ///    content: String,
@@ -403,7 +403,13 @@ where
             } else {
                 input_method::Purpose::Normal
             },
-            preedit: state.preedit.as_ref().map(input_method::Preedit::as_ref),
+            // Composition content is as sensitive as the field value. A secure
+            // input must not disclose it to platform IME overlays or any
+            // surrounding-text integration; the widget still renders its own
+            // masked composition locally.
+            preedit: (!self.is_secure)
+                .then(|| state.preedit.as_ref().map(input_method::Preedit::as_ref))
+                .flatten(),
         }
     }
 
@@ -626,6 +632,53 @@ where
         limits: &layout::Limits,
     ) -> layout::Node {
         self.layout(tree, renderer, limits, None)
+    }
+
+    fn semantics(&self, tree: &Tree, layout: Layout<'_>) -> Option<crate::core::semantics::Node> {
+        use crate::core::semantics::{
+            Actions, Node, Role, State as SemanticState, Value as SemanticValue,
+        };
+
+        let state = tree.state.downcast_ref::<State<Renderer::Paragraph>>();
+
+        // A field with no `on_input` is read-only, not merely styled that
+        // way: it must not advertise SET_VALUE.
+        let editable = self.on_input.is_some();
+
+        let mut flags = SemanticState::FOCUSABLE;
+        if !editable {
+            flags |= SemanticState::DISABLED;
+        }
+        if state.is_focused() {
+            flags |= SemanticState::FOCUSED;
+        }
+
+        let node = Node::new(
+            tree.id().clone(),
+            layout.bounds(),
+            if self.is_secure {
+                Role::SecureField
+            } else {
+                Role::TextField
+            },
+        )
+        .with_state(flags)
+        .with_actions(if editable {
+            Actions::FOCUS | Actions::SET_VALUE
+        } else {
+            Actions::FOCUS
+        });
+
+        // A secure field never discloses its value. `Node::with_value`
+        // enforces this itself (it ignores the call for a SecureField), so
+        // this is belt *and* braces: the guard here means the secret never
+        // even reaches the setter, and the setter means a future caller
+        // who forgets the guard still cannot leak it.
+        Some(if self.is_secure {
+            node
+        } else {
+            node.with_value(SemanticValue::Text(self.value.to_string().into()))
+        })
     }
 
     fn operate(

@@ -2,11 +2,11 @@
 //! per-widget, dirty-tracked contributions.
 //!
 //! [`build`] walks a tree of `(widget, Tree, Layout)` triples (adapted
-//! via [`Semantic`], the same pattern `iced_runtime::hit_test::Hoverable`
-//! uses for hit-testing) and produces the full [`semantics::Node`] an
-//! assistive-technology adapter would consume. Each node's own,
+//! via [`aura_core::widget::visit::Widgets`], the same hook
+//! `aura_runtime::hit_test` rides on) and produces the full
+//! [`semantics::Node`] forest an assistive-technology adapter consumes. Each node's own,
 //! non-recursive semantics are computed through
-//! [`iced_core::widget::tree::Tree::semantics_with_cache`], so a subtree
+//! [`aura_core::widget::tree::Tree::semantics_with_cache`], so a subtree
 //! whose [`DirtyFlags::SEMANTICS`] is clear contributes its last result
 //! without calling back into the widget at all; only children are always
 //! walked, since a parent cannot know whether *they* are dirty without
@@ -17,41 +17,12 @@
 //! Commit 4 does not need to invent identity, only avoid re-deriving a
 //! node's own properties when nothing about it changed.
 //!
-//! [`DirtyFlags::SEMANTICS`]: iced_core::widget::tree::DirtyFlags::SEMANTICS
+//! [`DirtyFlags::SEMANTICS`]: aura_core::widget::tree::DirtyFlags::SEMANTICS
 
 use crate::core::semantics;
+use crate::core::widget::visit::Visit;
 
-/// Something that can contribute a [`semantics::Node`] for itself (via
-/// [`Semantic::node`]) and enumerate its children for [`build`] to
-/// recurse into.
-///
-/// Exists for the same reason `hit_test::Hoverable` does: so [`build`]
-/// can walk a tree of widget/state/layout triples without depending on
-/// `iced_core::Widget`'s full, renderer-generic signature. A caller
-/// adapts its own widget/tree/layout triples to it (see
-/// `tests/semantics/incremental.rs` for a full example against real
-/// widgets).
-pub trait Semantic {
-    /// Computes this node's own, non-recursive [`semantics::Node`] (not
-    /// including children), reusing a cached result when this node's
-    /// [`iced_core::widget::tree::Tree`] is not semantics-dirty.
-    ///
-    /// Returns `None` if this widget has no semantics of its own (the
-    /// default for every widget today); [`build`] still recurses into
-    /// its children regardless, since a semantics-less container (e.g.
-    /// a plain `row`) may still have meaningful descendants.
-    fn node(&mut self) -> Option<semantics::Node>;
-
-    /// Returns the number of children this node has.
-    fn child_count(&self) -> usize;
-
-    /// Returns the `index`-th child, for recursing into. Must return the
-    /// same value every time for the same `index` during a single
-    /// [`build`] call.
-    fn child(&mut self, index: usize) -> Self
-    where
-        Self: Sized;
-}
+pub use crate::core::widget::visit::{Visit as Semantic, Widgets};
 
 /// Builds the forest of [`semantics::Node`]s rooted at `root`: usually
 /// one node (when `root` reports its own semantics), zero (when neither
@@ -70,52 +41,110 @@ pub trait Semantic {
 /// widget tree; [`Semantic`] adapters recursing into their own children
 /// use the internal, single-node [`build_one`] instead, since an
 /// intermediate level always has a definite parent to flatten into.
-pub fn build<T: Semantic>(root: &mut T) -> Vec<semantics::Node> {
-    match build_one(root) {
-        Some(node) => vec![node],
-        None => collect_children(root),
-    }
+pub fn build(root: &mut dyn Visit) -> Vec<semantics::Node> {
+    build_subtree(root)
 }
 
-/// Builds a single [`semantics::Node`] for `node` (including its
-/// semantics-reporting descendants as children), or `None` if neither
-/// `node` nor any of its descendants report any semantics.
-fn build_one<T: Semantic>(node: &mut T) -> Option<semantics::Node> {
-    let own = node.node();
+/// Builds the forest contributed by `node` and everything beneath it:
+/// one node when `node` reports its own semantics (absorbing its
+/// reporting descendants as [`semantics::Node::children`]), and
+/// otherwise its descendants' forest hoisted up, since a transparent
+/// container gives a screen reader nothing to attach them to.
+///
+/// Visits every descendant exactly once. The previous shape of this walk
+/// asked each child for a single built node and, on `None`, walked the
+/// same child a second time to collect what it had already computed and
+/// thrown away -- doubling the work at every transparent level, so an
+/// ordinary `container(row(column(..)))` nest cost exponential time in
+/// its depth. Hoisting inside one pass makes that impossible to
+/// reintroduce: there is no longer a discarded result to recompute.
+fn build_subtree(node: &mut dyn Visit) -> Vec<semantics::Node> {
+    let own = node.semantics();
     let children = collect_children(node);
 
     match own {
         Some(mut node) => {
+            if node.name.is_none() && names_from_content(node.role) {
+                node.name = name_from_content(&children);
+            }
+
             node.children = children;
-            Some(node)
+            vec![node]
         }
-        None if children.is_empty() => None,
-        None => {
-            // No semantics of our own, but our descendants have some:
-            // there is no single node to attach them to here, so the
-            // caller sees them via a flattened list one level up
-            // ([`collect_children`]) instead of losing them -- or, if
-            // this *is* the true root ([`build`]), as a forest with more
-            // than one top-level node.
-            None
+        None => children,
+    }
+}
+
+/// Whether a node of this [`semantics::Role`] takes its accessible name
+/// from its own content when it has none of its own.
+///
+/// This is ARIA's "name from content" rule, and AT-SPI/UIA behave the
+/// same way. It exists because a control's label is often not the
+/// control's own data but a *child widget*: `button("Save")` is a button
+/// wrapping a `text`, and the button has no `label` field to report from
+/// — unlike `checkbox`/`radio`/`toggler`/`icon_button`, which own theirs
+/// and set it directly.
+///
+/// A [`Role::Group`] is deliberately excluded, as ARIA excludes it: a
+/// group named after everything inside it would announce a whole
+/// subtree's prose as one label.
+///
+/// [`Role::Group`]: semantics::Role::Group
+fn names_from_content(role: semantics::Role) -> bool {
+    use semantics::Role;
+
+    matches!(
+        role,
+        Role::Button
+            | Role::Link
+            | Role::Tab
+            | Role::MenuItem
+            | Role::ListItem
+            | Role::Checkbox
+            | Role::RadioButton
+    )
+}
+
+/// Joins the names of `children` and their descendants, in document
+/// order, into an accessible name.
+///
+/// Returns `None` rather than an empty string when there is nothing to
+/// say: an unlabeled control must stay visibly unlabeled, not acquire a
+/// name of `""` that reads as "named, with an empty name".
+fn name_from_content(children: &[semantics::Node]) -> Option<crate::core::SmolStr> {
+    fn collect(nodes: &[semantics::Node], out: &mut Vec<String>) {
+        for node in nodes {
+            // A nested control names itself; absorbing its name into an
+            // ancestor's would announce it twice, and out of context.
+            if names_from_content(node.role) {
+                continue;
+            }
+
+            if let Some(name) = &node.name {
+                out.push(name.to_string());
+            }
+
+            collect(&node.children, out);
         }
     }
+
+    let mut parts = Vec::new();
+    collect(children, &mut parts);
+
+    if parts.is_empty() {
+        return None;
+    }
+
+    Some(crate::core::SmolStr::new(parts.join(" ")))
 }
 
 /// Collects the [`semantics::Node`]s contributed by `node`'s children,
 /// flattening through any child that reports no semantics of its own so
 /// its own reporting descendants are not lost.
-fn collect_children<T: Semantic>(node: &mut T) -> Vec<semantics::Node> {
+fn collect_children(node: &mut dyn Visit) -> Vec<semantics::Node> {
     let mut children = Vec::new();
 
-    for index in 0..node.child_count() {
-        let mut child = node.child(index);
-
-        match build_one(&mut child) {
-            Some(built) => children.push(built),
-            None => children.extend(collect_children(&mut child)),
-        }
-    }
+    node.children(&mut |child| children.extend(build_subtree(child)));
 
     children
 }
@@ -129,13 +158,12 @@ mod tests {
     use crate::core::widget::tree::DirtyFlags;
 
     /// A minimal synthetic tree for exercising [`build`] without any
-    /// dependency on `iced_core::Widget`.
+    /// dependency on `aura_core::Widget`.
     ///
     /// Stored as a flat arena (rather than `Vec<Node>` children owning
     /// their own subtrees directly) so [`Adapter`] can hold plain
     /// indices instead of borrows, sidestepping the self-referential
-    /// borrow that a `&'a mut Node`-holding adapter would otherwise need
-    /// to reborrow through on every [`Semantic::child`] call.
+    /// borrow a `&'a mut Node`-holding adapter would need.
     struct Node {
         id: Id,
         name: &'static str,
@@ -184,23 +212,34 @@ mod tests {
 
     /// Adapts an [`Arena`] node to [`Semantic`].
     ///
-    /// Holds a *shared* reference to the whole arena (rather than a
-    /// `&mut Node` to just this node, as a first draft of this test
-    /// tried): `Semantic::child` must produce a fresh `Self` on every
-    /// call while the caller ([`build`]/`collect_children`) holds `&mut
-    /// self` on the parent, and a `&'a mut`-holding adapter cannot
-    /// reborrow itself for a lifetime shorter than `'a` and still claim
-    /// to return `Self = Adapter<'a>`. A shared reference has no such
-    /// problem (it can be copied freely); node-local mutation goes
-    /// through `Node::tree`'s `RefCell` instead.
+    /// Holds a *shared* reference to the whole arena rather than a `&mut
+    /// Node` to just this node: an adapter must be able to hand out
+    /// children while the caller ([`build`]/`collect_children`) holds
+    /// `&mut self` on the parent. A shared reference can be copied
+    /// freely; node-local mutation goes through `Node::tree`'s `RefCell`
+    /// instead.
     #[derive(Clone, Copy)]
     struct Adapter<'a> {
         arena: &'a Arena,
         index: usize,
     }
 
-    impl<'a> Semantic for Adapter<'a> {
-        fn node(&mut self) -> Option<semantics::Node> {
+    impl<'a> Visit for Adapter<'a> {
+        fn contains(&self, _point: crate::core::Point) -> bool {
+            // These tests exercise semantic assembly only; the
+            // hit-testing half of `Visit` is covered against real
+            // widgets in `tests/events/`.
+            false
+        }
+
+        fn bounds(&self) -> Rectangle {
+            Rectangle::new(
+                crate::core::Point::ORIGIN,
+                crate::core::Size::new(10.0, 10.0),
+            )
+        }
+
+        fn semantics(&mut self) -> Option<semantics::Node> {
             let node = &self.arena.nodes[self.index];
             let name = node.name;
             let reports = node.reports;
@@ -224,14 +263,14 @@ mod tests {
             })
         }
 
-        fn child_count(&self) -> usize {
-            self.arena.nodes[self.index].children.len()
-        }
+        fn children(&mut self, visit: &mut dyn FnMut(&mut dyn Visit)) {
+            let arena = self.arena;
 
-        fn child(&mut self, index: usize) -> Self {
-            Adapter {
-                arena: self.arena,
-                index: self.arena.nodes[self.index].children[index],
+            for &child in &arena.nodes[self.index].children {
+                visit(&mut Adapter {
+                    arena,
+                    index: child,
+                });
             }
         }
     }

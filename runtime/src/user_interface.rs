@@ -1,4 +1,5 @@
 //! Implement your own event loop to drive a user interface.
+use crate::core::damage;
 use crate::core::event::{self, Event};
 use crate::core::layout;
 use crate::core::mouse;
@@ -6,29 +7,36 @@ use crate::core::overlay;
 use crate::core::renderer;
 use crate::core::shell;
 use crate::core::widget;
+use crate::core::widget::visit;
 use crate::core::window;
 use crate::core::{
-    Clipboard, Element, InputMethod, Layout, Rectangle, Shell, Size, Vector, Window,
+    Clipboard, Element, InputMethod, Layout, Point, Rectangle, Shell, Size, Vector, Window,
 };
+use crate::diagnostics;
+use crate::hit_test;
+use crate::invalidation::Aggregator;
+use crate::pointer_router::{self, Routing};
 
 /// A set of interactive graphical elements with a specific [`Layout`].
 ///
 /// It can be updated and drawn.
 ///
-/// Iced tries to avoid dictating how to write your event loop. You are in
+/// Aura tries to avoid dictating how to write your event loop. You are in
 /// charge of using this type in your system in any way you want.
 ///
 /// # Example
-/// The [`integration`] example uses a [`UserInterface`] to integrate Iced in an
+/// The [`integration`] example uses a [`UserInterface`] to integrate Aura in an
 /// existing graphical application.
 ///
-/// [`integration`]: https://github.com/iced-rs/iced/tree/master/examples/integration
+/// [`integration`]: https://github.com/aura-rs/aura/tree/master/examples/integration
 pub struct UserInterface<'a, Message, Theme, Renderer> {
     root: Element<'a, Message, Theme, Renderer>,
     base: layout::Node,
     state: widget::Tree,
     overlay: Option<Overlay>,
     bounds: Size,
+    pointer_router: pointer_router::Router,
+    trace: diagnostics::Trace,
 }
 
 struct Overlay {
@@ -51,7 +59,7 @@ where
     /// is naive way to set up our application loop:
     ///
     /// ```no_run
-    /// # mod iced_wgpu {
+    /// # mod aura_wgpu {
     /// #     pub type Renderer = ();
     /// # }
     /// #
@@ -59,14 +67,14 @@ where
     /// #
     /// # impl Counter {
     /// #     pub fn new() -> Self { Counter }
-    /// #     pub fn view(&self) -> iced_core::Element<(), (), Renderer> { unimplemented!() }
+    /// #     pub fn view(&self) -> aura_core::Element<(), (), Renderer> { unimplemented!() }
     /// #     pub fn update(&mut self, _: ()) {}
     /// # }
-    /// use iced_runtime::core::shell;
-    /// use iced_runtime::core::window;
-    /// use iced_runtime::core::Size;
-    /// use iced_runtime::user_interface::{self, UserInterface};
-    /// use iced_wgpu::Renderer;
+    /// use aura_runtime::core::shell;
+    /// use aura_runtime::core::window;
+    /// use aura_runtime::core::Size;
+    /// use aura_runtime::user_interface::{self, UserInterface};
+    /// use aura_wgpu::Renderer;
     ///
     /// // Initialization
     /// let mut counter = Counter::new();
@@ -103,14 +111,19 @@ where
     ) -> Self {
         let mut root = root.into();
 
-        let Cache { mut state } = cache;
-        state.diff(root.as_widget_mut());
+        let Cache { mut state, trace } = cache;
 
+        trace.begin(diagnostics::Phase::Diff);
+        state.diff(root.as_widget_mut());
+        trace.end(diagnostics::Phase::Diff);
+
+        trace.begin(diagnostics::Phase::Layout);
         let base = root.as_widget_mut().layout(
             &mut state,
             renderer,
             &layout::Limits::new(Size::ZERO, bounds),
         );
+        trace.end(diagnostics::Phase::Layout);
 
         UserInterface {
             root,
@@ -118,7 +131,29 @@ where
             state,
             overlay: None,
             bounds,
+            pointer_router: pointer_router::Router::new(),
+            trace,
         }
+    }
+
+    /// Records this [`UserInterface`]'s phases into `trace`.
+    ///
+    /// Off by default: a [`UserInterface`] built without this carries a
+    /// disabled collector, so every span below costs a relaxed atomic
+    /// load and nothing else.
+    ///
+    /// Survives [`UserInterface::relayout`], which rebuilds — a trace that
+    /// switched itself off the first time the window resized would be a
+    /// puzzle rather than a tool.
+    #[must_use]
+    pub fn with_trace(mut self, trace: diagnostics::Trace) -> Self {
+        self.trace = trace;
+        self
+    }
+
+    /// The trace this [`UserInterface`] records into.
+    pub fn trace(&self) -> &diagnostics::Trace {
+        &self.trace
     }
 
     /// Updates the [`UserInterface`] by processing each provided [`Event`].
@@ -131,7 +166,7 @@ where
     /// completing [the previous example](#example):
     ///
     /// ```no_run
-    /// # mod iced_wgpu {
+    /// # mod aura_wgpu {
     /// #     pub type Renderer = ();
     /// # }
     /// #
@@ -139,15 +174,15 @@ where
     /// #
     /// # impl Counter {
     /// #     pub fn new() -> Self { Counter }
-    /// #     pub fn view(&self) -> iced_core::Element<(), (), Renderer> { unimplemented!() }
+    /// #     pub fn view(&self) -> aura_core::Element<(), (), Renderer> { unimplemented!() }
     /// #     pub fn update(&mut self, _: ()) {}
     /// # }
-    /// use iced_runtime::core::mouse;
-    /// use iced_runtime::core::shell;
-    /// use iced_runtime::core::window;
-    /// use iced_runtime::core::Size;
-    /// use iced_runtime::user_interface::{self, UserInterface};
-    /// use iced_wgpu::Renderer;
+    /// use aura_runtime::core::mouse;
+    /// use aura_runtime::core::shell;
+    /// use aura_runtime::core::window;
+    /// use aura_runtime::core::Size;
+    /// use aura_runtime::user_interface::{self, UserInterface};
+    /// use aura_wgpu::Renderer;
     ///
     /// let mut counter = Counter::new();
     /// let mut cache = user_interface::Cache::new();
@@ -198,11 +233,14 @@ where
         renderer: &mut Renderer,
         messages: &mut Vec<Message>,
     ) -> (State, Vec<event::Status>) {
+        self.trace.begin(diagnostics::Phase::Event);
+
         let mut outdated = false;
         let mut redraw_request = window::RedrawRequest::Wait;
         let mut input_method = InputMethod::Disabled;
         let mut clipboard = Clipboard::new();
         let mut has_layout_changed = false;
+        let mut is_animating = false;
         let viewport = Rectangle::with_size(self.bounds);
 
         let mut maybe_overlay = self
@@ -231,6 +269,7 @@ where
 
                 event_statuses.push(shell.event_status());
                 redraw_request = redraw_request.min(shell.redraw_request());
+                is_animating |= shell.is_animating();
                 input_method.merge(shell.input_method());
                 clipboard.merge(shell.clipboard_mut());
 
@@ -341,6 +380,7 @@ where
                 }
 
                 redraw_request = redraw_request.min(shell.redraw_request());
+                is_animating |= shell.is_animating();
                 input_method.merge(shell.input_method());
                 clipboard.merge(shell.clipboard_mut());
 
@@ -403,6 +443,39 @@ where
             overlay_interaction
         };
 
+        // Aggregate damage from this frame's updates.
+        //
+        // Both paths go through the `Aggregator` -- including the layout
+        // one, which used to short-circuit straight to `Region::Full`.
+        // That short-circuit is why a relayout arrived at the caller with
+        // no reason attached: the one place in the frame that *knew* the
+        // answer was the one place that threw it away.
+        let damage = if has_layout_changed {
+            let mut aggregator = Aggregator::new();
+
+            // `Layout`, not `Unknown`. A relayout is the most common
+            // reason a frame redraws everything, and it is knowable right
+            // here.
+            aggregator.record(damage::Request::full(damage::Cause::Layout));
+            aggregator.attribution()
+        } else if redraw_request != window::RedrawRequest::Wait {
+            // A redraw was requested but layout didn't change. Still
+            // `Unknown`, and honestly so: without per-widget damage
+            // reporting there is nothing more specific to say, and naming
+            // a cause we do not know would be worse than admitting it.
+            // Phase 5+ refines this to per-widget granularity.
+            let mut aggregator = Aggregator::new();
+            aggregator.record(damage::Request::full(damage::Cause::Unknown));
+            aggregator.attribution()
+        } else {
+            None
+        };
+
+        // Closed here rather than at every early return: `update` has
+        // one exit, and a span that leaks because a future edit adds a
+        // second would silently charge the rest of the frame to `Event`.
+        self.trace.end(diagnostics::Phase::Event);
+
         (
             if outdated {
                 State::Outdated
@@ -413,6 +486,8 @@ where
                     input_method,
                     clipboard,
                     has_layout_changed,
+                    damage,
+                    is_animating,
                 }
             },
             event_statuses,
@@ -431,7 +506,7 @@ where
     /// [completing the last example](#example-1):
     ///
     /// ```no_run
-    /// # mod iced_wgpu {
+    /// # mod aura_wgpu {
     /// #     pub type Renderer = ();
     /// #     pub type Theme = ();
     /// # }
@@ -443,13 +518,13 @@ where
     /// #     pub fn view(&self) -> Element<(), (), Renderer> { unimplemented!() }
     /// #     pub fn update(&mut self, _: ()) {}
     /// # }
-    /// use iced_runtime::core::mouse;
-    /// use iced_runtime::core::renderer;
-    /// use iced_runtime::core::shell;
-    /// use iced_runtime::core::window;
-    /// use iced_runtime::core::{Element, Size};
-    /// use iced_runtime::user_interface::{self, UserInterface};
-    /// use iced_wgpu::{Renderer, Theme};
+    /// use aura_runtime::core::mouse;
+    /// use aura_runtime::core::renderer;
+    /// use aura_runtime::core::shell;
+    /// use aura_runtime::core::window;
+    /// use aura_runtime::core::{Element, Size};
+    /// use aura_runtime::user_interface::{self, UserInterface};
+    /// use aura_wgpu::{Renderer, Theme};
     ///
     /// let mut counter = Counter::new();
     /// let mut cache = user_interface::Cache::new();
@@ -502,6 +577,10 @@ where
         style: &renderer::Style,
         cursor: mouse::Cursor,
     ) {
+        // A span, not a `begin`/`end` pair: this method returns early when
+        // there is no overlay.
+        let _span = self.trace.span(diagnostics::Phase::PaintPreparation);
+
         let viewport = Rectangle::with_size(self.bounds);
         renderer.reset(viewport);
 
@@ -589,16 +668,215 @@ where
         }
     }
 
+    /// Assembles the [`semantics::Node`] forest describing this
+    /// [`UserInterface`] to assistive technology: the widget tree, plus
+    /// any overlay currently on top of it.
+    ///
+    /// A forest rather than a single node because a root is often
+    /// transparent — a plain `column` reports nothing of its own while
+    /// several of its children report independently, and there is
+    /// nothing above it to gather them under. An overlay contributes its
+    /// own top-level nodes for the same reason: a dropdown is not a
+    /// child of the widget tree it floats over.
+    ///
+    /// Subtrees whose `SEMANTICS` dirty flag is clear contribute cached
+    /// nodes without their widgets being asked, so calling this per
+    /// frame costs a walk, not a rebuild.
+    ///
+    /// This is the entry point an accessibility adapter drives: feed the
+    /// result to `aura_accessibility::Tree`, diff it against the
+    /// previous frame's, and hand the changes to the platform.
+    ///
+    /// [`semantics::Node`]: crate::core::semantics::Node
+    pub fn semantics(&mut self, renderer: &Renderer) -> Vec<crate::core::semantics::Node> {
+        self.trace.begin(diagnostics::Phase::Semantics);
+
+        let viewport = Rectangle::with_size(self.bounds);
+
+        let mut forest = crate::semantics::build(&mut self.visit());
+
+        if let Some(mut overlay) = self
+            .root
+            .as_widget_mut()
+            .overlay(
+                &mut self.state,
+                Layout::new(&self.base),
+                renderer,
+                &viewport,
+                Vector::ZERO,
+            )
+            .map(overlay::Nested::new)
+        {
+            if self.overlay.is_none() {
+                self.overlay = Some(Overlay {
+                    layout: overlay.layout(renderer, self.bounds),
+                    interaction: mouse::Interaction::None,
+                });
+            }
+
+            forest.extend(overlay.semantics(
+                Layout::new(&self.overlay.as_ref().unwrap().layout),
+                renderer,
+            ));
+        }
+
+        self.trace.end(diagnostics::Phase::Semantics);
+
+        forest
+    }
+
+    /// Adapts this [`UserInterface`]'s widget tree to
+    /// [`visit::Visit`], for running a whole-tree traversal over it.
+    ///
+    /// [`UserInterface::semantics`] and [`UserInterface::hit_test`] are
+    /// this method's two callers, and are what most embedders want. This
+    /// is public for one that needs to drive a traversal itself — most
+    /// usefully, to query a [`hit_test::Index`] built earlier:
+    ///
+    /// ```ignore
+    /// let index = ui.hit_test_index();       // once per layout pass
+    /// let path = index.hit_test(&mut ui.visit(), point);  // per event
+    /// ```
+    ///
+    /// Does not include any overlay: an overlay is not part of the widget
+    /// tree (see [`UserInterface::semantics`], which appends it
+    /// separately).
+    pub fn visit(&mut self) -> visit::Widgets<'_, Message, Theme, Renderer> {
+        visit::Widgets::new(
+            self.root.as_widget_mut(),
+            &mut self.state,
+            Layout::new(&self.base),
+        )
+    }
+
+    /// Finds the deepest widget containing `point`, as a
+    /// [`hit_test::Path`].
+    ///
+    /// This is the exhaustive oracle: it walks the tree. For per-event
+    /// queries, build a [`hit_test::Index`] once per layout pass with
+    /// [`UserInterface::hit_test_index`] and query that instead — it
+    /// agrees with this method by construction, since it narrows *which*
+    /// widgets are asked without ever substituting a bounding box for a
+    /// widget's own [`Widget::hit_test`].
+    ///
+    /// The resulting [`hit_test::Path`] is what
+    /// [`UserInterface::route_pointer`] expects.
+    ///
+    /// [`Widget::hit_test`]: crate::core::Widget::hit_test
+    pub fn hit_test(&mut self, point: Point) -> Option<hit_test::Path> {
+        hit_test::hit_test(&mut self.visit(), point)
+    }
+
+    /// Builds a [`hit_test::Index`] over this [`UserInterface`]'s current
+    /// layout, for querying many points against without re-walking the
+    /// tree for each.
+    ///
+    /// The [`hit_test::Index`] is a snapshot: rebuild it whenever layout
+    /// changes (see [`UserInterface::has_layout_changed`]), or it will
+    /// answer against stale bounds.
+    pub fn hit_test_index(&mut self) -> hit_test::Index {
+        hit_test::Index::build(&mut self.visit())
+    }
+
+    /// Routes a single pointer-derived [`Event`] (see
+    /// [`Event::to_pointer`]) through this [`UserInterface`]'s
+    /// [`pointer_router::Router`], starting a fresh gesture arena at
+    /// `path` on an unrecognized `Down` and returning [`Routing::None`]
+    /// for any [`Event`] that yields no [`pointer::Pointer`] at all
+    /// (see [`Event::to_pointer`]'s own documentation for which events
+    /// those are).
+    ///
+    /// This is deliberately independent of [`UserInterface::update`]:
+    /// deciding whether a pointer is captured, still competing, or just
+    /// resolved never needs a full-tree [`Widget::update`] traversal --
+    /// it only needs this event, the [`hit_test::Path`] the caller
+    /// already found (e.g. via [`hit_test::Index::hit_test`], built once
+    /// per layout pass rather than walked per event), and whatever
+    /// [`Arena`] the caller registers recognizers into for a new
+    /// contact. `phase.md`'s "integrate route without full-tree
+    /// traversal" is satisfied by this method's own cost being
+    /// independent of the widget tree's size, not by changing what
+    /// [`UserInterface::update`] itself does.
+    ///
+    /// A caller still dispatches the event to widgets via
+    /// [`UserInterface::update`] exactly as before; this method is
+    /// additive routing information (which gesture, if any, now owns the
+    /// pointer) for a caller that wants gesture recognition alongside
+    /// -- not a replacement for the existing per-widget event path,
+    /// since no [`Widget`] yet exposes the recognizers it would
+    /// register into an [`Arena`] (a larger, separate `Widget` API
+    /// question outside this method's scope).
+    ///
+    /// [`Arena`]: aura_gesture::arena::Arena
+    /// [`hit_test::Path`]: crate::hit_test::Path
+    /// [`hit_test::Index::hit_test`]: crate::hit_test::Index::hit_test
+    /// [`Widget`]: crate::core::Widget
+    /// [`Widget::update`]: crate::core::Widget::update
+    pub fn route_pointer(
+        &mut self,
+        event: &Event,
+        cursor: mouse::Cursor,
+        timestamp: crate::core::time::Instant,
+        start: impl FnOnce() -> Option<(crate::hit_test::Path, aura_gesture::arena::Arena)>,
+    ) -> Routing {
+        let Some(pointer) = event.to_pointer(cursor.position(), timestamp) else {
+            return Routing::None;
+        };
+
+        let is_down = pointer.phase == crate::core::pointer::Phase::Down;
+        let id = pointer.id;
+
+        let routing = self.pointer_router.route(pointer);
+
+        if is_down
+            && matches!(routing, Routing::None)
+            && let Some((path, arena)) = start()
+        {
+            self.pointer_router.start(id, path, arena);
+
+            return self.pointer_router.route(
+                event.to_pointer(cursor.position(), timestamp).expect(
+                    "already produced a pointer above from the same event and cursor position",
+                ),
+            );
+        }
+
+        routing
+    }
+
+    /// Advances every still-competing gesture arena tracked by this
+    /// [`UserInterface`]'s [`pointer_router::Router`] (see
+    /// [`pointer_router::Router::tick`]), resolving any whose
+    /// deadline-based recognizers (e.g. a long-press) have now elapsed
+    /// with no new pointer event.
+    pub fn tick_pointer_router(
+        &mut self,
+        now: crate::core::time::Instant,
+    ) -> Vec<(crate::core::pointer::Id, Routing)> {
+        self.pointer_router.tick(now)
+    }
+
     /// Relayouts and returns a new  [`UserInterface`] using the provided
     /// bounds.
     pub fn relayout(self, bounds: Size, renderer: &mut Renderer) -> Self {
-        Self::build(self.root, bounds, Cache { state: self.state }, renderer)
+        Self::build(
+            self.root,
+            bounds,
+            Cache {
+                state: self.state,
+                trace: self.trace,
+            },
+            renderer,
+        )
     }
 
     /// Extract the [`Cache`] of the [`UserInterface`], consuming it in the
     /// process.
     pub fn into_cache(self) -> Cache {
-        Cache { state: self.state }
+        Cache {
+            state: self.state,
+            trace: self.trace,
+        }
     }
 }
 
@@ -606,6 +884,14 @@ where
 #[derive(Debug)]
 pub struct Cache {
     state: widget::Tree,
+    /// Carried through the rebuild so a trace survives it.
+    ///
+    /// `build` runs `Diff` and `Layout` before a [`UserInterface`] exists
+    /// to hold anything, so those two phases can only be recorded through
+    /// something the caller already handed over — and a profiler that
+    /// could see every phase *except* the two that run at startup would
+    /// be missing exactly the ones a slow first frame is made of.
+    trace: diagnostics::Trace,
 }
 
 impl Cache {
@@ -616,7 +902,20 @@ impl Cache {
     pub fn new() -> Cache {
         Cache {
             state: widget::Tree::empty(),
+            trace: diagnostics::Trace::new(aura_profiler::Collector::disabled()),
         }
+    }
+
+    /// Records the phases of every [`UserInterface`] built from this
+    /// [`Cache`] into `trace`.
+    ///
+    /// Set here rather than only on the [`UserInterface`] because `Diff`
+    /// and `Layout` run inside [`UserInterface::build`], before there is a
+    /// [`UserInterface`] to attach anything to.
+    #[must_use]
+    pub fn with_trace(mut self, trace: diagnostics::Trace) -> Self {
+        self.trace = trace;
+        self
     }
 }
 
@@ -645,6 +944,27 @@ pub enum State {
         clipboard: Clipboard,
         /// Whether the layout of the [`UserInterface`] has changed.
         has_layout_changed: bool,
+        /// The aggregated damage from this frame's updates, **and why**.
+        ///
+        /// When present, this tells the compositor which parts of the
+        /// surface need redrawing, and tells a developer why. The
+        /// compositor can use the region for partial presentation if the
+        /// backend supports it, and ignore the rest.
+        ///
+        /// `None` means "no damage was recorded" (either nothing changed,
+        /// or damage tracking was not active). A
+        /// [`damage::Region::Full`] means the entire surface needs
+        /// redrawing — and [`damage::Attribution::fallback`] says whether
+        /// that was a caller's request or damage tracking giving up.
+        damage: Option<damage::Attribution>,
+        /// Whether continuous redraws were requested this update (see
+        /// [`crate::core::Shell::request_animation`]), rather than a
+        /// single one-shot redraw.
+        ///
+        /// A frame scheduler (`runtime::frame_scheduler::Scheduler`)
+        /// reads this to decide whether to enter its continuous
+        /// animating state or schedule a single deadline.
+        is_animating: bool,
     },
 }
 
@@ -656,6 +976,48 @@ impl State {
             State::Updated {
                 has_layout_changed, ..
             } => *has_layout_changed,
+        }
+    }
+
+    /// Returns this frame's damage and its causes, if any.
+    ///
+    /// Prefer this to [`State::damage_region`] anywhere the answer might
+    /// be [`damage::Region::Full`]: "redraw everything" is not a finding,
+    /// and "redraw everything because the layout changed" is.
+    ///
+    /// [`State::Outdated`] attributes to [`damage::Cause::Layout`]: an
+    /// outdated interface is one whose view must be rebuilt, which is a
+    /// structural change by definition.
+    pub fn damage(&self) -> Option<damage::Attribution> {
+        match self {
+            State::Outdated => Some(damage::Attribution {
+                region: damage::Region::Full,
+                causes: damage::Causes::LAYOUT,
+                fallback: Some(damage::Fallback::Requested(damage::Cause::Layout)),
+            }),
+            State::Updated { damage, .. } => *damage,
+        }
+    }
+
+    /// Returns the damage region from this frame's updates, if any.
+    ///
+    /// The geometry alone, for a compositor that only needs to know what
+    /// to present. A caller diagnosing a *cost* wants [`State::damage`].
+    pub fn damage_region(&self) -> Option<damage::Region> {
+        Some(self.damage()?.region)
+    }
+
+    /// Returns whether continuous redraws were requested this update.
+    ///
+    /// Returns `false` for [`State::Outdated`]: an outdated interface
+    /// needs to be rebuilt before anything can be known about whether it
+    /// is animating, and defaulting to `false` (rather than assuming
+    /// `true`) avoids forcing a continuous redraw loop from a state that
+    /// says nothing about animation either way.
+    pub fn is_animating(&self) -> bool {
+        match self {
+            State::Outdated => false,
+            State::Updated { is_animating, .. } => *is_animating,
         }
     }
 }

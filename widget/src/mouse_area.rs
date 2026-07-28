@@ -4,6 +4,7 @@ use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
 use crate::core::touch;
+use crate::core::widget::visit;
 use crate::core::widget::{Operation, Tree, tree};
 use crate::core::{Element, Event, Layout, Length, Point, Rectangle, Shell, Size, Vector, Widget};
 
@@ -180,6 +181,19 @@ where
         self.content
             .as_widget_mut()
             .layout(&mut tree.children[0], renderer, limits)
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        visit(&mut visit::Widgets::new(
+            self.content.as_widget_mut(),
+            &mut tree.children[0],
+            layout,
+        ));
     }
 
     fn operate(

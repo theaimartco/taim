@@ -5,6 +5,7 @@ use crate::core::overlay;
 use crate::core::renderer;
 use crate::core::widget::Operation;
 use crate::core::widget::tree::{self, Tree};
+use crate::core::widget::visit;
 use crate::core::{
     Alignment, Element, Event, Layout, Length, Padding, Pixels, Rectangle, Shell, Size, Vector,
     Widget,
@@ -14,10 +15,10 @@ use crate::core::{
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{keyed_column, text};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{keyed_column, text};
 ///
 /// enum Message {
 ///     // ...
@@ -87,7 +88,7 @@ where
 
     /// Sets the vertical spacing _between_ elements.
     ///
-    /// Custom margins per element do not exist in iced. You should use this
+    /// Custom margins per element do not exist in aura. You should use this
     /// method instead! While less flexible, it helps you keep spacing between
     /// elements consistent.
     pub fn spacing(mut self, amount: impl Into<Pixels>) -> Self {
@@ -202,7 +203,7 @@ where
         // Pair each existing `Tree` with the key it was built from (the
         // two are parallel vectors on `Tree`/`State`, since `Tree` itself
         // has no notion of a key), reconcile by key -- see
-        // `iced_runtime::reconcile` for why this finds every surviving
+        // `aura_runtime::reconcile` for why this finds every surviving
         // item regardless of reordering, unlike the previous
         // boundary-only heuristic -- then split the result back into the
         // parallel shape `Tree`/`State` require.
@@ -219,7 +220,7 @@ where
             .zip(self.children.iter_mut())
             .collect::<Vec<_>>();
 
-        let reconciled = iced_runtime::reconcile::reconcile(
+        let reconciled = aura_runtime::reconcile::reconcile(
             current,
             &mut new_items,
             |tree, child| child.as_widget_mut().diff(tree),
@@ -269,6 +270,25 @@ where
             &mut self.children,
             &mut tree.children,
         )
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        self.children
+            .iter_mut()
+            .zip(&mut tree.children)
+            .zip(layout.children())
+            .for_each(|((child, state), layout)| {
+                visit(&mut visit::Widgets::new(
+                    child.as_widget_mut(),
+                    state,
+                    layout,
+                ));
+            });
     }
 
     fn operate(

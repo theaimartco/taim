@@ -4,6 +4,7 @@ use crate::core::Color;
 use crate::core::backend;
 use crate::core::font;
 use crate::core::renderer;
+use crate::damage::DamageRegion;
 use crate::futures::{MaybeSend, MaybeSync};
 use crate::{Shell, Viewport};
 
@@ -13,9 +14,58 @@ use thiserror::Error;
 use std::borrow::Cow;
 use std::fmt::Debug;
 
+/// Context for a single frame's presentation.
+///
+/// Carries the damage region, scale factor, and other per-frame metadata
+/// that the compositor needs to optimize presentation. A compositor that
+/// does not support partial presentation can ignore the damage and do a
+/// full present (the default behavior).
+#[derive(Debug, Clone)]
+pub struct FrameContext {
+    /// The damage region for this frame, indicating which parts of the
+    /// surface need redrawing. `None` means "unknown — do a full
+    /// present."
+    pub damage: Option<DamageRegion>,
+
+    /// The scale factor applied to the surface (e.g. 2.0 for HiDPI).
+    pub scale_factor: f32,
+
+    /// Whether the frame should be presented with sRGB color space.
+    pub srgb: bool,
+}
+
+impl FrameContext {
+    /// Creates a frame context with no damage information (full present).
+    pub fn full_present(scale_factor: f32) -> Self {
+        Self {
+            damage: None,
+            scale_factor,
+            srgb: true,
+        }
+    }
+
+    /// Creates a frame context with a damage region.
+    pub fn with_damage(damage: DamageRegion, scale_factor: f32) -> Self {
+        Self {
+            damage: Some(damage),
+            scale_factor,
+            srgb: true,
+        }
+    }
+
+    /// Returns `true` if this frame can use partial presentation
+    /// (has a non-full damage region).
+    pub fn supports_partial_present(&self) -> bool {
+        match &self.damage {
+            Some(damage) => !damage.is_full() && !damage.is_empty(),
+            None => false,
+        }
+    }
+}
+
 /// A graphics compositor that can draw to windows.
 pub trait Compositor: Sized {
-    /// The iced renderer of the backend.
+    /// The aura renderer of the backend.
     type Renderer;
 
     /// The surface of the backend.
@@ -86,6 +136,34 @@ pub trait Compositor: Sized {
         background_color: Color,
         on_pre_present: impl FnOnce(),
     ) -> Result<(), SurfaceError>;
+
+    /// Presents the current [`Renderer`] primitives to the given [`Surface`],
+    /// with damage-aware hints from the [`FrameContext`].
+    ///
+    /// The default implementation ignores the damage and falls back to a
+    /// full-surface present via [`present`](Self::present). Backends that
+    /// support partial presentation should override this to forward damage
+    /// rects to the platform compositor.
+    ///
+    /// [`Renderer`]: Self::Renderer
+    /// [`Surface`]: Self::Surface
+    fn present_with_damage(
+        &mut self,
+        renderer: &mut Self::Renderer,
+        surface: &mut Self::Surface,
+        viewport: &Viewport,
+        background_color: Color,
+        _frame_context: &FrameContext,
+        on_pre_present: impl FnOnce(),
+    ) -> Result<(), SurfaceError> {
+        self.present(
+            renderer,
+            surface,
+            viewport,
+            background_color,
+            on_pre_present,
+        )
+    }
 
     /// Screenshots the current [`Renderer`] primitives to an offscreen texture, and returns the bytes of
     /// the texture ordered as `RGBA` in the `sRGB` color space.

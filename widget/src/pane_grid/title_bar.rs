@@ -3,6 +3,7 @@ use crate::core::layout;
 use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
+use crate::core::widget::visit;
 use crate::core::widget::{self, Tree};
 use crate::core::{self, Element, Event, Layout, Padding, Point, Rectangle, Shell, Size, Vector};
 use crate::pane_grid::controls::Controls;
@@ -106,10 +107,7 @@ where
             }
         };
 
-        Tree {
-            children,
-            ..Tree::empty()
-        }
+        Tree::with_children(children)
     }
 
     pub(super) fn diff(&mut self, tree: &mut Tree) {
@@ -333,6 +331,63 @@ where
         };
 
         layout::Node::container(node, self.padding)
+    }
+
+    /// Mirrors [`TitleBar::operate`], including its collapse rule: when
+    /// the title and controls do not both fit, only the one actually
+    /// shown is visited. Reporting a hidden title to a screen reader
+    /// would announce something that is not on screen.
+    pub(crate) fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        let mut children = layout.children();
+        let padded = children.next().unwrap();
+
+        let mut children = padded.children();
+        let title_layout = children.next().unwrap();
+        let mut show_title = true;
+
+        if let Some(controls) = &mut self.controls {
+            let controls_layout = children.next().unwrap();
+
+            if title_layout.bounds().width + controls_layout.bounds().width > padded.bounds().width
+            {
+                if let Some(compact) = controls.compact.as_mut() {
+                    let compact_layout = children.next().unwrap();
+
+                    visit(&mut visit::Widgets::new(
+                        compact.as_widget_mut(),
+                        &mut tree.children[2],
+                        compact_layout,
+                    ));
+                } else {
+                    show_title = false;
+
+                    visit(&mut visit::Widgets::new(
+                        controls.full.as_widget_mut(),
+                        &mut tree.children[1],
+                        controls_layout,
+                    ));
+                }
+            } else {
+                visit(&mut visit::Widgets::new(
+                    controls.full.as_widget_mut(),
+                    &mut tree.children[1],
+                    controls_layout,
+                ));
+            }
+        };
+
+        if show_title {
+            visit(&mut visit::Widgets::new(
+                self.content.as_widget_mut(),
+                &mut tree.children[0],
+                title_layout,
+            ));
+        }
     }
 
     pub(crate) fn operate(

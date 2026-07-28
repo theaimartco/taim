@@ -13,3 +13,6 @@ mod dirty_flags;
 
 #[path = "widgets/invalidation.rs"]
 mod invalidation;
+
+#[path = "widgets/virtual_list.rs"]
+mod virtual_list;

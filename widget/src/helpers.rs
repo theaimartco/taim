@@ -1,14 +1,16 @@
 //! Helper functions to create pure widgets.
+use crate::adaptive::{self, Adaptive};
 use crate::button::{self, Button};
 use crate::checkbox::{self, Checkbox};
 use crate::combo_box::{self, ComboBox};
+use crate::constraint::{self, Constraint};
 use crate::container::{self, Container};
 use crate::core;
 use crate::core::theme;
 use crate::core::time::Instant;
 use crate::core::widget::operation::{self, Operation};
 use crate::core::window;
-use crate::core::{Element, Length, Size, Widget};
+use crate::core::{Element, Length, Pixels, Size, Widget};
 use crate::float::{self, Float};
 use crate::keyed;
 use crate::overlay;
@@ -16,6 +18,7 @@ use crate::pane_grid::{self, PaneGrid};
 use crate::pick_list::{self, PickList};
 use crate::progress_bar::{self, ProgressBar};
 use crate::radio::{self, Radio};
+use crate::safe_area::{Insets, SafeArea};
 use crate::scrollable::{self, Scrollable};
 use crate::slider::{self, Slider};
 use crate::text::{self, Text};
@@ -25,6 +28,7 @@ use crate::toggler::{self, Toggler};
 use crate::tooltip::{self, Tooltip};
 use crate::transition::{self, Transition};
 use crate::vertical_slider::{self, VerticalSlider};
+use crate::virtual_list::VirtualList;
 use crate::{Column, Grid, MouseArea, Pin, Responsive, Row, Sensor, Space, Stack, Themer};
 
 use std::borrow::Borrow;
@@ -38,10 +42,10 @@ pub use crate::table::table;
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{button, column};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{button, column};
 ///
 /// #[derive(Debug, Clone)]
 /// enum Message {
@@ -72,10 +76,10 @@ macro_rules! column {
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{button, row};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{button, row};
 ///
 /// #[derive(Debug, Clone)]
 /// enum Message {
@@ -138,7 +142,7 @@ macro_rules! grid {
 /// # Examples
 ///
 /// ```no_run
-/// # mod iced {
+/// # mod aura {
 /// #     pub mod widget {
 /// #         macro_rules! text {
 /// #           ($($arg:tt)*) => {unimplemented!()}
@@ -147,8 +151,8 @@ macro_rules! grid {
 /// #     }
 /// # }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::core::Theme, ()>;
-/// use iced::widget::text;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::core::Theme, ()>;
+/// use aura::widget::text;
 ///
 /// enum Message {
 ///     // ...
@@ -178,12 +182,12 @@ macro_rules! text {
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::core::*; }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::core::*; }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::font;
-/// use iced::widget::{rich_text, span};
-/// use iced::{color, never, Font};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::font;
+/// use aura::widget::{rich_text, span};
+/// use aura::{color, never, Font};
 ///
 /// #[derive(Debug, Clone)]
 /// enum Message {
@@ -217,10 +221,10 @@ macro_rules! rich_text {
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::container;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::container;
 ///
 /// enum Message {
 ///     // ...
@@ -249,8 +253,8 @@ where
 ///
 /// This is equivalent to:
 /// ```rust,no_run
-/// # use iced_widget::core::Length::Fill;
-/// # use iced_widget::Container;
+/// # use aura_widget::core::Length::Fill;
+/// # use aura_widget::Container;
 /// # fn container<A>(x: A) -> Container<'static, ()> { unreachable!() }
 /// let center = container("Center!").center(Fill);
 /// ```
@@ -271,8 +275,8 @@ where
 ///
 /// This is equivalent to:
 /// ```rust,no_run
-/// # use iced_widget::core::Length::Fill;
-/// # use iced_widget::Container;
+/// # use aura_widget::core::Length::Fill;
+/// # use aura_widget::Container;
 /// # fn container<A>(x: A) -> Container<'static, ()> { unreachable!() }
 /// let center_x = container("Horizontal Center!").center_x(Fill);
 /// ```
@@ -293,8 +297,8 @@ where
 ///
 /// This is equivalent to:
 /// ```rust,no_run
-/// # use iced_widget::core::Length::Fill;
-/// # use iced_widget::Container;
+/// # use aura_widget::core::Length::Fill;
+/// # use aura_widget::Container;
 /// # fn container<A>(x: A) -> Container<'static, ()> { unreachable!() }
 /// let center_y = container("Vertical Center!").center_y(Fill);
 /// ```
@@ -315,8 +319,8 @@ where
 ///
 /// This is equivalent to:
 /// ```rust,no_run
-/// # use iced_widget::core::Length::Fill;
-/// # use iced_widget::Container;
+/// # use aura_widget::core::Length::Fill;
+/// # use aura_widget::Container;
 /// # fn container<A>(x: A) -> Container<'static, ()> { unreachable!() }
 /// let right = container("Right!").align_right(Fill);
 /// ```
@@ -337,8 +341,8 @@ where
 ///
 /// This is equivalent to:
 /// ```rust,no_run
-/// # use iced_widget::core::Length::Fill;
-/// # use iced_widget::Container;
+/// # use aura_widget::core::Length::Fill;
+/// # use aura_widget::Container;
 /// # fn container<A>(x: A) -> Container<'static, ()> { unreachable!() }
 /// let right_center = container("Bottom Center!").align_right(Fill).center_y(Fill);
 /// ```
@@ -361,8 +365,8 @@ where
 ///
 /// This is equivalent to:
 /// ```rust,no_run
-/// # use iced_widget::core::Length::Fill;
-/// # use iced_widget::Container;
+/// # use aura_widget::core::Length::Fill;
+/// # use aura_widget::Container;
 /// # fn container<A>(x: A) -> Container<'static, ()> { unreachable!() }
 /// let bottom = container("Bottom!").align_bottom(Fill);
 /// ```
@@ -383,8 +387,8 @@ where
 ///
 /// This is equivalent to:
 /// ```rust,no_run
-/// # use iced_widget::core::Length::Fill;
-/// # use iced_widget::Container;
+/// # use aura_widget::core::Length::Fill;
+/// # use aura_widget::Container;
 /// # fn container<A>(x: A) -> Container<'static, ()> { unreachable!() }
 /// let bottom_center = container("Bottom Center!").center_x(Fill).align_bottom(Fill);
 /// ```
@@ -407,8 +411,8 @@ where
 ///
 /// This is equivalent to:
 /// ```rust,no_run
-/// # use iced_widget::core::Length::Fill;
-/// # use iced_widget::Container;
+/// # use aura_widget::core::Length::Fill;
+/// # use aura_widget::Container;
 /// # fn container<A>(x: A) -> Container<'static, ()> { unreachable!() }
 /// let bottom_right = container("Bottom!").align_right(Fill).align_bottom(Fill);
 /// ```
@@ -432,11 +436,11 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::core::Length::Fill; }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::core::Length::Fill; }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::pin;
-/// use iced::Fill;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::pin;
+/// use aura::Fill;
 ///
 /// enum Message {
 ///     // ...
@@ -464,10 +468,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{column, text};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{column, text};
 ///
 /// enum Message {
 ///     // ...
@@ -492,10 +496,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{keyed_column, text};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{keyed_column, text};
 ///
 /// enum Message {
 ///     // ...
@@ -523,10 +527,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{row, text};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{row, text};
 ///
 /// enum Message {
 ///     // ...
@@ -565,6 +569,62 @@ where
     Renderer: core::Renderer,
 {
     Stack::with_children(children)
+}
+
+/// Creates a new [`VirtualList`] with `item_count` items of the given
+/// fixed `item_height`, built lazily by `builder`.
+///
+/// [`VirtualList`]: crate::VirtualList
+pub fn virtual_list<'a, Message, Theme, Renderer>(
+    item_count: usize,
+    item_height: impl Into<Pixels>,
+    builder: impl Fn(usize) -> Element<'a, Message, Theme, Renderer> + 'a,
+) -> VirtualList<'a, Message, Theme, Renderer>
+where
+    Renderer: core::Renderer,
+{
+    VirtualList::new(item_count, item_height, builder)
+}
+
+/// Wraps `content` in a [`SafeArea`], padding it away from the given
+/// platform [`Insets`].
+///
+/// [`SafeArea`]: crate::SafeArea
+pub fn safe_area<'a, Message, Theme, Renderer>(
+    content: impl Into<Element<'a, Message, Theme, Renderer>>,
+    insets: Insets,
+) -> SafeArea<'a, Message, Theme, Renderer>
+where
+    Renderer: core::Renderer,
+{
+    SafeArea::new(content, insets)
+}
+
+/// Creates a new [`Adaptive`] widget that builds different content
+/// depending on the [`adaptive::WindowClass`] of the width it is given.
+///
+/// [`Adaptive`]: crate::Adaptive
+pub fn adaptive<'a, Message, Theme, Renderer>(
+    builder: impl Fn(adaptive::WindowClass) -> Element<'a, Message, Theme, Renderer> + 'a,
+) -> Adaptive<'a, Message, Theme, Renderer>
+where
+    Renderer: core::Renderer,
+{
+    Adaptive::new(builder)
+}
+
+/// Wraps `content`, clamping its resolved size to the given
+/// [`constraint::Limits`].
+///
+/// [`Constraint`]: crate::Constraint
+pub fn constrain<'a, Message, Theme, Renderer>(
+    content: impl Into<Element<'a, Message, Theme, Renderer>>,
+    limits: constraint::Limits,
+) -> Constraint<'a, Message, Theme, Renderer>
+where
+    Renderer: core::Renderer,
+{
+    Constraint::new(content, limits)
 }
 
 /// Wraps the given widget and captures any mouse button presses inside the bounds of
@@ -984,10 +1044,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{column, scrollable, space};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{column, scrollable, space};
 ///
 /// enum Message {
 ///     // ...
@@ -1015,10 +1075,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::button;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::button;
 ///
 /// #[derive(Clone)]
 /// enum Message {
@@ -1046,10 +1106,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{container, tooltip};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{container, tooltip};
 ///
 /// enum Message {
 ///     // ...
@@ -1081,18 +1141,18 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::core::Theme, ()>;
-/// use iced::widget::text;
-/// use iced::color;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::core::Theme, ()>;
+/// use aura::widget::text;
+/// use aura::color;
 ///
 /// enum Message {
 ///     // ...
 /// }
 ///
 /// fn view(state: &State) -> Element<'_, Message> {
-///     text("Hello, this is iced!")
+///     text("Hello, this is aura!")
 ///         .size(20)
 ///         .color(color!(0x0000ff))
 ///         .into()
@@ -1121,12 +1181,12 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::core::*; }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::core::*; }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::font;
-/// use iced::widget::{rich_text, span};
-/// use iced::{color, never, Font};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::font;
+/// use aura::widget::{rich_text, span};
+/// use aura::{color, never, Font};
 ///
 /// #[derive(Debug, Clone)]
 /// enum Message {
@@ -1166,12 +1226,12 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::core::*; }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::core::*; }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::font;
-/// use iced::widget::{rich_text, span};
-/// use iced::{color, never, Font};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::font;
+/// use aura::widget::{rich_text, span};
+/// use aura::{color, never, Font};
 ///
 /// #[derive(Debug, Clone)]
 /// enum Message {
@@ -1201,10 +1261,10 @@ pub use crate::markdown::view as markdown;
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::checkbox;
+/// use aura::widget::checkbox;
 ///
 /// struct State {
 ///    is_checked: bool,
@@ -1229,7 +1289,7 @@ pub use crate::markdown::view as markdown;
 ///     }
 /// }
 /// ```
-/// ![Checkbox drawn by `iced_wgpu`](https://github.com/iced-rs/iced/blob/7760618fb112074bc40b148944521f312152012a/docs/images/checkbox.png?raw=true)
+/// ![Checkbox drawn by `aura_wgpu`](https://github.com/aura-rs/aura/blob/7760618fb112074bc40b148944521f312152012a/docs/images/checkbox.png?raw=true)
 pub fn checkbox<'a, Message, Theme, Renderer>(
     is_checked: bool,
 ) -> Checkbox<'a, Message, Theme, Renderer>
@@ -1246,10 +1306,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::{column, radio};
+/// use aura::widget::{column, radio};
 ///
 /// struct State {
 ///    selection: Option<Choice>,
@@ -1321,10 +1381,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::toggler;
+/// use aura::widget::toggler;
 ///
 /// struct State {
 ///    is_checked: bool,
@@ -1365,10 +1425,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::text_input;
+/// use aura::widget::text_input;
 ///
 /// struct State {
 ///    content: String,
@@ -1411,10 +1471,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::text_editor;
+/// use aura::widget::text_editor;
 ///
 /// struct State {
 ///    content: text_editor::Content,
@@ -1457,10 +1517,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::slider;
+/// use aura::widget::slider;
 ///
 /// struct State {
 ///    value: f32,
@@ -1502,10 +1562,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::vertical_slider;
+/// use aura::widget::vertical_slider;
 ///
 /// struct State {
 ///    value: f32,
@@ -1547,10 +1607,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::pick_list;
+/// use aura::widget::pick_list;
 ///
 /// struct State {
 ///    favorite: Option<Fruit>,
@@ -1628,10 +1688,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::combo_box;
+/// use aura::widget::combo_box;
 ///
 /// struct State {
 ///    fruits: combo_box::State<Fruit>,
@@ -1712,10 +1772,10 @@ pub fn space() -> Space {
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::progress_bar;
+/// use aura::widget::progress_bar;
 ///
 /// struct State {
 ///    progress: f32,
@@ -1744,10 +1804,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::image;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::image;
 ///
 /// enum Message {
 ///     // ...
@@ -1757,7 +1817,7 @@ where
 ///     image("ferris.png").into()
 /// }
 /// ```
-/// <img src="https://github.com/iced-rs/iced/blob/9712b319bb7a32848001b96bd84977430f14b623/examples/resources/ferris.png?raw=true" width="300">
+/// <img src="https://github.com/aura-rs/aura/blob/9712b319bb7a32848001b96bd84977430f14b623/examples/resources/ferris.png?raw=true" width="300">
 #[cfg(feature = "image")]
 pub fn image<Handle>(handle: impl Into<Handle>) -> crate::Image<Handle> {
     crate::Image::new(handle.into())
@@ -1772,10 +1832,10 @@ pub fn image<Handle>(handle: impl Into<Handle>) -> crate::Image<Handle> {
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::svg;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::svg;
 ///
 /// enum Message {
 ///     // ...
@@ -1793,11 +1853,11 @@ where
     crate::Svg::new(handle)
 }
 
-/// Creates an [`Element`] that displays the iced logo with the given `text_size`.
+/// Creates an [`Element`] that displays the aura logo with the given `text_size`.
 ///
 /// Useful for showing some love to your favorite GUI library in your "About" screen,
 /// for instance.
-pub fn iced<'a, Message, Theme, Renderer>(
+pub fn aura<'a, Message, Theme, Renderer>(
     text_size: impl Into<core::Pixels>,
 ) -> Element<'a, Message, Theme, Renderer>
 where
@@ -1816,7 +1876,7 @@ where
 
     row![
         container(
-            text(Renderer::ICED_LOGO)
+            text(Renderer::AURA_LOGO)
                 .line_height(1.0)
                 .size(text_size)
                 .font(Renderer::ICON_FONT)
@@ -1833,7 +1893,7 @@ where
             border: border::rounded(border::radius(text_size * 0.4)),
             ..container::Style::default()
         }),
-        text("iced").size(text_size).font(Font::MONOSPACE)
+        text("aura").size(text_size).font(Font::MONOSPACE)
     ]
     .spacing(text_size.0 / 3.0)
     .align_y(Alignment::Center)
@@ -1848,13 +1908,13 @@ where
 ///
 /// # Example: Drawing a Simple Circle
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::mouse;
-/// use iced::widget::canvas;
-/// use iced::{Color, Rectangle, Renderer, Theme};
+/// use aura::mouse;
+/// use aura::widget::canvas;
+/// use aura::{Color, Rectangle, Renderer, Theme};
 ///
 /// // First, we define the data we need for drawing
 /// #[derive(Debug)]
@@ -1912,10 +1972,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::qr_code;
+/// use aura::widget::qr_code;
 ///
 /// struct State {
 ///    data: qr_code::Data,
@@ -1977,10 +2037,10 @@ where
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::{pane_grid, text};
+/// use aura::widget::{pane_grid, text};
 ///
 /// struct State {
 ///     panes: pane_grid::State<Pane>,
@@ -2062,10 +2122,10 @@ where
 /// Here is how you could implement a smooth progress bar:
 ///
 /// ```
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::core::Animation; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{transition, progress_bar};
-/// use iced::Animation;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::core::Animation; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{transition, progress_bar};
+/// use aura::Animation;
 ///
 /// fn smooth_progress_bar<'a, Message: 'a>(progress: f32) -> Element<'a, Message> {
 ///     transition(progress, || Animation::new(0.).quick(), |animation, now| {
@@ -2090,4 +2150,63 @@ where
 /// containers.
 pub fn void() -> core::widget::Void {
     core::widget::Void
+}
+
+/// Creates an [`IconButton`] showing `glyph`, named `label`.
+///
+/// The label is **required**: an icon-only control carries no visible
+/// text, so this is the only name assistive technology can announce.
+///
+/// [`IconButton`]: crate::icon_button::IconButton
+pub fn icon_button<'a, Message, Theme, Renderer>(
+    glyph: char,
+    label: impl Into<String>,
+) -> crate::icon_button::IconButton<'a, Message, Theme, Renderer>
+where
+    Renderer: core::text::Renderer,
+    Theme: crate::icon_button::Catalog,
+{
+    crate::icon_button::IconButton::new(glyph, label)
+}
+
+/// Creates a one-line [`ListTile`] with the given body.
+///
+/// [`ListTile`]: crate::list_tile::ListTile
+pub fn list_tile<'a, Message, Theme, Renderer>(
+    content: impl Into<Element<'a, Message, Theme, Renderer>>,
+) -> crate::list_tile::ListTile<'a, Message, Theme, Renderer>
+where
+    Renderer: core::Renderer,
+    Theme: crate::list_tile::Catalog,
+{
+    crate::list_tile::ListTile::new(content)
+}
+
+/// Creates a standard [`AppBar`] with the given title.
+///
+/// [`AppBar`]: crate::app_bar::AppBar
+pub fn app_bar<'a, Message, Theme, Renderer>(
+    title: impl Into<Element<'a, Message, Theme, Renderer>>,
+) -> crate::app_bar::AppBar<'a, Message, Theme, Renderer>
+where
+    Renderer: core::Renderer,
+    Theme: crate::app_bar::Catalog,
+{
+    crate::app_bar::AppBar::new(title)
+}
+
+/// Creates a modal [`Dialog`] around `content`.
+///
+/// Layer it over your page with [`stack`]; see the module documentation
+/// for why a dialog is a stacked widget rather than an overlay.
+///
+/// [`Dialog`]: crate::dialog::Dialog
+pub fn dialog<'a, Message, Theme, Renderer>(
+    content: impl Into<Element<'a, Message, Theme, Renderer>>,
+) -> crate::dialog::Dialog<'a, Message, Theme, Renderer>
+where
+    Renderer: core::Renderer,
+    Theme: crate::dialog::Catalog,
+{
+    crate::dialog::Dialog::new(content)
 }

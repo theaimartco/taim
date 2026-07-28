@@ -1,0 +1,12 @@
+# Aura icon manifest. SVG assets are added only with a reviewed license record.
+[[icon]]
+name = "add"
+grid = 24
+mirror_rtl = false
+license = "TBD-before-asset-import"
+
+[[icon]]
+name = "back"
+grid = 24
+mirror_rtl = true
+license = "TBD-before-asset-import"

@@ -7,11 +7,11 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 //! #
-//! use iced::widget::markdown;
-//! use iced::Theme;
+//! use aura::widget::markdown;
+//! use aura::Theme;
 //!
 //! struct State {
 //!    markdown: Vec<markdown::Item>,
@@ -383,11 +383,11 @@ impl Bullet {
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::markdown;
-/// use iced::Theme;
+/// use aura::widget::markdown;
+/// use aura::Theme;
 ///
 /// struct State {
 ///    markdown: Vec<markdown::Item>,
@@ -437,7 +437,7 @@ struct State {
 struct Highlighter {
     lines: Vec<(String, Vec<Span>)>,
     language: String,
-    parser: iced_highlighter::Stream,
+    parser: aura_highlighter::Stream,
     current: usize,
 }
 
@@ -446,8 +446,8 @@ impl Highlighter {
     pub fn new(language: &str) -> Self {
         Self {
             lines: Vec::new(),
-            parser: iced_highlighter::Stream::new(&iced_highlighter::Settings {
-                theme: iced_highlighter::Theme::Base16Ocean,
+            parser: aura_highlighter::Stream::new(&aura_highlighter::Settings {
+                theme: aura_highlighter::Theme::Base16Ocean,
                 token: language.to_owned(),
             }),
             language: language.to_owned(),
@@ -1117,11 +1117,11 @@ impl From<Theme> for Style {
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::markdown;
-/// use iced::Theme;
+/// use aura::widget::markdown;
+/// use aura::Theme;
 ///
 /// struct State {
 ///    markdown: Vec<markdown::Item>,

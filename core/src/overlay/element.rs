@@ -66,6 +66,15 @@ where
         self.content.layout(renderer, bounds)
     }
 
+    /// Forwards the mapped overlay's semantics unchanged.
+    ///
+    /// Mapping a message type says nothing about what a node *is*: the
+    /// same dropdown is the same dropdown to a screen reader regardless of
+    /// which `Message` its selections turn into.
+    fn semantics(&self, layout: Layout<'_>) -> Option<crate::semantics::Node> {
+        self.content.semantics(layout)
+    }
+
     fn operate(
         &mut self,
         layout: Layout<'_>,

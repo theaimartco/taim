@@ -31,7 +31,7 @@ use std::fmt::Debug;
 
 pub use raw_window_handle;
 
-/// A window managed by iced.
+/// A window managed by aura.
 ///
 /// It implements both [`HasWindowHandle`] and [`HasDisplayHandle`].
 pub trait Window: HasWindowHandle + HasDisplayHandle + Debug {}

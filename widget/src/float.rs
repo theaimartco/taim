@@ -5,8 +5,10 @@ use crate::core::layout;
 use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
+use crate::core::semantics;
 use crate::core::widget;
 use crate::core::widget::tree;
+use crate::core::widget::visit;
 use crate::core::{
     Element, Event, Layout, Length, Rectangle, Shadow, Shell, Size, Transformation, Vector, Widget,
 };
@@ -179,6 +181,43 @@ where
         self.content
             .as_widget()
             .mouse_interaction(tree, layout, cursor, viewport, renderer)
+    }
+
+    /// Delegates to the content, rather than reporting a node of its own
+    /// and visiting the content as a child.
+    ///
+    /// This [`Float`] is transparent in the widget tree -- its `tag`,
+    /// `state` and `diff` all defer to the content, so the two share a
+    /// single [`Tree`], and therefore a single
+    /// `Tree::semantics_with_cache` slot. Reporting separately would have
+    /// this wrapper's `None` cached into that shared slot and the dirty
+    /// flag cleared, so the content's own lookup would return the cached
+    /// `None` and the content would vanish from the semantic tree
+    /// entirely.
+    fn semantics(&self, tree: &widget::Tree, layout: Layout<'_>) -> Option<semantics::Node> {
+        self.content.as_widget().semantics(tree, layout)
+    }
+
+    /// Delegates to the content, rather than reporting a node of its own
+    /// and visiting the content as a child.
+    ///
+    /// This [`Float`] is transparent in the widget tree -- its `tag`,
+    /// `state` and `diff` all defer to the content, so the two share a
+    /// single [`Tree`], and therefore a single
+    /// `Tree::semantics_with_cache` slot. Reporting separately would have
+    /// this wrapper's `None` cached into that shared slot and the dirty
+    /// flag cleared, so the content's own lookup would return the cached
+    /// `None` and the content would vanish from the semantic tree
+    /// entirely.
+    fn visit_children(
+        &mut self,
+        tree: &mut widget::Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        self.content
+            .as_widget_mut()
+            .visit_children(tree, layout, visit);
     }
 
     fn operate(

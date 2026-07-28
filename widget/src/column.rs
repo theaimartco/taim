@@ -4,19 +4,30 @@ use crate::core::layout;
 use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
-use crate::core::widget::{Operation, Tree};
+use crate::core::widget::visit;
+use crate::core::widget::{self, Operation, Tree};
 use crate::core::{
     Element, Event, Layout, Length, Padding, Pixels, Rectangle, Shell, Size, Vector, Widget,
 };
+
+/// The internal, per-instance state of a [`Column`]: a bounded measure
+/// cache keyed on the [`layout::Limits`] it is asked to resolve under.
+///
+/// Mirrors `Row`'s identical caching strategy along the vertical axis;
+/// see that type's internal `State` for the full rationale.
+#[derive(Debug, Default)]
+struct State {
+    cache: layout::Cache,
+}
 
 /// A container that distributes its contents vertically.
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::{button, column};
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::{button, column};
 ///
 /// #[derive(Debug, Clone)]
 /// enum Message {
@@ -79,7 +90,7 @@ where
 
     /// Sets the vertical spacing _between_ elements.
     ///
-    /// Custom margins per element do not exist in iced. You should use this
+    /// Custom margins per element do not exist in aura. You should use this
     /// method instead! While less flexible, it helps you keep spacing between
     /// elements consistent.
     pub fn spacing(mut self, amount: impl Into<Pixels>) -> Self {
@@ -171,8 +182,21 @@ impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
 where
     Renderer: crate::core::Renderer,
 {
+    fn tag(&self) -> widget::tree::Tag {
+        widget::tree::Tag::of::<State>()
+    }
+
+    fn state(&self) -> widget::tree::State {
+        widget::tree::State::new(State::default())
+    }
+
     fn diff(&mut self, tree: &mut Tree) {
         tree.diff_children(&mut self.children);
+
+        // See `Row::diff`'s identical comment: clearing unconditionally
+        // is the conservative, currently-correct choice until per-widget
+        // `diff` reports fine-grained layout-affecting changes.
+        tree.state.downcast_mut::<State>().cache.clear();
 
         if self.width.is_fit() || self.height.is_fit() {
             for child in &self.children {
@@ -197,7 +221,18 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        layout::flex::resolve(
+        let fingerprint = layout::cache::Fingerprint::build(|hasher| {
+            hasher.write_usize(self.children.len());
+            self.width.hash_stable(hasher);
+            self.height.hash_stable(hasher);
+            hasher.write_u32(self.spacing.to_bits());
+        });
+
+        let state = tree.state.downcast_mut::<State>();
+
+        layout::flex::resolve_cached(
+            &mut state.cache,
+            fingerprint,
             layout::flex::Axis::Vertical,
             renderer,
             limits,
@@ -209,6 +244,25 @@ where
             &mut self.children,
             &mut tree.children,
         )
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        self.children
+            .iter_mut()
+            .zip(&mut tree.children)
+            .zip(layout.children())
+            .for_each(|((child, state), layout)| {
+                visit(&mut visit::Widgets::new(
+                    child.as_widget_mut(),
+                    state,
+                    layout,
+                ));
+            });
     }
 
     fn operate(
@@ -369,6 +423,14 @@ impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
 where
     Renderer: crate::core::Renderer,
 {
+    fn tag(&self) -> widget::tree::Tag {
+        self.column.tag()
+    }
+
+    fn state(&self) -> widget::tree::State {
+        self.column.state()
+    }
+
     fn diff(&mut self, tree: &mut Tree) {
         self.column.diff(tree);
     }
@@ -487,6 +549,15 @@ where
         let size = limits.resolve(self.column.width, self.column.height, intrinsic_size);
 
         layout::Node::with_children(size.expand(self.column.padding), children)
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        self.column.visit_children(tree, layout, visit);
     }
 
     fn operate(

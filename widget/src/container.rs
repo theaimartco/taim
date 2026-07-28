@@ -2,10 +2,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } }
+//! # mod aura { pub mod widget { pub use aura_widget::*; } }
 //! # pub type State = ();
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-//! use iced::widget::container;
+//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+//! use aura::widget::container;
 //!
 //! enum Message {
 //!     // ...
@@ -26,8 +26,10 @@ use crate::core::layout;
 use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
+use crate::core::semantics;
 use crate::core::theme;
 use crate::core::widget::tree::{self, Tree};
+use crate::core::widget::visit;
 use crate::core::widget::{self, Operation};
 use crate::core::{
     self, Background, Color, Element, Event, Layout, Length, Padding, Rectangle, Shadow, Shell,
@@ -38,10 +40,10 @@ use crate::core::{
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } }
+/// # mod aura { pub mod widget { pub use aura_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::container;
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// use aura::widget::container;
 ///
 /// enum Message {
 ///     // ...
@@ -241,6 +243,45 @@ where
             self.vertical_alignment,
             |limits| self.content.as_widget_mut().layout(tree, renderer, limits),
         )
+    }
+
+    /// Delegates to the content, rather than reporting a node of its own
+    /// and visiting the content as a child.
+    ///
+    /// This [`Container`] is transparent in the widget tree -- its `tag`,
+    /// `state` and `diff` all defer to the content, so the two share a
+    /// single [`Tree`], and therefore a single
+    /// `Tree::semantics_with_cache` slot. Reporting separately would have
+    /// this wrapper's `None` cached into that shared slot and the dirty
+    /// flag cleared, so the content's own lookup would return the cached
+    /// `None` and the content would vanish from the semantic tree
+    /// entirely.
+    fn semantics(&self, tree: &Tree, layout: Layout<'_>) -> Option<semantics::Node> {
+        self.content
+            .as_widget()
+            .semantics(tree, layout.children().next().unwrap())
+    }
+
+    /// Delegates to the content, rather than reporting a node of its own
+    /// and visiting the content as a child.
+    ///
+    /// This [`Container`] is transparent in the widget tree -- its `tag`,
+    /// `state` and `diff` all defer to the content, so the two share a
+    /// single [`Tree`], and therefore a single
+    /// `Tree::semantics_with_cache` slot. Reporting separately would have
+    /// this wrapper's `None` cached into that shared slot and the dirty
+    /// flag cleared, so the content's own lookup would return the cached
+    /// `None` and the content would vanish from the semantic tree
+    /// entirely.
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        self.content
+            .as_widget_mut()
+            .visit_children(tree, layout.children().next().unwrap(), visit);
     }
 
     fn operate(

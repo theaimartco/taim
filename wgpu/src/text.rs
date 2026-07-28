@@ -1,5 +1,7 @@
 use crate::core::alignment;
 use crate::core::text::Alignment;
+use crate::core::text::fallback::{FallbackChain, Script};
+use crate::core::text::paragraph::Direction;
 use crate::core::{Rectangle, Size, Transformation};
 use crate::graphics::cache;
 use crate::graphics::color;
@@ -483,6 +485,11 @@ fn prepare(
                         shaping: *shaping,
                         wrapping: *wrapping,
                         ellipsis: *ellipsis,
+                        locale: None,
+                        direction: Direction::Auto,
+                        script: Script::Latin,
+                        fallback: FallbackChain::for_script(Script::Latin),
+                        axes: &[],
                     },
                 );
 

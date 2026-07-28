@@ -1,4 +1,6 @@
 use crate::core::alignment;
+use crate::core::text::fallback::{FallbackChain, Script};
+use crate::core::text::paragraph::Direction;
 use crate::core::text::{Alignment, Ellipsis, Shaping, Wrapping};
 use crate::core::{Color, Font, Pixels, Point, Rectangle, Transformation};
 use crate::graphics::text::cache::{self, Cache};
@@ -122,6 +124,11 @@ impl Pipeline {
             wrapping,
             ellipsis,
             align_x,
+            locale: None,
+            direction: Direction::Auto,
+            script: Script::Latin,
+            fallback: FallbackChain::for_script(Script::Latin),
+            axes: &[],
         };
 
         let (_, entry) = self.cache.get_mut().allocate(font_system, key);
@@ -179,6 +186,10 @@ impl Pipeline {
     pub fn trim_cache(&mut self) {
         self.cache.get_mut().trim();
         self.glyph_cache.trim();
+    }
+
+    pub fn cache_statistics(&self) -> cache::Statistics {
+        self.cache.borrow().statistics()
     }
 }
 

@@ -1,6 +1,6 @@
 [package]
-name = "iced_runtime"
-description = "A renderer-agnostic runtime for iced"
+name = "aura_runtime"
+description = "A renderer-agnostic runtime for aura"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -11,7 +11,7 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-image = ["iced_core/image"]
+image = ["aura_core/image"]
 # Enables phase counters in `diagnostics`. Disabled by default so
 # instrumentation compiles out entirely in production release builds
 # (phase.md Phase 2 design constraint); see docs/architecture/feature-policy.md.
@@ -21,9 +21,12 @@ profiling = []
 workspace = true
 
 [dependencies]
+aura-profiler.workspace = true
+aura-gesture.workspace = true
 bytes.workspace = true
-iced_core.workspace = true
-iced_futures.workspace = true
+aura_core.workspace = true
+aura_futures.workspace = true
+aura_graphics.workspace = true
 rustc-hash.workspace = true
 
 thiserror.workspace = true

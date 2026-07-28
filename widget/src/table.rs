@@ -6,6 +6,7 @@ use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
 use crate::core::widget;
+use crate::core::widget::visit;
 use crate::core::{
     Alignment, Background, Element, Layout, Length, Pixels, Rectangle, Size, Widget,
 };
@@ -550,6 +551,26 @@ where
             })
             .max()
             .unwrap_or_default()
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut widget::Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        for ((cell, state), layout) in self
+            .cells
+            .iter_mut()
+            .zip(&mut tree.children)
+            .zip(layout.children())
+        {
+            visit(&mut visit::Widgets::new(
+                cell.as_widget_mut(),
+                state,
+                layout,
+            ));
+        }
     }
 
     fn operate(

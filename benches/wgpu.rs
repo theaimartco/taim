@@ -1,19 +1,19 @@
 #![allow(missing_docs)]
 use criterion::{Bencher, Criterion, criterion_group, criterion_main};
 
-use iced::alignment;
-use iced::mouse;
-use iced::widget::{canvas, scrollable, stack, text};
-use iced::{Color, Element, Font, Length, Pixels, Point, Rectangle, Size, Theme};
-use iced_wgpu::Renderer;
-use iced_wgpu::wgpu;
+use aura::alignment;
+use aura::mouse;
+use aura::widget::{canvas, scrollable, stack, text};
+use aura::{Color, Element, Font, Length, Pixels, Point, Rectangle, Size, Theme};
+use aura_wgpu::Renderer;
+use aura_wgpu::wgpu;
 
 criterion_main!(benches);
 criterion_group!(benches, wgpu_benchmark);
 
 pub fn wgpu_benchmark(c: &mut Criterion) {
-    use iced_futures::futures::executor;
-    use iced_wgpu::wgpu;
+    use aura_futures::futures::executor;
+    use aura_wgpu::wgpu;
 
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::all(),
@@ -73,16 +73,16 @@ fn benchmark<'a>(
     queue: &wgpu::Queue,
     view: impl Fn(usize) -> Element<'a, (), Theme, Renderer>,
 ) {
-    use iced_wgpu::graphics;
-    use iced_wgpu::graphics::{Antialiasing, Shell};
-    use iced_wgpu::wgpu;
-    use iced_winit::core;
-    use iced_winit::core::renderer;
-    use iced_winit::runtime;
+    use aura_wgpu::graphics;
+    use aura_wgpu::graphics::{Antialiasing, Shell};
+    use aura_wgpu::wgpu;
+    use aura_winit::core;
+    use aura_winit::core::renderer;
+    use aura_winit::runtime;
 
     let format = wgpu::TextureFormat::Bgra8UnormSrgb;
 
-    let engine = iced_wgpu::Engine::new(
+    let engine = aura_wgpu::Engine::new(
         adapter,
         device.clone(),
         queue.clone(),

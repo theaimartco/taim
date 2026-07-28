@@ -2,19 +2,19 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub fn text<T>(t: T) -> iced_core::widget::Text<'static, iced_core::Theme, ()> { unimplemented!() } }
-//! #            pub use iced_core::color; }
+//! # mod aura { pub mod widget { pub fn text<T>(t: T) -> aura_core::widget::Text<'static, aura_core::Theme, ()> { unimplemented!() } }
+//! #            pub use aura_core::color; }
 //! # pub type State = ();
-//! # pub type Element<'a, Message> = iced_core::Element<'a, Message, iced_core::Theme, ()>;
-//! use iced::widget::text;
-//! use iced::color;
+//! # pub type Element<'a, Message> = aura_core::Element<'a, Message, aura_core::Theme, ()>;
+//! use aura::widget::text;
+//! use aura::color;
 //!
 //! enum Message {
 //!     // ...
 //! }
 //!
 //! fn view(state: &State) -> Element<'_, Message> {
-//!     text("Hello, this is iced!")
+//!     text("Hello, this is aura!")
 //!         .size(20)
 //!         .color(color!(0x0000ff))
 //!         .into()
@@ -24,6 +24,7 @@ use crate::alignment;
 use crate::layout;
 use crate::mouse;
 use crate::renderer;
+use crate::semantics;
 use crate::text;
 use crate::text::paragraph::{self, Paragraph};
 use crate::widget::tree::{self, Tree};
@@ -35,19 +36,19 @@ pub use text::{Alignment, Ellipsis, LineHeight, Shaping, Wrapping};
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub fn text<T>(t: T) -> iced_core::widget::Text<'static, iced_core::Theme, ()> { unimplemented!() } }
-/// #            pub use iced_core::color; }
+/// # mod aura { pub mod widget { pub fn text<T>(t: T) -> aura_core::widget::Text<'static, aura_core::Theme, ()> { unimplemented!() } }
+/// #            pub use aura_core::color; }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_core::Element<'a, Message, iced_core::Theme, ()>;
-/// use iced::widget::text;
-/// use iced::color;
+/// # pub type Element<'a, Message> = aura_core::Element<'a, Message, aura_core::Theme, ()>;
+/// use aura::widget::text;
+/// use aura::color;
 ///
 /// enum Message {
 ///     // ...
 /// }
 ///
 /// fn view(state: &State) -> Element<'_, Message> {
-///     text("Hello, this is iced!")
+///     text("Hello, this is aura!")
 ///         .size(20)
 ///         .color(color!(0x0000ff))
 ///         .into()
@@ -210,6 +211,28 @@ where
             width: self.format.width,
             height: self.format.height,
         }
+    }
+
+    fn semantics(&self, tree: &Tree, layout: Layout<'_>) -> Option<semantics::Node> {
+        // Without this, every label and paragraph in an application is
+        // invisible to assistive technology: a screen reader would hear
+        // the controls and none of the prose between them.
+        //
+        // Empty text is not reported. It is laid out and drawn (as
+        // nothing), and announcing "" would be noise -- the common case
+        // is a placeholder or a spacer built out of `text("")`.
+        if self.fragment.is_empty() {
+            return None;
+        }
+
+        Some(
+            semantics::Node::new(
+                tree.id().clone(),
+                layout.bounds(),
+                semantics::Role::StaticText,
+            )
+            .with_name(self.fragment.as_ref()),
+        )
     }
 
     fn layout(

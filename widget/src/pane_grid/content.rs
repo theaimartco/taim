@@ -3,6 +3,7 @@ use crate::core::layout;
 use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
+use crate::core::widget::visit;
 use crate::core::widget::{self, Tree};
 use crate::core::{self, Element, Event, Layout, Point, Rectangle, Shell, Size, Vector};
 use crate::pane_grid::{Draggable, TitleBar};
@@ -71,10 +72,7 @@ where
             vec![Tree::new(&self.body), Tree::empty()]
         };
 
-        Tree {
-            children,
-            ..Tree::empty()
-        }
+        Tree::with_children(children)
     }
 
     pub(super) fn diff(&mut self, tree: &mut Tree) {
@@ -188,6 +186,29 @@ where
                 .as_widget_mut()
                 .layout(&mut tree.children[0], renderer, limits)
         }
+    }
+
+    pub(crate) fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        let body_layout = if let Some(title_bar) = &mut self.title_bar {
+            let mut children = layout.children();
+
+            title_bar.visit_children(&mut tree.children[1], children.next().unwrap(), visit);
+
+            children.next().unwrap()
+        } else {
+            layout
+        };
+
+        visit(&mut visit::Widgets::new(
+            self.body.as_widget_mut(),
+            &mut tree.children[0],
+            body_layout,
+        ));
     }
 
     pub(crate) fn operate(

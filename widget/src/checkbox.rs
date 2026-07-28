@@ -2,10 +2,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 //! #
-//! use iced::widget::checkbox;
+//! use aura::widget::checkbox;
 //!
 //! struct State {
 //!    is_checked: bool,
@@ -30,7 +30,7 @@
 //!     }
 //! }
 //! ```
-//! ![Checkbox drawn by `iced_wgpu`](https://github.com/iced-rs/iced/blob/7760618fb112074bc40b148944521f312152012a/docs/images/checkbox.png?raw=true)
+//! ![Checkbox drawn by `aura_wgpu`](https://github.com/aura-rs/aura/blob/7760618fb112074bc40b148944521f312152012a/docs/images/checkbox.png?raw=true)
 use crate::core::alignment;
 use crate::core::layout;
 use crate::core::mouse;
@@ -50,10 +50,10 @@ use crate::core::{
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::checkbox;
+/// use aura::widget::checkbox;
 ///
 /// struct State {
 ///    is_checked: bool,
@@ -78,7 +78,7 @@ use crate::core::{
 ///     }
 /// }
 /// ```
-/// ![Checkbox drawn by `iced_wgpu`](https://github.com/iced-rs/iced/blob/7760618fb112074bc40b148944521f312152012a/docs/images/checkbox.png?raw=true)
+/// ![Checkbox drawn by `aura_wgpu`](https://github.com/aura-rs/aura/blob/7760618fb112074bc40b148944521f312152012a/docs/images/checkbox.png?raw=true)
 pub struct Checkbox<'a, Message, Theme = crate::Theme, Renderer = crate::Renderer>
 where
     Renderer: text::Renderer,
@@ -453,6 +453,37 @@ where
                 viewport,
             );
         }
+    }
+
+    fn semantics(&self, tree: &Tree, layout: Layout<'_>) -> Option<crate::core::semantics::Node> {
+        use crate::core::semantics::{Actions, Node, Role, State as SemanticState};
+
+        let enabled = self.on_toggle.is_some();
+
+        let mut flags = if enabled {
+            SemanticState::FOCUSABLE
+        } else {
+            SemanticState::DISABLED
+        };
+
+        if self.is_checked {
+            flags |= SemanticState::CHECKED;
+        }
+
+        let node = Node::new(tree.id().clone(), layout.bounds(), Role::Checkbox)
+            .with_state(flags)
+            .with_actions(if enabled {
+                Actions::ACTIVATE | Actions::FOCUS
+            } else {
+                Actions::empty()
+            });
+
+        // The visible label *is* the accessible name: a checkbox
+        // announced without one is "checkbox, checked" and nothing else.
+        Some(match &self.label {
+            Some(label) => node.with_name(label.as_ref()),
+            None => node,
+        })
     }
 
     fn operate(

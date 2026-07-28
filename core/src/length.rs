@@ -210,6 +210,59 @@ impl Length {
         matches!(self, Self::Fit)
     }
 
+    /// Folds this [`Length`] into `hasher`, normalizing any `f32` fields
+    /// the same way [`layout::Limits::key`](crate::layout::Limits::key)
+    /// does, so a [`Length`] can participate in a
+    /// [`layout::cache::Fingerprint`](crate::layout::cache::Fingerprint)
+    /// despite not implementing [`std::hash::Hash`] itself (`f32` does
+    /// not implement it).
+    pub fn hash_stable(&self, hasher: &mut dyn std::hash::Hasher) {
+        fn hash_f32(value: f32, hasher: &mut dyn std::hash::Hasher) {
+            let bits = if value == 0.0 {
+                0.0f32.to_bits()
+            } else {
+                value.to_bits()
+            };
+
+            hasher.write_u32(bits);
+        }
+
+        hasher.write_u8(match self {
+            Length::Fit => 0,
+            Length::Fill => 1,
+            Length::FillPortion(_) => 2,
+            Length::Shrink => 3,
+            Length::Fixed(_) => 4,
+            Length::Bounded { .. } => 5,
+            Length::Fluid(_) => 6,
+        });
+
+        match self {
+            Length::Fit | Length::Fill | Length::Shrink => {}
+            Length::FillPortion(factor) => hasher.write_u16(*factor),
+            Length::Fixed(amount) => hash_f32(*amount, hasher),
+            Length::Bounded { bounds, sizing } => {
+                match bounds {
+                    Bounds::Min(min) => hash_f32(*min, hasher),
+                    Bounds::Max(max) => hash_f32(*max, hasher),
+                    Bounds::Both { min, max } => {
+                        hash_f32(*min, hasher);
+                        hash_f32(*max, hasher);
+                    }
+                }
+
+                match sizing {
+                    Sizing::Fit | Sizing::Shrink => {}
+                    Sizing::Fill(factor) => hasher.write_u16(*factor),
+                }
+            }
+            Length::Fluid(constraint) => match constraint {
+                Constraint::Min(min) => hash_f32(*min, hasher),
+                Constraint::Max => {}
+            },
+        }
+    }
+
     /// Stacks the constraints of the current [`Length`] with the given one, if applicable.
     ///
     /// Specifically, minimum constraints will be _added_ together and accumulated.

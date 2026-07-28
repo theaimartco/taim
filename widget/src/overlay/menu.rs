@@ -297,6 +297,26 @@ where
             .mouse_interaction(self.tree, layout, cursor, &self.viewport, renderer)
     }
 
+    fn semantics(&self, layout: Layout<'_>) -> Option<crate::core::semantics::Node> {
+        use crate::core::semantics::{Actions, Node, Role, State as SemanticState};
+
+        // An open dropdown is, right then, the only thing the user can
+        // interact with -- so it must be reachable. Before
+        // `Overlay::semantics` existed this list announced nothing at all:
+        // a screen-reader user could hear the closed control, open it, and
+        // find the choices gone.
+        //
+        // The list itself is a scrollable group; its options are drawn
+        // directly by this overlay rather than being child widgets, so
+        // they have no nodes of their own yet (see
+        // docs/accessibility/contract.md).
+        Some(
+            Node::new(self.tree.id().clone(), layout.bounds(), Role::Group)
+                .with_state(SemanticState::EXPANDED)
+                .with_actions(Actions::SCROLL_INTO_VIEW),
+        )
+    }
+
     fn draw(
         &self,
         renderer: &mut Renderer,

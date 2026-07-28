@@ -1,11 +1,17 @@
 //! Draw and interact with text.
 pub mod editor;
+pub mod fallback;
 pub mod highlighter;
+pub mod line_break;
 pub mod paragraph;
+pub mod selection;
 
 pub use editor::Editor;
+pub use fallback::{FallbackChain, Script};
 pub use highlighter::Highlighter;
+pub use line_break::{LineBreak, LineBreakPolicy};
 pub use paragraph::Paragraph;
+pub use selection::{Selection, SelectionGeometry};
 
 use crate::alignment;
 use crate::{Background, Border, Color, Padding, Pixels, Point, Rectangle, Size};
@@ -361,10 +367,10 @@ pub trait Renderer: crate::Renderer {
     /// [`ICON_FONT`]: Self::ICON_FONT
     const SCROLL_RIGHT_ICON: char;
 
-    /// The 'char' representing the iced logo in the built-in ['ICON_FONT'].
+    /// The 'char' representing the aura logo in the built-in ['ICON_FONT'].
     ///
     /// ['ICON_FONT']: Self::ICON_FONT
-    const ICED_LOGO: char;
+    const AURA_LOGO: char;
 
     /// Returns the default [`Self::Font`].
     fn default_font(&self) -> Self::Font;

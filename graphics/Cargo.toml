@@ -1,6 +1,6 @@
 [package]
-name = "iced_graphics"
-description = "A bunch of backend-agnostic types that can be leveraged to build a renderer for iced"
+name = "aura_graphics"
+description = "A bunch of backend-agnostic types that can be leveraged to build a renderer for aura"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -25,8 +25,8 @@ web-colors = []
 fira-sans = []
 
 [dependencies]
-iced_core.workspace = true
-iced_futures.workspace = true
+aura_core.workspace = true
+aura_futures.workspace = true
 
 bitflags.workspace = true
 bytemuck.workspace = true
@@ -35,6 +35,7 @@ half.workspace = true
 log.workspace = true
 raw-window-handle.workspace = true
 rustc-hash.workspace = true
+smallvec.workspace = true
 thiserror.workspace = true
 unicode-segmentation.workspace = true
 

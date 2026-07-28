@@ -2,10 +2,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 //! #
-//! use iced::widget::{column, radio};
+//! use aura::widget::{column, radio};
 //!
 //! struct State {
 //!    selection: Option<Choice>,
@@ -75,10 +75,10 @@ use crate::core::{
 ///
 /// # Example
 /// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::Renderer; pub use iced_widget::core::*; }
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
+/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
 /// #
-/// use iced::widget::{column, radio};
+/// use aura::widget::{column, radio};
 ///
 /// struct State {
 ///    selection: Option<Choice>,
@@ -357,6 +357,28 @@ where
         {
             shell.request_redraw();
         }
+    }
+
+    fn semantics(&self, tree: &Tree, layout: Layout<'_>) -> Option<crate::core::semantics::Node> {
+        use crate::core::semantics::{Actions, Node, Role, State as SemanticState};
+
+        // A radio always has an `on_click` (it is not optional upstream),
+        // so it is always operable.
+        let mut flags = SemanticState::FOCUSABLE;
+
+        if self.is_selected {
+            // A radio reports both: CHECKED is what a screen reader
+            // announces for the control itself, SELECTED is what marks it
+            // as the chosen member of its group.
+            flags |= SemanticState::CHECKED | SemanticState::SELECTED;
+        }
+
+        Some(
+            Node::new(tree.id().clone(), layout.bounds(), Role::RadioButton)
+                .with_state(flags)
+                .with_actions(Actions::ACTIVATE | Actions::FOCUS)
+                .with_name(self.label.as_str()),
+        )
     }
 
     fn mouse_interaction(

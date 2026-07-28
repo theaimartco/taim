@@ -6,6 +6,7 @@ use crate::core::overlay;
 use crate::core::renderer;
 use crate::core::widget;
 use crate::core::widget::tree::{self, Tree};
+use crate::core::widget::visit;
 use crate::core::{self, Element, Length, Rectangle, Shell, Size, Vector, Widget};
 
 use ouroboros::self_referencing;
@@ -16,9 +17,9 @@ use std::rc::Rc;
 /// A reusable, custom widget that uses The Elm Architecture.
 ///
 /// A [`Component`] allows you to implement custom widgets as if they were
-/// `iced` applications with encapsulated state.
+/// `aura` applications with encapsulated state.
 ///
-/// In other words, a [`Component`] allows you to turn `iced` applications into
+/// In other words, a [`Component`] allows you to turn `aura` applications into
 /// custom widgets and embed them without cumbersome wiring.
 ///
 /// A [`Component`] produces widgets that may fire an [`Event`](Component::Event)
@@ -245,11 +246,11 @@ where
     }
 
     fn state(&self) -> tree::State {
-        let state = Rc::new(RefCell::new(Some(Tree {
-            tag: tree::Tag::of::<Tag<S>>(),
-            state: tree::State::new(S::default()),
-            children: vec![Tree::empty()],
-        })));
+        let state = Rc::new(RefCell::new(Some(Tree::with_state(
+            tree::Tag::of::<Tag<S>>(),
+            tree::State::new(S::default()),
+            vec![Tree::empty()],
+        ))));
 
         *self.tree.borrow_mut() = state.clone();
         self.diff_self();
@@ -344,6 +345,30 @@ where
             shell.invalidate_layout();
             shell.request_redraw();
         }
+    }
+
+    /// Unlike [`operate`], this does not rebuild the element with the
+    /// visitor first: `rebuild_element_with_operation` exists so a focus
+    /// operation can reach state that only exists once the element is
+    /// built, and semantics has no equivalent need — `with_element_mut`
+    /// already rebuilds if necessary, which is all this requires.
+    ///
+    /// [`operate`]: Self::operate
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        let tree = tree.state.downcast_mut::<Rc<RefCell<Option<Tree>>>>();
+
+        self.with_element_mut(|element| {
+            visit(&mut visit::Widgets::new(
+                element.as_widget_mut(),
+                &mut tree.borrow_mut().as_mut().unwrap().children[0],
+                layout,
+            ));
+        });
     }
 
     fn operate(

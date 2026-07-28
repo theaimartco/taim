@@ -1,8 +1,8 @@
-//! The definition of an iced program.
-pub use iced_graphics as graphics;
-pub use iced_runtime as runtime;
-pub use iced_runtime::core;
-pub use iced_runtime::futures;
+//! The definition of an aura program.
+pub use aura_graphics as graphics;
+pub use aura_runtime as runtime;
+pub use aura_runtime::core;
+pub use aura_runtime::futures;
 
 pub mod message;
 
@@ -83,7 +83,7 @@ pub trait Program: Sized {
             title.push_str(&part);
         }
 
-        format!("{title} - Iced")
+        format!("{title} - Aura")
     }
 
     fn subscription(&self, _state: &Self::State) -> Subscription<Self::Message> {

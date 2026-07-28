@@ -115,6 +115,61 @@ where
     }
 
     /// Applies a [`widget::Operation`] to the [`Nested`] overlay.
+    /// Collects the semantics of this overlay and every overlay nested
+    /// inside it, outermost first.
+    ///
+    /// A forest rather than a single node: an overlay chain (a menu whose
+    /// item opens a submenu) has no natural parent to gather under, and
+    /// each level is an independent thing a screen reader may land on.
+    ///
+    /// This is the piece that was missing entirely before: the runtime
+    /// walks widgets for semantics, and an overlay is not in the widget
+    /// tree, so nothing ever asked it. See
+    /// [`Overlay::semantics`](overlay::Overlay::semantics).
+    ///
+    /// Takes `&mut self` -- as [`Nested::operate`] does, and for the same
+    /// reason: reaching a nested overlay goes through
+    /// [`Overlay::overlay`](overlay::Overlay::overlay), which needs a
+    /// mutable borrow. Producing semantics is conceptually a read, but the
+    /// traversal is not.
+    pub fn semantics(
+        &mut self,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+    ) -> Vec<crate::semantics::Node> {
+        fn recurse<Message, Theme, Renderer>(
+            element: &mut overlay::Element<'_, Message, Theme, Renderer>,
+            layout: Layout<'_>,
+            renderer: &Renderer,
+            found: &mut Vec<crate::semantics::Node>,
+        ) where
+            Renderer: renderer::Renderer,
+        {
+            let mut layouts = layout.children();
+
+            let Some(layout) = layouts.next() else {
+                return;
+            };
+
+            let overlay = element.as_overlay_mut();
+
+            if let Some(node) = overlay.semantics(layout) {
+                found.push(node);
+            }
+
+            if let Some((mut nested, nested_layout)) =
+                overlay.overlay(layout, renderer).zip(layouts.next())
+            {
+                recurse(&mut nested, nested_layout, renderer, found);
+            }
+        }
+
+        let mut found = Vec::new();
+        recurse(&mut self.overlay, layout, renderer, &mut found);
+        found
+    }
+
+    /// Applies a [`widget::Operation`] to the [`Nested`] overlay.
     pub fn operate(
         &mut self,
         layout: Layout<'_>,

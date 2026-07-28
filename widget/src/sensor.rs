@@ -6,6 +6,7 @@ use crate::core::renderer;
 use crate::core::time::{Duration, Instant};
 use crate::core::widget;
 use crate::core::widget::tree::{self, Tree};
+use crate::core::widget::visit;
 use crate::core::window;
 use crate::core::{
     self, Element, Event, Layout, Length, Pixels, Rectangle, Shell, Size, Vector, Widget,
@@ -283,6 +284,19 @@ where
             cursor,
             viewport,
         );
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        visit(&mut visit::Widgets::new(
+            self.content.as_widget_mut(),
+            &mut tree.children[0],
+            layout,
+        ));
     }
 
     fn operate(

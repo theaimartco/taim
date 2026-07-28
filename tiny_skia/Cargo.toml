@@ -1,6 +1,6 @@
 [package]
-name = "iced_tiny_skia"
-description = "A software renderer for iced on top of tiny-skia"
+name = "aura_tiny_skia"
+description = "A software renderer for aura on top of tiny-skia"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -15,17 +15,17 @@ workspace = true
 
 [features]
 default = ["x11", "wayland"]
-image = ["iced_graphics/image"]
-svg = ["iced_graphics/svg", "resvg"]
+image = ["aura_graphics/image"]
+svg = ["aura_graphics/svg", "resvg"]
 svg-text = ["svg", "resvg/text", "resvg/system-fonts", "resvg/memmap-fonts"]
 svg-raster-images = ["svg", "resvg/raster-images"]
-geometry = ["iced_graphics/geometry"]
+geometry = ["aura_graphics/geometry"]
 x11 = ["softbuffer/x11", "softbuffer/x11-dlopen"]
 wayland = ["softbuffer/wayland", "softbuffer/wayland-dlopen"]
 
 [dependencies]
-iced_debug.workspace = true
-iced_graphics.workspace = true
+aura_debug.workspace = true
+aura_graphics.workspace = true
 
 bytemuck.workspace = true
 cosmic-text.workspace = true

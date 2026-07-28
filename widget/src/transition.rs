@@ -1,13 +1,14 @@
 //! A widget to make animated views.
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use crate::core::animation::{Animation, Float};
+use crate::core::animation::{Animation, Float, Motion, MotionInterpolate};
 use crate::core::layout::{self, Layout};
 use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
 use crate::core::shell;
 use crate::core::time::Instant;
+use crate::core::widget::visit;
 use crate::core::widget::{self, Operation, Tree, tree};
 use crate::core::{self, Element, Event, Length, Point, Rectangle, Shell, Size, Vector, Widget};
 use crate::space;
@@ -28,6 +29,21 @@ pub trait Program: 'static {
 impl<I> Program for Animation<I>
 where
     I: Float + Clone + Copy + PartialEq + 'static,
+{
+    type Value = I;
+
+    fn go(&mut self, value: Self::Value, now: Instant) {
+        self.go_mut(value, now);
+    }
+
+    fn is_animating(&self, now: Instant) -> bool {
+        self.is_animating(now)
+    }
+}
+
+impl<I> Program for Motion<I>
+where
+    I: MotionInterpolate + 'static,
 {
     type Value = I;
 
@@ -267,6 +283,15 @@ where
                     }
 
                     shell.request_redraw();
+
+                    // This transition owns no timer. It only tells the shared
+                    // frame scheduler that another frame is needed while the
+                    // program remains active; once it settles, the request
+                    // naturally stops and an idle surface returns to zero
+                    // submissions.
+                    if is_animating {
+                        shell.request_animation();
+                    }
                 }
 
                 if just_finished && let Some(on_finish) = &self.on_finish {
@@ -322,6 +347,21 @@ where
             viewport,
             renderer,
         )
+    }
+
+    fn visit_children(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn visit::Visit),
+    ) {
+        let layout = self::layout(layout, &self.new_layout);
+
+        visit(&mut visit::Widgets::new(
+            self.element.as_widget_mut(),
+            &mut tree.children[0],
+            layout,
+        ));
     }
 
     fn operate(
@@ -398,12 +438,12 @@ impl Key {
 struct ShouldReset(bool);
 
 /// Reset the [`Animation`] of a [`Transition`].
-pub fn reset<Message>(id: impl Into<widget::Id>) -> iced_runtime::Task<Message>
+pub fn reset<Message>(id: impl Into<widget::Id>) -> aura_runtime::Task<Message>
 where
-    Message: iced_runtime::futures::MaybeSend + 'static,
+    Message: aura_runtime::futures::MaybeSend + 'static,
 {
     let id = id.into();
-    iced_runtime::task::widget(reset_raw(id)).discard()
+    aura_runtime::task::widget(reset_raw(id)).discard()
 }
 
 /// An [`Operation`] to reset the [`Animation`] of a [`Transition`].

@@ -86,9 +86,9 @@ impl<'a, Message, Theme, Renderer> Element<'a, Message, Theme, Renderer> {
     /// producing them. Let's implement our __view logic__ now:
     ///
     /// ```no_run
-    /// # mod iced {
-    /// #     pub use iced_core::Function;
-    /// #     pub type Element<'a, Message> = iced_core::Element<'a, Message, iced_core::Theme, ()>;
+    /// # mod aura {
+    /// #     pub use aura_core::Function;
+    /// #     pub type Element<'a, Message> = aura_core::Element<'a, Message, aura_core::Theme, ()>;
     /// #
     /// #     pub mod widget {
     /// #         pub fn row<'a, Message>(iter: impl IntoIterator<Item = super::Element<'a, Message>>) -> super::Element<'a, Message> {
@@ -102,7 +102,7 @@ impl<'a, Message, Theme, Renderer> Element<'a, Message, Theme, Renderer> {
     /// #     pub enum Message {}
     /// #     pub struct Counter;
     /// #
-    /// #     pub type Element<'a, Message> = iced_core::Element<'a, Message, iced_core::Theme, ()>;
+    /// #     pub type Element<'a, Message> = aura_core::Element<'a, Message, aura_core::Theme, ()>;
     /// #
     /// #     impl Counter {
     /// #         pub fn view(&self) -> Element<Message> {
@@ -113,8 +113,8 @@ impl<'a, Message, Theme, Renderer> Element<'a, Message, Theme, Renderer> {
     /// #
     /// use counter::Counter;
     ///
-    /// use iced::widget::row;
-    /// use iced::{Element, Function};
+    /// use aura::widget::row;
+    /// use aura::{Element, Function};
     ///
     /// struct ManyCounters {
     ///     counters: Vec<Counter>,

@@ -1,23 +1,29 @@
 //! A renderer-agnostic native GUI runtime.
 //!
-//! ![The native path of the Iced ecosystem](https://github.com/iced-rs/iced/blob/master/docs/graphs/native.png?raw=true)
+//! ![The native path of the Aura ecosystem](https://github.com/aura-rs/aura/blob/master/docs/graphs/native.png?raw=true)
 //!
-//! `iced_runtime` takes [`iced_core`] and builds a native runtime on top of it.
+//! `aura_runtime` takes [`aura_core`] and builds a native runtime on top of it.
 //!
-//! [`iced_core`]: https://github.com/iced-rs/iced/tree/master/core
+//! [`aura_core`]: https://github.com/aura-rs/aura/tree/master/core
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/iced-rs/iced/9ab6923e943f784985e9ef9ca28b10278297225d/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/aura-rs/aura/9ab6923e943f784985e9ef9ca28b10278297225d/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 pub mod backend;
 pub mod clipboard;
 pub mod diagnostics;
 pub mod font;
+pub mod frame_scheduler;
 pub mod hit_test;
 pub mod image;
 pub mod invalidation;
 pub mod keyboard;
+pub mod memory_pressure;
+pub mod pointer_router;
+pub mod power_policy;
+pub mod quality_controller;
 pub mod reconcile;
+pub mod recovery;
 pub mod semantics;
 pub mod system;
 pub mod task;
@@ -25,8 +31,8 @@ pub mod user_interface;
 pub mod widget;
 pub mod window;
 
-pub use iced_core as core;
-pub use iced_futures as futures;
+pub use aura_core as core;
+pub use aura_futures as futures;
 
 pub use task::Task;
 pub use user_interface::UserInterface;
@@ -35,7 +41,7 @@ use crate::core::Event;
 
 use std::fmt;
 
-/// An action that the iced runtime can perform.
+/// An action that the aura runtime can perform.
 pub enum Action<T> {
     /// Output some value.
     Output(T),
@@ -137,7 +143,7 @@ where
     }
 }
 
-/// Creates a [`Task`] that exits the iced runtime.
+/// Creates a [`Task`] that exits the aura runtime.
 ///
 /// This will normally close any application windows and
 /// terminate the runtime loop.

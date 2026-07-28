@@ -37,6 +37,39 @@ where
         cursor: mouse::Cursor,
     );
 
+    /// Returns the [`semantics::Node`] describing this [`Overlay`] to
+    /// assistive technology, if it has one.
+    ///
+    /// # Why an overlay needs this at all
+    ///
+    /// An overlay is not decoration: a dropdown, a menu, or a sheet is
+    /// often the *only* thing the user can currently interact with. Before
+    /// this method existed, every overlay was invisible to the semantic
+    /// tree -- `aura_runtime::semantics::build` walks widgets, and an
+    /// overlay is reached through [`crate::Widget::overlay`] rather than
+    /// through the widget tree, so nothing ever asked it.
+    ///
+    /// The practical effect was that an open `pick_list` announced
+    /// nothing: a screen-reader user could hear the closed control, open
+    /// it, and then find the entire list of choices unreachable.
+    ///
+    /// # Contract
+    ///
+    /// Like [`crate::Widget::semantics`], this is **non-recursive**: it
+    /// describes this overlay only. Composing a subtree is the runtime's
+    /// job. `None` (the default) means "no semantics of my own", which is
+    /// correct for a purely presentational overlay; it does not stop the
+    /// runtime from reaching nested overlays via [`Overlay::overlay`].
+    ///
+    /// An overlay reporting a node must give it a stable
+    /// [`semantics::Node::id`], for the same reason a widget must: an
+    /// identity regenerated per frame makes the node look new on every
+    /// repaint. An overlay produced from a widget should derive its
+    /// identity from that widget's [`Tree::id`](widget::tree::Tree::id).
+    fn semantics(&self, _layout: Layout<'_>) -> Option<crate::semantics::Node> {
+        None
+    }
+
     /// Applies a [`widget::Operation`] to the [`Overlay`].
     fn operate(
         &mut self,

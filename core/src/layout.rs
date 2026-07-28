@@ -2,9 +2,11 @@
 mod limits;
 mod node;
 
+pub mod cache;
 pub mod flex;
 
-pub use limits::Limits;
+pub use cache::Cache;
+pub use limits::{Key as LimitsKey, Limits};
 pub use node::Node;
 
 use crate::{Length, Padding, Point, Rectangle, Size, Vector};
