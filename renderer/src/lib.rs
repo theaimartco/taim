@@ -14,12 +14,12 @@ pub use aura_graphics::geometry;
 
 /// The default graphics renderer for [`aura`].
 ///
-/// [`aura`]: https://github.com/aura-rs/aura
+/// [`aura`]: https://github.com/theaimartco/vyom-aura
 pub type Renderer = renderer::Renderer;
 
 /// The default graphics compositor for [`aura`].
 ///
-/// [`aura`]: https://github.com/aura-rs/aura
+/// [`aura`]: https://github.com/theaimartco/vyom-aura
 pub type Compositor = renderer::Compositor;
 
 #[cfg(all(feature = "wgpu-bare", feature = "tiny-skia"))]

@@ -134,6 +134,21 @@ pub struct Packed {
     direction: [f32; 4],
 }
 
+impl Packed {
+    /// Multiplies every packed color stop's alpha channel.
+    pub fn scale_alpha(mut self, factor: f32) -> Self {
+        let factor = factor.clamp(0.0, 1.0);
+
+        for color in &mut self.colors {
+            let alpha = f16::from_bits((color[1] & 0xffff) as u16);
+            let scaled = f16::from_f32(alpha.to_f32() * factor);
+            color[1] = (color[1] & 0xffff_0000) | u32::from(scaled.to_bits());
+        }
+
+        self
+    }
+}
+
 /// Creates a new [`Packed`] gradient for use in shader code.
 pub fn pack(gradient: &core::Gradient, bounds: Rectangle) -> Packed {
     match gradient {

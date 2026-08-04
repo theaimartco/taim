@@ -64,12 +64,9 @@ web-colors = ["aura_renderer/web-colors"]
 crisp = ["aura_core/crisp"]
 # Enables the WebGL backend
 webgl = ["aura_renderer/webgl"]
-# Declared with no backing dependency: `aura_highlighter` is absent from
-# this checkout (see docs/architecture/path-map.md). Do not enable; it
-# only exists so `#[cfg(feature = "highlighter")]` call sites in
-# `aura_widget` do not need deleting and re-adding when a later phase
-# restores an Aura-owned highlighter crate.
-highlighter = []
+# Enables syntax highlighting for the `markdown` widget and the
+# `text_editor` widget, via the dependency-free `aura-highlighter` crate
+highlighter = ["dep:aura-highlighter", "aura_widget/highlighter"]
 # Enables the advanced module
 advanced = ["aura_core/advanced", "aura_widget/advanced"]
 # Embeds Fira Sans into the final application; useful for testing and Wasm builds
@@ -101,6 +98,9 @@ aura_renderer.workspace = true
 aura_runtime.workspace = true
 aura_widget.workspace = true
 aura_winit.workspace = true
+
+aura-highlighter.workspace = true
+aura-highlighter.optional = true
 
 thiserror.workspace = true
 
@@ -152,6 +152,7 @@ members = [
     "aura-accessibility",
     "aura-design",
     "aura-gesture",
+    "aura-highlighter",
     "aura-motion",
     "aura-platform-vyom",
     "aura-profiler",
@@ -172,13 +173,18 @@ members = [
 
 [workspace.package]
 version = "0.15.0-dev"
-authors = ["Héctor Ramón Jiménez <hector@hecrj.dev>"]
+authors = [
+    "VYOM Aura contributors",
+    # Aura is a fork of `iced`; the upstream architecture and a large part
+    # of the widget/renderer code originate there. See CREDITS.md.
+    "Héctor Ramón Jiménez <hector@hecrj.dev>",
+]
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/aura-rs/aura"
-homepage = "https://aura.rs"
+repository = "https://github.com/theaimartco/vyom-aura"
+homepage = "https://github.com/theaimartco/vyom-aura"
 categories = ["gui"]
-keywords = ["gui", "ui", "graphics", "interface", "widgets"]
+keywords = ["gui", "ui", "graphics", "vyom", "wayland"]
 rust-version = "1.92"
 
 [workspace.dependencies]
@@ -186,6 +192,7 @@ zbus = "5.17"
 aura-accessibility = { version = "0.15.0-dev", path = "aura-accessibility" }
 aura-design = { version = "0.15.0-dev", path = "aura-design" }
 aura-gesture = { version = "0.15.0-dev", path = "aura-gesture" }
+aura-highlighter = { version = "0.15.0-dev", path = "aura-highlighter" }
 aura-motion = { version = "0.15.0-dev", path = "aura-motion", default-features = false }
 aura-platform-vyom = { version = "0.15.0-dev", path = "aura-platform-vyom" }
 aura-profiler = { version = "0.15.0-dev", path = "aura-profiler" }

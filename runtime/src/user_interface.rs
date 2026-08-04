@@ -17,6 +17,9 @@ use crate::hit_test;
 use crate::invalidation::Aggregator;
 use crate::pointer_router::{self, Routing};
 
+use aura_gesture::arena::Arena;
+use std::hash::{Hash, Hasher};
+
 /// A set of interactive graphical elements with a specific [`Layout`].
 ///
 /// It can be updated and drawn.
@@ -28,7 +31,7 @@ use crate::pointer_router::{self, Routing};
 /// The [`integration`] example uses a [`UserInterface`] to integrate Aura in an
 /// existing graphical application.
 ///
-/// [`integration`]: https://github.com/aura-rs/aura/tree/master/examples/integration
+/// [`integration`]: https://github.com/theaimartco/vyom-aura/tree/master/examples/integration
 pub struct UserInterface<'a, Message, Theme, Renderer> {
     root: Element<'a, Message, Theme, Renderer>,
     base: layout::Node,
@@ -36,6 +39,8 @@ pub struct UserInterface<'a, Message, Theme, Renderer> {
     overlay: Option<Overlay>,
     bounds: Size,
     pointer_router: pointer_router::Router,
+    automatic_pointer_routing: bool,
+    semantic_tree: aura_accessibility::Tree,
     trace: diagnostics::Trace,
 }
 
@@ -111,10 +116,17 @@ where
     ) -> Self {
         let mut root = root.into();
 
-        let Cache { mut state, trace } = cache;
+        let Cache {
+            mut state,
+            pointer_router,
+            automatic_pointer_routing,
+            semantic_tree,
+            trace,
+        } = cache;
 
         trace.begin(diagnostics::Phase::Diff);
         state.diff(root.as_widget_mut());
+        state.mark_dirty(widget::tree::DirtyFlags::PAINT);
         trace.end(diagnostics::Phase::Diff);
 
         trace.begin(diagnostics::Phase::Layout);
@@ -131,7 +143,9 @@ where
             state,
             overlay: None,
             bounds,
-            pointer_router: pointer_router::Router::new(),
+            pointer_router,
+            automatic_pointer_routing,
+            semantic_tree,
             trace,
         }
     }
@@ -154,6 +168,16 @@ where
     /// The trace this [`UserInterface`] records into.
     pub fn trace(&self) -> &diagnostics::Trace {
         &self.trace
+    }
+
+    /// Enables or disables automatic gesture-arena routing during [`Self::update`].
+    ///
+    /// Automatic routing is enabled by default. Integrations that call
+    /// [`Self::route_pointer`] themselves to install recognizers should disable
+    /// it before dispatching the same event batch, preventing duplicate arena
+    /// delivery.
+    pub fn set_automatic_pointer_routing(&mut self, enabled: bool) {
+        self.automatic_pointer_routing = enabled;
     }
 
     /// Updates the [`UserInterface`] by processing each provided [`Event`].
@@ -242,6 +266,17 @@ where
         let mut has_layout_changed = false;
         let mut is_animating = false;
         let viewport = Rectangle::with_size(self.bounds);
+
+        // Pointer routing is part of the normal event path. A caller may
+        // still use `route_pointer` to supply recognizers, but ordinary
+        // mouse/touch input is never silently bypassing the arena anymore.
+        if self.automatic_pointer_routing {
+            let timestamp = crate::core::time::Instant::now();
+            let _ = self.pointer_router.tick(timestamp);
+            for event in events {
+                let _ = self.route_pointer_default(event, cursor, timestamp);
+            }
+        }
 
         let mut maybe_overlay = self
             .root
@@ -471,6 +506,10 @@ where
             None
         };
 
+        if outdated || has_layout_changed || redraw_request != window::RedrawRequest::Wait {
+            self.state.mark_dirty(widget::tree::DirtyFlags::PAINT);
+        }
+
         // Closed here rather than at every early return: `update` has
         // one exit, and a span that leaks because a future edit adds a
         // second would silently charge the rest of the frame to `Event`.
@@ -593,15 +632,28 @@ where
             _ => mouse::Cursor::Unavailable,
         };
 
-        self.root.as_widget().draw(
-            &self.state,
-            renderer,
-            theme,
-            style,
-            Layout::new(&self.base),
-            base_cursor,
-            &viewport,
-        );
+        let retained_key = {
+            let mut hasher = rustc_hash::FxHasher::default();
+            self.state.id().hash(&mut hasher);
+            hasher.finish()
+        };
+        let revision = self.state.revision().value();
+
+        if !renderer.replay_retained_layer(retained_key, revision, viewport) {
+            renderer.start_retained_layer(retained_key, revision, viewport);
+            self.root.as_widget().draw(
+                &self.state,
+                renderer,
+                theme,
+                style,
+                Layout::new(&self.base),
+                base_cursor,
+                &viewport,
+            );
+            renderer.end_retained_layer();
+        }
+
+        self.state.clear_dirty(widget::tree::DirtyFlags::PAINT);
 
         let Self {
             overlay,
@@ -725,6 +777,28 @@ where
         forest
     }
 
+    /// Builds and diffs the semantic tree for the current frame.
+    ///
+    /// The returned changes are the platform-facing incremental payload. The
+    /// previous tree is retained by the interface, so the running backend can
+    /// call this after every update/draw cycle without rebuilding or
+    /// re-announcing an unchanged UI.
+    pub fn semantics_changes(
+        &mut self,
+        renderer: &Renderer,
+    ) -> Vec<aura_accessibility::tree::Change> {
+        let forest = self.semantics(renderer);
+        let next = aura_accessibility::Tree::from_forest(&forest);
+        let changes = self.semantic_tree.diff(&next);
+        self.semantic_tree = next;
+        changes
+    }
+
+    /// Returns the latest retained semantic tree.
+    pub fn semantic_tree(&self) -> &aura_accessibility::Tree {
+        &self.semantic_tree
+    }
+
     /// Adapts this [`UserInterface`]'s widget tree to
     /// [`visit::Visit`], for running a whole-tree traversal over it.
     ///
@@ -844,6 +918,33 @@ where
         routing
     }
 
+    /// Routes a pointer event through the default gesture arena.
+    ///
+    /// This is the safe baseline for widgets that have not registered a
+    /// specialised recognizer yet: the contact is still tracked by the
+    /// arena, preserves down/up/cancel ordering, and is released without
+    /// being captured by a fabricated winner. Specialised widgets can use
+    /// [`Self::route_pointer`] to register their recognizers at the hit path.
+    pub fn route_pointer_default(
+        &mut self,
+        event: &Event,
+        cursor: mouse::Cursor,
+        timestamp: crate::core::time::Instant,
+    ) -> Routing {
+        let Some(pointer) = event.to_pointer(cursor.position(), timestamp) else {
+            return Routing::None;
+        };
+
+        let start = if pointer.phase == crate::core::pointer::Phase::Down {
+            self.hit_test(pointer.position)
+                .map(|path| (path, Arena::new()))
+        } else {
+            None
+        };
+
+        self.route_pointer(event, cursor, timestamp, move || start)
+    }
+
     /// Advances every still-competing gesture arena tracked by this
     /// [`UserInterface`]'s [`pointer_router::Router`] (see
     /// [`pointer_router::Router::tick`]), resolving any whose
@@ -864,6 +965,9 @@ where
             bounds,
             Cache {
                 state: self.state,
+                pointer_router: self.pointer_router,
+                automatic_pointer_routing: self.automatic_pointer_routing,
+                semantic_tree: self.semantic_tree,
                 trace: self.trace,
             },
             renderer,
@@ -875,6 +979,9 @@ where
     pub fn into_cache(self) -> Cache {
         Cache {
             state: self.state,
+            pointer_router: self.pointer_router,
+            automatic_pointer_routing: self.automatic_pointer_routing,
+            semantic_tree: self.semantic_tree,
             trace: self.trace,
         }
     }
@@ -884,6 +991,9 @@ where
 #[derive(Debug)]
 pub struct Cache {
     state: widget::Tree,
+    pointer_router: pointer_router::Router,
+    automatic_pointer_routing: bool,
+    semantic_tree: aura_accessibility::Tree,
     /// Carried through the rebuild so a trace survives it.
     ///
     /// `build` runs `Diff` and `Layout` before a [`UserInterface`] exists
@@ -902,6 +1012,9 @@ impl Cache {
     pub fn new() -> Cache {
         Cache {
             state: widget::Tree::empty(),
+            pointer_router: pointer_router::Router::new(),
+            automatic_pointer_routing: true,
+            semantic_tree: aura_accessibility::Tree::new(),
             trace: diagnostics::Trace::new(aura_profiler::Collector::disabled()),
         }
     }
@@ -915,6 +1028,13 @@ impl Cache {
     #[must_use]
     pub fn with_trace(mut self, trace: diagnostics::Trace) -> Self {
         self.trace = trace;
+        self
+    }
+
+    /// Configures automatic pointer routing for interfaces built from this cache.
+    #[must_use]
+    pub fn with_automatic_pointer_routing(mut self, enabled: bool) -> Self {
+        self.automatic_pointer_routing = enabled;
         self
     }
 }

@@ -16,9 +16,9 @@ use aura_debug as debug;
 ///
 /// Purity is needed when you want your application to end up in the
 /// same exact state given the same history of messages. This property
-/// enables proper time traveling debugging with [`comet`].
+/// enables proper time-traveling debugging with [`Aura Lab`][`comet`].
 ///
-/// [`comet`]: https://github.com/aura-rs/comet
+/// [`comet`]: https://github.com/theaimartco/vyom-aura/tree/main/tools/aura_lab
 pub fn timed<State, Message, Theme, Renderer>(
     boot: impl BootFn<State, Message>,
     update: impl UpdateFn<State, Message>,

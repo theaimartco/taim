@@ -564,6 +564,11 @@ impl Revision {
         Self(self.0.wrapping_add(1))
     }
 
+    /// Returns the raw revision value for renderer cache validation.
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+
     /// Returns whether `self` comes strictly after `other`, correctly
     /// accounting for one wraparound of the underlying counter. See the
     /// [`Revision`] documentation for why this -- not a numeric

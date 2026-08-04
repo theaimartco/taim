@@ -1289,7 +1289,6 @@ pub use crate::markdown::view as markdown;
 ///     }
 /// }
 /// ```
-/// ![Checkbox drawn by `aura_wgpu`](https://github.com/aura-rs/aura/blob/7760618fb112074bc40b148944521f312152012a/docs/images/checkbox.png?raw=true)
 pub fn checkbox<'a, Message, Theme, Renderer>(
     is_checked: bool,
 ) -> Checkbox<'a, Message, Theme, Renderer>
@@ -1817,7 +1816,6 @@ where
 ///     image("ferris.png").into()
 /// }
 /// ```
-/// <img src="https://github.com/aura-rs/aura/blob/9712b319bb7a32848001b96bd84977430f14b623/examples/resources/ferris.png?raw=true" width="300">
 #[cfg(feature = "image")]
 pub fn image<Handle>(handle: impl Into<Handle>) -> crate::Image<Handle> {
     crate::Image::new(handle.into())

@@ -50,6 +50,38 @@ pub trait Renderer {
         self.with_transformation(Transformation::translate(translation.x, translation.y), f);
     }
 
+    /// Applies an opacity multiplier to all primitives recorded by `f`.
+    fn with_opacity(&mut self, opacity: f32, f: impl FnOnce(&mut Self)) {
+        self.start_opacity(opacity);
+        f(self);
+        self.end_opacity();
+    }
+
+    /// Pushes an opacity multiplier for subsequent primitives.
+    fn start_opacity(&mut self, opacity: f32) {
+        let _ = opacity;
+    }
+
+    /// Pops the current opacity multiplier.
+    fn end_opacity(&mut self) {}
+
+    /// Attempts to replay a retained display list for a stable subtree.
+    fn replay_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) -> bool {
+        let _ = (key, revision, bounds);
+        false
+    }
+
+    /// Starts recording a retained display list after a replay miss.
+    fn start_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) {
+        let _ = (key, revision);
+        self.start_layer(bounds);
+    }
+
+    /// Finishes recording a retained display list.
+    fn end_retained_layer(&mut self) {
+        self.end_layer();
+    }
+
     /// Fills a [`Quad`] with the provided [`Background`].
     fn fill_quad(&mut self, quad: Quad, background: impl Into<Background>);
 

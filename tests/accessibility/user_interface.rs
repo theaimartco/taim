@@ -270,6 +270,24 @@ fn identity_is_stable_across_frames() {
 }
 
 #[test]
+fn live_semantic_diff_only_publishes_real_changes() {
+    let mut renderer = headless_renderer();
+    let view: Element<'_, Message, Theme, Renderer> =
+        column![button("Save").on_press("save")].into();
+    let mut ui = UserInterface::build(view, WINDOW, Cache::new(), &mut renderer);
+
+    let initial = ui.semantics_changes(&renderer);
+    assert!(
+        !initial.is_empty(),
+        "the first live semantic frame must publish the initial tree"
+    );
+    assert!(
+        ui.semantics_changes(&renderer).is_empty(),
+        "an unchanged frame must not re-announce semantic nodes"
+    );
+}
+
+#[test]
 fn a_clean_tree_reuses_its_cached_nodes_across_frames() {
     // `semantics` is called per frame, so it must cost a walk rather than
     // a rebuild. Equal output across two builds of an untouched tree is

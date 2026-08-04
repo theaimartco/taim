@@ -70,6 +70,18 @@ impl Cache {
         self.text = Arc::from(text);
         self.version += 1;
     }
+
+    pub fn scale_alpha(mut self, factor: f32) -> Self {
+        self.text = self
+            .text
+            .iter()
+            .cloned()
+            .map(|text| text.scale_alpha(factor))
+            .collect::<Vec<_>>()
+            .into();
+        self.version += 1;
+        self
+    }
 }
 
 struct Upload {

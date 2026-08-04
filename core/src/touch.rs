@@ -2,6 +2,27 @@
 use crate::Point;
 use crate::pointer;
 
+/// The smallest edge, in logical pixels, an interactive surface may
+/// present as a touch target.
+///
+/// This constant is the single source of the policy for the whole
+/// workspace. `aura-design` re-exports it as `MIN_TOUCH_TARGET` and
+/// widgets clamp to it directly, so there is exactly one number to
+/// change and no way for a widget to drift from the design contract.
+///
+/// VYOM is touch-first, so the floor is 48px. See
+/// [`MIN_TARGET_COMPATIBILITY`] for the explicit opt-out.
+pub const MIN_TARGET: f32 = 48.0;
+
+/// The reduced touch-target floor available to UI that explicitly opts
+/// out of [`MIN_TARGET`].
+///
+/// This is the 44px figure common to platform accessibility guidance.
+/// It exists so "we deliberately match the host platform here" can be
+/// written down, rather than appearing as an unexplained smaller number
+/// in a widget.
+pub const MIN_TARGET_COMPATIBILITY: f32 = 44.0;
+
 /// A touch interaction.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(missing_docs)]

@@ -60,12 +60,14 @@ done < <(grep -rn '^\s*path\s*=\s*"' --include='Cargo.toml' . 2>/dev/null || tru
 echo "== Checking no manifest still depends on known-removed crates =="
 
 # Source files may still mention these names inside code gated by a
-# feature that no longer exists anywhere (e.g. widget/src/markdown.rs's
-# `#[cfg(feature = "highlighter")]` blocks) -- that is dead-but-harmless
+# feature that no longer exists anywhere -- that is dead-but-harmless
 # code, not a workspace break. What must never happen is a *manifest*
 # still declaring the dependency, since that is what makes
 # `cargo metadata` fail outright. See docs/architecture/path-map.md.
-removed_crates=(aura_beacon aura_devtools aura_highlighter aura_selector aura_tester aura_test)
+#
+# `aura_highlighter` is deliberately absent from this list: it is now a
+# real workspace member (`aura-highlighter`), not a removed crate.
+removed_crates=(aura_beacon aura_devtools aura_selector aura_tester aura_test)
 
 for crate in "${removed_crates[@]}"; do
     hits=$(grep -rn "^\s*${crate}\s*\.\?\s*\(=\|workspace\)" --include='Cargo.toml' \

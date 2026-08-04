@@ -80,6 +80,14 @@ pub struct Router {
     contacts: rustc_hash::FxHashMap<PointerId, Contact>,
 }
 
+impl std::fmt::Debug for Router {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Router")
+            .field("tracked_contacts", &self.contacts.len())
+            .finish()
+    }
+}
+
 impl Router {
     /// Creates an empty [`Router`] with no tracked contacts.
     pub fn new() -> Self {
@@ -153,7 +161,13 @@ impl Router {
                         path: contact.path.clone(),
                     },
                     Some(resolution) => {
-                        contact.arena = None;
+                        // Only a winning recognizer captures the contact.
+                        // `NoWinner` and `Cancelled` resolve the competition
+                        // but must not turn the path into a capture target.
+                        let won = matches!(resolution, Resolution::Won(_));
+                        if won {
+                            contact.arena = None;
+                        }
 
                         Routing::Resolved {
                             path: contact.path.clone(),
@@ -164,7 +178,15 @@ impl Router {
             },
         };
 
-        if is_terminal {
+        if is_terminal
+            || matches!(
+                routing,
+                Routing::Resolved {
+                    resolution: Resolution::NoWinner | Resolution::Cancelled,
+                    ..
+                }
+            )
+        {
             let _ = self.contacts.remove(&pointer.id);
         }
 
@@ -183,20 +205,17 @@ impl Router {
     /// pointer's `Up`/`Cancel` -- not an external abandonment -- is the
     /// normal way a capture ends).
     pub fn cancel(&mut self, id: PointerId) {
-        if let Some(contact) = self.contacts.get_mut(&id)
-            && let Some(arena) = &mut contact.arena
-        {
-            let _ = arena.cancel();
-        }
-
-        if self
+        let was_competing = self
             .contacts
-            .get(&id)
-            .is_some_and(|contact| contact.arena.is_none())
-        {
-            // Only remove a *competing* contact we just cancelled;
-            // an already-captured contact stays tracked until its own
-            // terminal event, per this method's own documentation.
+            .get_mut(&id)
+            .and_then(|contact| contact.arena.as_mut())
+            .map(|arena| {
+                let _ = arena.cancel();
+            })
+            .is_some();
+
+        if was_competing {
+            let _ = self.contacts.remove(&id);
         }
     }
 
@@ -213,7 +232,9 @@ impl Router {
             if let Some(arena) = &mut contact.arena
                 && let Some(resolution) = arena.tick(now)
             {
-                contact.arena = None;
+                if matches!(resolution, Resolution::Won(_)) {
+                    contact.arena = None;
+                }
 
                 changes.push((
                     id,
@@ -222,6 +243,18 @@ impl Router {
                         resolution,
                     },
                 ));
+            }
+        }
+
+        for (id, routing) in &changes {
+            if matches!(
+                routing,
+                Routing::Resolved {
+                    resolution: Resolution::NoWinner | Resolution::Cancelled,
+                    ..
+                }
+            ) {
+                let _ = self.contacts.remove(id);
             }
         }
 
@@ -509,6 +542,27 @@ mod tests {
         router.cancel(PointerId::from_raw(1));
 
         assert!(!router.is_captured(PointerId::from_raw(1)));
+        assert_eq!(router.tracked_ids().count(), 0);
+    }
+
+    #[test]
+    fn an_empty_arena_never_creates_pointer_capture() {
+        let mut router = Router::new();
+        router.start(PointerId::from_raw(1), path(&[0]), Arena::new());
+
+        assert!(matches!(
+            router.route(pointer(1, Phase::Down, 0)),
+            Routing::Competing { .. }
+        ));
+        assert!(matches!(
+            router.route(pointer(1, Phase::Up, 10)),
+            Routing::Resolved {
+                resolution: Resolution::NoWinner,
+                ..
+            }
+        ));
+        assert!(!router.is_captured(PointerId::from_raw(1)));
+        assert_eq!(router.tracked_ids().count(), 0);
     }
 
     #[test]

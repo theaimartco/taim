@@ -51,6 +51,22 @@ pub struct Config {
     /// difference. This is what phase.md's exit gate ("two consecutive
     /// baseline runs differ by <= 5% on P95") is checked against.
     pub compare_against: Option<String>,
+
+    /// Path to write this run's JSON report to, in addition to stdout.
+    ///
+    /// Saving is the point at which a report stops being a console
+    /// reading and becomes an archived artifact others will compare
+    /// against, so it is also the point at which
+    /// [`crate::report::Environment::missing_identity`] is enforced.
+    pub save_to: Option<String>,
+
+    /// Whether to save a report that cannot be fully attributed to a
+    /// tree, compiler, and named device.
+    ///
+    /// Off by default: an unattributable report in `benchmarks/baseline/`
+    /// is indistinguishable from an attributable one at a glance, and
+    /// silently becomes the number someone quotes.
+    pub allow_unidentified: bool,
 }
 
 impl Default for Config {
@@ -67,6 +83,8 @@ impl Default for Config {
             backend: None,
             device: None,
             compare_against: None,
+            save_to: None,
+            allow_unidentified: false,
         }
     }
 }

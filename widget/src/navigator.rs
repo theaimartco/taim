@@ -17,165 +17,10 @@ use crate::core::widget::tree::{self, Tree};
 use crate::core::window;
 use crate::core::{self, Element, Event, Length, Rectangle, Shell, Size, Widget};
 
-// -----------------------------------------------------------------------
-// Page transition types (self-contained, no external dep on aura-motion)
-// -----------------------------------------------------------------------
-
-/// The visual state of a page surface mid-transition.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TransformState {
-    /// Horizontal offset as a fraction of the surface width.
-    pub offset_x: f32,
-    /// Vertical offset as a fraction of the surface height.
-    pub offset_y: f32,
-    /// Surface opacity, 0.0 = invisible, 1.0 = fully opaque.
-    pub opacity: f32,
-}
-
-impl TransformState {
-    const IDENTITY: Self = Self {
-        offset_x: 0.0,
-        offset_y: 0.0,
-        opacity: 1.0,
-    };
-}
-
-/// A page transition specification.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum PageTransition {
-    /// A simple cross-fade between pages.
-    Fade {
-        /// Duration in milliseconds.
-        duration_ms: u16,
-    },
-    /// The new page slides in from the right (forward navigation).
-    SlideLeft {
-        /// Duration in milliseconds.
-        duration_ms: u16,
-    },
-    /// The new page slides in from the left (back navigation).
-    SlideRight {
-        /// Duration in milliseconds.
-        duration_ms: u16,
-    },
-    /// The new page slides up from the bottom (modal presentation).
-    SlideUp {
-        /// Duration in milliseconds.
-        duration_ms: u16,
-    },
-    /// Scale + fade: new page scales up from 85% while fading in
-    /// (Material 3 "container transform").
-    ZoomFade {
-        /// Duration in milliseconds.
-        duration_ms: u16,
-    },
-    /// No animation — an instant cut.
-    None,
-}
-
-impl Default for PageTransition {
-    fn default() -> Self {
-        Self::SlideLeft { duration_ms: 300 }
-    }
-}
-
-impl PageTransition {
-    /// A fast fade, suitable for tab switches.
-    pub const FADE: Self = Self::Fade { duration_ms: 200 };
-
-    /// The standard forward navigation slide.
-    pub const FORWARD: Self = Self::SlideLeft { duration_ms: 300 };
-
-    /// The standard back navigation slide.
-    pub const BACK: Self = Self::SlideRight { duration_ms: 300 };
-
-    /// A modal presentation from the bottom.
-    pub const MODAL: Self = Self::SlideUp { duration_ms: 400 };
-
-    /// Material 3-style container transform.
-    pub const ZOOM: Self = Self::ZoomFade { duration_ms: 350 };
-
-    fn duration_seconds(self) -> f64 {
-        match self {
-            Self::Fade { duration_ms }
-            | Self::SlideLeft { duration_ms }
-            | Self::SlideRight { duration_ms }
-            | Self::SlideUp { duration_ms }
-            | Self::ZoomFade { duration_ms } => f64::from(duration_ms) / 1000.0,
-            Self::None => 0.0,
-        }
-    }
-
-    fn ease(t: f32) -> f32 {
-        // EaseInOut quadratic
-        let t = t.clamp(0.0, 1.0);
-        if t < 0.5 {
-            2.0 * t * t
-        } else {
-            let inv = -2.0 * t + 2.0;
-            1.0 - inv * inv / 2.0
-        }
-    }
-
-    fn enter_at(self, t: f32) -> TransformState {
-        let e = Self::ease(t);
-        match self {
-            Self::Fade { .. } => TransformState {
-                opacity: e,
-                ..TransformState::IDENTITY
-            },
-            Self::SlideLeft { .. } => TransformState {
-                offset_x: 1.0 - e,
-                ..TransformState::IDENTITY
-            },
-            Self::SlideRight { .. } => TransformState {
-                offset_x: -(1.0 - e),
-                ..TransformState::IDENTITY
-            },
-            Self::SlideUp { .. } => TransformState {
-                offset_y: 1.0 - e,
-                ..TransformState::IDENTITY
-            },
-            Self::ZoomFade { .. } => TransformState {
-                offset_x: 0.0,
-                offset_y: 0.0,
-                opacity: e,
-            },
-            Self::None => TransformState::IDENTITY,
-        }
-    }
-
-    fn exit_at(self, t: f32) -> TransformState {
-        let e = Self::ease(t);
-        match self {
-            Self::Fade { .. } => TransformState {
-                opacity: 1.0 - e,
-                ..TransformState::IDENTITY
-            },
-            Self::SlideLeft { .. } => TransformState {
-                offset_x: -0.3 * e,
-                ..TransformState::IDENTITY
-            },
-            Self::SlideRight { .. } => TransformState {
-                offset_x: 0.3 * e,
-                ..TransformState::IDENTITY
-            },
-            Self::SlideUp { .. } => TransformState {
-                opacity: 1.0 - 0.3 * e,
-                ..TransformState::IDENTITY
-            },
-            Self::ZoomFade { .. } => TransformState {
-                offset_x: 0.0,
-                offset_y: 0.0,
-                opacity: 1.0 - e,
-            },
-            Self::None => TransformState {
-                opacity: 0.0,
-                ..TransformState::IDENTITY
-            },
-        }
-    }
-}
+// Navigation and the rest of Aura use the same transition contract. Keeping
+// this re-export preserves the widget-facing API without maintaining a
+// second, incompatible implementation here.
+pub use aura_motion::{PageTransition, TransformState};
 
 // -----------------------------------------------------------------------
 // Animation state
@@ -184,19 +29,21 @@ impl PageTransition {
 #[derive(Debug, Clone, Copy)]
 struct TransitionAnim {
     transition: PageTransition,
+    kind: TransitionKind,
     started_at: Instant,
     duration: f64,
     settled: bool,
 }
 
 impl TransitionAnim {
-    fn new(transition: PageTransition, now: Instant) -> Self {
-        let duration = transition.duration_seconds();
+    fn new(transition: PageTransition, kind: TransitionKind, now: Instant) -> Self {
+        let duration = transition.duration_seconds().unwrap_or(f64::INFINITY);
         Self {
             transition,
+            kind,
             started_at: now,
             duration,
-            settled: duration <= 0.0,
+            settled: duration == 0.0,
         }
     }
 
@@ -205,7 +52,11 @@ impl TransitionAnim {
             return 1.0;
         }
         let elapsed = now.duration_since(self.started_at).as_secs_f64();
-        if self.duration > 0.0 {
+        if let PageTransition::SpringSlide { spring } = self.transition {
+            let mut motion = aura_motion::Spring::with_config(0.0, spring);
+            motion.set_target(1.0);
+            motion.advance(elapsed.min(10.0) as f32).clamp(0.0, 1.0)
+        } else if self.duration > 0.0 {
             (elapsed / self.duration).min(1.0) as f32
         } else {
             1.0
@@ -216,9 +67,17 @@ impl TransitionAnim {
         if self.settled {
             return false;
         }
-        if self.progress(now) >= 1.0 {
-            self.settled = true;
-        }
+        let elapsed = now.duration_since(self.started_at).as_secs_f64();
+        self.settled = if let PageTransition::SpringSlide { spring } = self.transition {
+            let mut motion = aura_motion::Spring::with_config(0.0, spring);
+            motion.set_target(1.0);
+            let _ = motion.advance(elapsed.min(10.0) as f32);
+
+            motion.is_at_rest() || elapsed >= 10.0
+        } else {
+            self.progress(now) >= 1.0
+        };
+
         !self.settled
     }
 
@@ -229,6 +88,13 @@ impl TransitionAnim {
     fn exit_state(&self, now: Instant) -> TransformState {
         self.transition.exit_at(self.progress(now))
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TransitionKind {
+    Push,
+    Pop,
+    Replace,
 }
 
 // -----------------------------------------------------------------------
@@ -269,7 +135,8 @@ where
     Renderer: core::Renderer,
 {
     pages: Vec<Page<'a, Message, Theme, Renderer>>,
-    pending_transition: Option<PageTransition>,
+    departing: Option<Page<'a, Message, Theme, Renderer>>,
+    pending_transition: Option<(PageTransition, TransitionKind)>,
     width: Length,
     height: Length,
 }
@@ -284,6 +151,7 @@ where
             pages: vec![Page {
                 element: root.into(),
             }],
+            departing: None,
             pending_transition: None,
             width: Length::Fill,
             height: Length::Fill,
@@ -299,7 +167,34 @@ where
         self.pages.push(Page {
             element: page.into(),
         });
-        self.pending_transition = Some(transition);
+        self.pending_transition = Some((transition, TransitionKind::Push));
+        self
+    }
+
+    /// Pops the top page, retaining the root page, and animates the revealed
+    /// page with the supplied transition.
+    pub fn pop(mut self, transition: PageTransition) -> Self {
+        if self.pages.len() > 1 {
+            self.departing = self.pages.pop();
+            self.pending_transition = Some((transition, TransitionKind::Pop));
+        }
+        self
+    }
+
+    /// Replaces the top page without changing the stack depth.
+    pub fn replace(
+        mut self,
+        page: impl Into<Element<'a, Message, Theme, Renderer>>,
+        transition: PageTransition,
+    ) -> Self {
+        let page = page.into();
+        if let Some(top) = self.pages.last_mut() {
+            let outgoing = std::mem::replace(&mut top.element, page);
+            self.departing = Some(Page { element: outgoing });
+        } else {
+            self.pages.push(Page { element: page });
+        }
+        self.pending_transition = Some((transition, TransitionKind::Replace));
         self
     }
 
@@ -337,13 +232,36 @@ where
     }
 
     fn diff(&mut self, tree: &mut Tree) {
-        while tree.children.len() < self.pages.len() {
+        let visual_len = self.pages.len() + usize::from(self.departing.is_some());
+
+        // `replace` needs two visual children, but the existing top child's
+        // state belongs to the outgoing page. Move that state to the
+        // departing slot before reconciling the incoming page into a fresh
+        // child. Pop already leaves the outgoing child at this exact index.
+        if matches!(self.pending_transition, Some((_, TransitionKind::Replace)))
+            && self.departing.is_some()
+            && tree.children.len() == self.pages.len()
+            && !self.pages.is_empty()
+        {
+            tree.children.push(Tree::empty());
+            let incoming = self.pages.len() - 1;
+            let outgoing = self.pages.len();
+            tree.children.swap(incoming, outgoing);
+        }
+
+        while tree.children.len() < visual_len {
             tree.children.push(Tree::empty());
         }
-        tree.children.truncate(self.pages.len());
+        tree.children.truncate(visual_len);
 
         for (child, page) in tree.children.iter_mut().zip(self.pages.iter_mut()) {
             child.diff(page.element.as_widget_mut());
+        }
+
+        if let Some(departing) = self.departing.as_mut()
+            && let Some(child) = tree.children.get_mut(self.pages.len())
+        {
+            child.diff(departing.element.as_widget_mut());
         }
     }
 
@@ -367,6 +285,17 @@ where
             }
         }
 
+        if let Some(departing) = self.departing.as_mut() {
+            let index = self.pages.len();
+            if index < tree.children.len() {
+                children.push(departing.element.as_widget_mut().layout(
+                    &mut tree.children[index],
+                    renderer,
+                    &limits,
+                ));
+            }
+        }
+
         layout::Node::with_children(size, children)
     }
 
@@ -381,19 +310,32 @@ where
         viewport: &Rectangle,
     ) {
         if let Event::Window(window::Event::RedrawRequested(now)) = event {
-            let state = tree.state.downcast_mut::<NavigatorState>();
-            state.last_instant = *now;
+            tree.mark_dirty(tree::DirtyFlags::PAINT);
+            let mut remove_departing = false;
 
-            if let Some(transition) = self.pending_transition.take() {
-                state.active_transition = Some(TransitionAnim::new(transition, *now));
+            {
+                let state = tree.state.downcast_mut::<NavigatorState>();
+                state.last_instant = *now;
+
+                if let Some((transition, kind)) = self.pending_transition.take() {
+                    state.active_transition = Some(TransitionAnim::new(transition, kind, *now));
+                }
+
+                if let Some(ref mut anim) = state.active_transition {
+                    if anim.advance(*now) {
+                        shell.request_animation();
+                        shell.request_redraw();
+                    } else {
+                        remove_departing =
+                            matches!(anim.kind, TransitionKind::Pop | TransitionKind::Replace);
+                        state.active_transition = None;
+                    }
+                }
             }
 
-            if let Some(ref mut anim) = state.active_transition {
-                if anim.advance(*now) {
-                    shell.request_redraw();
-                } else {
-                    state.active_transition = None;
-                }
+            if remove_departing && self.departing.take().is_some() {
+                tree.children.truncate(self.pages.len());
+                shell.invalidate_layout();
             }
         }
 
@@ -431,30 +373,52 @@ where
         let transition = state.active_transition.as_ref();
         let now = state.last_instant;
 
-        for (i, page) in self.pages.iter().enumerate() {
+        let visual_len = self.pages.len() + usize::from(self.departing.is_some());
+
+        for i in 0..visual_len {
             if i >= children.len() || i >= tree.children.len() {
                 break;
             }
 
+            let page = if i < self.pages.len() {
+                &self.pages[i]
+            } else {
+                self.departing
+                    .as_ref()
+                    .expect("visual departing page must exist")
+            };
             let child_layout = children[i];
 
             // A transition animates between two pages: the entering
             // (topmost) and the exiting (second from top). Pages below
             // the pair are not drawn. A transition requires >= 2 pages.
-            if let Some(anim) = transition.filter(|_| self.pages.len() >= 2) {
+            let transition_is_valid = transition.is_some_and(|anim| match anim.kind {
+                TransitionKind::Push => self.pages.len() >= 2,
+                TransitionKind::Pop | TransitionKind::Replace => self.departing.is_some(),
+            });
+
+            if let Some(anim) = transition.filter(|_| transition_is_valid) {
                 let entering_idx = self.pages.len() - 1;
-                let exiting_idx = self.pages.len() - 2;
+                let exiting_idx = match anim.kind {
+                    TransitionKind::Push => self.pages.len() - 2,
+                    TransitionKind::Pop | TransitionKind::Replace => self.pages.len(),
+                };
 
                 if i == entering_idx {
                     let t = anim.enter_state(now);
                     if t.opacity > 0.001 {
                         let bounds = child_layout.bounds();
-                        renderer.with_translation(
-                            core::Vector::new(
-                                t.offset_x * bounds.width,
-                                t.offset_y * bounds.height,
-                            ),
-                            |renderer| {
+                        let center_x = bounds.x + bounds.width / 2.0;
+                        let center_y = bounds.y + bounds.height / 2.0;
+                        let transform = core::Transformation::translate(
+                            t.offset_x * bounds.width,
+                            t.offset_y * bounds.height,
+                        ) * core::Transformation::translate(center_x, center_y)
+                            * core::Transformation::scale(t.scale)
+                            * core::Transformation::translate(-center_x, -center_y);
+
+                        renderer.with_opacity(t.opacity, |renderer| {
+                            renderer.with_transformation(transform, |renderer| {
                                 page.element.as_widget().draw(
                                     &tree.children[i],
                                     renderer,
@@ -464,19 +428,24 @@ where
                                     cursor,
                                     viewport,
                                 );
-                            },
-                        );
+                            });
+                        });
                     }
                 } else if i == exiting_idx {
                     let t = anim.exit_state(now);
                     if t.opacity > 0.001 {
                         let bounds = child_layout.bounds();
-                        renderer.with_translation(
-                            core::Vector::new(
-                                t.offset_x * bounds.width,
-                                t.offset_y * bounds.height,
-                            ),
-                            |renderer| {
+                        let center_x = bounds.x + bounds.width / 2.0;
+                        let center_y = bounds.y + bounds.height / 2.0;
+                        let transform = core::Transformation::translate(
+                            t.offset_x * bounds.width,
+                            t.offset_y * bounds.height,
+                        ) * core::Transformation::translate(center_x, center_y)
+                            * core::Transformation::scale(t.scale)
+                            * core::Transformation::translate(-center_x, -center_y);
+
+                        renderer.with_opacity(t.opacity, |renderer| {
+                            renderer.with_transformation(transform, |renderer| {
                                 page.element.as_widget().draw(
                                     &tree.children[i],
                                     renderer,
@@ -486,8 +455,8 @@ where
                                     cursor,
                                     viewport,
                                 );
-                            },
-                        );
+                            });
+                        });
                     }
                 }
                 // Pages below the transition pair are not drawn.
@@ -541,5 +510,95 @@ where
 {
     fn from(navigator: Navigator<'a, Message, Theme, Renderer>) -> Self {
         Self::new(navigator)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Root;
+    struct Outgoing;
+    struct Incoming;
+
+    macro_rules! page_widget {
+        ($page:ty) => {
+            impl Widget<(), (), ()> for $page {
+                fn size(&self) -> Size<Length> {
+                    Size::new(Length::Fill, Length::Fill)
+                }
+
+                fn layout(
+                    &mut self,
+                    _tree: &mut Tree,
+                    _renderer: &(),
+                    limits: &layout::Limits,
+                ) -> layout::Node {
+                    layout::Node::new(limits.max())
+                }
+
+                fn draw(
+                    &self,
+                    _tree: &Tree,
+                    _renderer: &mut (),
+                    _theme: &(),
+                    _style: &renderer::Style,
+                    _layout: Layout<'_>,
+                    _cursor: mouse::Cursor,
+                    _viewport: &Rectangle,
+                ) {
+                }
+            }
+        };
+    }
+
+    page_widget!(Root);
+    page_widget!(Outgoing);
+    page_widget!(Incoming);
+
+    #[test]
+    fn pop_keeps_the_outgoing_page_until_the_reverse_transition_finishes() {
+        let navigator: Navigator<'_, (), (), ()> = Navigator::new(Element::new(Root))
+            .push(Element::new(Outgoing), PageTransition::FORWARD)
+            .pop(PageTransition::BACK);
+
+        assert_eq!(navigator.pages.len(), 1);
+        assert!(navigator.departing.is_some());
+        assert!(matches!(
+            navigator.pending_transition,
+            Some((PageTransition::SlideRight { .. }, TransitionKind::Pop))
+        ));
+    }
+
+    #[test]
+    fn replace_moves_the_existing_top_state_to_the_departing_slot() {
+        let mut previous: Navigator<'_, (), (), ()> =
+            Navigator::new(Element::new(Root)).push(Element::new(Outgoing), PageTransition::None);
+        let mut tree = Tree::new(&previous as &dyn Widget<(), (), ()>);
+        previous.diff(&mut tree);
+        let outgoing_id = tree.children[1].id().clone();
+
+        let mut replacement: Navigator<'_, (), (), ()> = Navigator::new(Element::new(Root))
+            .push(Element::new(Outgoing), PageTransition::None)
+            .replace(Element::new(Incoming), PageTransition::ZOOM);
+        replacement.diff(&mut tree);
+
+        assert_ne!(tree.children[1].id(), &outgoing_id);
+        assert_eq!(tree.children[2].id(), &outgoing_id);
+    }
+
+    #[test]
+    fn spring_navigation_is_animated_instead_of_becoming_an_instant_cut() {
+        let now = Instant::now();
+        let mut animation = TransitionAnim::new(
+            PageTransition::SpringSlide {
+                spring: aura_motion::SpringConfig::default(),
+            },
+            TransitionKind::Push,
+            now,
+        );
+
+        assert!(animation.advance(now));
+        assert!(animation.progress(now) < 1.0);
     }
 }

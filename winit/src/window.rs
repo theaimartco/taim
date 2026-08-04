@@ -89,6 +89,9 @@ where
                 mouse_interaction: mouse::Interaction::None,
                 redraw_at: None,
                 scheduler: Scheduler::new(),
+                accessibility: aura_accessibility::Session::new(
+                    aura_accessibility::atspi::adapter::Adapter::new(),
+                ),
                 preedit: None,
                 ime_state: None,
             },
@@ -204,6 +207,10 @@ where
     ///
     /// [`WindowEvent::Occluded`]: winit::event::WindowEvent::Occluded
     pub scheduler: Scheduler,
+    /// Retained accessibility session for this window. The in-memory AT-SPI
+    /// adapter is updated on the UI thread; platform bus delivery can drain
+    /// its bounded event queue without blocking rendering.
+    pub accessibility: aura_accessibility::Session<aura_accessibility::atspi::adapter::Adapter>,
     preedit: Option<Preedit<P::Renderer>>,
     ime_state: Option<(Rectangle, input_method::Purpose)>,
 }

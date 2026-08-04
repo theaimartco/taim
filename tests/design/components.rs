@@ -36,6 +36,7 @@ use aura_design::state::Interaction;
 use aura_design::theme::Theme;
 use aura_design::tokens::{Contrast, Scheme};
 
+use aura_core::Size;
 use aura_core::semantics::{Actions, Role};
 
 const EVERY_SCHEME: [Scheme; 3] = [Scheme::Light, Scheme::Dark, Scheme::HighContrast];
@@ -987,4 +988,67 @@ fn menu_typeahead_matches_prefixes_case_insensitively() {
         !Menu::matches_typeahead("Save As...", "   "),
         "an empty query must not jump the selection"
     );
+}
+
+/// The touch-target floor is a *policy*, and a policy that two crates
+/// state independently is a policy that will eventually disagree with
+/// itself. `phase.md` sets 48px; `aura-design` and the widgets must both
+/// mean that same 48px, and the compatibility floor must stay an
+/// explicit, separately-named opt-out rather than a second default.
+#[test]
+fn the_touch_target_policy_has_exactly_one_source() {
+    assert_eq!(
+        MIN_TOUCH_TARGET,
+        aura_core::touch::MIN_TARGET,
+        "aura-design must re-export the core constant, not restate it"
+    );
+    assert_eq!(
+        MIN_TOUCH_TARGET, 48.0,
+        "phase.md's default target is 48x48 logical pixels"
+    );
+
+    assert_eq!(
+        MIN_TOUCH_TARGET_COMPATIBILITY,
+        aura_core::touch::MIN_TARGET_COMPATIBILITY
+    );
+    assert!(
+        MIN_TOUCH_TARGET_COMPATIBILITY < MIN_TOUCH_TARGET,
+        "the compatibility floor only makes sense as a relaxation"
+    );
+
+    assert_eq!(TouchTargetPolicy::default(), TouchTargetPolicy::Vyom);
+    assert_eq!(TouchTargetPolicy::Vyom.min_edge(), MIN_TOUCH_TARGET);
+    assert_eq!(
+        TouchTargetPolicy::PlatformCompatibility.min_edge(),
+        MIN_TOUCH_TARGET_COMPATIBILITY
+    );
+}
+
+/// A target that is tall enough but too narrow is still a miss. Both
+/// axes are checked, on both policies.
+#[test]
+fn touch_target_policies_check_both_axes() {
+    for policy in TouchTargetPolicy::ALL {
+        let edge = policy.min_edge();
+
+        assert!(policy.is_satisfied_by(Size::new(edge, edge)));
+        assert!(!policy.is_satisfied_by(Size::new(edge - 0.01, edge)));
+        assert!(!policy.is_satisfied_by(Size::new(edge, edge - 0.01)));
+    }
+}
+
+/// Every component must clear the *default* policy at every density --
+/// the compatibility floor is not a licence to ship a smaller control.
+#[test]
+fn every_component_clears_the_default_policy_at_every_density() {
+    for (name, spec) in every_component() {
+        for density in Density::ALL {
+            let size = spec.min_size(density);
+
+            assert!(
+                TouchTargetPolicy::Vyom.is_satisfied_by(size),
+                "{name}/{density:?}: {size:?} is below the {MIN_TOUCH_TARGET}px default policy"
+            );
+        }
+    }
 }

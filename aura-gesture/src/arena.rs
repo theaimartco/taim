@@ -313,6 +313,17 @@ impl Arena {
             return None;
         }
 
+        // An empty arena is the runtime's passive/default routing mode. It
+        // tracks the full pointer lifetime without inventing a winner, then
+        // resolves cleanly once the final pointer leaves.
+        if self.entrants.is_empty() {
+            return self
+                .tracked_pointers
+                .is_empty()
+                .then(|| self.resolve(Resolution::NoWinner))
+                .flatten();
+        }
+
         // Rule 1 + 2: collect every team with at least one accepting
         // member, then pick the highest-priority (then
         // earliest-registered) one.
@@ -410,6 +421,21 @@ mod tests {
 
     fn t(millis: u64) -> Instant {
         epoch() + Duration::from_millis(millis)
+    }
+
+    #[test]
+    fn empty_arena_passively_tracks_until_pointer_up() {
+        let mut arena = Arena::new();
+
+        assert_eq!(arena.dispatch(pointer(Phase::Down, Point::ORIGIN, 0)), None);
+        assert_eq!(
+            arena.dispatch(pointer(Phase::Move, Point::new(1.0, 0.0), 1)),
+            None
+        );
+        assert_eq!(
+            arena.dispatch(pointer(Phase::Up, Point::new(1.0, 0.0), 2)),
+            Some(Resolution::NoWinner)
+        );
     }
 
     fn pointer(phase: Phase, position: Point, millis: u64) -> Pointer {

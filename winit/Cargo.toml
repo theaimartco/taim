@@ -26,6 +26,7 @@ wayland = ["winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita",
 
 [dependencies]
 aura_debug.workspace = true
+aura-accessibility.workspace = true
 aura_program.workspace = true
 aura_runtime.workspace = true
 

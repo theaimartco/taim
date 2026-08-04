@@ -33,6 +33,16 @@ impl Image {
             Image::Vector { svg, bounds, .. } => bounds.rotate(svg.rotation),
         }
     }
+
+    /// Multiplies this image's opacity.
+    pub fn scale_alpha(mut self, factor: f32) -> Self {
+        match &mut self {
+            Self::Raster { image, .. } => image.opacity *= factor.clamp(0.0, 1.0),
+            Self::Vector { svg, .. } => svg.opacity *= factor.clamp(0.0, 1.0),
+        }
+
+        self
+    }
 }
 
 /// An image buffer.

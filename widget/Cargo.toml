@@ -31,16 +31,14 @@ qr_code = ["canvas", "dep:qrcode"]
 wgpu = ["aura_renderer/wgpu-bare"]
 markdown = ["dep:pulldown-cmark"]
 advanced = []
-# Declared with no backing dependency: `aura_highlighter` is absent from
-# this checkout (see docs/architecture/path-map.md). Keeping the feature
-# name declared (rather than deleting the `#[cfg(feature = "highlighter")]`
-# call sites in markdown.rs/text_editor.rs) lets syntax highlighting come
-# back by adding the dependency, with no source changes, if a later phase
-# restores an Aura-owned highlighter crate.
-highlighter = []
+# Enables syntax highlighting of fenced code blocks in the `markdown`
+# widget, and the `aura-highlighter` adapter for `text_editor`.
+highlighter = ["dep:aura-highlighter"]
 
 [dependencies]
 aura-design = { workspace = true, optional = true }
+aura-highlighter = { workspace = true, optional = true }
+aura-motion.workspace = true
 aura_renderer.workspace = true
 aura_runtime.workspace = true
 

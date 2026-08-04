@@ -47,7 +47,7 @@ corresponding directory on disk, which made every `cargo metadata` /
 |---|---|---|---|
 | `beacon` | `aura_beacon` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and `debug/Cargo.toml`'s (former) `enable` feature. |
 | `devtools` | `aura_devtools` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and the root `debug`/`time-travel` features and their call sites in `src/daemon.rs` / `src/application.rs`. |
-| `highlighter` | `aura_highlighter` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and the root/`widget` `highlighter` features. Call sites in `widget/src/markdown.rs` and `widget/src/text_editor.rs` were already `#[cfg(feature = "highlighter")]`-gated and needed no source changes. |
+| `highlighter` | `aura_highlighter` | No | Removed in Phase 0, then **restored** as the Aura-owned `aura-highlighter` workspace member. The root/`widget` `highlighter` features now resolve to a real dependency, so they build instead of failing. See [aura-highlighter](../../aura-highlighter/src/lib.rs) for the scope it deliberately does and does not cover. |
 | `selector` | `aura_selector` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and `runtime`'s `selector` feature. Deleted `runtime/src/widget/selector.rs` and its `#[cfg(feature = "selector")] pub mod selector;` declaration in `runtime/src/widget.rs`. |
 | `test` | `aura_test` | No | Removed from `[workspace.members]` and `[workspace.dependencies]`. This crate had zero references anywhere else in the tree — it was dead even before the directory went missing. |
 | `tester` | `aura_tester` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and the root `tester` feature and its call sites in `src/daemon.rs` / `src/application.rs`. |
@@ -55,9 +55,9 @@ corresponding directory on disk, which made every `cargo metadata` /
 
 None of these six crates are needed by any phase before the point where
 the roadmap explicitly reintroduces an Aura-owned equivalent (`selector`-like
-widget querying is not yet scheduled; syntax highlighting has no scheduled
-return; hot-reload/time-travel debugging is superseded by `aura-profiler`
-and Aura Lab in Phase 15). Per the roadmap's own instruction ("restore a
+widget querying is not yet scheduled; syntax highlighting has since
+returned as `aura-highlighter`; hot-reload/time-travel debugging is
+superseded by `aura-profiler` and Aura Lab in Phase 15). Per the roadmap's own instruction ("restore a
 deleted capability only when a later phase explicitly needs an Aura-owned
 replacement"), Phase 0 did not stub or recreate any of them.
 

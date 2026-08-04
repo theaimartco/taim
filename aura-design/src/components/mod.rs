@@ -57,9 +57,59 @@ use aura_core::semantics::{Actions, Role};
 use aura_core::{Color, Size};
 
 /// The smallest edge, in logical pixels, any interactive component may
-/// present as a touch target. Matches the 44px floor common to platform
-/// accessibility guidance; Aura's own density scale starts above it.
-pub const MIN_TOUCH_TARGET: f32 = 44.0;
+/// present as a touch target.
+///
+/// VYOM is a touch-first system, so this is the 48px floor, matching the
+/// roadmap's own default rather than the smaller floor some desktop
+/// platforms allow. [`MIN_TOUCH_TARGET_COMPATIBILITY`] exists for the
+/// explicit opt-out; there is no third value anywhere in the tree.
+///
+/// Re-exported from [`aura_core::touch::MIN_TARGET`] so widgets that do
+/// not depend on `aura-design` clamp to the same number.
+pub const MIN_TOUCH_TARGET: f32 = aura_core::touch::MIN_TARGET;
+
+/// The reduced touch-target floor permitted only under
+/// [`TouchTargetPolicy::PlatformCompatibility`].
+///
+/// This is the 44px figure common to platform accessibility guidance. It
+/// is *not* the Aura default: shipping it means accepting a target that
+/// is measurably harder to hit on a touch screen, which is a decision a
+/// caller has to make deliberately.
+pub const MIN_TOUCH_TARGET_COMPATIBILITY: f32 = aura_core::touch::MIN_TARGET_COMPATIBILITY;
+
+/// Which touch-target floor a component is held to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+pub enum TouchTargetPolicy {
+    /// The VYOM default: [`MIN_TOUCH_TARGET`].
+    #[default]
+    Vyom,
+    /// The opt-in compatibility floor: [`MIN_TOUCH_TARGET_COMPATIBILITY`].
+    ///
+    /// Intended for UI ported from a platform whose own layout metrics
+    /// assume the smaller target, where growing every control would break
+    /// the imported design.
+    PlatformCompatibility,
+}
+
+impl TouchTargetPolicy {
+    /// Every policy, for exhaustive iteration in tests.
+    pub const ALL: [Self; 2] = [Self::Vyom, Self::PlatformCompatibility];
+
+    /// Returns the smallest edge, in logical pixels, this policy allows.
+    pub const fn min_edge(self) -> f32 {
+        match self {
+            Self::Vyom => MIN_TOUCH_TARGET,
+            Self::PlatformCompatibility => MIN_TOUCH_TARGET_COMPATIBILITY,
+        }
+    }
+
+    /// Returns `true` if `size` satisfies this policy on both axes.
+    pub fn is_satisfied_by(self, size: Size) -> bool {
+        let min = self.min_edge();
+
+        size.width >= min && size.height >= min
+    }
+}
 
 /// Screen-size class used by adaptive components.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

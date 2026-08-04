@@ -69,23 +69,36 @@ run_scene() {
         --refresh-rate "${REFRESH_RATE}"
         --warm-up-secs "${WARM_UP_SECS}"
         --runs "${RUNS}"
+        --device "${DEVICE}"
+        --save "${output_file}"
     )
 
-    if [[ -n "${DEVICE}" ]]; then
-        args+=(--device "${DEVICE}")
+    # `--save` refuses to write a report whose git commit, compiler, or
+    # device could not be determined, so the human summary on stdout is
+    # all that survives a run that cannot be attributed.
+    ./target/release/aura_bench "${args[@]}"
+}
+
+require_device() {
+    if [[ -z "${DEVICE}" ]]; then
+        log "error: DEVICE is required."
+        log "error: a report in ${OUTPUT_DIR} that does not name the machine it ran on"
+        log "error: cannot be compared against anything, so this script will not produce one."
+        log "error: set DEVICE to a [[device]] name from benchmarks/devices.toml, e.g."
+        log "error:     DEVICE=dev-workstation-01 $0"
+        exit 1
     fi
 
-    local full_output
-    full_output=$(./target/release/aura_bench "${args[@]}")
-
-    # `aura_bench` prints a human summary, a blank line, then the JSON
-    # report; keep only the JSON for the stored file.
-    echo "${full_output}" | awk 'BEGIN{found=0} /^\{/{found=1} found' > "${output_file}"
-
-    log "wrote ${output_file}"
+    if ! grep -q "name = \"${DEVICE}\"" benchmarks/devices.toml; then
+        log "error: '${DEVICE}' has no [[device]] entry in benchmarks/devices.toml."
+        log "error: add one describing the CPU, GPU, OS, compositor, refresh rate, and"
+        log "error: power mode before recording reports against that name."
+        exit 1
+    fi
 }
 
 main() {
+    require_device
     check_governor
     require_clean_worktree_or_warn
     build_release

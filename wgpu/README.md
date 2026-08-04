@@ -1,7 +1,7 @@
 # `aura_wgpu`
 [![Documentation](https://docs.rs/aura_wgpu/badge.svg)][documentation]
 [![Crates.io](https://img.shields.io/crates/v/aura_wgpu.svg)](https://crates.io/crates/aura_wgpu)
-[![License](https://img.shields.io/crates/l/aura_wgpu.svg)](https://github.com/aura-rs/aura/blob/master/LICENSE)
+[![License](https://img.shields.io/crates/l/aura_wgpu.svg)](https://github.com/theaimartco/vyom-aura/blob/master/LICENSE)
 [![Discord Server](https://img.shields.io/discord/628993209984614400?label=&labelColor=6A7EC2&logo=discord&logoColor=ffffff&color=7389D8)](https://discord.gg/3xZJ65GAhd)
 
 `aura_wgpu` is a [`wgpu`] renderer for [`aura_runtime`]. For now, it is the default renderer of Aura on [native platforms].

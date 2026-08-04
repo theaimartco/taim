@@ -205,7 +205,7 @@ impl<T> Subscription<T> {
     /// Check out the [`websocket`] example, which showcases this pattern to maintain a `WebSocket`
     /// connection open.
     ///
-    /// [`websocket`]: https://github.com/aura-rs/aura/tree/master/examples/websocket
+    /// [`websocket`]: https://github.com/theaimartco/vyom-aura/tree/master/examples/websocket
     pub fn run<S>(builder: fn() -> S) -> Self
     where
         S: Stream<Item = T> + MaybeSend + 'static,

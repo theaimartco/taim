@@ -103,6 +103,18 @@ pub enum Text {
 }
 
 impl Text {
+    /// Multiplies this text primitive's alpha channel.
+    pub fn scale_alpha(mut self, factor: f32) -> Self {
+        match &mut self {
+            Self::Paragraph { color, .. }
+            | Self::Editor { color, .. }
+            | Self::Cached { color, .. } => *color = color.scale_alpha(factor),
+            Self::Raw { raw, .. } => raw.color = raw.color.scale_alpha(factor),
+        }
+
+        self
+    }
+
     /// Returns the visible bounds of the [`Text`].
     pub fn visible_bounds(&self) -> Option<Rectangle> {
         match self {

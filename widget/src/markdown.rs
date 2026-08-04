@@ -447,7 +447,7 @@ impl Highlighter {
         Self {
             lines: Vec::new(),
             parser: aura_highlighter::Stream::new(&aura_highlighter::Settings {
-                theme: aura_highlighter::Theme::Base16Ocean,
+                theme: aura_highlighter::Theme::Dark,
                 token: language.to_owned(),
             }),
             language: language.to_owned(),

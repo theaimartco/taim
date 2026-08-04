@@ -133,8 +133,9 @@ version rather than "at least these fields."
 # One scene, human summary + JSON to stdout:
 cargo run --release --package aura_bench -- --scene idle_shell
 
-# Every registered scene, saved to benchmarks/baseline/<scene>.json:
-scripts/perf/run-baseline.sh
+# Every registered scene, saved to benchmarks/baseline/<scene>.json.
+# DEVICE is required and must name a [[device]] in benchmarks/devices.toml:
+DEVICE=dev-workstation-01 scripts/perf/run-baseline.sh
 
 # Compare a fresh run against a saved baseline:
 cargo run --release --package aura_bench -- \
@@ -145,10 +146,15 @@ See `benchmarks/devices.toml` for how to register a named reference
 device before checking in a report that should be trusted as a real
 baseline rather than an ad hoc local run.
 
+`--save` refuses to write a report whose `git_commit`, `rustc_version`,
+or `device` could not be determined, so an unattributable run never
+reaches `benchmarks/baseline/`. `benchmarks/baseline/README.md` records
+why that directory is currently empty and what has to happen to fill it.
+
 ## Known limitation: P95 stability on an unpinned development machine
 
-The reports checked into `benchmarks/baseline/` for this phase were
-produced on `dev-workstation-01` (see `benchmarks/devices.toml`) with the
+The reports this section analyses were produced on `dev-workstation-01`
+(see `benchmarks/devices.toml`) with the
 CPU frequency governor at `powersave`, not `performance` --
 `scripts/perf/run-baseline.sh` warned about exactly this and did not (and
 should not, without explicit authorization) change a system-wide governor

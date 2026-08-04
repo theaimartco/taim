@@ -1,6 +1,6 @@
 //! A windowing shell for Aura, on top of [`winit`].
 //!
-//! ![The native path of the Aura ecosystem](https://github.com/aura-rs/aura/blob/0525d76ff94e828b7b21634fa94a747022001c83/docs/graphs/native.png?raw=true)
+//! ![The native path of the Aura ecosystem](https://github.com/theaimartco/vyom-aura/blob/main/docs/graphs/native.png?raw=true)
 //!
 //! `aura_winit` offers some convenient abstractions on top of [`aura_runtime`]
 //! to quickstart development when using [`winit`].
@@ -11,11 +11,11 @@
 //! Additionally, a [`conversion`] module is available for users that decide to
 //! implement a custom event loop.
 //!
-//! [`aura_runtime`]: https://github.com/aura-rs/aura/tree/master/runtime
+//! [`aura_runtime`]: https://github.com/theaimartco/vyom-aura/tree/master/runtime
 //! [`winit`]: https://github.com/rust-windowing/winit
 //! [`conversion`]: crate::conversion
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/aura-rs/aura/9ab6923e943f784985e9ef9ca28b10278297225d/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 pub use aura_debug as debug;
@@ -924,6 +924,23 @@ async fn run_instance<P>(
                             },
                             cursor,
                         );
+
+                        // Accessibility is part of the live frame path. The
+                        // interface retains the previous semantic tree and
+                        // returns only incremental changes, so unchanged
+                        // frames are cheap while assistive technology never
+                        // depends on an application-specific callback being
+                        // remembered by the event loop.
+                        let semantic_changes = interface.semantics_changes(&window.renderer);
+                        window.accessibility.publish(&semantic_changes);
+
+                        let focused = interface
+                            .semantic_tree()
+                            .in_order()
+                            .into_iter()
+                            .find(|entry| entry.state.contains(core::semantics::State::FOCUSED))
+                            .map(|entry| &entry.id);
+                        window.accessibility.focus_changed(focused);
                         draw_span.finish();
 
                         if let user_interface::State::Updated {

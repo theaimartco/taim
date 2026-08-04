@@ -23,6 +23,7 @@ workspace = true
 [dependencies]
 aura-profiler.workspace = true
 aura-gesture.workspace = true
+aura-accessibility.workspace = true
 bytes.workspace = true
 aura_core.workspace = true
 aura_futures.workspace = true
