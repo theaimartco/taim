@@ -33,10 +33,10 @@ use crate::{cache, semantics};
 /// - [`geometry`], a custom widget showcasing how to draw geometry with the
 ///   `Mesh2D` primitive in [`aura_wgpu`].
 ///
-/// [examples]: https://github.com/aura-rs/aura/tree/master/examples
-/// [`custom_widget`]: https://github.com/aura-rs/aura/tree/master/examples/custom_widget
-/// [`geometry`]: https://github.com/aura-rs/aura/tree/master/examples/geometry
-/// [`aura_wgpu`]: https://github.com/aura-rs/aura/tree/master/wgpu
+/// [examples]: https://github.com/theaimartco/vyom-aura/tree/master/examples
+/// [`custom_widget`]: https://github.com/theaimartco/vyom-aura/tree/master/examples/custom_widget
+/// [`geometry`]: https://github.com/theaimartco/vyom-aura/tree/master/examples/geometry
+/// [`aura_wgpu`]: https://github.com/theaimartco/vyom-aura/tree/master/wgpu
 pub trait Widget<Message, Theme, Renderer>
 where
     Renderer: crate::Renderer,

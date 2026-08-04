@@ -11,7 +11,7 @@ pub mod tokens;
 pub mod prelude {
     pub use crate::components::{
         Appearance, ComponentSpec, Density, FocusRing, InputMethods, LayoutSpec, MIN_TOUCH_TARGET,
-        StateSupport, ViewportClass,
+        MIN_TOUCH_TARGET_COMPATIBILITY, StateSupport, TouchTargetPolicy, ViewportClass,
     };
     pub use crate::state::{Interaction, ResolvedState};
     pub use crate::theme::Theme;

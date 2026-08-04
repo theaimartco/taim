@@ -55,12 +55,21 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
 
-            match report.to_json() {
-                Ok(json) => println!("\n{json}"),
+            let json = match report.to_json() {
+                Ok(json) => json,
                 Err(error) => {
                     eprintln!("error: failed to serialize report: {error}");
                     return ExitCode::FAILURE;
                 }
+            };
+
+            println!("\n{json}");
+
+            if let Some(path) = &config.save_to
+                && let Err(message) = save_report(&report, &json, path, config.allow_unidentified)
+            {
+                eprintln!("error: {message}");
+                return ExitCode::FAILURE;
             }
 
             ExitCode::SUCCESS
@@ -70,6 +79,48 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// Writes `json` to `path`, refusing to archive an unattributable report.
+///
+/// A report on stdout is a reading someone is looking at right now; a
+/// report on disk is evidence someone will cite later without re-deriving
+/// where it came from. Only the second one needs to prove it knows what
+/// tree, compiler, and machine produced it, which is why the check lives
+/// here and not in [`Report`] itself.
+fn save_report(
+    report: &Report,
+    json: &str,
+    path: &str,
+    allow_unidentified: bool,
+) -> Result<(), String> {
+    let missing = report.environment.missing_identity();
+
+    if !missing.is_empty() {
+        if !allow_unidentified {
+            return Err(format!(
+                "refusing to save an unidentified report: {} could not be determined.\n\
+                 \x20 - git_commit/rustc_version: run inside the repository, or set \
+                 AURA_BENCH_GIT_COMMIT / AURA_BENCH_RUSTC_VERSION\n\
+                 \x20 - device: pass --device <NAME> naming a benchmarks/devices.toml entry\n\
+                 Pass --allow-unidentified to save anyway (the report must not then be \
+                 used for any comparison a reader is expected to trust).",
+                missing.join(", ")
+            ));
+        }
+
+        eprintln!(
+            "warning: saving an unidentified report; {} could not be determined",
+            missing.join(", ")
+        );
+    }
+
+    std::fs::write(path, format!("{json}\n"))
+        .map_err(|error| format!("failed to write '{path}': {error}"))?;
+
+    eprintln!("wrote {path}");
+
+    Ok(())
 }
 
 /// The exit gate in phase.md Phase 1 requires "two consecutive baseline
@@ -150,6 +201,8 @@ fn print_usage() {
          \x20   --backend <NAME>     Force a renderer backend (\"wgpu\" or \"tiny-skia\")\n\
          \x20   --device <NAME>      Label the report with a benchmarks/devices.toml entry\n\
          \x20   --compare <PATH>     Compare this run's median P95 against a saved report\n\
+         \x20   --save <PATH>        Write the JSON report to PATH (requires full identity)\n\
+         \x20   --allow-unidentified Permit --save when git/rustc/device cannot be determined\n\
          \x20   -h, --help           Print this message\n\n\
          Available scenes: {}",
         scenes::names().join(", ")
@@ -204,6 +257,8 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
             "--backend" => config.backend = Some(value()?),
             "--device" => config.device = Some(value()?),
             "--compare" => config.compare_against = Some(value()?),
+            "--save" => config.save_to = Some(value()?),
+            "--allow-unidentified" => config.allow_unidentified = true,
             "--help" | "-h" => {}
             other => return Err(format!("unknown argument '{other}'")),
         }

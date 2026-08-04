@@ -13,6 +13,12 @@ impl Packed {
     pub fn components(self) -> [f32; 4] {
         self.0
     }
+
+    /// Multiplies the packed color's alpha channel.
+    pub fn scale_alpha(mut self, factor: f32) -> Self {
+        self.0[3] *= factor.clamp(0.0, 1.0);
+        self
+    }
 }
 
 /// A flag that indicates whether the renderer should perform gamma correction.

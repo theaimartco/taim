@@ -1,12 +1,5 @@
-//! A renderer-agnostic native GUI runtime.
-//!
-//! ![The native path of the Aura ecosystem](https://github.com/aura-rs/aura/blob/master/docs/graphs/native.png?raw=true)
-//!
-//! `aura_runtime` takes [`aura_core`] and builds a native runtime on top of it.
-//!
-//! [`aura_core`]: https://github.com/aura-rs/aura/tree/master/core
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/aura-rs/aura/9ab6923e943f784985e9ef9ca28b10278297225d/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 pub mod backend;

@@ -1,8 +1,8 @@
 //! Asynchronous tasks for GUI programming, inspired by Elm.
 //!
-//! ![The foundations of the Aura ecosystem](https://github.com/aura-rs/aura/blob/0525d76ff94e828b7b21634fa94a747022001c83/docs/graphs/foundations.png?raw=true)
+//! ![The foundations of the Aura ecosystem](https://github.com/theaimartco/vyom-aura/blob/main/docs/graphs/foundations.png?raw=true)
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/aura-rs/aura/9ab6923e943f784985e9ef9ca28b10278297225d/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 pub use aura_core as core;

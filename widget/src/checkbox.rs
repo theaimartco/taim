@@ -30,7 +30,6 @@
 //!     }
 //! }
 //! ```
-//! ![Checkbox drawn by `aura_wgpu`](https://github.com/aura-rs/aura/blob/7760618fb112074bc40b148944521f312152012a/docs/images/checkbox.png?raw=true)
 use crate::core::alignment;
 use crate::core::layout;
 use crate::core::mouse;
@@ -78,7 +77,6 @@ use crate::core::{
 ///     }
 /// }
 /// ```
-/// ![Checkbox drawn by `aura_wgpu`](https://github.com/aura-rs/aura/blob/7760618fb112074bc40b148944521f312152012a/docs/images/checkbox.png?raw=true)
 pub struct Checkbox<'a, Message, Theme = crate::Theme, Renderer = crate::Renderer>
 where
     Renderer: text::Renderer,

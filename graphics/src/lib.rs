@@ -1,11 +1,11 @@
 //! A bunch of backend-agnostic types that can be leveraged to build a renderer
 //! for [`aura`].
 //!
-//! ![The native path of the Aura ecosystem](https://github.com/aura-rs/aura/blob/0525d76ff94e828b7b21634fa94a747022001c83/docs/graphs/native.png?raw=true)
+//! ![The native path of the Aura ecosystem](https://github.com/theaimartco/vyom-aura/blob/main/docs/graphs/native.png?raw=true)
 //!
-//! [`aura`]: https://github.com/aura-rs/aura
+//! [`aura`]: https://github.com/theaimartco/vyom-aura
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/aura-rs/aura/9ab6923e943f784985e9ef9ca28b10278297225d/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 mod antialiasing;

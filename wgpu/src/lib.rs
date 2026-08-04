@@ -1,6 +1,6 @@
 //! A [`wgpu`] renderer for [Aura].
 //!
-//! ![The native path of the Aura ecosystem](https://github.com/aura-rs/aura/blob/0525d76ff94e828b7b21634fa94a747022001c83/docs/graphs/native.png?raw=true)
+//! ![The native path of the Aura ecosystem](https://github.com/theaimartco/vyom-aura/blob/main/docs/graphs/native.png?raw=true)
 //!
 //! [`wgpu`] supports most modern graphics backends: Vulkan, Metal, DX11, and
 //! DX12 (OpenGL and WebGL are still WIP). Additionally, it will support the
@@ -13,12 +13,12 @@
 //! - Images and SVG, loaded from memory or the file system.
 //! - Meshes of triangles, useful to draw geometry freely.
 //!
-//! [Aura]: https://github.com/aura-rs/aura
+//! [Aura]: https://github.com/theaimartco/vyom-aura
 //! [`wgpu`]: https://github.com/gfx-rs/wgpu-rs
 //! [WebGPU API]: https://gpuweb.github.io/gpuweb/
 //! [`glyphon`]: https://github.com/grovesNL/glyphon
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/aura-rs/aura/9ab6923e943f784985e9ef9ca28b10278297225d/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(missing_docs)]
@@ -70,16 +70,46 @@ use crate::graphics::mesh;
 use crate::graphics::text::{Editor, Paragraph};
 use crate::graphics::{Shell, Viewport};
 
+#[derive(Debug)]
+struct RetainedFrame {
+    key: u64,
+    revision: u64,
+    bounds: Rectangle,
+    scale_factor: Option<f32>,
+    display_list: layer::Stack,
+}
+
+#[derive(Debug)]
+struct ActiveRetainedFrame {
+    key: u64,
+    revision: u64,
+    bounds: Rectangle,
+    scale_factor: Option<f32>,
+    range: std::ops::Range<usize>,
+}
+
+#[derive(Debug)]
+struct RecordingRetainedFrame {
+    key: u64,
+    revision: u64,
+    bounds: Rectangle,
+    scale_factor: Option<f32>,
+    start: usize,
+}
+
 /// A [`wgpu`] graphics renderer for [`aura`].
 ///
 /// [`wgpu`]: https://github.com/gfx-rs/wgpu-rs
-/// [`aura`]: https://github.com/aura-rs/aura
+/// [`aura`]: https://github.com/theaimartco/vyom-aura
 pub struct Renderer {
     engine: Engine,
     settings: renderer::Settings,
 
     layers: layer::Stack,
     scale_factor: Option<f32>,
+    retained_frame: Option<RetainedFrame>,
+    active_retained_frame: Option<ActiveRetainedFrame>,
+    recording_retained_frame: Option<RecordingRetainedFrame>,
 
     quad: quad::State,
     triangle: triangle::State,
@@ -104,6 +134,9 @@ impl Renderer {
             settings,
             layers: layer::Stack::new(),
             scale_factor: None,
+            retained_frame: None,
+            active_retained_frame: None,
+            recording_retained_frame: None,
 
             quad: quad::State::new(),
             triangle: triangle::State::new(&engine.device, &engine.triangle_pipeline),
@@ -311,7 +344,14 @@ impl Renderer {
         let physical_bounds =
             Rectangle::<f32>::from(Rectangle::with_size(viewport.physical_size()));
 
-        self.layers.merge();
+        // A retained range must keep its layer boundaries intact until the
+        // next frame moves it into the cache. Merging would drain commands
+        // across that boundary and make the cached display list incomplete.
+        if self.active_retained_frame.is_some() {
+            self.layers.flush();
+        } else {
+            self.layers.merge();
+        }
 
         for layer in self.layers.iter() {
             let clip_bounds = layer.bounds * scale_factor;
@@ -713,9 +753,72 @@ impl core::Renderer for Renderer {
         self.layers.pop_transformation();
     }
 
-    fn fill_quad(&mut self, quad: core::renderer::Quad, background: impl Into<Background>) {
+    fn start_opacity(&mut self, opacity: f32) {
+        self.layers.push_opacity(opacity);
+    }
+
+    fn end_opacity(&mut self) {
+        self.layers.pop_opacity();
+    }
+
+    fn fill_quad(&mut self, mut quad: core::renderer::Quad, background: impl Into<Background>) {
+        let opacity = self.layers.opacity();
+        quad.border.color = quad.border.color.scale_alpha(opacity);
+        quad.shadow.color = quad.shadow.color.scale_alpha(opacity);
         let (layer, transformation) = self.layers.current_mut();
-        layer.draw_quad(quad, background.into(), transformation);
+        layer.draw_quad(quad, background.into().scale_alpha(opacity), transformation);
+    }
+
+    fn replay_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) -> bool {
+        let scale_factor = self.scale_factor;
+
+        if let Some(retained) = self.retained_frame.take()
+            && retained.key == key
+            && retained.revision == revision
+            && retained.bounds == bounds
+            && retained.scale_factor == scale_factor
+        {
+            let range = self.layers.replay_owned(retained.display_list);
+            self.active_retained_frame = Some(ActiveRetainedFrame {
+                key,
+                revision,
+                bounds,
+                scale_factor,
+                range,
+            });
+            return true;
+        }
+
+        false
+    }
+
+    fn start_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) {
+        let start = self.layers.active_count();
+        self.layers.push_clip(bounds);
+        self.recording_retained_frame = Some(RecordingRetainedFrame {
+            key,
+            revision,
+            bounds,
+            scale_factor: self.scale_factor,
+            start,
+        });
+    }
+
+    fn end_retained_layer(&mut self) {
+        self.layers.pop_clip();
+        let end = self.layers.active_count();
+        let recording = self
+            .recording_retained_frame
+            .take()
+            .expect("end_retained_layer without start_retained_layer");
+
+        self.active_retained_frame = Some(ActiveRetainedFrame {
+            key: recording.key,
+            revision: recording.revision,
+            bounds: recording.bounds,
+            scale_factor: recording.scale_factor,
+            range: recording.start..end,
+        });
     }
 
     fn allocate_image(
@@ -743,7 +846,18 @@ impl core::Renderer for Renderer {
     }
 
     fn reset(&mut self, new_bounds: Rectangle) {
-        self.layers.reset(new_bounds);
+        if let Some(active) = self.active_retained_frame.take() {
+            let display_list = self.layers.take_range(active.range, new_bounds);
+            self.retained_frame = Some(RetainedFrame {
+                key: active.key,
+                revision: active.revision,
+                bounds: active.bounds,
+                scale_factor: active.scale_factor,
+                display_list,
+            });
+        } else {
+            self.layers.reset(new_bounds);
+        }
     }
 }
 
@@ -776,6 +890,7 @@ impl core::text::Renderer for Renderer {
         color: Color,
         clip_bounds: Rectangle,
     ) {
+        let color = color.scale_alpha(self.layers.opacity());
         let (layer, transformation) = self.layers.current_mut();
 
         layer.draw_paragraph(text, position, color, clip_bounds, transformation);
@@ -788,6 +903,7 @@ impl core::text::Renderer for Renderer {
         color: Color,
         clip_bounds: Rectangle,
     ) {
+        let color = color.scale_alpha(self.layers.opacity());
         let (layer, transformation) = self.layers.current_mut();
         layer.draw_editor(editor, position, color, clip_bounds, transformation);
     }
@@ -799,13 +915,15 @@ impl core::text::Renderer for Renderer {
         color: Color,
         clip_bounds: Rectangle,
     ) {
+        let color = color.scale_alpha(self.layers.opacity());
         let (layer, transformation) = self.layers.current_mut();
         layer.draw_text(text, position, color, clip_bounds, transformation);
     }
 }
 
 impl graphics::text::Renderer for Renderer {
-    fn fill_raw(&mut self, raw: graphics::text::Raw) {
+    fn fill_raw(&mut self, mut raw: graphics::text::Raw) {
+        raw.color = raw.color.scale_alpha(self.layers.opacity());
         let (layer, transformation) = self.layers.current_mut();
         layer.draw_text_raw(raw, transformation);
     }
@@ -828,7 +946,8 @@ impl core::image::Renderer for Renderer {
         self.image_cache.borrow_mut().measure_image(handle)
     }
 
-    fn draw_image(&mut self, image: core::Image, bounds: Rectangle, clip_bounds: Rectangle) {
+    fn draw_image(&mut self, mut image: core::Image, bounds: Rectangle, clip_bounds: Rectangle) {
+        image.opacity *= self.layers.opacity();
         let (layer, transformation) = self.layers.current_mut();
         layer.draw_raster(image, bounds, clip_bounds, transformation);
     }
@@ -840,7 +959,8 @@ impl core::svg::Renderer for Renderer {
         self.image_cache.borrow_mut().measure_svg(handle)
     }
 
-    fn draw_svg(&mut self, svg: core::Svg, bounds: Rectangle, clip_bounds: Rectangle) {
+    fn draw_svg(&mut self, mut svg: core::Svg, bounds: Rectangle, clip_bounds: Rectangle) {
+        svg.opacity *= self.layers.opacity();
         let (layer, transformation) = self.layers.current_mut();
         layer.draw_svg(svg, bounds, clip_bounds, transformation);
     }
@@ -858,11 +978,13 @@ impl graphics::mesh::Renderer for Renderer {
             "Mesh indices length must be a multiple of 3"
         );
 
+        let mesh = mesh.scale_alpha(self.layers.opacity());
         let (layer, transformation) = self.layers.current_mut();
         layer.draw_mesh(mesh, transformation);
     }
 
     fn draw_mesh_cache(&mut self, cache: mesh::Cache) {
+        let cache = cache.scale_alpha(self.layers.opacity());
         let (layer, transformation) = self.layers.current_mut();
         layer.draw_mesh_cache(cache, transformation);
     }
@@ -878,6 +1000,7 @@ impl graphics::geometry::Renderer for Renderer {
     }
 
     fn draw_geometry(&mut self, geometry: Self::Geometry) {
+        let opacity = self.layers.opacity();
         let (layer, transformation) = self.layers.current_mut();
 
         match geometry {
@@ -886,27 +1009,38 @@ impl graphics::geometry::Renderer for Renderer {
                 images,
                 text,
             } => {
-                layer.draw_mesh_group(meshes, transformation);
+                layer.draw_mesh_group(
+                    meshes
+                        .into_iter()
+                        .map(|mesh| mesh.scale_alpha(opacity))
+                        .collect(),
+                    transformation,
+                );
 
                 for image in images {
-                    layer.draw_image(image, transformation);
+                    layer.draw_image(image.scale_alpha(opacity), transformation);
                 }
 
-                layer.draw_text_group(text, transformation);
+                layer.draw_text_group(
+                    text.into_iter()
+                        .map(|text| text.scale_alpha(opacity))
+                        .collect(),
+                    transformation,
+                );
             }
             Geometry::Cached(cache) => {
                 if let Some(meshes) = cache.meshes {
-                    layer.draw_mesh_cache(meshes, transformation);
+                    layer.draw_mesh_cache(meshes.scale_alpha(opacity), transformation);
                 }
 
                 if let Some(images) = cache.images {
                     for image in images.iter().cloned() {
-                        layer.draw_image(image, transformation);
+                        layer.draw_image(image.scale_alpha(opacity), transformation);
                     }
                 }
 
                 if let Some(text) = cache.text {
-                    layer.draw_text_cache(text, transformation);
+                    layer.draw_text_cache(text.scale_alpha(opacity), transformation);
                 }
             }
         }

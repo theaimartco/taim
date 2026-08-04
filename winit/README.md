@@ -1,7 +1,7 @@
 # `aura_winit`
 [![Documentation](https://docs.rs/aura_winit/badge.svg)][documentation]
 [![Crates.io](https://img.shields.io/crates/v/aura_winit.svg)](https://crates.io/crates/aura_winit)
-[![License](https://img.shields.io/crates/l/aura_winit.svg)](https://github.com/aura-rs/aura/blob/master/LICENSE)
+[![License](https://img.shields.io/crates/l/aura_winit.svg)](https://github.com/theaimartco/vyom-aura/blob/master/LICENSE)
 [![Discord Server](https://img.shields.io/discord/628993209984614400?label=&labelColor=6A7EC2&logo=discord&logoColor=ffffff&color=7389D8)](https://discord.gg/3xZJ65GAhd)
 
 `aura_winit` offers some convenient abstractions on top of [`aura_native`] to quickstart development when using [`winit`].

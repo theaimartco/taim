@@ -72,6 +72,34 @@ where
         delegate!(self, renderer, renderer.end_transformation());
     }
 
+    fn start_opacity(&mut self, opacity: f32) {
+        delegate!(self, renderer, renderer.start_opacity(opacity));
+    }
+
+    fn end_opacity(&mut self) {
+        delegate!(self, renderer, renderer.end_opacity());
+    }
+
+    fn replay_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) -> bool {
+        delegate!(
+            self,
+            renderer,
+            renderer.replay_retained_layer(key, revision, bounds)
+        )
+    }
+
+    fn start_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) {
+        delegate!(
+            self,
+            renderer,
+            renderer.start_retained_layer(key, revision, bounds)
+        );
+    }
+
+    fn end_retained_layer(&mut self) {
+        delegate!(self, renderer, renderer.end_retained_layer());
+    }
+
     fn allocate_image(
         &mut self,
         handle: &image::Handle,

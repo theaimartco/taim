@@ -172,6 +172,22 @@ fn an_unchanging_real_ui_settles_and_stops_requesting_redraws() {
         "the first draw must draw at least once"
     );
 
+    // Promote the frame's recorded layer exactly as the compositor does at
+    // the beginning of the next frame. The second draw must replay that
+    // retained display list without re-entering the widget.
+    aura::advanced::Renderer::reset(&mut renderer, Rectangle::with_size(Size::new(200.0, 200.0)));
+    ui.draw(
+        &mut renderer,
+        &Theme::Light,
+        &renderer::Style::default(),
+        mouse::Cursor::Unavailable,
+    );
+    assert_eq!(
+        draw_calls.get(),
+        after_first_build_draw_calls,
+        "an unchanged live UI must replay its retained layer without Widget::draw"
+    );
+
     // Nothing changes: no events, no messages. A real event loop would
     // not even call `update` again without an event to process, but
     // this proves that if it did, an unchanging widget contributes no

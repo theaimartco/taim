@@ -1,6 +1,5 @@
 //! Pane grids let your users split regions of your application and organize layout dynamically.
 //!
-//! ![Pane grid - Aura](https://aura.rs/examples/pane_grid.gif)
 //!
 //! This distribution of space is common in tiling window managers (like
 //! [`awesome`](https://awesomewm.org/), [`i3`](https://i3wm.org/), or even
@@ -52,7 +51,7 @@
 //! The [`pane_grid` example] showcases how to use a [`PaneGrid`] with resizing,
 //! drag and drop, and hotkey support.
 //!
-//! [`pane_grid` example]: https://github.com/aura-rs/aura/tree/master/examples/pane_grid
+//! [`pane_grid` example]: https://github.com/theaimartco/vyom-aura/tree/master/examples/pane_grid
 mod axis;
 mod configuration;
 mod content;
@@ -99,7 +98,6 @@ const THICKNESS_RATIO: f32 = 25.0;
 /// A collection of panes distributed using either vertical or horizontal splits
 /// to completely fill the space available.
 ///
-/// ![Pane grid - Aura](https://aura.rs/examples/pane_grid.gif)
 ///
 /// This distribution of space is common in tiling window managers (like
 /// [`awesome`](https://awesomewm.org/), [`i3`](https://i3wm.org/), or even

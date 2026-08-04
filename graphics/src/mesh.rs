@@ -68,6 +68,24 @@ impl Mesh {
             } => *clip_bounds * *transformation,
         }
     }
+
+    /// Multiplies every vertex alpha in this mesh.
+    pub fn scale_alpha(mut self, factor: f32) -> Self {
+        match &mut self {
+            Self::Solid { buffers, .. } => {
+                for vertex in &mut buffers.vertices {
+                    vertex.color = vertex.color.scale_alpha(factor);
+                }
+            }
+            Self::Gradient { buffers, .. } => {
+                for vertex in &mut buffers.vertices {
+                    vertex.gradient = vertex.gradient.scale_alpha(factor);
+                }
+            }
+        }
+
+        self
+    }
 }
 
 /// A set of vertices and indices representing a list of triangles.
@@ -193,6 +211,18 @@ impl Cache {
     pub fn update(&mut self, meshes: Arc<[Mesh]>) {
         self.batch = meshes;
         self.version += 1;
+    }
+
+    /// Returns a transient cache with alpha-scaled copies of its meshes.
+    pub fn scale_alpha(&self, factor: f32) -> Self {
+        let batch = self
+            .batch
+            .iter()
+            .cloned()
+            .map(|mesh| mesh.scale_alpha(factor))
+            .collect::<Vec<_>>();
+
+        Self::new(Arc::from(batch))
     }
 }
 

@@ -63,7 +63,7 @@ Every component implements `components::ComponentSpec`, which turns
 | semantic role/actions | `role()`, `actions()` |
 | state matrix | `supported_states()` + `appearance(Interaction, &Theme)` |
 | keyboard/pointer/touch/gamepad | `input_methods() -> InputMethods` |
-| minimum touch target | `min_size(Density)` vs `MIN_TOUCH_TARGET` (44px) |
+| minimum touch target | `min_size(Density)` vs `MIN_TOUCH_TARGET` (48px, re-exported from `aura_core::touch::MIN_TARGET`; `TouchTargetPolicy::PlatformCompatibility` is the only way to 44px) |
 | focus ring | `Appearance::focus_ring` |
 | compact/medium/expanded layout | `layout(ViewportClass, Density) -> LayoutSpec` |
 | tokens only | every `Appearance`/`LayoutSpec` field is a theme token |

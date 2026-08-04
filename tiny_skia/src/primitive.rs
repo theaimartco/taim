@@ -23,6 +23,17 @@ pub enum Primitive {
 }
 
 impl Primitive {
+    /// Multiplies the primitive paint's opacity.
+    pub fn scale_alpha(mut self, factor: f32) -> Self {
+        match &mut self {
+            Primitive::Fill { paint, .. } | Primitive::Stroke { paint, .. } => {
+                paint.shader.apply_opacity(factor);
+            }
+        }
+
+        self
+    }
+
     /// Returns the visible bounds of the [`Primitive`].
     pub fn visible_bounds(&self) -> Rectangle {
         let bounds = match self {

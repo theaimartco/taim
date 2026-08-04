@@ -1,6 +1,6 @@
 //! Use the built-in widgets or create your own.
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/aura-rs/aura/9ab6923e943f784985e9ef9ca28b10278297225d/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 pub use aura_renderer as renderer;

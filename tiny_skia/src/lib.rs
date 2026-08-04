@@ -33,14 +33,41 @@ use crate::graphics::Viewport;
 use crate::graphics::compositor;
 use crate::graphics::text::{Editor, Paragraph};
 
+#[derive(Debug)]
+struct RetainedFrame {
+    key: u64,
+    revision: u64,
+    bounds: Rectangle,
+    display_list: layer::Stack,
+}
+
+#[derive(Debug)]
+struct ActiveRetainedFrame {
+    key: u64,
+    revision: u64,
+    bounds: Rectangle,
+    range: std::ops::Range<usize>,
+}
+
+#[derive(Debug)]
+struct RecordingRetainedFrame {
+    key: u64,
+    revision: u64,
+    bounds: Rectangle,
+    start: usize,
+}
+
 /// A [`tiny-skia`] graphics renderer for [`aura`].
 ///
 /// [`tiny-skia`]: https://github.com/RazrFalcon/tiny-skia
-/// [`aura`]: https://github.com/aura-rs/aura
+/// [`aura`]: https://github.com/theaimartco/vyom-aura
 #[derive(Debug)]
 pub struct Renderer {
     settings: renderer::Settings,
     layers: layer::Stack,
+    retained_frame: Option<RetainedFrame>,
+    active_retained_frame: Option<ActiveRetainedFrame>,
+    recording_retained_frame: Option<RecordingRetainedFrame>,
     engine: Engine, // TODO: Shared engine
 }
 
@@ -49,6 +76,9 @@ impl Renderer {
         Self {
             settings,
             layers: layer::Stack::new(),
+            retained_frame: None,
+            active_retained_frame: None,
+            recording_retained_frame: None,
             engine: Engine::new(),
         }
     }
@@ -203,9 +233,66 @@ impl core::Renderer for Renderer {
         self.layers.pop_transformation();
     }
 
-    fn fill_quad(&mut self, quad: renderer::Quad, background: impl Into<Background>) {
+    fn start_opacity(&mut self, opacity: f32) {
+        self.layers.push_opacity(opacity);
+    }
+
+    fn end_opacity(&mut self) {
+        self.layers.pop_opacity();
+    }
+
+    fn fill_quad(&mut self, mut quad: renderer::Quad, background: impl Into<Background>) {
+        let opacity = self.layers.opacity();
+        quad.border.color = quad.border.color.scale_alpha(opacity);
+        quad.shadow.color = quad.shadow.color.scale_alpha(opacity);
         let (layer, transformation) = self.layers.current_mut();
-        layer.draw_quad(quad, background.into(), transformation);
+        layer.draw_quad(quad, background.into().scale_alpha(opacity), transformation);
+    }
+
+    fn replay_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) -> bool {
+        if let Some(retained) = self.retained_frame.take()
+            && retained.key == key
+            && retained.revision == revision
+            && retained.bounds == bounds
+        {
+            let range = self.layers.replay_owned(retained.display_list);
+            self.active_retained_frame = Some(ActiveRetainedFrame {
+                key,
+                revision,
+                bounds,
+                range,
+            });
+            return true;
+        }
+
+        false
+    }
+
+    fn start_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) {
+        let start = self.layers.active_count();
+        self.layers.push_clip(bounds);
+        self.recording_retained_frame = Some(RecordingRetainedFrame {
+            key,
+            revision,
+            bounds,
+            start,
+        });
+    }
+
+    fn end_retained_layer(&mut self) {
+        self.layers.pop_clip();
+        let end = self.layers.active_count();
+        let recording = self
+            .recording_retained_frame
+            .take()
+            .expect("end_retained_layer without start_retained_layer");
+
+        self.active_retained_frame = Some(ActiveRetainedFrame {
+            key: recording.key,
+            revision: recording.revision,
+            bounds: recording.bounds,
+            range: recording.start..end,
+        });
     }
 
     fn allocate_image(
@@ -232,7 +319,17 @@ impl core::Renderer for Renderer {
     }
 
     fn reset(&mut self, new_bounds: Rectangle) {
-        self.layers.reset(new_bounds);
+        if let Some(active) = self.active_retained_frame.take() {
+            let display_list = self.layers.take_range(active.range, new_bounds);
+            self.retained_frame = Some(RetainedFrame {
+                key: active.key,
+                revision: active.revision,
+                bounds: active.bounds,
+                display_list,
+            });
+        } else {
+            self.layers.reset(new_bounds);
+        }
     }
 }
 
@@ -265,6 +362,7 @@ impl core::text::Renderer for Renderer {
         color: Color,
         clip_bounds: Rectangle,
     ) {
+        let color = color.scale_alpha(self.layers.opacity());
         let (layer, transformation) = self.layers.current_mut();
 
         layer.draw_paragraph(text, position, color, clip_bounds, transformation);
@@ -277,6 +375,7 @@ impl core::text::Renderer for Renderer {
         color: Color,
         clip_bounds: Rectangle,
     ) {
+        let color = color.scale_alpha(self.layers.opacity());
         let (layer, transformation) = self.layers.current_mut();
         layer.draw_editor(editor, position, color, clip_bounds, transformation);
     }
@@ -288,13 +387,15 @@ impl core::text::Renderer for Renderer {
         color: Color,
         clip_bounds: Rectangle,
     ) {
+        let color = color.scale_alpha(self.layers.opacity());
         let (layer, transformation) = self.layers.current_mut();
         layer.draw_text(text, position, color, clip_bounds, transformation);
     }
 }
 
 impl graphics::text::Renderer for Renderer {
-    fn fill_raw(&mut self, raw: graphics::text::Raw) {
+    fn fill_raw(&mut self, mut raw: graphics::text::Raw) {
+        raw.color = raw.color.scale_alpha(self.layers.opacity());
         let (layer, transformation) = self.layers.current_mut();
         layer.draw_text_raw(raw, transformation);
     }
@@ -310,6 +411,7 @@ impl graphics::geometry::Renderer for Renderer {
     }
 
     fn draw_geometry(&mut self, geometry: Self::Geometry) {
+        let opacity = self.layers.opacity();
         let (layer, transformation) = self.layers.current_mut();
 
         match geometry {
@@ -319,22 +421,47 @@ impl graphics::geometry::Renderer for Renderer {
                 text,
                 clip_bounds,
             } => {
-                layer.draw_primitive_group(primitives, clip_bounds, transformation);
+                layer.draw_primitive_group(
+                    primitives
+                        .into_iter()
+                        .map(|primitive| primitive.scale_alpha(opacity))
+                        .collect(),
+                    clip_bounds,
+                    transformation,
+                );
 
                 for image in images {
-                    layer.draw_image(image, transformation);
+                    layer.draw_image(image.scale_alpha(opacity), transformation);
                 }
 
-                layer.draw_text_group(text, clip_bounds, transformation);
+                layer.draw_text_group(
+                    text.into_iter()
+                        .map(|text| text.scale_alpha(opacity))
+                        .collect(),
+                    clip_bounds,
+                    transformation,
+                );
             }
             Geometry::Cache(cache) => {
-                layer.draw_primitive_cache(cache.primitives, cache.clip_bounds, transformation);
+                let primitives = cache
+                    .primitives
+                    .iter()
+                    .cloned()
+                    .map(|primitive| primitive.scale_alpha(opacity))
+                    .collect();
+                layer.draw_primitive_group(primitives, cache.clip_bounds, transformation);
 
                 for image in cache.images.iter() {
-                    layer.draw_image(image.clone(), transformation);
+                    layer.draw_image(image.clone().scale_alpha(opacity), transformation);
                 }
 
-                layer.draw_text_cache(cache.text, cache.clip_bounds, transformation);
+                let text = cache
+                    .text
+                    .iter()
+                    .cloned()
+                    .map(|text| text.scale_alpha(opacity))
+                    .collect();
+                layer.draw_text_group(text, cache.clip_bounds, transformation);
             }
         }
     }
@@ -365,7 +492,8 @@ impl core::image::Renderer for Renderer {
         self.engine.raster_pipeline.dimensions(handle)
     }
 
-    fn draw_image(&mut self, image: core::Image, bounds: Rectangle, clip_bounds: Rectangle) {
+    fn draw_image(&mut self, mut image: core::Image, bounds: Rectangle, clip_bounds: Rectangle) {
+        image.opacity *= self.layers.opacity();
         let (layer, transformation) = self.layers.current_mut();
         layer.draw_raster(image, bounds, clip_bounds, transformation);
     }
@@ -377,7 +505,8 @@ impl core::svg::Renderer for Renderer {
         self.engine.vector_pipeline.viewport_dimensions(handle)
     }
 
-    fn draw_svg(&mut self, svg: core::Svg, bounds: Rectangle, clip_bounds: Rectangle) {
+    fn draw_svg(&mut self, mut svg: core::Svg, bounds: Rectangle, clip_bounds: Rectangle) {
+        svg.opacity *= self.layers.opacity();
         let (layer, transformation) = self.layers.current_mut();
         layer.draw_svg(svg, bounds, clip_bounds, transformation);
     }

@@ -79,10 +79,31 @@ pub struct Environment {
 impl Environment {
     /// Captures what can be determined from the current process without
     /// requiring external tools (`nvidia-smi`, etc.) to be installed.
+    ///
+    /// `git_commit` and `rustc_version` come from `build.rs`, which reads
+    /// them from the tree and compiler that actually produced this
+    /// binary. The same variables are also read at runtime as a fallback,
+    /// which is how a build system that already knows them injects them
+    /// without a rebuild.
+    ///
+    /// Neither is re-derived here by running `git` or `rustc`: this
+    /// process may be running on a different machine, at a different
+    /// commit, under a different toolchain than the one that built it,
+    /// and an identity field that is confidently wrong is worse than one
+    /// that is honestly absent. A field stays `None` when both sources
+    /// failed -- an unidentified report. [`Environment::missing_identity`]
+    /// names those fields, and `--save` refuses to write such a report
+    /// unless the caller opts in.
     pub fn capture(renderer_backend: String, device: Option<String>) -> Self {
         Self {
-            git_commit: option_env!("AURA_BENCH_GIT_COMMIT").map(str::to_owned),
-            rustc_version: option_env!("AURA_BENCH_RUSTC_VERSION").map(str::to_owned),
+            git_commit: resolve_identity(
+                option_env!("AURA_BENCH_GIT_COMMIT"),
+                "AURA_BENCH_GIT_COMMIT",
+            ),
+            rustc_version: resolve_identity(
+                option_env!("AURA_BENCH_RUSTC_VERSION"),
+                "AURA_BENCH_RUSTC_VERSION",
+            ),
             renderer_backend,
             build_profile: if cfg!(debug_assertions) {
                 "debug".to_owned()
@@ -94,6 +115,44 @@ impl Environment {
             allocation_counting_active: crate::metrics::allocations::is_active(),
         }
     }
+
+    /// Names the identity fields that could not be determined.
+    ///
+    /// An empty slice means the report can be attributed to a specific
+    /// tree, compiler, and machine, which is the precondition for using
+    /// it in any comparison a reader is expected to trust. `--save`
+    /// refuses to write a report with a non-empty result unless
+    /// `--allow-unidentified` is passed.
+    pub fn missing_identity(&self) -> Vec<&'static str> {
+        let mut missing = Vec::new();
+
+        if self.git_commit.is_none() {
+            missing.push("git_commit");
+        }
+
+        if self.rustc_version.is_none() {
+            missing.push("rustc_version");
+        }
+
+        if self.device.is_none() {
+            missing.push("device");
+        }
+
+        missing
+    }
+}
+
+/// Resolves one identity field from a build-time variable, falling back to
+/// the same variable read at runtime.
+///
+/// An empty value counts as absent: an unknown provenance must stay
+/// visibly unknown rather than become an empty string that serializes as
+/// a present-looking field.
+fn resolve_identity(built_in: Option<&'static str>, variable: &str) -> Option<String> {
+    built_in
+        .map(str::to_owned)
+        .or_else(|| std::env::var(variable).ok())
+        .filter(|value| !value.is_empty())
 }
 
 /// The summary produced from one measured run's raw frame samples.

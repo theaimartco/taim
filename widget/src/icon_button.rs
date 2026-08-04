@@ -41,8 +41,11 @@ use crate::core::{
 };
 
 /// The default edge length of an icon button, which is also the smallest
-/// touch target platform guidance allows.
-const DEFAULT_SIZE: f32 = 44.0;
+/// touch target Aura allows.
+///
+/// Taken from [`touch::MIN_TARGET`] rather than restated, so this widget
+/// cannot drift from `aura-design`'s `MIN_TOUCH_TARGET`.
+const DEFAULT_SIZE: f32 = touch::MIN_TARGET;
 
 /// A button whose content is a single icon glyph.
 #[allow(missing_debug_implementations)]

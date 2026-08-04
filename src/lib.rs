@@ -20,11 +20,13 @@
 //! beginners have learned it and had a good time with it. Since it leverages a lot of what
 //! Rust has to offer in a type-safe way, it can be a great way to discover Rust itself.
 //!
-//! If you don't like the sound of that, you expect to be spoonfed, or you feel frustrated
-//! and struggle to use the library; then I recommend you to wait patiently until [the book]
-//! is finished.
+//! If that does not sound like what you want right now, start from the worked examples in
+//! [`examples/`] instead of this reference, and consult [the capability matrix] before
+//! relying on any subsystem: it records, per subsystem, whether it is implemented, tested
+//! in isolation, or actually reached by a running application.
 //!
-//! [the book]: https://book.aura.rs
+//! [`examples/`]: https://github.com/theaimartco/vyom-aura/tree/main/examples
+//! [the capability matrix]: https://github.com/theaimartco/vyom-aura/blob/main/docs/status.md
 //!
 //! # The Pocket Guide
 //! Start by calling [`run`]:
@@ -468,7 +470,7 @@
 //! Furthermore, functor methods like [`Task::map`], [`Element::map`], and [`Subscription::map`] make composition
 //! seamless.
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/aura-rs/aura/bdf0430880f5c29443f5f0a0ae4895866dfef4c6/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 use aura_widget::renderer;

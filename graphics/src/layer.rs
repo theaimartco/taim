@@ -48,6 +48,7 @@ pub trait Layer: Default {
 pub struct Stack<T: Layer> {
     layers: Vec<T>,
     transformations: Vec<Transformation>,
+    opacities: Vec<f32>,
     previous: Vec<usize>,
     current: usize,
     active_count: usize,
@@ -59,6 +60,7 @@ impl<T: Layer> Stack<T> {
         Self {
             layers: vec![T::default()],
             transformations: vec![Transformation::IDENTITY],
+            opacities: vec![1.0],
             previous: vec![],
             current: 0,
             active_count: 1,
@@ -78,6 +80,24 @@ impl<T: Layer> Stack<T> {
     #[inline]
     pub fn transformation(&self) -> Transformation {
         self.transformations.last().copied().unwrap()
+    }
+
+    /// Returns the current cumulative opacity multiplier.
+    pub fn opacity(&self) -> f32 {
+        self.opacities.last().copied().unwrap_or(1.0)
+    }
+
+    /// Pushes a nested opacity multiplier.
+    pub fn push_opacity(&mut self, opacity: f32) {
+        self.opacities
+            .push(self.opacity() * opacity.clamp(0.0, 1.0));
+    }
+
+    /// Pops the current opacity multiplier.
+    pub fn pop_opacity(&mut self) {
+        if self.opacities.len() > 1 {
+            let _ = self.opacities.pop();
+        }
     }
 
     /// Pushes a new clipping region in the [`Stack`]; creating a new layer in the
@@ -130,6 +150,55 @@ impl<T: Layer> Stack<T> {
     /// Returns the slice of layers in the [`Stack`].
     pub fn as_slice(&self) -> &[T] {
         &self.layers[..self.active_count]
+    }
+
+    /// Returns the number of layers recorded in the current frame.
+    pub fn active_count(&self) -> usize {
+        self.active_count
+    }
+
+    /// Moves a contiguous recorded range into an independent display list
+    /// and resets this stack for a new frame.
+    pub fn take_range(&mut self, range: std::ops::Range<usize>, new_bounds: Rectangle) -> Self {
+        let mut recorded = std::mem::take(self);
+        self.reset(new_bounds);
+
+        let start = range.start.min(recorded.active_count);
+        let end = range.end.min(recorded.active_count).max(start);
+        let layers: Vec<T> = recorded.layers.drain(start..end).collect();
+        let active_count = layers.len();
+
+        Self {
+            layers,
+            transformations: vec![Transformation::IDENTITY],
+            opacities: vec![1.0],
+            previous: Vec::new(),
+            current: 0,
+            active_count,
+        }
+    }
+
+    /// Moves a retained display list into this frame and returns the range
+    /// occupied by the replayed layers.
+    pub fn replay_owned(&mut self, mut display_list: Self) -> std::ops::Range<usize> {
+        debug_assert_eq!(
+            self.current, 0,
+            "retained replay must start at the frame root"
+        );
+
+        let start = self.active_count;
+        let count = display_list.active_count;
+
+        for layer in display_list.layers.drain(..count) {
+            if self.active_count == self.layers.len() {
+                self.layers.push(layer);
+            } else {
+                self.layers[self.active_count] = layer;
+            }
+            self.active_count += 1;
+        }
+
+        start..self.active_count
     }
 
     /// Flushes and settles any primitives in the [`Stack`].
@@ -211,6 +280,9 @@ impl<T: Layer> Stack<T> {
         self.current = 0;
         self.active_count = 1;
         self.previous.clear();
+        self.transformations.truncate(1);
+        self.opacities.truncate(1);
+        self.opacities[0] = 1.0;
     }
 }
 
