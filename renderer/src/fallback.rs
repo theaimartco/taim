@@ -100,6 +100,10 @@ where
         delegate!(self, renderer, renderer.end_retained_layer());
     }
 
+    fn retained_layer_statistics(&self) -> renderer::RetainedLayerStatistics {
+        delegate!(self, renderer, renderer.retained_layer_statistics())
+    }
+
     fn allocate_image(
         &mut self,
         handle: &image::Handle,

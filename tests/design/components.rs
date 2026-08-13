@@ -1037,11 +1037,26 @@ fn touch_target_policies_check_both_axes() {
     }
 }
 
-/// Every component must clear the *default* policy at every density --
-/// the compatibility floor is not a licence to ship a smaller control.
+/// Every component that accepts input must clear the *default* policy at
+/// every density -- the compatibility floor is not a licence to ship a
+/// smaller control.
+///
+/// The policy governs **touch targets**, and only a component that
+/// accepts input presents one. A pure container declares no actions and
+/// takes at least one axis from its parent -- `app_bar` is the case in
+/// point: it is a `Role::Group` with `Actions::empty()` whose width is
+/// imposed by the window, so it has no intrinsic target to measure.
+/// Skipping it here is not a relaxation of the policy, because the
+/// controls it *hosts* (an `IconButton` in its navigation slot) are
+/// separate specs that are checked on their own. The companion test
+/// below pins the exempt set so this cannot quietly grow.
 #[test]
 fn every_component_clears_the_default_policy_at_every_density() {
     for (name, spec) in every_component() {
+        if !spec.is_interactive() {
+            continue;
+        }
+
         for density in Density::ALL {
             let size = spec.min_size(density);
 
@@ -1051,4 +1066,32 @@ fn every_component_clears_the_default_policy_at_every_density() {
             );
         }
     }
+}
+
+/// The exemption above is only sound while "non-interactive" stays a
+/// deliberate property of a small, known set of containers.
+///
+/// Without this test, a real control that lost its actions -- through a
+/// refactor, a wrong `disabled` default, a typo in `actions()` -- would
+/// silently drop out of touch-target coverage instead of failing. Pinning
+/// the set means that regression shows up here as an unexpected name.
+#[test]
+fn only_known_containers_are_exempt_from_the_touch_target_policy() {
+    let exempt: Vec<&'static str> = every_component()
+        .into_iter()
+        .filter(|(_, spec)| !spec.is_interactive())
+        .map(|(name, _)| name)
+        .collect();
+
+    // Each of these is presentation, not control: `app_bar` and
+    // `window_chrome` are containers whose buttons are separate
+    // `IconButton` specs, and `progress` and `tooltip` report status
+    // without ever accepting input.
+    assert_eq!(
+        exempt,
+        ["app_bar", "progress", "tooltip", "window_chrome"],
+        "the set of components exempt from the touch-target policy changed; \
+         a container may join it deliberately, but a control appearing here \
+         means it stopped declaring actions"
+    );
 }

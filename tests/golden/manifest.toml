@@ -1,0 +1,14 @@
+[tolerances]
+primitives = "exact"
+text = "approximate"
+effects = "effect-specific"
+
+[cases]
+# List of approved golden test cases with tolerance classes
+components = "exact"
+damage_motion = "exact"
+design_system = "exact"
+effects = "effect-specific"
+gpu_primitives = "exact"
+multilingual_text = "approximate"
+transitions = "exact"

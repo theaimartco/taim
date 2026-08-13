@@ -1,3 +1,6 @@
+#[path = "pipeline_cache.rs"]
+pub mod pipeline_cache;
+
 use crate::graphics::{Antialiasing, Shell};
 use crate::primitive;
 use crate::quad;
@@ -12,11 +15,14 @@ pub struct Engine {
     pub(crate) queue: wgpu::Queue,
     pub(crate) format: wgpu::TextureFormat,
 
+    pub(crate) pipeline_cache: Arc<RwLock<pipeline_cache::PipelineCache>>,
+
     pub(crate) quad_pipeline: quad::Pipeline,
     pub(crate) text_pipeline: text::Pipeline,
     pub(crate) triangle_pipeline: triangle::Pipeline,
     #[cfg(any(feature = "image", feature = "svg"))]
     pub(crate) image_pipeline: crate::image::Pipeline,
+    pub(crate) effect_pipeline: crate::effects::pipeline::Pipeline,
     pub(crate) primitive_storage: Arc<RwLock<primitive::Storage>>,
     _shell: Shell,
 }
@@ -30,19 +36,83 @@ impl Engine {
         antialiasing: Option<Antialiasing>, // TODO: Initialize AA pipelines lazily
         shell: Shell,
     ) -> Self {
+        let mut cache = pipeline_cache::PipelineCache::new(32);
+        cache.prewarm(format, &device, &queue);
+
+        let quad_pipeline = match cache.get_or_create(
+            pipeline_cache::PipelineKey {
+                kind: pipeline_cache::PipelineKind::Quad,
+                format,
+                antialiasing: None,
+                backend: None,
+            },
+            &device,
+            &queue,
+        ) {
+            pipeline_cache::CachedPipeline::Quad(p) => p,
+            _ => unreachable!(),
+        };
+
+        let text_pipeline = match cache.get_or_create(
+            pipeline_cache::PipelineKey {
+                kind: pipeline_cache::PipelineKind::Text,
+                format,
+                antialiasing: None,
+                backend: None,
+            },
+            &device,
+            &queue,
+        ) {
+            pipeline_cache::CachedPipeline::Text(p) => p,
+            _ => unreachable!(),
+        };
+
+        let triangle_pipeline = match cache.get_or_create(
+            pipeline_cache::PipelineKey {
+                kind: pipeline_cache::PipelineKind::Triangle,
+                format,
+                antialiasing,
+                backend: None,
+            },
+            &device,
+            &queue,
+        ) {
+            pipeline_cache::CachedPipeline::Triangle(p) => p,
+            _ => unreachable!(),
+        };
+
+        #[cfg(any(feature = "image", feature = "svg"))]
+        let image_pipeline = {
+            let backend = _adapter.get_info().backend;
+            match cache.get_or_create(
+                pipeline_cache::PipelineKey {
+                    kind: pipeline_cache::PipelineKind::Image,
+                    format,
+                    antialiasing: None,
+                    backend: Some(backend),
+                },
+                &device,
+                &queue,
+            ) {
+                pipeline_cache::CachedPipeline::Image(p) => p,
+                _ => unreachable!(),
+            }
+        };
+
         Self {
             format,
 
-            quad_pipeline: quad::Pipeline::new(&device, format),
-            text_pipeline: text::Pipeline::new(&device, &queue, format),
-            triangle_pipeline: triangle::Pipeline::new(&device, format, antialiasing),
+            pipeline_cache: Arc::new(RwLock::new(cache)),
+
+            quad_pipeline,
+            text_pipeline,
+            triangle_pipeline,
+            effect_pipeline: crate::effects::pipeline::Pipeline::new(&device, format),
 
             #[cfg(any(feature = "image", feature = "svg"))]
-            image_pipeline: {
-                let backend = _adapter.get_info().backend;
+            image_pipeline,
+            
 
-                crate::image::Pipeline::new(&device, format, backend)
-            },
 
             primitive_storage: Arc::new(RwLock::new(primitive::Storage::default())),
 
@@ -60,6 +130,7 @@ impl Engine {
 
     pub fn trim(&mut self) {
         self.text_pipeline.trim();
+        self.effect_pipeline.trim();
 
         self.primitive_storage
             .write()

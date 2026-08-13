@@ -519,6 +519,12 @@ pub mod daemon;
 pub mod time;
 pub mod window;
 
+/// The VYOM backend for aura applications.
+#[cfg(feature = "vyom")]
+pub mod platform_vyom {
+    pub use aura_platform_vyom::*;
+}
+
 #[cfg(feature = "advanced")]
 pub mod advanced;
 

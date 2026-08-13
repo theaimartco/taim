@@ -1,0 +1,23 @@
+name: Golden Tests
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  golden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y mesa-utils libgl1-mesa-dri xvfb
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run golden tests
+        run: xvfb-run cargo test --test golden
+      - name: Upload golden diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diffs
+          path: tests/golden/diffs/

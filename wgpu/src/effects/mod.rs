@@ -4,6 +4,7 @@ pub mod blur;
 pub mod color_matrix;
 pub mod mask;
 pub mod noise;
+pub mod pipeline;
 pub mod pool;
 pub mod saturation;
 pub mod shadow;

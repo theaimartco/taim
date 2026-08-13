@@ -465,6 +465,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-showcase"
+version = "0.1.0"
+dependencies = [
+ "aura",
+]
+
+[[package]]
 name = "aura_bench"
 version = "0.1.0"
 dependencies = [
@@ -621,6 +628,7 @@ dependencies = [
  "cryoglyph",
  "futures",
  "guillotiere",
+ "image",
  "log",
  "lyon",
  "resvg",
@@ -654,6 +662,7 @@ version = "0.15.0-dev"
 dependencies = [
  "arboard",
  "aura-accessibility",
+ "aura-gesture",
  "aura_debug",
  "aura_program",
  "aura_runtime",
@@ -2289,6 +2298,13 @@ checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
 dependencies = [
  "adler2",
  "simd-adler32",
+]
+
+[[package]]
+name = "mobile_shell"
+version = "0.1.0"
+dependencies = [
+ "aura",
 ]
 
 [[package]]

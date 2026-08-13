@@ -1,119 +1,90 @@
 #!/usr/bin/env bash
-# Runs every registered aura_bench scene through a release build with
-# governor/warm-up checks, and writes one JSON report per scene into
-# benchmarks/baseline/. See docs/performance/methodology.md for the full
-# reproducibility contract this script exists to enforce.
+#
+# Captures a performance baseline for every scene and commits it to
+# benchmarks/baseline/.
+#
+# These baselines are what `compare-baseline.sh` gates future runs
+# against. They are only meaningful when captured on locked reference
+# hardware -- a shared CI runner produces numbers nobody should trust
+# (roadmap rule 1: measure first, on reproducible hardware). Pass a
+# --device name matching an entry in benchmarks/devices.toml so the
+# report records what produced it.
+#
+# Usage:
+#   scripts/perf/run-baseline.sh --device vyom-ref-1
+#   scripts/perf/run-baseline.sh --device dev-laptop --quick
 
 set -euo pipefail
 
-cd "$(git rev-parse --show-toplevel)"
+cd "$(dirname "$0")/../.."
 
-SCENES="${SCENES:-}"
-DEVICE="${DEVICE:-}"
-WARM_UP_SECS="${WARM_UP_SECS:-30}"
-RUNS="${RUNS:-5}"
-REFRESH_RATE="${REFRESH_RATE:-60}"
-OUTPUT_DIR="${OUTPUT_DIR:-benchmarks/baseline}"
+readonly BASELINE_DIR="benchmarks/baseline"
 
-log() {
-    echo "[run-baseline] $*" >&2
-}
+device=""
+warm_up=30
+runs=5
 
-check_governor() {
-    local governor_files
-    governor_files=(/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor)
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --device)
+      device="${2:-}"
+      shift 2
+      ;;
+    --quick)
+      # For checking the pipeline works, not for a baseline worth
+      # committing. The report records the shortened warm-up, so a
+      # baseline captured this way is identifiable after the fact.
+      warm_up=3
+      runs=5
+      shift
+      ;;
+    -h | --help)
+      sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
 
-    if [[ ! -e "${governor_files[0]}" ]]; then
-        log "warning: could not read CPU frequency governor (not Linux, or cpufreq unavailable); proceeding without a check."
-        return
-    fi
+if [[ -z "$device" ]]; then
+  echo "error: --device is required so the baseline records what produced it." >&2
+  echo "       See benchmarks/devices.toml for known device names." >&2
+  exit 1
+fi
 
-    local governors
-    governors=$(cat "${governor_files[@]}" 2>/dev/null | sort -u)
+echo "Building aura_bench (release)..."
+cargo build --release -p aura_bench
 
-    if [[ "${governors}" != "performance" ]]; then
-        log "warning: CPU governor is not pinned to 'performance' (found: ${governors//$'\n'/, })."
-        log "warning: results may not be comparable to a prior 'performance'-governor run."
-        log "warning: set it with: for g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance | sudo tee \"\$g\"; done"
-    fi
-}
+readonly BENCH="target/release/aura_bench"
 
-require_clean_worktree_or_warn() {
-    if [[ -n "$(git status --porcelain)" ]]; then
-        log "warning: working tree has uncommitted changes; the report's git_commit field will not fully describe what was measured."
-    fi
-}
+mkdir -p "$BASELINE_DIR"
 
-build_release() {
-    log "building aura_bench in release mode..."
-    cargo build --release --package aura_bench
-}
+scenes=$("$BENCH" --list)
 
-resolve_scenes() {
-    if [[ -n "${SCENES}" ]]; then
-        echo "${SCENES}"
-        return
-    fi
+echo "Capturing baselines for device '$device' (warm-up ${warm_up}s, $runs runs/scene)"
+echo
 
-    ./target/release/aura_bench --list
-}
+for scene in $scenes; do
+  printf '  %-28s' "$scene"
 
-run_scene() {
-    local scene="$1"
-    local output_file="${OUTPUT_DIR}/${scene}.json"
+  if "$BENCH" \
+    --scene "$scene" \
+    --device "$device" \
+    --warm-up-secs "$warm_up" \
+    --runs "$runs" \
+    --save "$BASELINE_DIR/$scene.json" \
+    >/dev/null 2>&1; then
+    echo "ok"
+  else
+    echo "FAILED"
+    echo "    re-run without --save to see the error" >&2
+    exit 1
+  fi
+done
 
-    log "running scene '${scene}' (warm-up ${WARM_UP_SECS}s, ${RUNS} measured runs)..."
-
-    local args=(
-        --scene "${scene}"
-        --refresh-rate "${REFRESH_RATE}"
-        --warm-up-secs "${WARM_UP_SECS}"
-        --runs "${RUNS}"
-        --device "${DEVICE}"
-        --save "${output_file}"
-    )
-
-    # `--save` refuses to write a report whose git commit, compiler, or
-    # device could not be determined, so the human summary on stdout is
-    # all that survives a run that cannot be attributed.
-    ./target/release/aura_bench "${args[@]}"
-}
-
-require_device() {
-    if [[ -z "${DEVICE}" ]]; then
-        log "error: DEVICE is required."
-        log "error: a report in ${OUTPUT_DIR} that does not name the machine it ran on"
-        log "error: cannot be compared against anything, so this script will not produce one."
-        log "error: set DEVICE to a [[device]] name from benchmarks/devices.toml, e.g."
-        log "error:     DEVICE=dev-workstation-01 $0"
-        exit 1
-    fi
-
-    if ! grep -q "name = \"${DEVICE}\"" benchmarks/devices.toml; then
-        log "error: '${DEVICE}' has no [[device]] entry in benchmarks/devices.toml."
-        log "error: add one describing the CPU, GPU, OS, compositor, refresh rate, and"
-        log "error: power mode before recording reports against that name."
-        exit 1
-    fi
-}
-
-main() {
-    require_device
-    check_governor
-    require_clean_worktree_or_warn
-    build_release
-
-    mkdir -p "${OUTPUT_DIR}"
-
-    local scenes
-    scenes=$(resolve_scenes)
-
-    while IFS= read -r scene; do
-        [[ -z "${scene}" ]] && continue
-        run_scene "${scene}"
-    done <<< "${scenes}"
-
-    log "done. Compare two runs' P95 with: jq '.median.frame_time.p95' benchmarks/baseline/<scene>.json"
-}
-
-main "$@"
+echo
+echo "Baselines written to $BASELINE_DIR/."
+echo "Commit them in the same change as whatever they were captured for."

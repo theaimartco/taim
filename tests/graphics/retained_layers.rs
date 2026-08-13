@@ -217,7 +217,17 @@ fn lru_eviction_under_budget_pressure() {
 
 #[test]
 fn recently_accessed_layers_survive_eviction() {
-    let mut cache = RetainedLayerCache::with_budget(32);
+    // Sized to hold exactly the two resource-carrying layers below, so
+    // the third insert is what forces an eviction.
+    //
+    // `make_layer_with_resource` produces a one-command display list,
+    // which `estimate_display_list_bytes` puts at 16 + 96 = 112 bytes;
+    // `make_layer` is an empty list at 16. A smaller budget would now be
+    // rejected outright by `insert`'s oversized-entry guard -- an entry
+    // larger than the whole budget cannot be retained without making the
+    // cache unbounded -- and the eviction this test exists to observe
+    // would never be reached.
+    let mut cache = RetainedLayerCache::with_budget(224);
     let resource_gen = Generation::next();
 
     let key1 = RetainedLayerKey::unique();
@@ -248,9 +258,28 @@ fn recently_accessed_layers_survive_eviction() {
     let key3 = RetainedLayerKey::unique();
     cache.insert(key3, make_layer(Revision::INITIAL));
 
-    // key1 was accessed more recently than key2, so it should survive
-    // (exact eviction depends on byte sizes, but eviction should happen)
-    assert!(cache.telemetry().evictions > 0);
+    assert!(
+        cache.telemetry().evictions > 0,
+        "the third insert should not have fit within the budget"
+    );
+
+    // The point of the test: recency, not insertion order, decides who
+    // goes. key1 was touched after key2 was inserted, so key2 is the
+    // least recently used and the one that should have been dropped.
+    assert!(
+        cache
+            .get(
+                key1,
+                Revision::INITIAL,
+                surface(),
+                Transformation::IDENTITY,
+                resource_gen,
+            )
+            .is_some(),
+        "the recently accessed layer should have survived eviction"
+    );
+
+    assert!(cache.current_bytes() <= cache.budget_bytes());
 }
 
 // ── Purge ──────────────────────────────────────────────────────────

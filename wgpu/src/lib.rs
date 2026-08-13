@@ -110,6 +110,7 @@ pub struct Renderer {
     retained_frame: Option<RetainedFrame>,
     active_retained_frame: Option<ActiveRetainedFrame>,
     recording_retained_frame: Option<RecordingRetainedFrame>,
+    retained_layer_statistics: core::renderer::RetainedLayerStatistics,
 
     quad: quad::State,
     triangle: triangle::State,
@@ -137,6 +138,7 @@ impl Renderer {
             retained_frame: None,
             active_retained_frame: None,
             recording_retained_frame: None,
+            retained_layer_statistics: core::renderer::RetainedLayerStatistics::default(),
 
             quad: quad::State::new(),
             triangle: triangle::State::new(&engine.device, &engine.triangle_pipeline),
@@ -463,6 +465,10 @@ impl Renderer {
 
                 prepare_span.finish();
             }
+
+            if !layer.effects.is_empty() {
+                self.engine.effect_pipeline.prepare(&layer.effects);
+            }
         }
     }
 
@@ -696,6 +702,28 @@ impl Renderer {
                 );
                 render_span.finish();
             }
+
+            if !layer.effects.is_empty() {
+                let _ = ManuallyDrop::into_inner(render_pass);
+                self.engine.effect_pipeline.render(encoder);
+                render_pass =
+                    ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("aura_wgpu render pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: frame,
+                            depth_slice: None,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                        multiview_mask: None,
+                    }));
+            }
         }
 
         let _ = ManuallyDrop::into_inner(render_pass);
@@ -734,6 +762,12 @@ impl Renderer {
     pub fn recall(&mut self) {
         self.staging_belt.recall();
     }
+
+    /// Submits an effect node to the current layer's effect graph.
+    pub fn add_effect(&mut self, effect: crate::effects::Effect, tier: crate::graphics::quality::Tier) -> bool {
+        let (layer, _) = self.layers.current_mut();
+        layer.effects.push(effect, tier)
+    }
 }
 
 impl core::Renderer for Renderer {
@@ -771,6 +805,7 @@ impl core::Renderer for Renderer {
 
     fn replay_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) -> bool {
         let scale_factor = self.scale_factor;
+        let had_cached_frame = self.retained_frame.is_some();
 
         if let Some(retained) = self.retained_frame.take()
             && retained.key == key
@@ -779,6 +814,7 @@ impl core::Renderer for Renderer {
             && retained.scale_factor == scale_factor
         {
             let range = self.layers.replay_owned(retained.display_list);
+            self.retained_layer_statistics.hits += 1;
             self.active_retained_frame = Some(ActiveRetainedFrame {
                 key,
                 revision,
@@ -787,6 +823,13 @@ impl core::Renderer for Renderer {
                 range,
             });
             return true;
+        }
+
+        self.retained_layer_statistics.misses += 1;
+        if had_cached_frame {
+            // The sole cached display list was incompatible with this draw
+            // context and was dropped by `take` above.
+            self.retained_layer_statistics.evictions += 1;
         }
 
         false
@@ -819,6 +862,10 @@ impl core::Renderer for Renderer {
             scale_factor: recording.scale_factor,
             range: recording.start..end,
         });
+    }
+
+    fn retained_layer_statistics(&self) -> core::renderer::RetainedLayerStatistics {
+        self.retained_layer_statistics
     }
 
     fn allocate_image(

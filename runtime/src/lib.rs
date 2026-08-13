@@ -1,3 +1,11 @@
+//! A renderer-agnostic native GUI runtime.
+//!
+//! `aura_runtime` turns an [`aura_core`] widget tree into a running
+//! application frame: event dispatch, layout, semantic updates, paint
+//! preparation, input-method coordination, and background tasks.
+//!
+//! [`aura_core`]: https://github.com/theaimartco/vyom-aura/tree/main/core
+
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
 )]

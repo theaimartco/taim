@@ -1,5 +1,5 @@
 /// An antialiasing strategy.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Antialiasing {
     /// Multisample AA with 2 samples
     MSAAx2,

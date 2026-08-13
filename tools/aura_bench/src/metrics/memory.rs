@@ -40,8 +40,41 @@ pub fn resident_set_size() -> Option<u64> {
 
 /// Reads the current process's resident set size.
 ///
-/// Not implemented on this platform; see the Linux implementation above.
-#[cfg(not(target_os = "linux"))]
+/// macOS exposes RSS through `task_info(MACH_TASK_BASIC_INFO)`, which is
+/// a raw Mach call and therefore `unsafe` -- and `unsafe_code = "deny"`
+/// is the workspace default (phase.md rule 8: no unsafe without an RFC).
+/// A benchmark harness reading its own memory once per run is nowhere
+/// near strong enough grounds for an exception, so this shells out to
+/// `ps` instead. It samples once per measured run, not once per frame,
+/// so the cost of a fork does not reach any reported number.
+#[cfg(target_os = "macos")]
+pub fn resident_set_size() -> Option<u64> {
+    use std::process::Command;
+
+    let pid = std::process::id();
+
+    let output = Command::new("ps")
+        .args(["-o", "rss=", "-p", &pid.to_string()])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    // `ps -o rss=` prints kibibytes with no header and leading padding.
+    let kib: u64 = String::from_utf8(output.stdout).ok()?.trim().parse().ok()?;
+
+    Some(kib * 1024)
+}
+
+/// Reads the current process's resident set size.
+///
+/// Not implemented on this platform; see the Linux and macOS
+/// implementations above. Returning `None` rather than a fabricated
+/// number is deliberate: a report field that is consistently `None`
+/// should read as "not measured on this OS".
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 pub fn resident_set_size() -> Option<u64> {
     None
 }
@@ -55,10 +88,20 @@ mod tests {
         let _ = MemorySnapshot::capture();
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     #[test]
-    fn resident_set_size_is_nonzero_on_linux() {
-        let rss = resident_set_size().expect("VmRSS should be readable in a normal process");
-        assert!(rss > 0);
+    fn resident_set_size_is_readable_on_supported_platforms() {
+        let rss = resident_set_size()
+            .expect("RSS should be readable for our own process on Linux and macOS");
+
+        assert!(rss > 0, "a running process has a non-zero resident set");
+
+        // A plausibility floor: any process that has linked this binary
+        // and reached a test holds more than a megabyte. Catches a unit
+        // mix-up (reporting KiB as bytes) that a `> 0` check would miss.
+        assert!(
+            rss > 1024 * 1024,
+            "RSS looks like it is being reported in the wrong unit: {rss} bytes"
+        );
     }
 }
