@@ -89,6 +89,8 @@ linux-theme-detection = ["aura_winit/linux-theme-detection"]
 x11 = ["aura_renderer/x11", "aura_winit/x11"]
 # Enables the Unix Wayland backend
 wayland = ["aura_renderer/wayland", "aura_winit/wayland"]
+# Enables the VYOM platform backend
+vyom = ["dep:aura-platform-vyom"]
 
 [dependencies]
 aura_debug.workspace = true
@@ -101,6 +103,9 @@ aura_winit.workspace = true
 
 aura-highlighter.workspace = true
 aura-highlighter.optional = true
+
+aura-platform-vyom.workspace = true
+aura-platform-vyom.optional = true
 
 thiserror.workspace = true
 
@@ -156,8 +161,10 @@ members = [
     "aura-motion",
     "aura-platform-vyom",
     "aura-profiler",
+    "aura-showcase",
     "core",
     "debug",
+    "examples/mobile_shell",
     "futures",
     "graphics",
     "program",

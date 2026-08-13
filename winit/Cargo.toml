@@ -29,6 +29,7 @@ aura_debug.workspace = true
 aura-accessibility.workspace = true
 aura_program.workspace = true
 aura_runtime.workspace = true
+aura-gesture.workspace = true
 
 log.workspace = true
 rustc-hash.workspace = true

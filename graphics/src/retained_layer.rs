@@ -261,7 +261,10 @@ impl RetainedLayerCache {
         current_transform: Transformation,
         current_resource_generation: Generation,
     ) -> Option<&RetainedLayer> {
-        let layer = self.layers.get_mut(&key)?;
+        let Some(layer) = self.layers.get_mut(&key) else {
+            self.telemetry.misses += 1;
+            return None;
+        };
 
         if layer.is_valid(
             current_revision,
@@ -288,6 +291,15 @@ impl RetainedLayerCache {
     /// recently-used layers are evicted first.
     pub fn insert(&mut self, key: RetainedLayerKey, layer: RetainedLayer) {
         let new_bytes = layer.estimated_bytes;
+
+        // A single entry larger than the entire budget cannot be retained:
+        // storing it would make this supposedly bounded cache unbounded.
+        // Existing entries are deliberately left intact, as rejecting an
+        // uncacheable candidate must not evict useful content.
+        if new_bytes > self.budget_bytes {
+            self.telemetry.total_bytes = self.current_bytes as u64;
+            return;
+        }
 
         // Remove existing entry for this key (if any)
         if let Some(existing) = self.layers.remove(&key) {
@@ -563,6 +575,32 @@ mod tests {
 
         // key1 should have been evicted (LRU)
         assert!(cache.telemetry().evictions > 0);
+        assert!(cache.current_bytes() <= cache.budget_bytes());
+    }
+
+    #[test]
+    fn cache_rejects_a_layer_larger_than_its_entire_budget() {
+        let mut cache = RetainedLayerCache::with_budget(16);
+        let key = RetainedLayerKey::unique();
+        let generation_id = Generation::next();
+
+        cache.insert(key, make_layer_with_gen(Revision::INITIAL, generation_id));
+
+        assert!(cache.is_empty());
+        assert_eq!(cache.current_bytes(), 0);
+    }
+
+    #[test]
+    fn rejecting_an_oversized_replacement_keeps_the_cached_layer() {
+        let mut cache = RetainedLayerCache::with_budget(32);
+        let key = RetainedLayerKey::unique();
+        let generation_id = Generation::next();
+
+        cache.insert(key, make_layer(Revision::INITIAL));
+        cache.insert(key, make_layer_with_gen(Revision::INITIAL, generation_id));
+
+        assert_eq!(cache.len(), 1);
+        assert_eq!(cache.current_bytes(), 16);
     }
 
     #[test]
@@ -629,7 +667,7 @@ mod tests {
             Transformation::IDENTITY,
             generation_id,
         );
-        assert_eq!(cache.telemetry().misses, 0); // get returns None for missing, no miss counter
+        assert_eq!(cache.telemetry().misses, 1);
     }
 
     #[test]

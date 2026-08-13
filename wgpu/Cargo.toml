@@ -20,7 +20,7 @@ all-features = true
 [features]
 default = ["wgpu/default"]
 geometry = ["aura_graphics/geometry", "lyon"]
-image = ["aura_graphics/image", "guillotiere"]
+image = ["aura_graphics/image", "guillotiere", "dep:image"]
 svg = ["aura_graphics/svg", "resvg", "guillotiere"]
 svg-text = ["svg", "resvg/text", "resvg/system-fonts", "resvg/memmap-fonts"]
 svg-raster-images = ["svg", "resvg/raster-images"]
@@ -50,3 +50,7 @@ guillotiere.optional = true
 
 resvg.workspace = true
 resvg.optional = true
+
+image.workspace = true
+image.optional = true
+

@@ -161,22 +161,66 @@ fn compare_against_saved_report(current: &Report, path: &str) -> Result<(), Stri
         current.median.frame_time.p95,
     );
 
+    let absolute = current
+        .median
+        .frame_time
+        .p95
+        .saturating_sub(previous.median.frame_time.p95);
+
     println!(
-        "\ncompared against {path}: P95 {:?} -> {:?} ({:+.2}% difference)",
+        "\ncompared against {path}: P95 {:?} -> {:?} ({:+.2}% difference, {:?} absolute)",
         previous.median.frame_time.p95,
         current.median.frame_time.p95,
         difference * 100.0,
+        absolute,
     );
 
-    if difference > 0.05 {
+    if is_regression(difference, absolute) {
         return Err(format!(
-            "P95 differs by {:.2}%, exceeding the 5% reproducibility gate (phase.md Phase 1 exit gate)",
-            difference * 100.0
+            "P95 differs by {:.2}% ({:?} absolute), exceeding both the {:.0}% reproducibility \
+             gate and the {:?} noise floor",
+            difference * 100.0,
+            absolute,
+            RELATIVE_GATE * 100.0,
+            ABSOLUTE_GATE,
         ));
     }
 
     Ok(())
 }
+
+/// Whether a measured difference counts as a regression.
+///
+/// Both gates must be cleared. Either one alone produces a useless
+/// signal at the scale this harness now measures: see [`ABSOLUTE_GATE`]
+/// for why the relative gate cannot stand on its own, and note that the
+/// absolute gate cannot either -- 25 µs is a rounding error on a scene
+/// that legitimately costs milliseconds.
+fn is_regression(relative: f64, absolute: Duration) -> bool {
+    relative > RELATIVE_GATE && absolute > ABSOLUTE_GATE
+}
+
+/// The relative reproducibility gate from phase.md's Phase 1 exit
+/// criteria: a re-run on the same hardware should land within 5%.
+const RELATIVE_GATE: f64 = 0.05;
+
+/// The absolute floor a difference must also clear to count as a
+/// regression.
+///
+/// The relative gate alone was written when the reported frame time was
+/// dominated by a near-constant ~2.3 ms readback, where 5% meant ~115 µs
+/// of real signal. With that readback correctly excluded, frame times
+/// are microseconds -- `idle_shell` sits around 4 µs -- and ordinary
+/// run-to-run jitter of a microsecond or two clears 5% every time. A
+/// purely relative gate is red on every run at that scale, which trains
+/// everyone to ignore it.
+///
+/// 25 µs is chosen to sit above the jitter observed across repeated runs
+/// (roughly +/-3 µs) while staying far below anything that could threaten
+/// a frame budget: it is 0.15% of the 16.67 ms available at 60 Hz. A
+/// scene going from 9 µs to 40 µs still fails, which is the structural
+/// regression worth catching.
+const ABSOLUTE_GATE: Duration = Duration::from_micros(25);
 
 fn env_logger_init() {
     // Best-effort: `aura_bench` does not depend on `env_logger`; scenes
@@ -604,4 +648,51 @@ fn drive_one_frame<S: Scene>(
         draw,
         present,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_small_relative_jump_at_microsecond_scale_is_not_a_regression() {
+        // The case that made a purely relative gate useless: `idle_shell`
+        // sits around 4 µs, so a 2 µs jitter is a 50% "difference" that
+        // threatens nothing. Before the absolute floor existed, six of
+        // thirteen scenes reported a regression immediately after their
+        // own baselines were captured.
+        assert!(!is_regression(0.50, Duration::from_micros(2)));
+    }
+
+    #[test]
+    fn a_structural_regression_still_fails() {
+        // 9 µs -> 40 µs: well past the noise floor and a real change in
+        // the shape of the work, even though it is still far under a
+        // frame budget.
+        assert!(is_regression(3.4, Duration::from_micros(31)));
+    }
+
+    #[test]
+    fn a_large_absolute_jump_with_a_small_relative_one_is_not_a_regression() {
+        // A scene that legitimately costs milliseconds moving by 30 µs
+        // is a rounding error, not a regression. The absolute gate must
+        // not fire on its own.
+        assert!(!is_regression(0.01, Duration::from_micros(30)));
+    }
+
+    #[test]
+    fn an_improvement_is_never_a_regression() {
+        // `relative_difference` is signed; a faster run must pass both
+        // gates trivially, and `saturating_sub` floors the absolute
+        // difference at zero.
+        assert!(!is_regression(-0.40, Duration::ZERO));
+    }
+
+    #[test]
+    fn the_gates_sit_where_their_documentation_says() {
+        // Pins the constants so a change to either is deliberate and
+        // shows up in review rather than silently widening the gate.
+        assert!((RELATIVE_GATE - 0.05).abs() < f64::EPSILON);
+        assert_eq!(ABSOLUTE_GATE, Duration::from_micros(25));
+    }
 }

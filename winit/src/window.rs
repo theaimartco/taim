@@ -88,6 +88,7 @@ where
                 renderer,
                 mouse_interaction: mouse::Interaction::None,
                 redraw_at: None,
+                hit_test_index: None,
                 scheduler: Scheduler::new(),
                 accessibility: aura_accessibility::Session::new(
                     aura_accessibility::atspi::adapter::Adapter::new(),
@@ -199,6 +200,7 @@ where
     pub surface_version: u64,
     pub renderer: P::Renderer,
     pub redraw_at: Option<Instant>,
+    pub hit_test_index: Option<crate::runtime::hit_test::Index>,
     /// This window's frame-production state machine (Phase 6):
     /// [`WindowEvent::Occluded`] and presentation feedback flow through
     /// it, and [`Window::redraw_at`]/`ControlFlow` computation defers to

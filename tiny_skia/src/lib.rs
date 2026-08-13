@@ -68,6 +68,7 @@ pub struct Renderer {
     retained_frame: Option<RetainedFrame>,
     active_retained_frame: Option<ActiveRetainedFrame>,
     recording_retained_frame: Option<RecordingRetainedFrame>,
+    retained_layer_statistics: core::renderer::RetainedLayerStatistics,
     engine: Engine, // TODO: Shared engine
 }
 
@@ -79,6 +80,7 @@ impl Renderer {
             retained_frame: None,
             active_retained_frame: None,
             recording_retained_frame: None,
+            retained_layer_statistics: core::renderer::RetainedLayerStatistics::default(),
             engine: Engine::new(),
         }
     }
@@ -250,12 +252,15 @@ impl core::Renderer for Renderer {
     }
 
     fn replay_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) -> bool {
+        let had_cached_frame = self.retained_frame.is_some();
+
         if let Some(retained) = self.retained_frame.take()
             && retained.key == key
             && retained.revision == revision
             && retained.bounds == bounds
         {
             let range = self.layers.replay_owned(retained.display_list);
+            self.retained_layer_statistics.hits += 1;
             self.active_retained_frame = Some(ActiveRetainedFrame {
                 key,
                 revision,
@@ -263,6 +268,13 @@ impl core::Renderer for Renderer {
                 range,
             });
             return true;
+        }
+
+        self.retained_layer_statistics.misses += 1;
+        if had_cached_frame {
+            // The sole cached display list was incompatible with this draw
+            // context and was dropped by `take` above.
+            self.retained_layer_statistics.evictions += 1;
         }
 
         false
@@ -293,6 +305,10 @@ impl core::Renderer for Renderer {
             bounds: recording.bounds,
             range: recording.start..end,
         });
+    }
+
+    fn retained_layer_statistics(&self) -> core::renderer::RetainedLayerStatistics {
+        self.retained_layer_statistics
     }
 
     fn allocate_image(
@@ -545,5 +561,41 @@ impl renderer::Headless for Renderer {
         let viewport = Viewport::with_physical_size(size, scale_factor);
 
         window::compositor::screenshot(self, &viewport, background_color)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retained_statistics_distinguish_hits_from_stale_cache_evictions() {
+        let mut renderer = Renderer::new(renderer::Settings::default());
+        let bounds = Rectangle::with_size(Size::new(100.0, 100.0));
+
+        core::Renderer::reset(&mut renderer, bounds);
+        core::Renderer::start_retained_layer(&mut renderer, 1, 1, bounds);
+        core::Renderer::end_retained_layer(&mut renderer);
+        core::Renderer::reset(&mut renderer, bounds);
+
+        assert!(core::Renderer::replay_retained_layer(
+            &mut renderer,
+            1,
+            1,
+            bounds
+        ));
+        assert_eq!(core::Renderer::retained_layer_statistics(&renderer).hits, 1);
+
+        core::Renderer::reset(&mut renderer, bounds);
+        assert!(!core::Renderer::replay_retained_layer(
+            &mut renderer,
+            1,
+            2,
+            bounds
+        ));
+
+        let statistics = core::Renderer::retained_layer_statistics(&renderer);
+        assert_eq!(statistics.misses, 1);
+        assert_eq!(statistics.evictions, 1);
     }
 }

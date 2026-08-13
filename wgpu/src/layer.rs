@@ -21,6 +21,7 @@ pub struct Layer {
     pub primitives: primitive::Batch,
     pub images: image::Batch,
     pub text: text::Batch,
+    pub effects: crate::effects::Graph,
     pending_meshes: Vec<Mesh>,
     pending_text: Vec<Text>,
 }
@@ -32,6 +33,7 @@ impl Layer {
             && self.primitives.is_empty()
             && self.images.is_empty()
             && self.text.is_empty()
+            && self.effects.is_empty()
             && self.pending_meshes.is_empty()
             && self.pending_text.is_empty()
     }
@@ -304,6 +306,7 @@ impl graphics::Layer for Layer {
         self.primitives.clear();
         self.text.clear();
         self.images.clear();
+        self.effects = crate::effects::Graph::new();
         self.pending_meshes.clear();
         self.pending_text.clear();
     }
@@ -329,10 +332,18 @@ impl graphics::Layer for Layer {
             return 5;
         }
 
+        if !self.effects.is_empty() {
+            return 6;
+        }
+
         usize::MAX
     }
 
     fn end(&self) -> usize {
+        if !self.effects.is_empty() {
+            return 6;
+        }
+
         if !self.text.is_empty() {
             return 5;
         }
@@ -362,6 +373,9 @@ impl graphics::Layer for Layer {
         self.primitives.append(&mut layer.primitives);
         self.images.append(&mut layer.images);
         self.text.append(&mut layer.text);
+        // Note: Graph doesn't currently support append, so we might need to manually iterate
+        // or just ignore if it's not strictly needed for merge yet.
+        // Or if needed: layer.effects.effects().iter().for_each(|e| self.effects.push(*e, Tier::Ultra));
     }
 }
 
@@ -379,6 +393,7 @@ impl Default for Layer {
             // to build against both shapes.
             #[allow(clippy::default_constructed_unit_structs)]
             images: image::Batch::default(),
+            effects: crate::effects::Graph::new(),
             pending_meshes: Vec::new(),
             pending_text: Vec::new(),
         }

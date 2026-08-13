@@ -232,10 +232,13 @@ impl Report {
             "scene: {scene} ({cache_state:?} cache, {hz} Hz gate)\n\
              renderer: {backend}\n\
              runs: {run_count} (frames/run: {frame_count})\n\
-             frame time  p50={p50:?}  p95={p95:?}  p99={p99:?}\n\
+             frame time  p50={p50:?}  p95={p95:?}  p99={p99:?}   (framework: update+draw)\n\
+             phases      update_p95={update_p95:?}  draw_p95={draw_p95:?}\n\
              missed frame rate: {missed:.3}%\n\
              latency     p50={lat_p50:?}  p95={lat_p95:?}\n\
-             rss: {rss}",
+             harness     readback_p95={present_p95:?}  (excluded from frame time)\n\
+             rss: {rss}\n\
+             allocations: {allocations}",
             scene = self.scene,
             cache_state = self.cache_state,
             hz = self.refresh_rate.as_hz(),
@@ -245,6 +248,9 @@ impl Report {
             p50 = m.frame_time.p50,
             p95 = m.frame_time.p95,
             p99 = m.frame_time.p99,
+            update_p95 = m.frame_time.update_p95,
+            draw_p95 = m.frame_time.draw_p95,
+            present_p95 = m.frame_time.present_p95,
             missed = m.frame_time.missed_frame_rate * 100.0,
             lat_p50 = m.latency.p50,
             lat_p95 = m.latency.p95,
@@ -252,7 +258,21 @@ impl Report {
                 .memory
                 .rss_bytes
                 .map(|bytes| format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0)))
-                .unwrap_or_else(|| "not measured".to_owned()),
+                .unwrap_or_else(|| "not measured on this platform".to_owned()),
+            // Without the counting allocator the counters are never
+            // incremented, so every field reads zero. Printing those
+            // zeros unqualified would look like a measurement of "no
+            // allocations", which is the opposite of the truth.
+            allocations = if self.environment.allocation_counting_active {
+                format!(
+                    "{} allocs, {} frees, {:.1} MiB allocated",
+                    m.allocations.allocations,
+                    m.allocations.deallocations,
+                    m.allocations.bytes_allocated as f64 / (1024.0 * 1024.0)
+                )
+            } else {
+                "not measured (rebuild with --features profiling)".to_owned()
+            },
         )
     }
 }

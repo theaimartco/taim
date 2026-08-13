@@ -19,3 +19,6 @@ pub mod design_system;
 
 #[path = "golden/effects.rs"]
 pub mod effects;
+
+#[path = "golden/components.rs"]
+pub mod components;

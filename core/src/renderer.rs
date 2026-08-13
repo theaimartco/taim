@@ -11,6 +11,21 @@ use crate::{
 /// pixel grid.
 pub const CRISP: bool = cfg!(feature = "crisp");
 
+/// Snapshot of retained-layer reuse in a renderer.
+///
+/// These counters are monotonic for the renderer's lifetime. They make
+/// retained rendering observable to diagnostics without exposing a backend's
+/// display-list implementation or cache ownership.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct RetainedLayerStatistics {
+    /// Number of display lists replayed without re-entering widget paint.
+    pub hits: u64,
+    /// Number of replay attempts that required a fresh recording.
+    pub misses: u64,
+    /// Number of cached display lists discarded as stale or incompatible.
+    pub evictions: u64,
+}
+
 /// A component that can be used by widgets to draw themselves on a screen.
 pub trait Renderer {
     /// Starts recording a new layer.
@@ -80,6 +95,11 @@ pub trait Renderer {
     /// Finishes recording a retained display list.
     fn end_retained_layer(&mut self) {
         self.end_layer();
+    }
+
+    /// Returns retained-layer reuse counters collected by this renderer.
+    fn retained_layer_statistics(&self) -> RetainedLayerStatistics {
+        RetainedLayerStatistics::default()
     }
 
     /// Fills a [`Quad`] with the provided [`Background`].

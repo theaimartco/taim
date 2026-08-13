@@ -58,6 +58,26 @@ pub mod transition;
 pub mod vertical_slider;
 pub mod virtual_list;
 
+pub mod accordion;
+pub mod avatar;
+pub mod badge;
+pub mod bottom_nav_bar;
+pub mod bottom_sheet;
+pub mod carousel;
+pub mod chip;
+pub mod date;
+pub mod date_picker;
+pub mod drawer;
+pub mod pull_to_refresh;
+pub mod scaffold;
+pub mod segmented_control;
+pub mod search_bar;
+pub mod skeleton;
+pub mod snackbar;
+pub mod stepper;
+pub mod tabs;
+pub mod time_picker;
+
 pub mod navigator;
 
 mod helpers;

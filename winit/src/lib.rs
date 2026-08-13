@@ -658,16 +658,15 @@ async fn run_instance<P>(
                 #[cfg(feature = "hinting")]
                 window.renderer.hint(window.state.scale_factor());
 
-                let _ = user_interfaces.insert(
+                let mut ui = build_user_interface(
+                    &program,
+                    user_interface::Cache::default(),
+                    &mut window.renderer,
+                    logical_size,
                     id,
-                    build_user_interface(
-                        &program,
-                        user_interface::Cache::default(),
-                        &mut window.renderer,
-                        logical_size,
-                        id,
-                    ),
                 );
+                window.hit_test_index = Some(ui.hit_test_index());
+                let _ = user_interfaces.insert(id, ui);
                 let _ = ui_caches.insert(id, user_interface::Cache::default());
 
                 if make_visible {
@@ -782,8 +781,9 @@ async fn run_instance<P>(
                             let ui = user_interfaces.remove(&id).expect("Remove user interface");
 
                             let layout_span = debug::layout(id);
-                            let _ = user_interfaces
-                                .insert(id, ui.relayout(logical_size, &mut window.renderer));
+                            let mut ui = ui.relayout(logical_size, &mut window.renderer);
+                            window.hit_test_index = Some(ui.hit_test_index());
+                            let _ = user_interfaces.insert(id, ui);
                             layout_span.finish();
 
                             current_compositor.configure_surface(
@@ -847,6 +847,11 @@ async fn run_instance<P>(
                                     caches,
                                     &mut proxy,
                                 ));
+                                for (ui_id, ui) in user_interfaces.iter_mut() {
+                                    if let Some(w) = window_manager.get_mut(*ui_id) {
+                                        w.hit_test_index = Some(ui.hit_test_index());
+                                    }
+                                }
 
                                 for action in actions {
                                     // Defer all window actions to avoid compositor
@@ -903,10 +908,9 @@ async fn run_instance<P>(
                                         user_interfaces.remove(&id).expect("Remove user interface");
 
                                     let layout_span = debug::layout(id);
-                                    let _ = user_interfaces.insert(
-                                        id,
-                                        ui.relayout(logical_size, &mut window.renderer),
-                                    );
+                                    let mut ui = ui.relayout(logical_size, &mut window.renderer);
+                                    window.hit_test_index = Some(ui.hit_test_index());
+                                    let _ = user_interfaces.insert(id, ui);
                                     layout_span.finish();
                                 }
 
@@ -1161,14 +1165,30 @@ async fn run_instance<P>(
                                 continue;
                             }
 
-                            let (ui_state, statuses) = user_interfaces
-                                .get_mut(&id)
-                                .expect("Get user interface")
+                            let interface = user_interfaces.get_mut(&id).expect("Get user interface");
+                            let cursor = window.state.cursor();
+                            let now = Instant::now();
+
+                            for event in &window_events {
+                                let path = event.to_pointer(cursor.position(), now).and_then(|pointer| {
+                                    if pointer.phase == crate::core::pointer::Phase::Down {
+                                        window.hit_test_index.as_mut()?.hit_test(&mut interface.visit(), pointer.position)
+                                    } else {
+                                        None
+                                    }
+                                });
+
+                                let _ = interface.route_pointer(event, cursor, now, || {
+                                    path.map(|p| (p, aura_gesture::arena::Arena::new()))
+                                });
+                            }
+
+                            let (ui_state, statuses) = interface
                                 .update(
                                     &window.raw,
                                     &window.waker,
                                     &window_events,
-                                    window.state.cursor(),
+                                    cursor,
                                     &mut window.renderer,
                                     &mut messages,
                                 );
@@ -1241,6 +1261,11 @@ async fn run_instance<P>(
                                 cached_interfaces,
                                 &mut proxy,
                             ));
+                            for (ui_id, ui) in user_interfaces.iter_mut() {
+                                if let Some(w) = window_manager.get_mut(*ui_id) {
+                                    w.hit_test_index = Some(ui.hit_test_index());
+                                }
+                            }
 
                             for action in actions {
                                 run_action(
@@ -1681,10 +1706,9 @@ fn run_action<'a, P, C>(
             window::Action::RelayoutAll => {
                 for (id, window) in window_manager.iter_mut() {
                     if let Some(ui) = interfaces.remove(&id) {
-                        let _ = interfaces.insert(
-                            id,
-                            ui.relayout(window.state.logical_size(), &mut window.renderer),
-                        );
+                        let mut ui = ui.relayout(window.state.logical_size(), &mut window.renderer);
+                        window.hit_test_index = Some(ui.hit_test_index());
+                        let _ = interfaces.insert(id, ui);
                     }
 
                     window.raw.request_redraw();
