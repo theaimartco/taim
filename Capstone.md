@@ -5,6 +5,51 @@
 
 ---
 
+## Status — M0 complete (2026-08-23)
+
+Section 10's **M0 — Restore truth** has been executed. All eight tasks are
+done and the exit gate passes:
+
+```
+cargo fmt --all -- --check                          PASS
+cargo clippy --workspace --all-targets -D warnings  PASS
+cargo test --workspace                              PASS  (1,705 passed, 0 failed)
+bash scripts/ci/check-budgets.sh                    PASS  (4/4)
+```
+
+**Closed by M0** — F-01, F-02, F-03, F-04, F-05, F-06, F-12, F-20, F-21,
+F-22, F-23, and the missing `CREDITS.md` (§9.7). F-11's dead code is gone;
+the *capability* it represented (off-thread image decode) remains unbuilt and
+is still M3 work.
+
+**Two things M0 found that this audit had wrong:**
+
+1. **The clippy error count was higher than 15.** `cargo clippy` aborted at
+   `aura_wgpu`, so six further lints in `aura_widget` and `tests/design` were
+   never reported. F-21's count reflected what the tool printed, not what was
+   there.
+2. **`aura_bench` recorded stale commits.** `build.rs` watched `.git/HEAD`,
+   whose contents do not change when you commit on a branch, so the commit
+   baked into the binary went stale until a branch switch. The new
+   dirty-tree guard surfaced this on its first run: a clean tree still
+   produced a `-dirty` report. Fixed in `5e2d7896`.
+
+**The re-captured baselines are worse than the numbers this audit quoted**,
+because they come from a different machine (Linux/Iris Xe, `powersave`
+governor) than the unattributable macOS reports. Worst-case p95 moved from
+33.79 µs to **57.59 µs** (`virtual_list`), and the 60 Hz margin from 493× to
+**224×** on worst p99. Section 4's tables record the *old* reports as they
+stood when audited; `benchmarks/baseline/` now holds the honest set, and
+`README.md` quotes those.
+
+**Everything else in this document stands as written.** The remaining P0s —
+F-07 (effect pipeline is a stub), F-08 (GPU damage discarded), F-10 (no
+visual truth set), F-13 (17 unthemed catalogs), F-14 (no icons or font),
+F-15 (accessibility never reaches a screen reader), F-17 (no mobile
+platform) — are untouched by M0 and unchanged.
+
+---
+
 ## 0. How to read this document
 
 Every number in this document was produced by a command run against this working tree on the

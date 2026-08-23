@@ -1,56 +1,54 @@
 # Baseline reports
 
-This directory holds one `<scene>.json` report per `aura_bench` scene, as
-written by `scripts/perf/run-baseline.sh`.
+One `<scene>.json` report per `aura_bench` scene, written by
+`scripts/perf/run-baseline.sh`. 13 scenes are currently checked in.
 
-**It is currently empty by design.** No attributable baseline exists yet.
+All 13 were captured on **2026-08-23** on `dev-workstation-01`, from a clean
+worktree at commit `5e2d7896dbe4`, with the `profiling` feature on so
+allocation counting is live.
 
-## Why it is empty
+## What was wrong with the previous set
 
-An earlier set of reports was checked in here with
-`environment.git_commit`, `environment.rustc_version`, and
-`environment.device` all `null`. The machine that produced them is
-described in `docs/performance/methodology.md` and
-`benchmarks/devices.toml` as `dev-workstation-01`, but the reports
-themselves did not say so, and the commit and toolchain that produced
-them cannot be recovered.
+The reports checked in before that date recorded `environment.os = "macos"`
+while `benchmarks/devices.toml` registers `dev-workstation-01` as a Linux
+machine, so they could not be attributed to any device at all. They were also
+captured from a dirty worktree (`...-dirty`), meaning the commit they name
+does not describe the sources measured and the run cannot be reproduced by
+anyone, including its author. And `allocation_counting_active` was `false`
+throughout, so every allocation field read zero because it was never measured
+-- while `README.md` quoted allocation figures from a run that was never
+committed.
 
-A report that cannot name the tree, compiler, and machine behind it
-cannot be compared against anything, which is the only thing a baseline
-is for. Rather than leave numbers here that look authoritative and are
-not, they were removed; `git log -- benchmarks/baseline/` still has them
-if the raw values are ever needed.
-
-The analysis those runs produced is not lost -- the `text_heavy` P95
-stability finding is written up in full in
-`docs/performance/methodology.md` under "Known limitation: P95 stability
-on an unpinned development machine".
+`git log -- benchmarks/baseline/` still has the old values. See `Capstone.md`
+F-02, F-03 and F-04 for the full analysis.
 
 ## How this is prevented from recurring
 
-- `tools/aura_bench/build.rs` captures the git commit (with a `-dirty`
-  suffix when the worktree is modified) and the rustc version at build
-  time.
-- `aura_bench --save <PATH>` refuses to write a report when any of
-  `git_commit`, `rustc_version`, or `device` is unknown. Saving one
-  anyway requires an explicit `--allow-unidentified`, which also prints a
-  warning.
-- `scripts/perf/run-baseline.sh` requires `DEVICE` to be set and to match
-  a `[[device]]` entry in `benchmarks/devices.toml` before it will run.
+- `tools/aura_bench/build.rs` captures the git commit and rustc version at
+  build time, and re-runs when `HEAD`, the ref it resolves to, or the index
+  changes -- watching `HEAD` alone silently went stale on every commit made
+  while staying on one branch.
+- `aura_bench --save` refuses a report when any of `git_commit`,
+  `rustc_version`, or `device` is unknown (`--allow-unidentified` opts out),
+  **and** refuses one captured from a dirty worktree (`--allow-dirty` opts
+  out). Either flag prints a warning, and a report saved with either must not
+  be committed here.
+- `scripts/perf/run-baseline.sh` requires `--device` naming a
+  `benchmarks/devices.toml` entry, and builds with `--features profiling`.
 
 ## Producing a baseline
 
 ```bash
-DEVICE=dev-workstation-01 scripts/perf/run-baseline.sh
+scripts/perf/run-baseline.sh --device dev-workstation-01
 ```
 
 Register the machine in `benchmarks/devices.toml` first, filling in every
-field of the `[[device]]` template. See `docs/performance/methodology.md`
-for the warm-up, run-count, governor, and cache-state contract the run
-has to satisfy before its output belongs in this directory.
+field of the `[[device]]` template. `docs/performance/methodology.md` has the
+warm-up, run-count, governor, and cache-state contract a run must satisfy
+before its output belongs here.
 
-Reports here are still headless harness measurements. They establish that
-the harness is reproducible on a named machine; they are not a claim
-about VYOM target hardware, and they are not comparable to a windowed
-Flutter or React Native run. See `docs/status.md` for what the
-performance evidence currently does and does not support.
+These are headless harness measurements. They establish that the harness is
+reproducible on a named machine. They are **not** a claim about VYOM target
+hardware, and they are **not** comparable to a windowed Flutter or React
+Native run -- see `benchmarks/competitors/README.md` for what such a
+comparison would require, and `Capstone.md` section 11 for the full protocol.
