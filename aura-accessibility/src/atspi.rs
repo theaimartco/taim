@@ -21,6 +21,8 @@
 
 pub mod adapter;
 #[cfg(feature = "atspi")]
+pub mod bridge;
+#[cfg(feature = "atspi")]
 pub mod server;
 pub mod store;
 pub mod vocabulary;

@@ -74,6 +74,19 @@ where
             });
         });
 
+        // Built before the entry so the bridge can borrow the session's
+        // adapter, and so the window's title can be read before `window` is
+        // moved in.
+        let accessibility =
+            aura_accessibility::Session::new(aura_accessibility::atspi::adapter::Adapter::new());
+
+        #[cfg(feature = "accessibility")]
+        let accessibility_bridge = aura_accessibility::atspi::bridge::Bridge::spawn(
+            accessibility.adapter().store().clone(),
+            accessibility.adapter().events().clone(),
+            window.title(),
+        );
+
         let _ = self.aliases.insert(window.id(), id);
 
         let _ = self.entries.insert(
@@ -90,9 +103,9 @@ where
                 redraw_at: None,
                 hit_test_index: None,
                 scheduler: Scheduler::new(),
-                accessibility: aura_accessibility::Session::new(
-                    aura_accessibility::atspi::adapter::Adapter::new(),
-                ),
+                accessibility,
+                #[cfg(feature = "accessibility")]
+                _accessibility_bridge: accessibility_bridge,
                 preedit: None,
                 ime_state: None,
             },
@@ -213,6 +226,14 @@ where
     /// adapter is updated on the UI thread; platform bus delivery can drain
     /// its bounded event queue without blocking rendering.
     pub accessibility: aura_accessibility::Session<aura_accessibility::atspi::adapter::Adapter>,
+    /// The thread carrying [`Window::accessibility`]'s queue to the platform
+    /// accessibility bus.
+    ///
+    /// Held so it lives exactly as long as the window: dropping it asks the
+    /// thread to stop. Without it the semantic tree is diffed every frame
+    /// into a queue nothing reads (`Capstone.md` F-15).
+    #[cfg(feature = "accessibility")]
+    _accessibility_bridge: aura_accessibility::atspi::bridge::Bridge,
     preedit: Option<Preedit<P::Renderer>>,
     ime_state: Option<(Rectangle, input_method::Purpose)>,
 }
