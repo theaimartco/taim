@@ -10,13 +10,13 @@
   ],
   "scale_factor": 1.0,
   "environment": {
-    "git_commit": "30b5e969f3db0123721597dbbc894aca63a69af9-dirty",
+    "git_commit": "5e2d7896dbe4c005926a8c7d132e6835432d0fa4",
     "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
     "renderer_backend": "wgpu",
     "build_profile": "release",
     "device": "dev-workstation-01",
-    "os": "macos",
-    "allocation_counting_active": false
+    "os": "linux",
+    "allocation_counting_active": true
   },
   "runs": [
     {
@@ -24,39 +24,39 @@
         "sample_count": 180,
         "p50": {
           "secs": 0,
-          "nanos": 3375
+          "nanos": 3909
         },
         "p95": {
           "secs": 0,
-          "nanos": 6375
+          "nanos": 6226
         },
         "p99": {
           "secs": 0,
-          "nanos": 8250
+          "nanos": 7004
         },
         "missed_frame_rate": 0.0,
         "update_p95": {
           "secs": 0,
-          "nanos": 1791
+          "nanos": 1720
         },
         "draw_p95": {
           "secs": 0,
-          "nanos": 4833
+          "nanos": 4540
         },
         "present_p95": {
           "secs": 0,
-          "nanos": 2905583
+          "nanos": 7698480
         }
       },
       "latency": {
         "sample_count": 180,
         "p50": {
           "secs": 0,
-          "nanos": 3006208
+          "nanos": 6150222
         },
         "p95": {
           "secs": 0,
-          "nanos": 3299209
+          "nanos": 8161320
         }
       },
       "pacing": {
@@ -77,13 +77,13 @@
         "mean_queue_depth": 0.0
       },
       "allocations": {
-        "allocations": 0,
-        "deallocations": 0,
-        "bytes_allocated": 0,
-        "live_bytes": 0
+        "allocations": 63566,
+        "deallocations": 63563,
+        "bytes_allocated": 2292036748,
+        "live_bytes": 24576
       },
       "memory": {
-        "rss_bytes": 297549824
+        "rss_bytes": 143527936
       }
     },
     {
@@ -91,39 +91,39 @@
         "sample_count": 180,
         "p50": {
           "secs": 0,
-          "nanos": 3208
+          "nanos": 3937
         },
         "p95": {
           "secs": 0,
-          "nanos": 6583
+          "nanos": 6951
         },
         "p99": {
           "secs": 0,
-          "nanos": 7542
+          "nanos": 8944
         },
         "missed_frame_rate": 0.0,
         "update_p95": {
           "secs": 0,
-          "nanos": 1834
+          "nanos": 2049
         },
         "draw_p95": {
           "secs": 0,
-          "nanos": 4833
+          "nanos": 4958
         },
         "present_p95": {
           "secs": 0,
-          "nanos": 2805917
+          "nanos": 7615136
         }
       },
       "latency": {
         "sample_count": 180,
         "p50": {
           "secs": 0,
-          "nanos": 2930334
+          "nanos": 6132808
         },
         "p95": {
           "secs": 0,
-          "nanos": 3178917
+          "nanos": 8068737
         }
       },
       "pacing": {
@@ -144,13 +144,13 @@
         "mean_queue_depth": 0.0
       },
       "allocations": {
-        "allocations": 0,
-        "deallocations": 0,
-        "bytes_allocated": 0,
-        "live_bytes": 0
+        "allocations": 63567,
+        "deallocations": 63564,
+        "bytes_allocated": 2292038244,
+        "live_bytes": 24576
       },
       "memory": {
-        "rss_bytes": 297598976
+        "rss_bytes": 143527936
       }
     },
     {
@@ -158,39 +158,39 @@
         "sample_count": 180,
         "p50": {
           "secs": 0,
-          "nanos": 3043
+          "nanos": 3803
         },
         "p95": {
           "secs": 0,
-          "nanos": 6667
+          "nanos": 7226
         },
         "p99": {
           "secs": 0,
-          "nanos": 8041
+          "nanos": 8182
         },
         "missed_frame_rate": 0.0,
         "update_p95": {
           "secs": 0,
-          "nanos": 1916
+          "nanos": 1949
         },
         "draw_p95": {
           "secs": 0,
-          "nanos": 4792
+          "nanos": 5053
         },
         "present_p95": {
           "secs": 0,
-          "nanos": 2838708
+          "nanos": 6009472
         }
       },
       "latency": {
         "sample_count": 180,
         "p50": {
           "secs": 0,
-          "nanos": 2924167
+          "nanos": 4836805
         },
         "p95": {
           "secs": 0,
-          "nanos": 3199334
+          "nanos": 6482180
         }
       },
       "pacing": {
@@ -211,13 +211,13 @@
         "mean_queue_depth": 0.0
       },
       "allocations": {
-        "allocations": 0,
-        "deallocations": 0,
-        "bytes_allocated": 0,
-        "live_bytes": 0
+        "allocations": 63567,
+        "deallocations": 63564,
+        "bytes_allocated": 2292038244,
+        "live_bytes": 24576
       },
       "memory": {
-        "rss_bytes": 297598976
+        "rss_bytes": 143527936
       }
     },
     {
@@ -225,39 +225,39 @@
         "sample_count": 180,
         "p50": {
           "secs": 0,
-          "nanos": 2959
+          "nanos": 3960
         },
         "p95": {
           "secs": 0,
-          "nanos": 5417
+          "nanos": 5867
         },
         "p99": {
           "secs": 0,
-          "nanos": 6167
+          "nanos": 7948
         },
         "missed_frame_rate": 0.0,
         "update_p95": {
           "secs": 0,
-          "nanos": 1541
+          "nanos": 1678
         },
         "draw_p95": {
           "secs": 0,
-          "nanos": 4042
+          "nanos": 4260
         },
         "present_p95": {
           "secs": 0,
-          "nanos": 2726583
+          "nanos": 5812996
         }
       },
       "latency": {
         "sample_count": 180,
         "p50": {
           "secs": 0,
-          "nanos": 2874333
+          "nanos": 4807122
         },
         "p95": {
           "secs": 0,
-          "nanos": 3053625
+          "nanos": 6229854
         }
       },
       "pacing": {
@@ -278,13 +278,13 @@
         "mean_queue_depth": 0.0
       },
       "allocations": {
-        "allocations": 0,
-        "deallocations": 0,
-        "bytes_allocated": 0,
-        "live_bytes": 0
+        "allocations": 63567,
+        "deallocations": 63564,
+        "bytes_allocated": 2292038244,
+        "live_bytes": 24576
       },
       "memory": {
-        "rss_bytes": 297549824
+        "rss_bytes": 143527936
       }
     },
     {
@@ -292,39 +292,39 @@
         "sample_count": 180,
         "p50": {
           "secs": 0,
-          "nanos": 3042
+          "nanos": 4010
         },
         "p95": {
           "secs": 0,
-          "nanos": 6042
+          "nanos": 6508
         },
         "p99": {
           "secs": 0,
-          "nanos": 7875
+          "nanos": 7221
         },
         "missed_frame_rate": 0.0,
         "update_p95": {
           "secs": 0,
-          "nanos": 1709
+          "nanos": 1725
         },
         "draw_p95": {
           "secs": 0,
-          "nanos": 4375
+          "nanos": 4736
         },
         "present_p95": {
           "secs": 0,
-          "nanos": 2755416
+          "nanos": 7748776
         }
       },
       "latency": {
         "sample_count": 180,
         "p50": {
           "secs": 0,
-          "nanos": 2889083
+          "nanos": 6146819
         },
         "p95": {
           "secs": 0,
-          "nanos": 3092458
+          "nanos": 8159358
         }
       },
       "pacing": {
@@ -345,13 +345,13 @@
         "mean_queue_depth": 0.0
       },
       "allocations": {
-        "allocations": 0,
-        "deallocations": 0,
-        "bytes_allocated": 0,
-        "live_bytes": 0
+        "allocations": 63567,
+        "deallocations": 63564,
+        "bytes_allocated": 2292038244,
+        "live_bytes": 24576
       },
       "memory": {
-        "rss_bytes": 297549824
+        "rss_bytes": 143527936
       }
     }
   ],
@@ -360,39 +360,39 @@
       "sample_count": 180,
       "p50": {
         "secs": 0,
-        "nanos": 3375
+        "nanos": 4010
       },
       "p95": {
         "secs": 0,
-        "nanos": 6375
+        "nanos": 6508
       },
       "p99": {
         "secs": 0,
-        "nanos": 8250
+        "nanos": 7221
       },
       "missed_frame_rate": 0.0,
       "update_p95": {
         "secs": 0,
-        "nanos": 1791
+        "nanos": 1725
       },
       "draw_p95": {
         "secs": 0,
-        "nanos": 4833
+        "nanos": 4736
       },
       "present_p95": {
         "secs": 0,
-        "nanos": 2905583
+        "nanos": 7748776
       }
     },
     "latency": {
       "sample_count": 180,
       "p50": {
         "secs": 0,
-        "nanos": 3006208
+        "nanos": 6146819
       },
       "p95": {
         "secs": 0,
-        "nanos": 3299209
+        "nanos": 8159358
       }
     },
     "pacing": {
@@ -413,13 +413,13 @@
       "mean_queue_depth": 0.0
     },
     "allocations": {
-      "allocations": 0,
-      "deallocations": 0,
-      "bytes_allocated": 0,
-      "live_bytes": 0
+      "allocations": 63567,
+      "deallocations": 63564,
+      "bytes_allocated": 2292038244,
+      "live_bytes": 24576
     },
     "memory": {
-      "rss_bytes": 297549824
+      "rss_bytes": 143527936
     }
   }
 }
