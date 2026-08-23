@@ -2412,7 +2412,7 @@ pub fn accordion<'a, Message, Theme, Renderer>(
 where
     Message: Clone + 'a,
     Theme: crate::accordion::Catalog + 'a,
-    Renderer: crate::core::Renderer + 'a,
+    Renderer: crate::core::text::Renderer + 'a,
 {
     crate::accordion::Accordion::new(sections)
 }

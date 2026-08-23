@@ -38,39 +38,44 @@
 //! screen reader, which is how a "collapsed" section ends up announcing
 //! itself.
 
+use crate::core::alignment;
 use crate::core::animation::Animation;
 use crate::core::border::Border;
 use crate::core::layout;
 use crate::core::mouse;
 use crate::core::renderer;
+use crate::core::text;
 use crate::core::time::Instant;
 use crate::core::touch;
 use crate::core::widget::Operation;
 use crate::core::widget::tree::{self, Tree};
 use crate::core::widget::visit;
 use crate::core::{
-    Background, Color, Element, Event, Layout, Length, Padding, Point, Rectangle, Shell, Size,
-    Theme, Widget,
+    Background, Color, Element, Event, Layout, Length, Padding, Pixels, Point, Rectangle, Shell,
+    Size, Theme, Widget,
 };
 
 /// The height of a section's header, sized to clear the touch-target
 /// policy.
 const HEADER_HEIGHT: f32 = 56.0;
 
-/// The size of the drawn chevron.
-const CHEVRON_SIZE: f32 = 10.0;
+/// The chevron's rendered size.
+const CHEVRON_SIZE: f32 = 18.0;
 
-/// The stroke weight of the chevron.
-const CHEVRON_STROKE: f32 = 2.0;
+/// The width reserved for the chevron at the trailing edge.
+const CHEVRON_MARGIN: f32 = 36.0;
 
-/// How far the chevron sits from the trailing edge.
-const CHEVRON_MARGIN: f32 = 20.0;
+/// The padding between a header's leading edge and its title.
+const TITLE_PADDING: f32 = 16.0;
+
+/// The title's text size.
+const TITLE_SIZE: f32 = 15.0;
 
 /// One collapsible section.
 #[allow(missing_debug_implementations)]
 pub struct Section<'a, Message, Theme = crate::Theme, Renderer = crate::Renderer>
 where
-    Renderer: crate::core::Renderer,
+    Renderer: crate::core::text::Renderer,
     Theme: Catalog,
 {
     title: String,
@@ -79,7 +84,7 @@ where
 
 impl<'a, Message, Theme, Renderer> Section<'a, Message, Theme, Renderer>
 where
-    Renderer: crate::core::Renderer,
+    Renderer: crate::core::text::Renderer,
     Theme: Catalog,
 {
     /// Creates a section titled `title` revealing `content`.
@@ -121,7 +126,7 @@ impl Default for State {
 #[allow(missing_debug_implementations)]
 pub struct Accordion<'a, Message, Theme = crate::Theme, Renderer = crate::Renderer>
 where
-    Renderer: crate::core::Renderer,
+    Renderer: crate::core::text::Renderer,
     Theme: Catalog,
 {
     sections: Vec<Section<'a, Message, Theme, Renderer>>,
@@ -133,7 +138,7 @@ where
 
 impl<'a, Message, Theme, Renderer> Accordion<'a, Message, Theme, Renderer>
 where
-    Renderer: crate::core::Renderer,
+    Renderer: crate::core::text::Renderer,
     Theme: Catalog,
 {
     /// Creates an accordion from `sections`.
@@ -233,7 +238,7 @@ impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
     for Accordion<'_, Message, Theme, Renderer>
 where
     Message: Clone,
-    Renderer: crate::core::Renderer,
+    Renderer: crate::core::text::Renderer,
     Theme: Catalog,
 {
     fn tag(&self) -> tree::Tag {
@@ -480,34 +485,67 @@ where
                 },
             );
 
-            // The chevron: two bars forming a V, pointing down when the
-            // section is closed and up when it is open. Drawn rather than
-            // set as text so the control does not need an icon font.
-            let centre = Point::new(
-                header.x + header.width - CHEVRON_MARGIN,
-                header.y + header.height / 2.0,
+            // The title. This widget stored one, exposed it as its
+            // accessible name, and never drew it: its renderer bound was
+            // `core::Renderer`, which cannot draw text at all, so every
+            // header rendered as a blank bar. Found by looking at a golden.
+            renderer.fill_text(
+                text::Text {
+                    content: self.sections[index].title.clone(),
+                    font: renderer.default_font(),
+                    size: Pixels(TITLE_SIZE),
+                    line_height: text::LineHeight::default(),
+                    bounds: Size::new(
+                        (header.width - TITLE_PADDING - CHEVRON_MARGIN).max(0.0),
+                        header.height,
+                    ),
+                    align_x: text::Alignment::Left,
+                    align_y: alignment::Vertical::Center,
+                    shaping: text::Shaping::Advanced,
+                    wrapping: text::Wrapping::None,
+                    ellipsis: text::Ellipsis::default(),
+                    hint_factor: None,
+                },
+                Point::new(header.x + TITLE_PADDING, header.y + header.height / 2.0),
+                appearance.text_color,
+                *viewport,
             );
 
-            let rise = if self.is_open(index) {
-                -CHEVRON_SIZE / 2.0
+            // The chevron, from the icon font. It used to be two *vertical*
+            // bars -- `width: CHEVRON_STROKE` on both -- which is not a
+            // chevron in either state and rendered as two tick marks. A quad
+            // cannot express a diagonal, so a glyph is the fix, and it keeps
+            // every chevron in the framework identical.
+            let chevron = if self.is_open(index) {
+                crate::icon::Icon::CHEVRON_UP
             } else {
-                CHEVRON_SIZE / 2.0
+                crate::icon::Icon::CHEVRON_DOWN
             };
 
-            for direction in [-1.0_f32, 1.0] {
-                renderer.fill_quad(
-                    renderer::Quad {
-                        bounds: Rectangle {
-                            x: centre.x + direction * CHEVRON_SIZE / 2.0 - CHEVRON_STROKE / 2.0,
-                            y: centre.y - rise / 2.0,
-                            width: CHEVRON_STROKE,
-                            height: rise.abs(),
-                        },
-                        ..renderer::Quad::default()
-                    },
-                    Background::Color(appearance.chevron_color),
-                );
-            }
+            renderer.fill_text(
+                text::Text {
+                    content: chevron.codepoint().to_string(),
+                    // `ICON_FONT` rather than `icon::FONT`: same font file,
+                    // but typed as `Renderer::Font`, so the widget stays
+                    // generic over any text renderer.
+                    font: Renderer::ICON_FONT,
+                    size: Pixels(CHEVRON_SIZE),
+                    line_height: text::LineHeight::default(),
+                    bounds: Size::new(CHEVRON_MARGIN, header.height),
+                    align_x: text::Alignment::Center,
+                    align_y: alignment::Vertical::Center,
+                    shaping: text::Shaping::Basic,
+                    wrapping: text::Wrapping::None,
+                    ellipsis: text::Ellipsis::default(),
+                    hint_factor: None,
+                },
+                Point::new(
+                    header.x + header.width - CHEVRON_MARGIN / 2.0,
+                    header.y + header.height / 2.0,
+                ),
+                appearance.chevron_color,
+                *viewport,
+            );
         }
 
         if let Some(index) = self.open()
@@ -533,7 +571,7 @@ impl<'a, Message, Theme, Renderer> From<Accordion<'a, Message, Theme, Renderer>>
 where
     Message: 'a + Clone,
     Theme: 'a + Catalog,
-    Renderer: 'a + crate::core::Renderer,
+    Renderer: 'a + crate::core::text::Renderer,
 {
     fn from(accordion: Accordion<'a, Message, Theme, Renderer>) -> Self {
         Self::new(accordion)
