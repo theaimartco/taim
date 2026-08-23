@@ -17,6 +17,37 @@ cargo test --workspace                              PASS  (1,705 passed, 0 faile
 bash scripts/ci/check-budgets.sh                    PASS  (4/4)
 ```
 
+**Closed by M2** — F-10. `tests/golden/widget_gallery.rs` renders 20 widget
+cases in both themes through the real `UserInterface` pipeline and compares
+them against 40 committed `.rgba` goldens; `tests/golden/damage_pixels.rs`
+pins renderer determinism and that a change stays inside the widget that
+changed. A 1-px padding change to `button` fails exactly the two button
+cases and nothing else, and uploads a magenta-marked diff. Rendering is
+pinned to `tiny-skia` on the CPU — no GPU, no driver, no Vulkan — so a
+golden is reproducible on any machine.
+
+**M2 found four things by looking at pixels, three of them in work this
+audit had already called done:**
+
+1. **The harness rendered every button as disabled.** `button` latches its
+   paint status *only* while handling `Event::Window(RedrawRequested)`
+   (`widget/src/button.rs:381`), and an unset status resolves to
+   `Status::Disabled` at paint time. An enabled and a disabled button were
+   pixel identical. Golden suites must drive a frame event, not just draw.
+2. **A rendered frame does not survive its widget tree being dropped.**
+   Text records a handle into tree-owned paragraphs, so screenshotting after
+   the `UserInterface` is dropped yields a uniform background — on both
+   backends, with no error and no warning. A harness shaped "draw in a
+   closure, screenshot after" silently captures a plausible blank.
+3. **Two hand-drawn glyphs are visibly wrong.** `accordion`'s chevron
+   renders as two disconnected marks rather than a chevron, and
+   `search_bar`'s magnifier renders as a small dot. Both are drawn from
+   quads rather than the icon font, and both look nothing like the icon the
+   code names. Neither is caught by any test but the eye.
+4. **The runtime reports `damage: None` for a tree swap** — not `Full`.
+   Anything built on `State::damage()` for a partial present (F-08) must
+   treat `None` as "no information", never as "nothing changed".
+
 **Closed by M1** — F-13 (all 41 widget catalogues now have an
 `aura_design::Theme` implementation, enforced by
 `tests/design/catalog_coverage.rs`), F-14 (36 original icons, a typed
