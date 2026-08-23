@@ -119,6 +119,61 @@ platform) — are untouched by M0 and unchanged.
 
 ---
 
+## Status — quality gates and two corrections (2026-08-24)
+
+This pass closed the two open findings that were gate-shaped rather than
+feature-shaped, and corrected one finding this audit had wrong.
+
+| Finding | Status |
+|---|---|
+| **F-19** Web/WASM inherited and unexercised | **Closed.** `wasm32-unknown-unknown` was never built by any workflow, so whether it worked was unknown rather than true. It compiles: `cargo check -p aura --target wasm32-unknown-unknown --no-default-features --features "wgpu,webgl,web-colors"`. CI's `wasm32 build` job now holds it there. |
+| **M4 task 4** No AT-SPI test against a real bus | **Closed.** `aura-accessibility/tests/atspi_bus.rs` already served a tree over a live bus and queried it as a reader would, but `needs_bus!()` skipped whenever no accessibility bus was reachable — which is every CI box, so it had never once run there. It now stands up its own `org.a11y.Bus`, answering with the session bus's address, so `dbus-run-session` is enough; `AURA_ATSPI_REQUIRE_BUS=1` turns the skip into a failure. A fourth case covers retirement. CI's `AT-SPI over a real bus` job runs all four. |
+| **F-11** Image decode synchronous on the UI thread | **Wrong as written.** See below. |
+
+**F-11 was a false finding, and the fix it asked for would have been a
+regression.** The evidence given was that `grep -rn 'decode::' wgpu/src`
+returns nothing and clippy reports every item in `wgpu/src/image/decode.rs`
+as never constructed. Both were true. The conclusion drawn from them — that
+decoding therefore happens synchronously on the UI thread — does not follow,
+and is not what the code does.
+
+`wgpu/src/image/cache.rs:355-379` routes every compressed handle to
+`worker.load(handle, false)`, and the worker thread calls
+`graphics::image::load` at `cache.rs:520`. Decoding has been off-thread for
+as long as the `worker` module has existed (`22488c53`), which predates this
+audit. `decode.rs` was a *second*, unused decoder duplicating that path;
+deleting it in M0 was correct, and wiring it in — as F-11's fix section
+instructed — would have added a competing decode path alongside a working
+one.
+
+Two narrower gaps are real and remain, neither of them what F-11 described:
+
+- **wasm32 still decodes synchronously.** `cache.rs:366` carries a
+  `// TODO: Concurrent support for Wasm` and calls `Memory::load` inline.
+  Now that F-19 makes wasm a built target, this is the one that matters.
+- **`Handle::Rgba` decodes inline**, which is correct — the bytes are
+  already decoded, and there is nothing to move off-thread.
+
+**What this says about the audit's method.** F-11 was reached by grepping for
+a symbol and reading a clippy warning, without following the call graph of
+the module the symbol was supposed to live in. That is the same failure mode
+as F-21's undercount: the tool's output was read as the answer rather than as
+evidence. Findings derived that way — F-09 and F-19 were both reached by
+grep — deserve the call-graph check before their fix sections are executed.
+
+**F-09 is confirmed, not corrected.** `runtime/src/user_interface.rs:641-655`
+is still the only caller, still keys one layer on the whole viewport, and
+`wgpu/src/lib.rs:110-112` still holds three single-slot `Option`s rather than
+`RetainedLayerCache`. The fix is genuinely the deep one the finding
+describes: `start_retained_layer`/`end_retained_layer` cannot nest today —
+`recording_retained_frame` is one `Option` and `end_retained_layer` panics
+without a matching start — so subtree retention needs the recorder to become
+a stack before any widget can call it. Halfway is worse than not starting:
+swapping in the cache while retention stays per-frame adds the budget, LRU
+and telemetry machinery without the hit rate that justifies it.
+
+---
+
 ## Status — P0s, second pass (2026-08-24)
 
 | Finding | Status |
@@ -879,6 +934,11 @@ already exists and already uploads diffs on failure. **2–3 weeks.**
 
 **F-11 · P1 · Image decoding is synchronous on the UI thread; the async decoder is dead code**
 
+> **Corrected 2026-08-24 — this finding is wrong.** Decoding is already
+> off-thread via `cache.rs`'s `worker` module; `decode.rs` was a second,
+> unused decoder. The *Fix* below would have added a competing path.
+> See "Status — quality gates and two corrections".
+
 *Evidence:* `wgpu/src/image/decode.rs` implements `Decoder`, `DecodeRequest`, `DecodeHandle`,
 `DecodeResult`, `PendingRequest`, a thread count, a bounded queue, `submit`, `poll`, `cancel`,
 and `decode_image`. `grep -rn 'decode::' wgpu/src --include='*.rs'` excluding the file itself
@@ -1042,6 +1102,11 @@ damage-based partial present (F-08). **Three separate P0s converge on this one c
 ---
 
 **F-19 · P2 · Web/WASM is inherited and unexercised**
+
+> **Closed 2026-08-24.** `wasm32-unknown-unknown` compiles, and CI's
+> `wasm32 build` job keeps it compiling. The residual gap is narrower
+> than "unknown whether it works": no example targets wasm, no test
+> runs in a browser, and image decode is still inline there.
 
 *Evidence:* `webgl` feature, `web-sys 0.3.85`, `wasm32` target blocks in `futures/` and
 `winit/`, and `deny.toml` lists `wasm32-unknown-unknown` — all inherited from iced. No CI job

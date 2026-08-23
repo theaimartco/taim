@@ -77,6 +77,27 @@ jobs:
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
+  wasm:
+    name: wasm32 build
+    runs-on: ubuntu-latest
+    needs: metadata
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      # `webgl`, `web-sys`, the `wasm32` blocks in `futures/` and `winit/`,
+      # and `deny.toml`'s `wasm32-unknown-unknown` entry were all inherited
+      # from iced and never built by any workflow, so whether the target
+      # still compiled was unknown rather than true (Capstone.md F-19).
+      # Verified compiling at 9f9167e4; this job is what keeps it that way.
+      #
+      # Default features are off deliberately: `x11`, `wayland` and
+      # `thread-pool` are meaningless on the web and would fail the build
+      # for reasons that say nothing about wasm support.
+      - run: cargo check -p aura --target wasm32-unknown-unknown --no-default-features --features "wgpu,webgl,web-colors"
+
   test:
     name: test
     runs-on: ubuntu-latest
@@ -90,6 +111,31 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
       - run: cargo test --workspace
+
+  accessibility:
+    name: AT-SPI over a real bus
+    runs-on: ubuntu-latest
+    needs: [fmt, check, clippy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # `dbus-run-session` only; at-spi2-core is deliberately not installed.
+      # The test serves `org.a11y.Bus` itself and answers with the session
+      # bus's own address, so it exercises the whole object server without
+      # a registry or a display. See the test's module docs.
+      - name: Install D-Bus
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dbus dbus-x11
+      # AURA_ATSPI_REQUIRE_BUS turns "no bus, skip" into "no bus, fail".
+      # Without it this job could go green on a runner where D-Bus failed
+      # to start, which is the precise shape of the bug F-15 was: a
+      # transport nobody noticed was doing nothing.
+      - name: Test the AT-SPI transport
+        env:
+          AURA_ATSPI_REQUIRE_BUS: "1"
+        run: dbus-run-session -- cargo test -p aura-accessibility --features atspi --test atspi_bus
 
   budgets:
     name: budgets
