@@ -364,7 +364,7 @@ impl Renderer {
             self.layers.merge();
         }
 
-        for layer in self.layers.iter() {
+        for (index, layer) in self.layers.iter().enumerate() {
             let clip_bounds = layer.bounds * scale_factor;
 
             if physical_bounds
@@ -484,6 +484,7 @@ impl Renderer {
 
                 self.engine.effect_pipeline.prepare(
                     &self.engine.device,
+                    index,
                     &layer.effects,
                     layer.bounds * scale_factor,
                     surface,
@@ -551,7 +552,7 @@ impl Renderer {
 
         let scale = Transformation::scale(scale_factor);
 
-        for layer in self.layers.iter() {
+        for (index, layer) in self.layers.iter().enumerate() {
             let Some(physical_bounds) =
                 physical_bounds.intersection(&(layer.bounds * scale_factor))
             else {
@@ -568,6 +569,43 @@ impl Renderer {
             let Some(scissor_rect) = intersect(scissor_rect, self.frame_damage) else {
                 continue;
             };
+
+            // Backdrop effects read what is behind this layer, so they run
+            // before it draws over them. A backdrop blur frosts the page
+            // behind a sheet; running it after the sheet has drawn would
+            // blur the sheet instead.
+            if self.engine.effect_pipeline.has_backdrop(index) {
+                let physical = viewport.physical_size();
+
+                let _ = ManuallyDrop::into_inner(render_pass);
+
+                self.engine.effect_pipeline.render_backdrop(
+                    &self.engine.device,
+                    &self.engine.queue,
+                    encoder,
+                    frame_texture,
+                    (physical.width, physical.height),
+                    index,
+                );
+
+                render_pass =
+                    ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("aura_wgpu render pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: frame,
+                            depth_slice: None,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                        multiview_mask: None,
+                    }));
+            }
 
             if !layer.quads.is_empty() {
                 let render_span = debug::render(debug::Primitive::Quad);
@@ -802,6 +840,26 @@ impl Renderer {
     /// of [`Renderer::draw`] to a [`wgpu::Queue`].
     pub fn recall(&mut self) {
         self.staging_belt.recall();
+    }
+
+    /// Uploads a coverage mask for [`effects::Effect::Mask`] to clip to.
+    ///
+    /// See [`effects::pipeline::Pipeline::upload_mask`]; the mask must be
+    /// [`Renderer::mask_size`] square, one byte of coverage per pixel.
+    pub fn upload_mask(&self, slot: u32, coverage: &[u8]) -> Option<u32> {
+        self.engine
+            .effect_pipeline
+            .upload_mask(&self.engine.queue, slot, coverage)
+    }
+
+    /// The edge length every uploaded mask must have.
+    pub const fn mask_size() -> u32 {
+        crate::effects::pipeline::Pipeline::mask_size()
+    }
+
+    /// How many mask slots the atlas holds.
+    pub const fn mask_slots() -> u32 {
+        crate::effects::pipeline::Pipeline::mask_slots()
     }
 
     /// Narrows this frame to `damage`, preserving what is already on the
