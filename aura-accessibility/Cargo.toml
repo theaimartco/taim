@@ -30,3 +30,9 @@ log = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde = "1"
+# `tests/atspi_bus.rs` drives the transport the way a screen reader does:
+# from outside the crate, over a real bus. That needs its own handle on
+# both the vocabulary it asserts against and the bus it asserts over,
+# because an integration test does not inherit the library's dependencies.
+aura_core.workspace = true
+zbus.workspace = true
