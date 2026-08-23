@@ -278,6 +278,7 @@ pub fn present(
                 Some(background_color),
                 frame.texture.format(),
                 view,
+                &frame.texture,
                 viewport,
             );
 
@@ -355,7 +356,11 @@ impl graphics::Compositor for Compositor {
         surface.configure(
             &self.engine.device,
             &wgpu::SurfaceConfiguration {
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                // COPY_SRC as well as RENDER_ATTACHMENT: the effect pipeline
+                // copies a region of the presented frame into an offscreen
+                // target to post-process it. Without it, every effect is a
+                // validation error the moment a blur appears on screen.
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
                 format: self.format,
                 present_mode: self.settings.present_mode,
                 width,
