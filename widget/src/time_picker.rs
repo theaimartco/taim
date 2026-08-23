@@ -27,10 +27,12 @@
 //! granularity and the widget only ever produces minutes on that grid,
 //! so an application never has to round what it receives.
 
+use crate::core::alignment;
 use crate::core::border::Border;
 use crate::core::layout;
 use crate::core::mouse;
 use crate::core::renderer;
+use crate::core::text;
 use crate::core::touch;
 use crate::core::widget::tree::{self, Tree};
 use crate::core::{
@@ -42,6 +44,12 @@ const ROW_HEIGHT: f32 = 48.0;
 
 /// How many rows are visible in each column at once.
 const VISIBLE_ROWS: usize = 5;
+
+/// The text size of the chosen row.
+const SELECTED_SIZE: f32 = 20.0;
+
+/// The text size of the rows either side of it.
+const DIM_SIZE: f32 = 16.0;
 
 /// Minutes in an hour, and hours in a day.
 const MINUTES_PER_HOUR: u32 = 60;
@@ -249,7 +257,7 @@ where
 
 impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer> for TimePicker<'_, Message, Theme>
 where
-    Renderer: crate::core::Renderer,
+    Renderer: crate::core::text::Renderer,
     Theme: Catalog,
 {
     fn tag(&self) -> tree::Tag {
@@ -375,7 +383,7 @@ where
         _style: &renderer::Style,
         layout: Layout<'_>,
         _cursor: mouse::Cursor,
-        _viewport: &Rectangle,
+        viewport: &Rectangle,
     ) {
         let appearance = theme.style(&self.class);
         let bounds = layout.bounds();
@@ -410,6 +418,72 @@ where
             },
             appearance.selection,
         );
+
+        // The hours and minutes. Without these the control rendered as a
+        // single grey band and nothing else -- a time picker showing no
+        // time. Its renderer bound could not draw text at all.
+        let middle = (VISIBLE_ROWS / 2) as i64;
+
+        for column in [Column::Hour, Column::Minute] {
+            let column_bounds = self.column_bounds(bounds, column);
+            let values = match column {
+                Column::Hour => self.hours(),
+                Column::Minute => self.minutes(),
+            };
+
+            let selected = self.selected_index(column) as i64;
+
+            for offset in -middle..=middle {
+                let index = selected + offset;
+
+                // The columns do not wrap visually: an hour before 0 or
+                // after 23 is empty space, which is what tells a user they
+                // have reached the end of the dial.
+                let Ok(index) = usize::try_from(index) else {
+                    continue;
+                };
+
+                let Some(value) = values.get(index) else {
+                    continue;
+                };
+
+                let row = Rectangle {
+                    x: column_bounds.x,
+                    y: column_bounds.y + (middle + offset) as f32 * ROW_HEIGHT,
+                    width: column_bounds.width,
+                    height: ROW_HEIGHT,
+                };
+
+                let is_selected = offset == 0;
+
+                renderer.fill_text(
+                    text::Text {
+                        content: format!("{value:02}"),
+                        font: renderer.default_font(),
+                        size: crate::core::Pixels(if is_selected {
+                            SELECTED_SIZE
+                        } else {
+                            DIM_SIZE
+                        }),
+                        line_height: text::LineHeight::default(),
+                        bounds: row.size(),
+                        align_x: text::Alignment::Center,
+                        align_y: alignment::Vertical::Center,
+                        shaping: text::Shaping::Basic,
+                        wrapping: text::Wrapping::None,
+                        ellipsis: text::Ellipsis::default(),
+                        hint_factor: None,
+                    },
+                    row.center(),
+                    if is_selected {
+                        appearance.text_color
+                    } else {
+                        appearance.dim_text_color
+                    },
+                    *viewport,
+                );
+            }
+        }
     }
 }
 
@@ -418,7 +492,7 @@ impl<'a, Message, Theme, Renderer> From<TimePicker<'a, Message, Theme>>
 where
     Message: 'a,
     Theme: 'a + Catalog,
-    Renderer: 'a + crate::core::Renderer,
+    Renderer: 'a + crate::core::text::Renderer,
 {
     fn from(picker: TimePicker<'a, Message, Theme>) -> Self {
         Self::new(picker)

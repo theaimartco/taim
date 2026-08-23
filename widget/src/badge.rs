@@ -27,11 +27,13 @@
 //! a notification, and a badge that renders an empty marker trains
 //! people to ignore the marker.
 
+use crate::core::alignment;
 use crate::core::border::Border;
 use crate::core::layout;
 use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
+use crate::core::text;
 use crate::core::widget::Operation;
 use crate::core::widget::tree::{self, Tree};
 use crate::core::widget::visit;
@@ -65,7 +67,7 @@ enum Marker {
 #[allow(missing_debug_implementations)]
 pub struct Badge<'a, Message, Theme = crate::Theme, Renderer = crate::Renderer>
 where
-    Renderer: crate::core::Renderer,
+    Renderer: crate::core::text::Renderer,
     Theme: Catalog,
 {
     content: Element<'a, Message, Theme, Renderer>,
@@ -76,7 +78,7 @@ where
 
 impl<'a, Message, Theme, Renderer> Badge<'a, Message, Theme, Renderer>
 where
-    Renderer: crate::core::Renderer,
+    Renderer: crate::core::text::Renderer,
     Theme: Catalog,
 {
     /// Creates a badge marking `content`. Shows nothing until given a
@@ -181,7 +183,7 @@ where
     // No `Message: Clone`: a badge is presentation and never produces or
     // duplicates a message, so requiring it would force the bound on
     // every caller's message type for nothing.
-    Renderer: crate::core::Renderer,
+    Renderer: crate::core::text::Renderer,
     Theme: Catalog,
 {
     fn tag(&self) -> tree::Tag {
@@ -355,12 +357,35 @@ where
             appearance.background,
         );
 
-        // The count itself is drawn by the caller's text renderer only
-        // when there is one; a `Renderer` bound loose enough to accept
-        // any backend cannot assume text shaping, so the number is
-        // carried by the accessible name and the marker's size. See
-        // `Badge::marker_text` for what a text-capable caller would draw.
-        let _ = self.marker_text();
+        // The count. This used to be `let _ = self.marker_text();`, so a
+        // badge built with `.count(3)` rendered a plain red disc with no
+        // number in it -- the one thing a counting badge exists to show.
+        // The stated reason was that a loose `Renderer` bound "cannot assume
+        // text shaping"; the fix is to require the bound, since every
+        // renderer in this workspace, software included, shapes text.
+        let Some(count) = self.marker_text() else {
+            return;
+        };
+
+        renderer.fill_text(
+            text::Text {
+                content: count,
+                font: renderer.default_font(),
+                // Proportional to the marker so "9" and "99+" both fit.
+                size: crate::core::Pixels(marker.height * 0.62),
+                line_height: text::LineHeight::default(),
+                bounds: marker.size(),
+                align_x: text::Alignment::Center,
+                align_y: alignment::Vertical::Center,
+                shaping: text::Shaping::Basic,
+                wrapping: text::Wrapping::None,
+                ellipsis: text::Ellipsis::default(),
+                hint_factor: None,
+            },
+            marker.center(),
+            appearance.text_color,
+            *viewport,
+        );
     }
 
     fn overlay<'b>(
@@ -388,7 +413,7 @@ impl<'a, Message, Theme, Renderer> From<Badge<'a, Message, Theme, Renderer>>
 where
     Message: 'a,
     Theme: 'a + Catalog,
-    Renderer: 'a + crate::core::Renderer,
+    Renderer: 'a + crate::core::text::Renderer,
 {
     fn from(badge: Badge<'a, Message, Theme, Renderer>) -> Self {
         Self::new(badge)

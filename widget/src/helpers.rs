@@ -2323,7 +2323,7 @@ pub fn badge<'a, Message, Theme, Renderer>(
 where
     Message: 'a,
     Theme: crate::badge::Catalog + 'a,
-    Renderer: crate::core::Renderer + 'a,
+    Renderer: crate::core::text::Renderer + 'a,
 {
     crate::badge::Badge::new(content)
 }
