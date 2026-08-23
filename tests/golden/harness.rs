@@ -319,6 +319,29 @@ impl Harness {
     /// previous case warmed an atlas is a case that will fail the day
     /// someone reorders the file.
     pub fn render(size: Size<u32>, scale: f32, draw: impl FnOnce(&mut Renderer)) -> Option<Image> {
+        Self::render_onto(size, scale, CLEAR, draw)
+    }
+
+    /// [`Harness::render`], against a chosen background.
+    ///
+    /// Primitive cases clear to [`CLEAR`] so "drew nothing" is
+    /// distinguishable from "drew black". Widget cases clear to their
+    /// theme's own background instead, because a widget rendered against a
+    /// colour its theme never uses is not the picture anyone is shipping --
+    /// and text at the theme's colour on a black clear is how this harness
+    /// first "proved" that every glyph in the framework was blank.
+    pub fn render_onto(
+        size: Size<u32>,
+        scale: f32,
+        clear: Color,
+        draw: impl FnOnce(&mut Renderer),
+    ) -> Option<Image> {
+        // Pinned to the software renderer, not merely to a software *adapter*:
+        // `tiny-skia` rasterises on the CPU with no GPU, no driver, and no
+        // Vulkan implementation in the picture at all, so a golden recorded
+        // on one machine is reproducible on any other. A GPU backend --
+        // llvmpipe included -- would make these images a property of the
+        // driver version.
         let mut renderer = aura_futures::futures::executor::block_on(
             <Renderer as aura_core::renderer::Headless>::new(
                 aura_core::renderer::Settings::default(),
@@ -331,7 +354,121 @@ impl Harness {
         renderer.reset(Rectangle::with_size(logical));
         draw(&mut renderer);
 
-        let rgba = renderer.screenshot(size, scale, CLEAR);
+        let rgba = renderer.screenshot(size, scale, clear);
+
+        Some(Image {
+            width: size.width,
+            height: size.height,
+            rgba,
+        })
+    }
+
+    /// Renders one [`Element`] through the real widget pipeline.
+    ///
+    /// Goes through `UserInterface::build` and `draw` rather than calling
+    /// renderer primitives directly, because the thing worth pinning is what
+    /// a *widget* produces -- its layout, its catalogue lookup, its glyphs --
+    /// not what a quad looks like. A suite that drew primitives would have
+    /// passed happily while every icon in the framework resolved to a
+    /// missing glyph, which is exactly what happened.
+    /// Renders one [`Element`] through the real widget pipeline.
+    ///
+    /// Goes through `UserInterface::build` and `draw` rather than calling
+    /// renderer primitives directly, because the thing worth pinning is what
+    /// a *widget* produces -- its layout, its catalogue lookup, its glyphs --
+    /// not what a quad looks like. A suite that drew primitives would have
+    /// passed happily while every icon in the framework resolved to a
+    /// missing glyph, which is exactly what happened.
+    ///
+    /// # The tree must outlive the screenshot
+    ///
+    /// This does not delegate to [`Harness::render_onto`], and the reason is
+    /// worth stating because it costs an afternoon to rediscover: **the
+    /// renderer's recorded text does not survive its widget tree being
+    /// dropped.** A `fill_paragraph` records a handle into text the tree
+    /// owns, so dropping the `UserInterface` before `screenshot` yields a
+    /// uniform background -- on both backends, with no error, no panic, and
+    /// no warning. A harness shaped as "draw in a closure, screenshot after"
+    /// therefore captures a perfectly plausible blank, and would happily
+    /// adopt it as a golden.
+    ///
+    /// So the interface is built, drawn, and screenshotted in one scope, and
+    /// only then dropped.
+    pub fn render_element<'a, Message>(
+        size: Size<u32>,
+        scale: f32,
+        theme: &aura::Theme,
+        element: impl Into<aura_core::Element<'a, Message, aura::Theme, Renderer>>,
+    ) -> Option<Image>
+    where
+        Message: 'a,
+    {
+        use aura_core::theme::Base as _;
+
+        // Both the clear colour and the text colour come from the theme,
+        // exactly as `aura_winit` derives them for a real window. Using
+        // `Style::default()` means black text, which against the default
+        // black clear renders an invisible, entirely plausible-looking blank.
+        let base = theme.base();
+
+        let mut renderer = aura_futures::futures::executor::block_on(
+            <Renderer as aura_core::renderer::Headless>::new(
+                aura_core::renderer::Settings::default(),
+                Some("tiny-skia"),
+            ),
+        )?;
+
+        let logical = Size::new(size.width as f32 / scale, size.height as f32 / scale);
+
+        renderer.reset(Rectangle::with_size(logical));
+
+        let mut interface = aura_runtime::UserInterface::build(
+            element.into(),
+            logical,
+            aura_runtime::user_interface::Cache::new(),
+            &mut renderer,
+        );
+
+        // `update` before `draw`, exactly as the real frame loop does. This
+        // is not ceremony: several widgets only learn their own status while
+        // handling events, and `button` resolves an unset status to
+        // `Status::Disabled` at paint time (`widget/src/button.rs`). A
+        // harness that skipped this rendered every button in the suite as
+        // greyed out -- and the goldens looked entirely plausible.
+        // A `RedrawRequested`, exactly as a real window delivers every
+        // frame. Not ceremony, and not satisfied by an empty event slice:
+        // `button` latches its paint status *only* while handling this
+        // specific event (`widget/src/button.rs`), and an unset status
+        // resolves to `Status::Disabled` at paint time. A harness that
+        // skipped it rendered every button in the suite greyed out, and the
+        // goldens looked entirely plausible -- an enabled and a disabled
+        // button were pixel identical, which is what gave it away.
+        let mut messages = Vec::new();
+
+        let _ = interface.update(
+            &aura_core::window::Headless,
+            &aura_core::shell::Waker::noop(),
+            &[aura_core::Event::Window(
+                aura_core::window::Event::RedrawRequested(aura_core::time::Instant::now()),
+            )],
+            aura_core::mouse::Cursor::Unavailable,
+            &mut renderer,
+            &mut messages,
+        );
+
+        interface.draw(
+            &mut renderer,
+            theme,
+            &aura_core::renderer::Style {
+                text_color: base.text_color,
+            },
+            aura_core::mouse::Cursor::Unavailable,
+        );
+
+        // Still in scope. See the note above.
+        let rgba = renderer.screenshot(size, scale, base.background_color);
+
+        drop(interface);
 
         Some(Image {
             width: size.width,
@@ -380,6 +517,69 @@ impl Harness {
         }
 
         Outcome::Differed(difference)
+    }
+
+    /// Writes the golden, the render, and their difference to `diffs/`.
+    ///
+    /// `.github/workflows/golden.yml` uploads that directory when the job
+    /// fails, which is the only way a reviewer can see *what* changed: a
+    /// percentage in a log tells them a case moved, not whether it moved for
+    /// a good reason. Nothing wrote there until this existed, so the
+    /// workflow's upload step had been collecting an empty directory.
+    ///
+    /// Written as binary PPM (P6) rather than PNG: no encoder dependency, no
+    /// compressor between the renderer and what a human looks at, and every
+    /// image viewer opens it.
+    pub fn write_diff(&self, case: &str, rendered: &Image) {
+        let directory = self
+            .directory
+            .parent()
+            .unwrap_or(&self.directory)
+            .join("diffs");
+
+        let _ = std::fs::create_dir_all(&directory);
+
+        let write = |suffix: &str, image: &Image| {
+            let mut bytes = format!("P6\n{} {}\n255\n", image.width, image.height).into_bytes();
+
+            bytes.extend(image.rgba.chunks_exact(4).flat_map(|pixel| &pixel[..3]));
+
+            let _ = std::fs::write(directory.join(format!("{case}.{suffix}.ppm")), bytes);
+        };
+
+        write("rendered", rendered);
+
+        let Some(golden) = self.load(case) else {
+            return;
+        };
+
+        write("golden", &golden);
+
+        if golden.width != rendered.width || golden.height != rendered.height {
+            return;
+        }
+
+        // Magenta marks every changed pixel; unchanged pixels are dimmed so
+        // the change is legible against the picture it happened in.
+        let mut marked = rendered.clone();
+
+        for (pixel, reference) in marked
+            .rgba
+            .chunks_exact_mut(4)
+            .zip(golden.rgba.chunks_exact(4))
+        {
+            if pixel[..3].iter().zip(&reference[..3]).any(|(a, b)| a != b) {
+                pixel[0] = 255;
+                pixel[1] = 0;
+                pixel[2] = 255;
+            } else {
+                for channel in &mut pixel[..3] {
+                    *channel /= 3;
+                }
+            }
+        }
+
+        write("diff", &marked);
     }
 
     /// Loads the golden for `case`.

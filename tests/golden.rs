@@ -22,3 +22,9 @@ pub mod effects;
 
 #[path = "golden/components.rs"]
 pub mod components;
+
+#[path = "golden/widget_gallery.rs"]
+pub mod widget_gallery;
+
+#[path = "golden/damage_pixels.rs"]
+pub mod damage_pixels;

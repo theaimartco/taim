@@ -275,7 +275,8 @@ React Native on identical hardware, so no comparison is claimed.
 ## Testing
 
 ```bash
-cargo test --workspace          # 1,705 tests, 0 failures
+cargo test --workspace          # 1,738 tests, 0 failures
+cargo test --test golden        # 40 pixel goldens, both themes
 ./scripts/ci/check-budgets.sh   # dependency count, binary size, unsafe, metric guards
 ```
 
