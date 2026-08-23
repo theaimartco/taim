@@ -221,3 +221,155 @@ fn a_tree_rebuilt_with_different_content_reports_no_damage() {
          partial present has a source it did not have before"
     );
 }
+
+// ── Partial present: which region is safe to confine a frame to ───────
+//
+// `Renderer::accumulate_damage` decides that. It is the part of partial
+// present that can be wrong silently: too large a region only costs work,
+// while too small a region leaves stale pixels on screen that never repaint.
+
+/// A `wgpu` renderer, or `None` when no adapter is available.
+fn gpu() -> Option<aura_wgpu::Renderer> {
+    aura_futures::futures::executor::block_on(
+        <aura_wgpu::Renderer as aura_core::renderer::Headless>::new(
+            aura_core::renderer::Settings::default(),
+            None,
+        ),
+    )
+}
+
+macro_rules! needs_gpu {
+    ($renderer:ident) => {
+        let Some(mut $renderer) = gpu() else {
+            eprintln!("skipped: no wgpu adapter available");
+            return;
+        };
+    };
+}
+
+fn area(x: f32, y: f32, w: f32, h: f32) -> aura_wgpu::graphics::damage::DamageRegion {
+    aura_wgpu::graphics::damage::DamageRegion::from_rect(aura::Rectangle {
+        x,
+        y,
+        width: w,
+        height: h,
+    })
+    .expect("a non-empty rectangle is a valid damage region")
+}
+
+const SURFACE: aura::Size<u32> = aura::Size {
+    width: 400,
+    height: 300,
+};
+
+#[test]
+fn unknown_damage_forces_a_full_redraw() {
+    needs_gpu!(renderer);
+
+    assert_eq!(
+        renderer.accumulate_damage(None, SURFACE, 3),
+        None,
+        "`None` means the runtime could not attribute damage; confining the \
+         frame to anything would be a guess"
+    );
+}
+
+#[test]
+fn full_damage_forces_a_full_redraw() {
+    needs_gpu!(renderer);
+
+    let full = aura_wgpu::graphics::damage::DamageRegion::full();
+
+    assert_eq!(renderer.accumulate_damage(Some(&full), SURFACE, 3), None);
+}
+
+#[test]
+fn a_history_shallower_than_the_swapchain_forces_a_full_redraw() {
+    needs_gpu!(renderer);
+
+    let small = area(10.0, 10.0, 20.0, 20.0);
+
+    // The first two frames cannot know what the third buffer holds.
+    assert_eq!(renderer.accumulate_damage(Some(&small), SURFACE, 3), None);
+    assert_eq!(renderer.accumulate_damage(Some(&small), SURFACE, 3), None);
+
+    assert!(
+        renderer
+            .accumulate_damage(Some(&small), SURFACE, 3)
+            .is_some(),
+        "once the history is as deep as the swapchain, every buffer's staleness \
+         is accounted for and a partial frame is safe"
+    );
+}
+
+#[test]
+fn the_region_covers_every_frame_still_stale_in_some_buffer() {
+    needs_gpu!(renderer);
+
+    // Three frames, three disjoint areas. Whichever of three buffers comes
+    // back, it is missing at most these three, so all three must be redrawn.
+    let regions = [
+        area(0.0, 0.0, 20.0, 20.0),
+        area(100.0, 100.0, 20.0, 20.0),
+        area(200.0, 40.0, 30.0, 30.0),
+    ];
+
+    let mut last = None;
+
+    for region in &regions {
+        last = renderer.accumulate_damage(Some(region), SURFACE, 3);
+    }
+
+    let union = last.expect("the third frame has a deep enough history");
+
+    assert!(
+        union.x == 0 && union.y == 0,
+        "the union must reach the earliest frame's origin, got {union:?}"
+    );
+
+    assert!(
+        union.x + union.width >= 230 && union.y + union.height >= 120,
+        "the union must reach the far corner of every frame in the history, \
+         got {union:?}; anything less leaves a buffer showing stale pixels"
+    );
+}
+
+#[test]
+fn a_union_covering_the_surface_is_reported_as_a_full_redraw() {
+    needs_gpu!(renderer);
+
+    let whole = area(0.0, 0.0, 400.0, 300.0);
+
+    for _ in 0..3 {
+        let _ = renderer.accumulate_damage(Some(&whole), SURFACE, 3);
+    }
+
+    assert_eq!(
+        renderer.accumulate_damage(Some(&whole), SURFACE, 3),
+        None,
+        "scissoring to the whole surface is a full redraw with extra steps"
+    );
+}
+
+#[test]
+fn a_full_frame_resets_the_history() {
+    needs_gpu!(renderer);
+
+    let corner = area(300.0, 200.0, 40.0, 40.0);
+
+    for _ in 0..3 {
+        let _ = renderer.accumulate_damage(Some(&corner), SURFACE, 3);
+    }
+
+    // A full redraw makes every buffer current, so nothing before it is stale.
+    assert_eq!(renderer.accumulate_damage(None, SURFACE, 3), None);
+
+    let near_origin = area(0.0, 0.0, 10.0, 10.0);
+
+    assert_eq!(
+        renderer.accumulate_damage(Some(&near_origin), SURFACE, 3),
+        None,
+        "the history restarts after a full frame, so the next frames are full \
+         again until it is deep enough"
+    );
+}
