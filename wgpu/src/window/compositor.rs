@@ -429,18 +429,47 @@ impl graphics::Compositor for Compositor {
             }
         }
 
-        // For now, wgpu does not natively expose partial-present /
-        // damage hints in its surface API. We fall back to a full
-        // present, which is always correct. When wgpu gains
-        // `set_damage_region` support, this method will forward the
-        // damage rects to the underlying platform compositor.
-        present(
+        // wgpu exposes no damage hint on its surface API, so the saving here
+        // is in what gets *rasterised*, not in what gets handed to the
+        // compositor: the render pass is scissored to the damaged region and
+        // loads the surface rather than clearing it, so undamaged pixels are
+        // neither shaded nor overwritten.
+        //
+        // Which region is safe to confine the frame to is the whole problem.
+        // A swapchain returns one of several rotating buffers, holding what
+        // was drawn to it N frames ago rather than last frame, and wgpu does
+        // not report buffer age. `Renderer::accumulate_damage` therefore
+        // redraws the union of the last N frames' damage, N being the
+        // swapchain's depth: whichever buffer comes back, everything that has
+        // changed since it was last drawn falls inside that union.
+        //
+        // It returns `None` -- a full redraw -- whenever that cannot be
+        // guaranteed: unknown damage, full-surface damage, a history not yet
+        // as deep as the swapchain, or a union that covers the surface anyway.
+        let depth = self.settings.desired_maximum_frame_latency as usize + 1;
+
+        let scissor = renderer.accumulate_damage(
+            frame_context.damage.as_ref(),
+            viewport.physical_size(),
+            depth,
+        );
+
+        renderer.set_frame_damage(scissor);
+
+        let result = present(
             renderer,
             surface,
             viewport,
             background_color,
             on_pre_present,
-        )
+        );
+
+        // Cleared unconditionally: a `present` that failed must not leave the
+        // next frame confined to a region computed for a frame that never
+        // reached the screen.
+        renderer.set_frame_damage(None);
+
+        result
     }
 
     fn screenshot(

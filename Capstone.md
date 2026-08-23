@@ -119,6 +119,40 @@ platform) — are untouched by M0 and unchanged.
 
 ---
 
+## Status — P0s, second pass (2026-08-24)
+
+| Finding | Status |
+|---|---|
+| **F-07** GPU effects were an empty stub | **Closed.** `shader/effect.wgsl` plus a real pipeline: separable Gaussian blur, 4×5 colour matrix, Rec. 709 saturation. Verified on the GPU path against pixels. |
+| **F-08** GPU damage computed then discarded | **Closed for rasterisation.** The render pass is now scissored to the damaged region and loads rather than clears, so undamaged pixels are neither shaded nor overwritten. The *bandwidth* half still needs a platform damage hint — wgpu exposes none. |
+| **F-15** Accessibility never reached a screen reader | **Closed.** `atspi::bridge` drains the semantic queue onto the bus from a thread of its own. Verified against the live accessibility bus. |
+| **F-17** No mobile platform | **Not done, and not attemptable here.** See below. |
+
+**F-08's hard part was not the scissor.** A swapchain hands back one of
+several rotating buffers, holding what was drawn to it *N* frames ago rather
+than last frame, and wgpu reports no buffer age. Confining a frame to this
+frame's damage alone would leave every other buffer showing a stale image.
+`Renderer::accumulate_damage` therefore redraws the union of the last *N*
+frames' damage, *N* being the swapchain depth, and falls back to a full
+redraw whenever that cannot be guaranteed — unknown damage, full damage, a
+history shallower than the swapchain, or a union that covers the surface
+anyway. Six tests pin those cases, because too small a region fails silently
+and permanently.
+
+**F-07 found a bug only a rendered image could show.** The horizontal and
+vertical blur passes shared one uniform slot; every `write_buffer` for a
+frame lands before any pass runs, so both read the last value written and the
+blur ran vertically twice. The numbers looked right — more intermediate
+pixels, conserved luminance — and the vertical edges stayed hard.
+
+**On F-17.** An Android backend needs the NDK, a JNI bridge, a cross-compile
+toolchain, and a device or emulator to verify against. None of that exists in
+this environment, and a mobile backend that has never been run on a phone is
+not a mobile backend. Section 5.8 and §10's M5 still describe what it takes;
+nothing here shortcuts it.
+
+---
+
 ## 0. How to read this document
 
 Every number in this document was produced by a command run against this working tree on the

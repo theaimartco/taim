@@ -111,6 +111,11 @@ pub struct Renderer {
     active_retained_frame: Option<ActiveRetainedFrame>,
     recording_retained_frame: Option<RecordingRetainedFrame>,
     retained_layer_statistics: core::renderer::RetainedLayerStatistics,
+    /// The damage of the last few frames, deep enough to cover the swapchain.
+    /// See [`Renderer::accumulate_damage`].
+    damage_history: std::collections::VecDeque<Rectangle<u32>>,
+    /// The region this frame is confined to, if it is a partial one.
+    frame_damage: Option<Rectangle<u32>>,
 
     quad: quad::State,
     triangle: triangle::State,
@@ -139,6 +144,8 @@ impl Renderer {
             active_retained_frame: None,
             recording_retained_frame: None,
             retained_layer_statistics: core::renderer::RetainedLayerStatistics::default(),
+            damage_history: std::collections::VecDeque::new(),
+            frame_damage: None,
 
             quad: quad::State::new(),
             triangle: triangle::State::new(&engine.device, &engine.triangle_pipeline),
@@ -505,7 +512,10 @@ impl Renderer {
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: match clear_color {
+                        // A partial frame must preserve what is already on
+                        // the surface: clearing would blank everything
+                        // outside the damage, which is the whole screen.
+                        load: match clear_color.filter(|_| self.frame_damage.is_none()) {
                             Some(background_color) => wgpu::LoadOp::Clear({
                                 let [r, g, b, a] =
                                     graphics::color::pack(background_color).components();
@@ -549,6 +559,13 @@ impl Renderer {
             };
 
             let Some(scissor_rect) = physical_bounds.snap() else {
+                continue;
+            };
+
+            // Nothing outside the frame's damage may be touched, so a layer
+            // that falls entirely outside it is skipped rather than drawn and
+            // scissored away.
+            let Some(scissor_rect) = intersect(scissor_rect, self.frame_damage) else {
                 continue;
             };
 
@@ -785,6 +802,99 @@ impl Renderer {
     /// of [`Renderer::draw`] to a [`wgpu::Queue`].
     pub fn recall(&mut self) {
         self.staging_belt.recall();
+    }
+
+    /// Narrows this frame to `damage`, preserving what is already on the
+    /// surface outside it.
+    ///
+    /// # Why a history rather than the frame's own damage
+    ///
+    /// A swapchain hands back one of several rotating buffers, and the one
+    /// acquired this frame holds whatever was drawn to it *N frames ago*,
+    /// not last frame. Scissoring to this frame's damage alone would leave
+    /// everything else showing a stale image.
+    ///
+    /// wgpu exposes no buffer age, so the safe construction is to redraw the
+    /// union of the last `depth` frames' damage, where `depth` is the
+    /// swapchain's length: whichever buffer comes back, everything that has
+    /// changed since it was last drawn is inside that union.
+    ///
+    /// Returns the region to redraw, or `None` when the whole surface must
+    /// be — which is what an unknown or full-surface damage means, and what
+    /// the first frames after a resize mean.
+    pub fn accumulate_damage(
+        &mut self,
+        damage: Option<&graphics::damage::DamageRegion>,
+        surface: Size<u32>,
+        depth: usize,
+    ) -> Option<Rectangle<u32>> {
+        let bounded = damage.and_then(|damage| {
+            if damage.is_full() {
+                None
+            } else {
+                damage.bounding_rect()
+            }
+        });
+
+        let Some(bounds) = bounded else {
+            // Unknown or full: the history is meaningless now, because a full
+            // redraw makes every buffer current.
+            self.damage_history.clear();
+            return None;
+        };
+
+        let region = Rectangle {
+            x: bounds.x.floor().max(0.0) as u32,
+            y: bounds.y.floor().max(0.0) as u32,
+            width: bounds.width.ceil().max(0.0) as u32,
+            height: bounds.height.ceil().max(0.0) as u32,
+        };
+
+        self.damage_history.push_back(region);
+
+        while self.damage_history.len() > depth.max(1) {
+            let _ = self.damage_history.pop_front();
+        }
+
+        // The history is not yet as deep as the swapchain, so at least one
+        // buffer has never been drawn with a partial frame. Redraw all of it.
+        if self.damage_history.len() < depth.max(1) {
+            return None;
+        }
+
+        let mut union = region;
+
+        for past in &self.damage_history {
+            let right = union.x.max(past.x + past.width).max(union.x + union.width);
+            let bottom = union
+                .y
+                .max(past.y + past.height)
+                .max(union.y + union.height);
+
+            union.x = union.x.min(past.x);
+            union.y = union.y.min(past.y);
+            union.width = right - union.x;
+            union.height = bottom - union.y;
+        }
+
+        let clipped = Rectangle {
+            x: union.x.min(surface.width),
+            y: union.y.min(surface.height),
+            width: union.width.min(surface.width.saturating_sub(union.x)),
+            height: union.height.min(surface.height.saturating_sub(union.y)),
+        };
+
+        // A union that covers the surface is a full redraw with extra steps.
+        if clipped.width >= surface.width && clipped.height >= surface.height {
+            return None;
+        }
+
+        (clipped.width > 0 && clipped.height > 0).then_some(clipped)
+    }
+
+    /// Sets the scissor every layer in the next frame is clipped to.
+    pub fn set_frame_damage(&mut self, damage: Option<Rectangle<u32>>) {
+        self.frame_damage = damage;
     }
 
     /// Submits an effect node to the current layer's effect graph.
@@ -1207,4 +1317,26 @@ impl renderer::Headless for Renderer {
             background_color,
         )
     }
+}
+
+/// Intersects a scissor rectangle with the frame's damage, if any.
+///
+/// Returns `None` when they do not overlap, which means the layer has nothing
+/// to contribute to this frame and can be skipped outright.
+fn intersect(scissor: Rectangle<u32>, damage: Option<Rectangle<u32>>) -> Option<Rectangle<u32>> {
+    let Some(damage) = damage else {
+        return Some(scissor);
+    };
+
+    let x = scissor.x.max(damage.x);
+    let y = scissor.y.max(damage.y);
+    let right = (scissor.x + scissor.width).min(damage.x + damage.width);
+    let bottom = (scissor.y + scissor.height).min(damage.y + damage.height);
+
+    (right > x && bottom > y).then(|| Rectangle {
+        x,
+        y,
+        width: right - x,
+        height: bottom - y,
+    })
 }
