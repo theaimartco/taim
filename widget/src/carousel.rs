@@ -467,7 +467,10 @@ where
 
                 swipe.current = *position;
 
-                let elapsed = state.now.saturating_duration_since(swipe.last_at).as_secs_f32();
+                let elapsed = state
+                    .now
+                    .saturating_duration_since(swipe.last_at)
+                    .as_secs_f32();
 
                 if elapsed > 0.0 {
                     swipe.velocity = (position.x - swipe.last.x) / elapsed;

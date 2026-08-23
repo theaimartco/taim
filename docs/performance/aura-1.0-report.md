@@ -1,21 +1,37 @@
 # Aura 1.0 Performance Report
 
-## Methodology
-Frame times, memory usage, and CPU utilization were measured during typical workloads. Each test was run for 60 seconds after a warm-up phase.
+**Not yet measured.**
 
-## Hardware
-- Device: VYOM Reference Hardware
-- CPU: 8-core ARM64
-- RAM: 8GB
-- GPU: Vulkan-compatible mobile GPU
+This document previously reported frame times for scenes named "Launcher
+Scroll", "Settings Navigation", and "Complex Grid" on "VYOM Reference
+Hardware, 8-core ARM64". None of those existed: no such device is registered
+in `benchmarks/devices.toml`, no ARM64 run is committed under
+`benchmarks/baseline/`, and `tools/aura_bench/src/scenes/` defines no scene by
+any of those names. The numbers had no provenance and have been removed
+rather than corrected. See `Capstone.md` F-05.
 
-## Results by Scene
-- **Launcher Scroll**: 60fps solid, 2ms frame time.
-- **Settings Navigation**: 60fps solid, 1.5ms frame time.
-- **Complex Grid**: 60fps, 3ms frame time.
+## What is actually measured
 
-## Comparison
-(Insert benchmark data from compare-frameworks.sh vs Qt/Flutter)
+The 13 committed scene baselines under `benchmarks/baseline/`, reproducible
+with:
 
-## Limitations
-- Large static SVGs currently cause minor frame drops on initial load.
+```bash
+scripts/perf/run-baseline.sh --device <name from benchmarks/devices.toml>
+```
+
+Read them with `docs/performance/methodology.md`, which defines what the
+frame-cost metric does and does not include.
+
+## What is not measured
+
+- **Any comparison against Flutter, React Native, or Qt.**
+  `benchmarks/competitors/` states the rules such a comparison must follow and
+  contains no results. See `Capstone.md` §11.
+- **Cold start**, **energy draw**, and **steady-state application memory** —
+  the three axes on which a framework with no garbage collector should win,
+  and on which Aura currently has no evidence at all.
+- **Anything on VYOM target hardware.** Every committed baseline comes from a
+  development machine.
+
+This file will report results when there are results. Until then it reports
+that there are none, which is the only honest thing it can say.

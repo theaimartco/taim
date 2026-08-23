@@ -1165,33 +1165,39 @@ async fn run_instance<P>(
                                 continue;
                             }
 
-                            let interface = user_interfaces.get_mut(&id).expect("Get user interface");
+                            let interface =
+                                user_interfaces.get_mut(&id).expect("Get user interface");
                             let cursor = window.state.cursor();
                             let now = Instant::now();
 
                             for event in &window_events {
-                                let path = event.to_pointer(cursor.position(), now).and_then(|pointer| {
-                                    if pointer.phase == crate::core::pointer::Phase::Down {
-                                        window.hit_test_index.as_mut()?.hit_test(&mut interface.visit(), pointer.position)
-                                    } else {
-                                        None
-                                    }
-                                });
+                                let path =
+                                    event
+                                        .to_pointer(cursor.position(), now)
+                                        .and_then(|pointer| {
+                                            if pointer.phase == crate::core::pointer::Phase::Down {
+                                                window.hit_test_index.as_mut()?.hit_test(
+                                                    &mut interface.visit(),
+                                                    pointer.position,
+                                                )
+                                            } else {
+                                                None
+                                            }
+                                        });
 
                                 let _ = interface.route_pointer(event, cursor, now, || {
                                     path.map(|p| (p, aura_gesture::arena::Arena::new()))
                                 });
                             }
 
-                            let (ui_state, statuses) = interface
-                                .update(
-                                    &window.raw,
-                                    &window.waker,
-                                    &window_events,
-                                    cursor,
-                                    &mut window.renderer,
-                                    &mut messages,
-                                );
+                            let (ui_state, statuses) = interface.update(
+                                &window.raw,
+                                &window.waker,
+                                &window_events,
+                                cursor,
+                                &mut window.renderer,
+                                &mut messages,
+                            );
 
                             #[cfg(feature = "unconditional-rendering")]
                             window.request_redraw(window::RedrawRequest::NextFrame);

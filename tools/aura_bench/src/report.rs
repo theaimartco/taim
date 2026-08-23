@@ -116,6 +116,23 @@ impl Environment {
         }
     }
 
+    /// The suffix `build.rs` appends to `git_commit` when the worktree
+    /// that produced this binary had uncommitted changes.
+    pub const DIRTY_SUFFIX: &'static str = "-dirty";
+
+    /// Whether this report was produced from a worktree with uncommitted
+    /// changes.
+    ///
+    /// A `-dirty` report names a commit that does **not** describe the
+    /// sources that were measured, so nobody -- including its author --
+    /// can reconstruct the tree it came from. That makes it useless as a
+    /// baseline, which is why `--save` refuses one by default.
+    pub fn is_dirty(&self) -> bool {
+        self.git_commit
+            .as_deref()
+            .is_some_and(|commit| commit.ends_with(Self::DIRTY_SUFFIX))
+    }
+
     /// Names the identity fields that could not be determined.
     ///
     /// An empty slice means the report can be attributed to a specific

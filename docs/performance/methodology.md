@@ -148,8 +148,14 @@ baseline rather than an ad hoc local run.
 
 `--save` refuses to write a report whose `git_commit`, `rustc_version`,
 or `device` could not be determined, so an unattributable run never
-reaches `benchmarks/baseline/`. `benchmarks/baseline/README.md` records
-why that directory is currently empty and what has to happen to fill it.
+reaches `benchmarks/baseline/`. It also refuses a report captured from a
+worktree with uncommitted changes: a `-dirty` commit names a tree nobody
+can reconstruct, so the run cannot be reproduced. `--allow-unidentified`
+and `--allow-dirty` opt out of those checks respectively, and a report
+saved with either must not be committed as a baseline.
+
+`benchmarks/baseline/README.md` records what is currently checked in and
+on what hardware.
 
 ## Known limitation: P95 stability on an unpinned development machine
 
@@ -159,6 +165,16 @@ CPU frequency governor at `powersave`, not `performance` --
 `scripts/perf/run-baseline.sh` warned about exactly this and did not (and
 should not, without explicit authorization) change a system-wide governor
 setting itself.
+
+> **Units note.** The figures in this section were recorded when the
+> headline metric still included `present` -- the harness's
+> `Renderer::screenshot` readback, a near-constant ~2.5 ms regardless of
+> scene content. That readback was later excluded (it measures the
+> harness, not the framework), so today's `frame_time` for the same scene
+> is microseconds, not milliseconds. **The spread analysed below is the
+> finding that matters and it still stands; the absolute values describe
+> the older, readback-inclusive metric and are kept only so the reasoning
+> can be followed.** See `Capstone.md` F-06.
 
 Re-running `text_heavy` against its saved baseline on this machine
 produced P95 values ranging from ~2.44 ms to ~3.56 ms across otherwise

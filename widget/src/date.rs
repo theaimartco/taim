@@ -99,10 +99,7 @@ impl Date {
 
     /// The first day of this date's month.
     pub fn first_of_month(self) -> Self {
-        Self {
-            day: 1,
-            ..self
-        }
+        Self { day: 1, ..self }
     }
 
     /// The same day one month earlier, clamped into the shorter month.
@@ -252,17 +249,17 @@ mod tests {
             Date::new(2024, 1, 15).previous_month(),
             Date::new(2023, 12, 15)
         );
-        assert_eq!(
-            Date::new(2024, 12, 15).next_month(),
-            Date::new(2025, 1, 15)
-        );
+        assert_eq!(Date::new(2024, 12, 15).next_month(), Date::new(2025, 1, 15));
     }
 
     #[test]
     fn stepping_into_a_shorter_month_clamps_the_day() {
         // The case every naive implementation gets wrong.
         assert_eq!(Date::new(2023, 1, 31).next_month(), Date::new(2023, 2, 28));
-        assert_eq!(Date::new(2024, 3, 31).previous_month(), Date::new(2024, 2, 29));
+        assert_eq!(
+            Date::new(2024, 3, 31).previous_month(),
+            Date::new(2024, 2, 29)
+        );
     }
 
     #[test]
@@ -292,7 +289,9 @@ mod tests {
             date = if date.day < days_in_month(date.year, date.month) {
                 Date::new(date.year, date.month, date.day + 1)
             } else {
-                Date::new(date.year, date.month, 1).next_month().first_of_month()
+                Date::new(date.year, date.month, 1)
+                    .next_month()
+                    .first_of_month()
             };
 
             let current = date.weekday().index();

@@ -34,9 +34,7 @@ use crate::core::layout;
 use crate::core::mouse;
 use crate::core::renderer;
 use crate::core::widget::tree::{self, Tree};
-use crate::core::{
-    Background, Color, Element, Layout, Length, Rectangle, Size, Theme, Widget,
-};
+use crate::core::{Background, Color, Element, Layout, Length, Rectangle, Size, Theme, Widget};
 
 /// The default diameter.
 const DEFAULT_SIZE: f32 = 40.0;
@@ -190,8 +188,7 @@ where
     }
 }
 
-impl<'a, Message, Theme, Renderer> From<Avatar<'a, Theme>>
-    for Element<'a, Message, Theme, Renderer>
+impl<'a, Message, Theme, Renderer> From<Avatar<'a, Theme>> for Element<'a, Message, Theme, Renderer>
 where
     Message: 'a,
     Theme: 'a + Catalog,

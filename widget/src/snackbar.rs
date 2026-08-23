@@ -201,9 +201,7 @@ where
 
     /// Where the snackbar sits, given how far it has appeared.
     fn surface_bounds(&self, available: Size, progress: f32) -> Rectangle {
-        let width = (available.width - 2.0 * self.margin)
-            .min(MAX_WIDTH)
-            .max(0.0);
+        let width = (available.width - 2.0 * self.margin).clamp(0.0, MAX_WIDTH);
 
         let height = MIN_HEIGHT.max(self.padding.top + self.padding.bottom);
 
@@ -280,10 +278,7 @@ where
             action.as_widget_mut().layout(
                 &mut tree.children[1],
                 renderer,
-                &layout::Limits::new(
-                    Size::ZERO,
-                    Size::new(surface.width / 2.0, inner_height),
-                ),
+                &layout::Limits::new(Size::ZERO, Size::new(surface.width / 2.0, inner_height)),
             )
         });
 
@@ -657,7 +652,7 @@ fn fade(background: Background, progress: f32) -> Background {
             a: color.a * progress,
             ..color
         }),
-        other => other,
+        other @ Background::Gradient(_) => other,
     }
 }
 

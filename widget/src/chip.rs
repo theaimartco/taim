@@ -160,9 +160,7 @@ where
 
     /// The trailing region that removes the chip, if it has one.
     fn delete_bounds(&self, bounds: Rectangle) -> Option<Rectangle> {
-        if self.on_delete.is_none() {
-            return None;
-        }
+        let _ = self.on_delete.as_ref()?;
 
         // The full widget height, not the pill's: the affordance is small
         // but its target should not be.
@@ -213,19 +211,16 @@ where
         // The content is bounded by the pill, not by the taller touch
         // target: a chip's label sits inside the visible shape, and the
         // extra height exists only to be tappable.
-        let available_width = (limits.max().width
-            - self.padding.left
-            - self.padding.right
-            - delete_width)
-            .max(0.0);
+        let available_width =
+            (limits.max().width - self.padding.left - self.padding.right - delete_width).max(0.0);
 
         let content_limits =
             layout::Limits::new(Size::ZERO, Size::new(available_width, PILL_HEIGHT));
 
-        let content = self
-            .content
-            .as_widget_mut()
-            .layout(&mut tree.children[0], renderer, &content_limits);
+        let content =
+            self.content
+                .as_widget_mut()
+                .layout(&mut tree.children[0], renderer, &content_limits);
 
         let content_size = content.size();
 
@@ -579,15 +574,18 @@ mod tests {
         height: TOUCH_HEIGHT,
     };
 
+    // The fixture must itself be at least a touch target, or the centring
+    // assertion below proves nothing. Constant, so check it at compile time.
+    const _: () = assert!(
+        BOUNDS.height >= 48.0,
+        "the test fixture must occupy a full touch target"
+    );
+
     #[test]
     fn the_pill_is_centred_inside_a_full_touch_target() {
         let pill = chip().pill_bounds(BOUNDS);
 
         assert_eq!(pill.height, PILL_HEIGHT);
-        assert!(
-            BOUNDS.height >= 48.0,
-            "the widget must occupy a full touch target"
-        );
         assert_eq!(
             pill.y - BOUNDS.y,
             BOUNDS.y + BOUNDS.height - (pill.y + pill.height),

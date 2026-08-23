@@ -222,8 +222,10 @@ where
 
     /// Which section's header, if any, a position landed on.
     fn header_at(&self, layout: Layout<'_>, position: Point) -> Option<usize> {
-        (0..self.sections.len())
-            .find(|index| self.header_bounds(layout, *index).is_some_and(|header| header.contains(position)))
+        (0..self.sections.len()).find(|index| {
+            self.header_bounds(layout, *index)
+                .is_some_and(|header| header.contains(position))
+        })
     }
 }
 

@@ -1011,10 +1011,12 @@ fn the_touch_target_policy_has_exactly_one_source() {
         MIN_TOUCH_TARGET_COMPATIBILITY,
         aura_core::touch::MIN_TARGET_COMPATIBILITY
     );
-    assert!(
-        MIN_TOUCH_TARGET_COMPATIBILITY < MIN_TOUCH_TARGET,
-        "the compatibility floor only makes sense as a relaxation"
-    );
+    const {
+        assert!(
+            MIN_TOUCH_TARGET_COMPATIBILITY < MIN_TOUCH_TARGET,
+            "the compatibility floor only makes sense as a relaxation"
+        );
+    }
 
     assert_eq!(TouchTargetPolicy::default(), TouchTargetPolicy::Vyom);
     assert_eq!(TouchTargetPolicy::Vyom.min_edge(), MIN_TOUCH_TARGET);

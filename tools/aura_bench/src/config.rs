@@ -67,6 +67,13 @@ pub struct Config {
     /// is indistinguishable from an attributable one at a glance, and
     /// silently becomes the number someone quotes.
     pub allow_unidentified: bool,
+    /// Permits `--save` from a worktree with uncommitted changes.
+    ///
+    /// Separate from [`Config::allow_unidentified`] on purpose: "I cannot
+    /// tell what produced this" and "I know exactly what produced this and
+    /// it is uncommitted" are different admissions, and one must not
+    /// silently grant the other.
+    pub allow_dirty: bool,
 }
 
 impl Default for Config {
@@ -85,6 +92,7 @@ impl Default for Config {
             compare_against: None,
             save_to: None,
             allow_unidentified: false,
+            allow_dirty: false,
         }
     }
 }

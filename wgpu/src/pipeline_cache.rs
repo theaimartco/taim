@@ -32,18 +32,9 @@ pub enum CachedPipeline {
     Image(crate::image::Pipeline),
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct Telemetry {
-    pub cache_hits: usize,
-    pub cache_misses: usize,
-    pub creation_time_ms: f64,
-}
-
 pub struct PipelineCache {
     pipelines: HashMap<PipelineKey, CachedPipeline>,
     access_times: HashMap<PipelineKey, Instant>,
-    telemetry: Telemetry,
-    resource_generation: u64,
     capacity: usize,
 }
 
@@ -52,8 +43,6 @@ impl PipelineCache {
         Self {
             pipelines: HashMap::new(),
             access_times: HashMap::new(),
-            telemetry: Telemetry::default(),
-            resource_generation: 0,
             capacity,
         }
     }
@@ -65,32 +54,28 @@ impl PipelineCache {
         queue: &wgpu::Queue,
     ) -> CachedPipeline {
         if let Some(pipeline) = self.pipelines.get(&key) {
-            self.telemetry.cache_hits += 1;
             let _ = self.access_times.insert(key.clone(), Instant::now());
             return pipeline.clone();
         }
 
-        self.telemetry.cache_misses += 1;
-        let start = Instant::now();
-
         let pipeline = match key.kind {
-            PipelineKind::Quad => {
-                CachedPipeline::Quad(quad::Pipeline::new(device, key.format))
-            }
+            PipelineKind::Quad => CachedPipeline::Quad(quad::Pipeline::new(device, key.format)),
             PipelineKind::Text => {
                 CachedPipeline::Text(text::Pipeline::new(device, queue, key.format))
             }
-            PipelineKind::Triangle => {
-                CachedPipeline::Triangle(triangle::Pipeline::new(device, key.format, key.antialiasing))
-            }
+            PipelineKind::Triangle => CachedPipeline::Triangle(triangle::Pipeline::new(
+                device,
+                key.format,
+                key.antialiasing,
+            )),
             #[cfg(any(feature = "image", feature = "svg"))]
             PipelineKind::Image => {
-                let backend = key.backend.expect("Backend must be provided for image pipeline");
+                let backend = key
+                    .backend
+                    .expect("Backend must be provided for image pipeline");
                 CachedPipeline::Image(crate::image::Pipeline::new(device, key.format, backend))
             }
         };
-
-        self.telemetry.creation_time_ms += start.elapsed().as_secs_f64() * 1000.0;
 
         self.evict_if_needed();
 
@@ -123,27 +108,13 @@ impl PipelineCache {
         let _ = self.get_or_create(text_key, device, queue);
     }
 
-    pub fn invalidate_all(&mut self) {
-        self.pipelines.clear();
-        self.access_times.clear();
-        self.resource_generation += 1;
-    }
-
     fn evict_if_needed(&mut self) {
-        if self.pipelines.len() >= self.capacity {
-            if let Some((lru_key, _)) = self.access_times.iter().min_by_key(|&(_, &time)| time) {
-                let key_to_remove = lru_key.clone();
-                let _ = self.pipelines.remove(&key_to_remove);
-                let _ = self.access_times.remove(&key_to_remove);
-            }
+        if self.pipelines.len() >= self.capacity
+            && let Some((lru_key, _)) = self.access_times.iter().min_by_key(|&(_, &time)| time)
+        {
+            let key_to_remove = lru_key.clone();
+            let _ = self.pipelines.remove(&key_to_remove);
+            let _ = self.access_times.remove(&key_to_remove);
         }
-    }
-
-    pub fn telemetry(&self) -> &Telemetry {
-        &self.telemetry
-    }
-
-    pub fn resource_generation(&self) -> u64 {
-        self.resource_generation
     }
 }

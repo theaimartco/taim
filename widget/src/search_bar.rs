@@ -175,7 +175,6 @@ where
         self.class = (Box::new(style) as StyleFn<'a, Theme>).into();
         self
     }
-
 }
 
 impl<Message, Theme, Renderer> SearchBar<'_, Message, Theme, Renderer>
@@ -232,9 +231,7 @@ where
         tree.diff_children_custom(
             std::slice::from_mut(&mut self.input),
             |input_tree, input| Widget::diff(input, input_tree),
-            |input| {
-                Tree::new(input as &dyn Widget<Message, Theme, Renderer>)
-            },
+            |input| Tree::new(input as &dyn Widget<Message, Theme, Renderer>),
         );
     }
 
@@ -260,12 +257,9 @@ where
             0.0
         };
 
-        let input_width = (bar.width
-            - self.padding.left
-            - self.padding.right
-            - AFFORDANCE_WIDTH
-            - clear_width)
-            .max(0.0);
+        let input_width =
+            (bar.width - self.padding.left - self.padding.right - AFFORDANCE_WIDTH - clear_width)
+                .max(0.0);
 
         let input_height = (bar.height - self.padding.top - self.padding.bottom).max(0.0);
 

@@ -34,8 +34,7 @@ use crate::core::renderer;
 use crate::core::touch;
 use crate::core::widget::tree::{self, Tree};
 use crate::core::{
-    Background, Color, Element, Event, Layout, Length, Point, Rectangle, Shell, Size, Theme,
-    Widget,
+    Background, Color, Element, Event, Layout, Length, Point, Rectangle, Shell, Size, Theme, Widget,
 };
 
 /// The height of one selectable row.
@@ -149,7 +148,9 @@ where
 
     /// Every minute this picker can produce.
     pub fn minutes(&self) -> Vec<u32> {
-        (0..MINUTES_PER_HOUR).step_by(self.minute_step as usize).collect()
+        (0..MINUTES_PER_HOUR)
+            .step_by(self.minute_step as usize)
+            .collect()
     }
 
     /// Every hour this picker can produce.

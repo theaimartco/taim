@@ -105,7 +105,8 @@ where
     }
 }
 
-impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer> for Tab<'_, Message, Theme, Renderer>
+impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
+    for Tab<'_, Message, Theme, Renderer>
 where
     Message: Clone,
     Renderer: crate::core::Renderer,
@@ -489,10 +490,11 @@ where
             .zip(tree.children.iter_mut())
             .enumerate()
             .map(|(index, (tab, tab_tree))| {
-                tab.layout(tab_tree, renderer, &cell_limits).move_to(Point::new(
-                    self.padding.left + index as f32 * cell_width,
-                    self.padding.top,
-                ))
+                tab.layout(tab_tree, renderer, &cell_limits)
+                    .move_to(Point::new(
+                        self.padding.left + index as f32 * cell_width,
+                        self.padding.top,
+                    ))
             })
             .collect();
 
@@ -590,7 +592,9 @@ where
             .zip(tree.children.iter_mut())
             .zip(layout.children())
         {
-            tab.update(tab_tree, event, tab_layout, cursor, renderer, shell, viewport);
+            tab.update(
+                tab_tree, event, tab_layout, cursor, renderer, shell, viewport,
+            );
 
             if shell.is_event_captured() {
                 return;
@@ -645,7 +649,9 @@ where
             .zip(tree.children.iter())
             .zip(layout.children())
         {
-            tab.draw(tab_tree, renderer, theme, style, tab_layout, cursor, viewport);
+            tab.draw(
+                tab_tree, renderer, theme, style, tab_layout, cursor, viewport,
+            );
         }
 
         // The indicator is drawn last and positioned from the animation,

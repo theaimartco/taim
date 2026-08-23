@@ -105,7 +105,8 @@ where
     }
 }
 
-impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer> for Item<'_, Message, Theme, Renderer>
+impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
+    for Item<'_, Message, Theme, Renderer>
 where
     Message: Clone,
     Renderer: crate::core::Renderer,
@@ -490,8 +491,7 @@ where
             inner.width / self.items.len() as f32
         };
 
-        let cell_limits =
-            layout::Limits::new(Size::ZERO, Size::new(cell_width, inner.height));
+        let cell_limits = layout::Limits::new(Size::ZERO, Size::new(cell_width, inner.height));
 
         let children = self
             .items
@@ -499,12 +499,11 @@ where
             .zip(tree.children.iter_mut())
             .enumerate()
             .map(|(index, (item, item_tree))| {
-                item.layout(item_tree, renderer, &cell_limits).move_to(
-                    Point::new(
+                item.layout(item_tree, renderer, &cell_limits)
+                    .move_to(Point::new(
                         self.padding.left + index as f32 * cell_width,
                         self.padding.top,
-                    ),
-                )
+                    ))
             })
             .collect();
 
