@@ -63,14 +63,8 @@ const DEFAULT_HEIGHT: f32 = 48.0;
 /// region. Equal so the field itself stays optically centred.
 const AFFORDANCE_WIDTH: f32 = 44.0;
 
-/// The radius of the drawn magnifier.
-const GLYPH_RADIUS: f32 = 5.0;
-
-/// The stroke weight of the drawn glyphs.
-const GLYPH_STROKE: f32 = 1.5;
-
-/// The arm length of the drawn clear cross.
-const CLEAR_ARM: f32 = 11.0;
+/// The rendered size of the leading and trailing glyphs.
+const GLYPH_SIZE: f32 = 18.0;
 
 /// A search field with a leading glyph and a clear affordance.
 #[allow(missing_debug_implementations)]
@@ -424,7 +418,13 @@ where
             appearance.background,
         );
 
-        draw_magnifier(renderer, self.glyph_bounds(bounds), appearance.glyph_color);
+        draw_glyph(
+            renderer,
+            self.glyph_bounds(bounds),
+            crate::icon::Icon::SEARCH,
+            appearance.glyph_color,
+            viewport,
+        );
 
         if let Some(input_layout) = layout.children().next() {
             Widget::draw(
@@ -440,7 +440,13 @@ where
         }
 
         if let Some(clear) = self.clear_bounds(bounds) {
-            draw_cross(renderer, clear, appearance.glyph_color);
+            draw_glyph(
+                renderer,
+                clear,
+                crate::icon::Icon::CLOSE,
+                appearance.glyph_color,
+                viewport,
+            );
         }
     }
 
@@ -465,85 +471,48 @@ where
     }
 }
 
-/// Draws a magnifier from quads.
+/// Draws one icon-font glyph, centred in `bounds`.
 ///
-/// Drawn rather than set as text so a search bar does not depend on an
-/// icon font being installed to be recognisable -- the software
-/// fallback and headless tests have no font loader at all.
-fn draw_magnifier<Renderer>(renderer: &mut Renderer, bounds: Rectangle, color: Color)
-where
-    Renderer: crate::core::Renderer,
+/// These used to be assembled from quads, on the reasoning that "a search
+/// bar should not depend on an icon font being installed -- the software
+/// fallback and headless tests have no font loader at all". That is not
+/// true: `Aura-Icons.ttf` is compiled into the binary and loaded
+/// unconditionally by the text stack, and the software renderer draws it
+/// exactly as the GPU one does -- which the golden suite now proves on every
+/// run.
+///
+/// It was also not working. The magnifier's lens was a 10px ring that read
+/// as a dot, and the clear affordance was a vertical and a horizontal bar,
+/// which is a **plus sign** -- an "add" glyph on a control whose job is to
+/// erase. Both are now the same glyphs every other control uses.
+fn draw_glyph<Renderer>(
+    renderer: &mut Renderer,
+    bounds: Rectangle,
+    glyph: crate::icon::Icon,
+    color: Color,
+    viewport: &Rectangle,
+) where
+    Renderer: crate::core::text::Renderer,
 {
-    let centre = Point::new(
-        bounds.x + bounds.width / 2.0,
-        bounds.y + bounds.height / 2.0,
-    );
-
-    // The lens: a ring, drawn as a circle with a transparent fill and a
-    // stroked border.
-    renderer.fill_quad(
-        renderer::Quad {
-            bounds: Rectangle {
-                x: centre.x - GLYPH_RADIUS,
-                y: centre.y - GLYPH_RADIUS - 1.0,
-                width: GLYPH_RADIUS * 2.0,
-                height: GLYPH_RADIUS * 2.0,
-            },
-            border: Border {
-                radius: GLYPH_RADIUS.into(),
-                width: GLYPH_STROKE,
-                color,
-            },
-            ..renderer::Quad::default()
+    renderer.fill_text(
+        crate::core::text::Text {
+            content: glyph.codepoint().to_string(),
+            // Same font file as `icon::FONT`, but typed as `Renderer::Font`.
+            font: Renderer::ICON_FONT,
+            size: crate::core::Pixels(GLYPH_SIZE),
+            line_height: crate::core::text::LineHeight::default(),
+            bounds: bounds.size(),
+            align_x: crate::core::text::Alignment::Center,
+            align_y: crate::core::alignment::Vertical::Center,
+            shaping: crate::core::text::Shaping::Basic,
+            wrapping: crate::core::text::Wrapping::None,
+            ellipsis: crate::core::text::Ellipsis::default(),
+            hint_factor: None,
         },
-        Background::Color(Color::TRANSPARENT),
+        bounds.center(),
+        color,
+        *viewport,
     );
-
-    // The handle, running down and to the right of the lens.
-    renderer.fill_quad(
-        renderer::Quad {
-            bounds: Rectangle {
-                x: centre.x + GLYPH_RADIUS - 1.0,
-                y: centre.y + GLYPH_RADIUS - 1.0,
-                width: GLYPH_STROKE,
-                height: 5.0,
-            },
-            ..renderer::Quad::default()
-        },
-        Background::Color(color),
-    );
-}
-
-/// Draws a clear cross from two quads.
-fn draw_cross<Renderer>(renderer: &mut Renderer, bounds: Rectangle, color: Color)
-where
-    Renderer: crate::core::Renderer,
-{
-    let centre = Point::new(
-        bounds.x + bounds.width / 2.0,
-        bounds.y + bounds.height / 2.0,
-    );
-
-    for vertical in [false, true] {
-        let (width, height) = if vertical {
-            (GLYPH_STROKE, CLEAR_ARM)
-        } else {
-            (CLEAR_ARM, GLYPH_STROKE)
-        };
-
-        renderer.fill_quad(
-            renderer::Quad {
-                bounds: Rectangle {
-                    x: centre.x - width / 2.0,
-                    y: centre.y - height / 2.0,
-                    width,
-                    height,
-                },
-                ..renderer::Quad::default()
-            },
-            Background::Color(color),
-        );
-    }
 }
 
 impl<'a, Message, Theme, Renderer> From<SearchBar<'a, Message, Theme, Renderer>>
