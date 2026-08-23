@@ -40,6 +40,13 @@ struct Queued {
     effect: Effect,
     /// In physical texels, clipped to the surface.
     region: Rectangle<u32>,
+    /// The layer that submitted it.
+    ///
+    /// A backdrop effect must run at *its own* layer -- before that layer
+    /// draws and after every layer beneath it has. Without this, the first
+    /// layer with any backdrop effect would run all of them, frosting a page
+    /// that had not been drawn yet.
+    layer: usize,
 }
 
 /// The uniform block shared by every effect pass.
@@ -116,7 +123,98 @@ struct Targets {
 enum Kind {
     Blur,
     ColorMatrix,
+    Noise,
     Blit,
+    Mask,
+}
+
+/// The mask atlas.
+///
+/// One layer per mask rather than a packed 2D atlas: a mask is addressed in
+/// its own 0..1 space by [`Kind::Mask`], so packing would mean carrying each
+/// slot's rectangle through the uniform block to unpack it again. Layers cost
+/// a fixed footprint per mask and keep the shader's addressing trivial.
+#[derive(Clone)]
+struct Masks {
+    texture: wgpu::Texture,
+    /// One view per slot; index is the slot handed to the caller.
+    views: Vec<wgpu::TextureView>,
+    layout: wgpu::BindGroupLayout,
+}
+
+impl Masks {
+    /// The edge length of every mask layer.
+    ///
+    /// Fixed, and sampled with linear filtering, so a caller's mask is scaled
+    /// to the region it clips rather than the region being constrained to the
+    /// mask's resolution.
+    const SIZE: u32 = 256;
+
+    /// How many masks the atlas holds.
+    ///
+    /// A hard ceiling rather than a growing allocation: `phase.md` requires
+    /// that no effect can trigger unbounded texture allocation, and a mask
+    /// arrives from application code.
+    const SLOTS: u32 = 16;
+
+    fn new(device: &wgpu::Device) -> Self {
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("aura_wgpu.effect.mask_atlas"),
+            size: wgpu::Extent3d {
+                width: Self::SIZE,
+                height: Self::SIZE,
+                depth_or_array_layers: Self::SLOTS,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+
+        let views = (0..Self::SLOTS)
+            .map(|slot| {
+                texture.create_view(&wgpu::TextureViewDescriptor {
+                    label: Some("aura_wgpu.effect.mask_slot"),
+                    dimension: Some(wgpu::TextureViewDimension::D2),
+                    base_array_layer: slot,
+                    array_layer_count: Some(1),
+                    ..wgpu::TextureViewDescriptor::default()
+                })
+            })
+            .collect();
+
+        // Source *and* mask, because the portability floor allows only two
+        // bind groups and group 0 is the uniforms.
+        let entry = wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                view_dimension: wgpu::TextureViewDimension::D2,
+                multisampled: false,
+            },
+            count: None,
+        };
+
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("aura_wgpu.effect.mask_layout"),
+            entries: &[
+                entry,
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    ..entry
+                },
+            ],
+        });
+
+        Self {
+            texture,
+            views,
+            layout,
+        }
+    }
 }
 
 pub struct Pipeline {
@@ -126,12 +224,20 @@ pub struct Pipeline {
     texture_layout: wgpu::BindGroupLayout,
     blur: wgpu::RenderPipeline,
     color_matrix: wgpu::RenderPipeline,
+    noise: wgpu::RenderPipeline,
     blit: wgpu::RenderPipeline,
+    mask: wgpu::RenderPipeline,
+    /// The mask atlas, and the slots handed out of it.
+    masks: Masks,
     uniforms: wgpu::Buffer,
     /// How many uniform slots `uniforms` currently holds.
     capacity: u64,
     targets: Option<Targets>,
-    queued: Vec<Queued>,
+    /// Effects that read what is *behind* a layer, applied before the layer
+    /// draws over them.
+    backdrop: Vec<Queued>,
+    /// Effects that read the layer itself, applied after it draws.
+    foreground: Vec<Queued>,
 }
 
 impl Clone for Pipeline {
@@ -148,11 +254,15 @@ impl Clone for Pipeline {
             texture_layout: self.texture_layout.clone(),
             blur: self.blur.clone(),
             color_matrix: self.color_matrix.clone(),
+            noise: self.noise.clone(),
             blit: self.blit.clone(),
+            mask: self.mask.clone(),
+            masks: self.masks.clone(),
             uniforms: self.uniforms.clone(),
             capacity: self.capacity,
             targets: None,
-            queued: Vec::new(),
+            backdrop: Vec::new(),
+            foreground: Vec::new(),
         }
     }
 }
@@ -219,7 +329,12 @@ impl Pipeline {
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("../shader/effect.wgsl"))),
         });
 
-        let build = |label: &str, entry: &str| {
+        // `blend` matters most for the write-back. An effect's result
+        // *replaces* its region: a mask that erased a pixel, or a blur whose
+        // edge went transparent, must not blend over the original and leave
+        // it showing through. Intermediate passes clear their target first,
+        // so their blend mode never comes into play.
+        let build_with = |label: &str, entry: &str, blend: Option<wgpu::BlendState>| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(label),
                 layout: Some(&layout),
@@ -235,7 +350,7 @@ impl Pipeline {
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format,
-                        blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+                        blend,
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
                 }),
@@ -246,6 +361,50 @@ impl Pipeline {
                 cache: None,
             })
         };
+
+        let build = |label: &str, entry: &str| {
+            build_with(
+                label,
+                entry,
+                Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+            )
+        };
+
+        let masks = Masks::new(device);
+
+        // Its own pipeline layout, carrying the mask atlas as group 2, so no
+        // other pass pays for a binding it never reads.
+        let mask_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("aura_wgpu.effect.mask_pipeline_layout"),
+            bind_group_layouts: &[Some(&uniform_layout), Some(&masks.layout)],
+            immediate_size: 0,
+        });
+
+        let mask = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("aura_wgpu.effect.mask"),
+            layout: Some(&mask_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_mask"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format,
+                    blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
 
         let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("aura_wgpu.effect.uniforms"),
@@ -261,11 +420,16 @@ impl Pipeline {
             texture_layout,
             blur: build("aura_wgpu.effect.blur", "fs_blur"),
             color_matrix: build("aura_wgpu.effect.color_matrix", "fs_color_matrix"),
-            blit: build("aura_wgpu.effect.blit", "fs_blit"),
+            noise: build("aura_wgpu.effect.noise", "fs_noise"),
+            // Replace, not blend: see `build_with`.
+            blit: build_with("aura_wgpu.effect.blit", "fs_blit", None),
+            mask,
+            masks,
             uniforms,
             capacity: 24,
             targets: None,
-            queued: Vec::new(),
+            backdrop: Vec::new(),
+            foreground: Vec::new(),
         }
     }
 
@@ -278,6 +442,7 @@ impl Pipeline {
     pub fn prepare(
         &mut self,
         device: &wgpu::Device,
+        layer: usize,
         graph: &Graph,
         source: Rectangle,
         surface: Rectangle,
@@ -302,13 +467,24 @@ impl Pipeline {
                 continue;
             }
 
-            self.queued.push(Queued {
+            let queued = Queued {
                 effect: *effect,
                 region,
-            });
+                layer,
+            };
+
+            // A backdrop effect reads what is *behind* its layer, so it has
+            // to run before that layer draws over it. Everything else reads
+            // the layer and runs after. Splitting here rather than at render
+            // time keeps the ordering decision in one place.
+            if matches!(effect, Effect::BackdropBlur(_)) {
+                self.backdrop.push(queued);
+            } else {
+                self.foreground.push(queued);
+            }
         }
 
-        if self.queued.is_empty() {
+        if self.backdrop.is_empty() && self.foreground.is_empty() {
             return;
         }
 
@@ -316,7 +492,41 @@ impl Pipeline {
         self.ensure_uniform_capacity(device);
     }
 
-    /// Applies every queued effect to `frame`, then clears the queue.
+    /// Whether `layer` has backdrop effects waiting.
+    pub fn has_backdrop(&self, layer: usize) -> bool {
+        self.backdrop.iter().any(|queued| queued.layer == layer)
+    }
+
+    /// Applies the effects that read what is behind a layer.
+    ///
+    /// Must be called *before* the layer's own primitives are recorded: a
+    /// backdrop blur frosts the page behind a sheet, and running it after the
+    /// sheet has drawn would blur the sheet instead.
+    #[allow(clippy::too_many_arguments)]
+    pub fn render_backdrop(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        frame: &wgpu::Texture,
+        target: (u32, u32),
+        layer: usize,
+    ) {
+        let mut mine = Vec::new();
+
+        self.backdrop.retain(|queued| {
+            if queued.layer == layer {
+                mine.push(*queued);
+                false
+            } else {
+                true
+            }
+        });
+
+        self.apply(device, queue, encoder, frame, target, &mine);
+    }
+
+    /// Applies the effects that read the layer itself, then clears the queue.
     pub fn render(
         &mut self,
         device: &wgpu::Device,
@@ -325,17 +535,31 @@ impl Pipeline {
         frame: &wgpu::Texture,
         target: (u32, u32),
     ) {
-        if self.queued.is_empty() {
+        let queued = std::mem::take(&mut self.foreground);
+
+        self.apply(device, queue, encoder, frame, target, &queued);
+    }
+
+    /// Runs `queued` against `frame`.
+    #[allow(clippy::too_many_arguments)]
+    fn apply(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        frame: &wgpu::Texture,
+        target: (u32, u32),
+        queued: &[Queued],
+    ) {
+        if queued.is_empty() {
             return;
         }
 
         let Some(targets) = &self.targets else {
-            self.queued.clear();
             return;
         };
 
         let frame_view = frame.create_view(&wgpu::TextureViewDescriptor::default());
-        let queued = std::mem::take(&mut self.queued);
 
         for (index, item) in queued.iter().enumerate() {
             let base = index as u64 * Uniforms::SLOTS_PER_EFFECT * Uniforms::STRIDE;
@@ -405,6 +629,7 @@ impl Pipeline {
                             &targets.views[destination],
                             slot,
                             true,
+                            None,
                         );
 
                         source = destination;
@@ -422,6 +647,7 @@ impl Pipeline {
                         &targets.views[1],
                         base,
                         true,
+                        None,
                     );
 
                     source = 1;
@@ -438,20 +664,92 @@ impl Pipeline {
                         &targets.views[1],
                         base,
                         true,
+                        None,
                     );
 
                     source = 1;
                 }
-                // Shadow bounds are already handled by the quad pipeline's
-                // own shadow, mask is a clip rather than a colour operation,
-                // and noise needs a source of randomness this pass does not
-                // carry. Each is queued and skipped rather than silently
-                // dropped at `prepare`, so `Graph` stays the one place that
-                // decides what an effect costs.
-                Effect::Shadow(_)
-                | Effect::Noise(_)
-                | Effect::Mask(_)
-                | Effect::BackdropBlur(_) => {
+                // Identical machinery to a foreground blur; the difference
+                // is entirely *when* it runs, which `prepare` already decided
+                // by routing it into the backdrop queue.
+                Effect::BackdropBlur(backdrop) => {
+                    uniforms.params[0] = backdrop.radius;
+
+                    for (pass, direction) in [(0usize, [1.0, 0.0]), (1, [0.0, 1.0])] {
+                        let slot = base + pass as u64 * Uniforms::STRIDE;
+
+                        uniforms.step[2] = direction[0];
+                        uniforms.step[3] = direction[1];
+
+                        queue.write_buffer(&self.uniforms, slot, bytemuck::bytes_of(&uniforms));
+
+                        let destination = 1 - source;
+
+                        self.pass(
+                            device,
+                            encoder,
+                            Kind::Blur,
+                            &targets.views[source],
+                            &targets.views[destination],
+                            slot,
+                            true,
+                            None,
+                        );
+
+                        source = destination;
+                    }
+                }
+                Effect::Noise(noise) => {
+                    // Fixed amplitude: `Noise` carries only a seed, and grain
+                    // a user can see *as* grain is a bug in a UI. This is
+                    // enough to break up the banding a wide gradient or a
+                    // heavy blur produces, and no more.
+                    uniforms.params[1] = 0.02;
+                    uniforms.params[2] = f32::from_bits(noise.seed);
+
+                    queue.write_buffer(&self.uniforms, base, bytemuck::bytes_of(&uniforms));
+
+                    self.pass(
+                        device,
+                        encoder,
+                        Kind::Noise,
+                        &targets.views[0],
+                        &targets.views[1],
+                        base,
+                        true,
+                        None,
+                    );
+
+                    source = 1;
+                }
+                Effect::Mask(mask) => {
+                    // A slot nobody uploaded to would clip everything to
+                    // whatever the atlas happened to contain. Skipping is the
+                    // only safe reading of an out-of-range slot.
+                    if mask.atlas_slot >= Masks::SLOTS {
+                        continue;
+                    }
+
+                    queue.write_buffer(&self.uniforms, base, bytemuck::bytes_of(&uniforms));
+
+                    self.pass(
+                        device,
+                        encoder,
+                        Kind::Mask,
+                        &targets.views[0],
+                        &targets.views[1],
+                        base,
+                        true,
+                        Some(mask.atlas_slot),
+                    );
+
+                    source = 1;
+                }
+                // A shadow is drawn by the quad pipeline, which knows the
+                // shape casting it. Re-deriving one here from a rasterised
+                // region would give every widget a rectangle's shadow,
+                // whatever its actual outline.
+                Effect::Shadow(_) => {
                     continue;
                 }
             }
@@ -471,6 +769,7 @@ impl Pipeline {
                 &frame_view,
                 blit,
                 false,
+                None,
             );
         }
     }
@@ -486,6 +785,7 @@ impl Pipeline {
         destination: &wgpu::TextureView,
         slot: u64,
         clear: bool,
+        mask: Option<u32>,
     ) {
         let uniform_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("aura_wgpu.effect.uniform_bind_group"),
@@ -506,14 +806,34 @@ impl Pipeline {
             ],
         });
 
-        let texture_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("aura_wgpu.effect.texture_bind_group"),
-            layout: &self.texture_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(source),
-            }],
-        });
+        // The mask pipeline binds source *and* mask in group 1, so it needs
+        // its own layout; every other pass binds the source alone.
+        let texture_group = match mask {
+            Some(slot) => device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("aura_wgpu.effect.mask_bind_group"),
+                layout: &self.masks.layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(source),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(
+                            &self.masks.views[slot as usize],
+                        ),
+                    },
+                ],
+            }),
+            None => device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("aura_wgpu.effect.texture_bind_group"),
+                layout: &self.texture_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(source),
+                }],
+            }),
+        };
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("aura_wgpu.effect.pass"),
@@ -539,11 +859,14 @@ impl Pipeline {
         pass.set_pipeline(match kind {
             Kind::Blur => &self.blur,
             Kind::ColorMatrix => &self.color_matrix,
+            Kind::Noise => &self.noise,
             Kind::Blit => &self.blit,
+            Kind::Mask => &self.mask,
         });
 
         pass.set_bind_group(0, &uniform_group, &[slot as u32]);
         pass.set_bind_group(1, &texture_group, &[]);
+
         pass.draw(0..6, 0..1);
     }
 
@@ -595,7 +918,8 @@ impl Pipeline {
 
     /// Grows the uniform buffer when a frame queues more effects than it holds.
     fn ensure_uniform_capacity(&mut self, device: &wgpu::Device) {
-        let needed = self.queued.len() as u64 * Uniforms::SLOTS_PER_EFFECT;
+        let needed =
+            (self.backdrop.len() + self.foreground.len()) as u64 * Uniforms::SLOTS_PER_EFFECT;
 
         if needed <= self.capacity {
             return;
@@ -613,13 +937,66 @@ impl Pipeline {
         self.capacity = capacity;
     }
 
+    /// Uploads a coverage mask and returns the slot addressing it.
+    ///
+    /// `coverage` is one byte per pixel, row-major, `Masks::SIZE` square: 255
+    /// keeps a pixel, 0 erases it, and the values between antialias the edge.
+    /// The mask is sampled across whatever region the effect covers, so it
+    /// describes a *shape*, not a resolution.
+    ///
+    /// Returns `None` for an out-of-range slot or a wrongly sized mask.
+    pub fn upload_mask(&self, queue: &wgpu::Queue, slot: u32, coverage: &[u8]) -> Option<u32> {
+        let expected = (Masks::SIZE * Masks::SIZE) as usize;
+
+        if slot >= Masks::SLOTS || coverage.len() != expected {
+            return None;
+        }
+
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.masks.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d {
+                    x: 0,
+                    y: 0,
+                    z: slot,
+                },
+                aspect: wgpu::TextureAspect::All,
+            },
+            coverage,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(Masks::SIZE),
+                rows_per_image: Some(Masks::SIZE),
+            },
+            wgpu::Extent3d {
+                width: Masks::SIZE,
+                height: Masks::SIZE,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        Some(slot)
+    }
+
+    /// The edge length every uploaded mask must have.
+    pub const fn mask_size() -> u32 {
+        Masks::SIZE
+    }
+
+    /// How many mask slots the atlas holds.
+    pub const fn mask_slots() -> u32 {
+        Masks::SLOTS
+    }
+
     /// Releases the offscreen targets.
     ///
     /// Called when the renderer trims; a window that has stopped using
     /// effects should not hold two surface-sized textures indefinitely.
     pub fn trim(&mut self) {
         self.targets = None;
-        self.queued.clear();
+        self.backdrop.clear();
+        self.foreground.clear();
     }
 }
 

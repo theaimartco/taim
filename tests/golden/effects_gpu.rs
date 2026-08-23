@@ -194,6 +194,192 @@ fn a_zero_saturation_matrix_removes_colour() {
     );
 }
 
+#[test]
+fn noise_perturbs_a_flat_fill_without_shifting_it() {
+    needs_gpu!(renderer);
+
+    let flat = square(&mut renderer, None);
+    let grainy = square(
+        &mut renderer,
+        Some(aura_wgpu::effects::Effect::Noise(
+            aura_wgpu::effects::noise::Noise { seed: 0x5EED },
+        )),
+    );
+
+    assert_ne!(flat, grainy, "noise changed nothing at all");
+
+    // Grain is signed, so it must not move the image's overall brightness.
+    let total =
+        |rgba: &[u8]| -> u64 { rgba.chunks_exact(4).map(|pixel| u64::from(pixel[0])).sum() };
+
+    let before = total(&flat) as f64;
+    let after = total(&grainy) as f64;
+    let drift = (after - before).abs() / before;
+
+    println!("noise luminance drift: {:.3}%", drift * 100.0);
+
+    assert!(
+        drift < 0.02,
+        "noise moved total luminance by {:.2}%; the grain is not signed",
+        drift * 100.0
+    );
+}
+
+#[test]
+fn noise_is_deterministic_for_a_seed() {
+    needs_gpu!(renderer);
+
+    // The same seed must give the same grain, or a static screen shimmers.
+    let effect = |seed| {
+        Some(aura_wgpu::effects::Effect::Noise(
+            aura_wgpu::effects::noise::Noise { seed },
+        ))
+    };
+
+    let first = square(&mut renderer, effect(7));
+    let again = square(&mut renderer, effect(7));
+    let other = square(&mut renderer, effect(8));
+
+    assert_eq!(first, again, "the same seed produced different grain");
+    assert_ne!(first, other, "different seeds produced identical grain");
+}
+
+#[test]
+fn a_backdrop_blur_blurs_the_page_and_not_the_sheet() {
+    needs_gpu!(renderer);
+
+    // A hard-edged background, then an opaque "sheet" drawn over its middle
+    // with a backdrop blur. The blur must soften the background around the
+    // sheet -- what is *behind* it -- while the sheet itself stays crisp.
+    let logical = Size::new(WIDTH as f32, HEIGHT as f32);
+
+    let draw = |renderer: &mut Renderer, backdrop: bool| {
+        renderer.reset(Rectangle::with_size(logical));
+
+        // The page: a hard vertical edge down the middle of the surface.
+        renderer.fill_quad(
+            aura_core::renderer::Quad {
+                bounds: Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 64.0,
+                    height: 128.0,
+                },
+                ..Default::default()
+            },
+            Color::WHITE,
+        );
+
+        // The sheet, in a layer of its own. A backdrop effect reads what is
+        // behind *its* layer, so the page has to be in an earlier one -- put
+        // both in the same layer and the blur runs against an empty frame,
+        // which is exactly what the first version of this test did.
+        let sheet = Rectangle {
+            x: 24.0,
+            y: 32.0,
+            width: 80.0,
+            height: 64.0,
+        };
+
+        renderer.start_layer(sheet);
+
+        if backdrop {
+            assert!(
+                renderer.add_effect(
+                    aura_wgpu::effects::Effect::BackdropBlur(
+                        aura_wgpu::effects::backdrop_blur::BackdropBlur {
+                            radius: 10.0,
+                            area: 1.0,
+                        },
+                    ),
+                    aura_wgpu::graphics::quality::Tier::default(),
+                ),
+                "the tier rejected the backdrop blur"
+            );
+        }
+
+        renderer.end_layer();
+
+        let viewport = Viewport::with_physical_size(Size::new(WIDTH, HEIGHT), 1.0);
+
+        renderer.screenshot(&viewport, Color::BLACK)
+    };
+
+    let plain = draw(&mut renderer, false);
+    let frosted = draw(&mut renderer, true);
+
+    assert_ne!(plain, frosted, "the backdrop blur changed nothing at all");
+
+    println!(
+        "backdrop: plain={} frosted={} intermediate pixels",
+        intermediate(&plain),
+        intermediate(&frosted)
+    );
+
+    assert!(
+        intermediate(&frosted) > intermediate(&plain) + 100,
+        "the backdrop blur did not soften the page behind the sheet"
+    );
+}
+
+#[test]
+fn a_mask_erases_what_it_does_not_cover() {
+    needs_gpu!(renderer);
+
+    let size = Renderer::mask_size() as usize;
+
+    // Opaque on the left half, transparent on the right.
+    let mut coverage = vec![0u8; size * size];
+
+    for row in 0..size {
+        for column in 0..size / 2 {
+            coverage[row * size + column] = 255;
+        }
+    }
+
+    let slot = renderer
+        .upload_mask(0, &coverage)
+        .expect("a correctly sized mask in slot 0 must be accepted");
+
+    let masked = square(
+        &mut renderer,
+        Some(aura_wgpu::effects::Effect::Mask(
+            aura_wgpu::effects::mask::Mask { atlas_slot: slot },
+        )),
+    );
+
+    // The square spans x 32..96, so its own halves are 32..64 and 64..96.
+    let sample = |x: u32, y: u32| -> u8 { masked[((y * WIDTH + x) * 4) as usize] };
+
+    let kept = sample(40, 64);
+    let erased = sample(88, 64);
+
+    println!("mask: kept={kept} erased={erased}");
+
+    assert!(kept > 200, "the covered half was erased too, got {kept}");
+    assert!(erased < 40, "the uncovered half survived, got {erased}");
+}
+
+#[test]
+fn a_wrongly_sized_mask_is_refused() {
+    let Some(renderer) = wgpu_renderer() else {
+        eprintln!("skipped: no wgpu adapter available");
+        return;
+    };
+
+    // Silently accepting one would upload garbage into the atlas and clip
+    // every later effect to it.
+    assert_eq!(renderer.upload_mask(0, &[255; 16]), None);
+    assert_eq!(
+        renderer.upload_mask(
+            Renderer::mask_slots(),
+            &vec![255; (Renderer::mask_size() * Renderer::mask_size()) as usize],
+        ),
+        None,
+        "an out-of-range slot must be refused"
+    );
+}
+
 /// Writes the blurred square out for a human to look at.
 ///
 /// Not an assertion. The numeric tests above state properties -- more
@@ -212,6 +398,18 @@ fn dump_for_inspection() {
 
     for (name, effect) in [
         ("sharp", None),
+        (
+            "noise",
+            Some(aura_wgpu::effects::Effect::Noise(
+                aura_wgpu::effects::noise::Noise { seed: 0x5EED },
+            )),
+        ),
+        (
+            "desaturated",
+            Some(aura_wgpu::effects::Effect::Saturation(
+                aura_wgpu::effects::saturation::Saturation(0.0),
+            )),
+        ),
         (
             "blur8",
             Some(aura_wgpu::effects::Effect::Blur(
