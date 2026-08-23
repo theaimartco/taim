@@ -28,3 +28,6 @@ pub mod widget_gallery;
 
 #[path = "golden/damage_pixels.rs"]
 pub mod damage_pixels;
+
+#[path = "golden/effects_gpu.rs"]
+pub mod effects_gpu;

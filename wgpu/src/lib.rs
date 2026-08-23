@@ -185,6 +185,7 @@ impl Renderer {
         &mut self,
         clear_color: Option<Color>,
         target: &wgpu::TextureView,
+        target_texture: &wgpu::Texture,
         viewport: &Viewport,
     ) -> wgpu::CommandEncoder {
         self.metrics.reset();
@@ -197,7 +198,7 @@ impl Renderer {
                 });
 
         self.prepare(&mut encoder, viewport);
-        self.render(&mut encoder, target, clear_color, viewport);
+        self.render(&mut encoder, target, target_texture, clear_color, viewport);
 
         self.quad.trim();
         self.triangle.trim();
@@ -220,9 +221,10 @@ impl Renderer {
         clear_color: Option<Color>,
         _format: wgpu::TextureFormat,
         frame: &wgpu::TextureView,
+        frame_texture: &wgpu::Texture,
         viewport: &Viewport,
     ) -> wgpu::SubmissionIndex {
-        let encoder = self.draw(clear_color, frame, viewport);
+        let encoder = self.draw(clear_color, frame, frame_texture, viewport);
 
         self.staging_belt.finish();
         let submission = self.engine.queue.submit([encoder.finish()]);
@@ -282,7 +284,7 @@ impl Renderer {
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut encoder = self.draw(Some(background_color), &view, viewport);
+        let mut encoder = self.draw(Some(background_color), &view, &texture, viewport);
 
         let texture = crate::color::convert(
             &self.engine.device,
@@ -467,7 +469,20 @@ impl Renderer {
             }
 
             if !layer.effects.is_empty() {
-                self.engine.effect_pipeline.prepare(&layer.effects);
+                let physical = viewport.physical_size();
+                let surface = Rectangle::with_size(crate::core::Size::new(
+                    physical.width as f32,
+                    physical.height as f32,
+                ));
+
+                self.engine.effect_pipeline.prepare(
+                    &self.engine.device,
+                    &layer.effects,
+                    layer.bounds * scale_factor,
+                    surface,
+                    crate::graphics::quality::Tier::default(),
+                    (physical.width, physical.height),
+                );
             }
         }
     }
@@ -476,6 +491,7 @@ impl Renderer {
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         frame: &wgpu::TextureView,
+        frame_texture: &wgpu::Texture,
         clear_color: Option<Color>,
         viewport: &Viewport,
     ) {
@@ -705,7 +721,15 @@ impl Renderer {
 
             if !layer.effects.is_empty() {
                 let _ = ManuallyDrop::into_inner(render_pass);
-                self.engine.effect_pipeline.render(encoder);
+                let physical = viewport.physical_size();
+
+                self.engine.effect_pipeline.render(
+                    &self.engine.device,
+                    &self.engine.queue,
+                    encoder,
+                    frame_texture,
+                    (physical.width, physical.height),
+                );
                 render_pass =
                     ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: Some("aura_wgpu render pass"),
