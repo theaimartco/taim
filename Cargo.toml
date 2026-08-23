@@ -95,6 +95,13 @@ x11 = ["aura_renderer/x11", "aura_winit/x11"]
 wayland = ["aura_renderer/wayland", "aura_winit/wayland"]
 # Enables the VYOM platform backend
 vyom = ["dep:aura-platform-vyom"]
+# Delivers the semantic tree to assistive technology over AT-SPI.
+#
+# Aura builds a retained semantic tree every frame regardless; this is what
+# carries it to a screen reader. Without it the tree is diffed, translated,
+# and pushed into an in-memory queue nothing drains -- which is what the
+# framework did for its whole existence (Capstone.md F-15).
+accessibility = ["aura_winit/accessibility"]
 
 [dependencies]
 aura_debug.workspace = true
