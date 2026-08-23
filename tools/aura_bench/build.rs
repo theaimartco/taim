@@ -22,9 +22,28 @@ fn main() {
     }
 
     // Re-run only when the commit or rustc changes, not on every build.
+    //
+    // `.git/HEAD` alone is not enough: on a branch it holds `ref: refs/...`,
+    // whose *contents* do not change when you commit, so the recorded commit
+    // silently goes stale until you switch branches. Watch the ref HEAD
+    // resolves to as well, and the index, which every commit rewrites.
     println!("cargo:rerun-if-changed=../../.git/HEAD");
+    println!("cargo:rerun-if-changed=../../.git/index");
+
+    if let Some(reference) = head_reference() {
+        println!("cargo:rerun-if-changed=../../.git/{reference}");
+    }
+
     println!("cargo:rerun-if-env-changed=AURA_BENCH_GIT_COMMIT");
     println!("cargo:rerun-if-env-changed=AURA_BENCH_RUSTC_VERSION");
+}
+
+/// The ref path `HEAD` points at (e.g. `refs/heads/main`), or `None` when
+/// `HEAD` is detached or unreadable.
+fn head_reference() -> Option<String> {
+    let head = std::fs::read_to_string("../../.git/HEAD").ok()?;
+
+    head.trim().strip_prefix("ref: ").map(str::to_owned)
 }
 
 fn git_commit() -> Option<String> {
