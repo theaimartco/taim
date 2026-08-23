@@ -37,16 +37,37 @@ iced is MIT licensed. That licence, and its copyright notice, are reproduced in
 
 ## Assets
 
-- `docs/logo.svg`, `docs/logo-no-shadow.svg`, `widget/assets/iced-logo.svg`,
-  and `docs/graphs/*.png` are **iced's**, inherited with the fork. Aura has no
-  visual identity of its own yet; these are placeholders and must be replaced
-  before any public release. See `Capstone.md` F-14.
-- `assets/icons/manifest.toml` declares icons that have **not** been imported.
-  No SVG in that set ships today, and both entries record
-  `license = "TBD-before-asset-import"`. No icon may be added without a
-  reviewed licence record.
-- `assets/fonts/` contains no font. Text renders with whatever the host
-  system provides.
+### Fonts
+
+- **`graphics/fonts/FiraSans-Regular.ttf`** — [Fira Sans], digitized data
+  copyright (c) 2012-2015 The Mozilla Foundation and Telefonica S.A.,
+  licensed under the **SIL Open Font License 1.1**. The full licence is
+  vendored beside it as `graphics/fonts/FiraSans-LICENSE.txt`, as the OFL
+  requires. Enabled by default (the `fira-sans` feature) so an Aura
+  application renders the same on every machine.
+
+- **`graphics/fonts/Aura-Icons.ttf`** — the icon font. Seven glyphs at
+  `U+E800`–`U+E805` and `U+F00C` are **iced's**, inherited with the fork and
+  preserved byte for byte because the renderers address them by codepoint
+  (`Text::CHECKMARK_ICON` and friends). The 36 glyphs from `U+E900` up were
+  authored for this repository and are covered by its MIT licence.
+
+### Icons
+
+`assets/icons/*.svg` and `graphics/fonts/Aura-Icons.ttf` are generated from
+`scripts/assets/icon_geometry.py` by `scripts/assets/build-icon-font.py`. No
+third-party icon set is vendored, so there is no separate attribution
+requirement. `assets/icons/manifest.toml` records each icon's codepoint,
+grid, RTL mirroring, and licence.
+
+### Still iced's
+
+`docs/logo.svg`, `docs/logo-no-shadow.svg`, `widget/assets/iced-logo.svg`, and
+`docs/graphs/*.png` are **iced's**, inherited with the fork. Aura has no logo
+of its own; these are placeholders and must be replaced before any public
+release.
+
+[Fira Sans]: https://mozilla.github.io/Fira/
 
 ## Dependencies
 

@@ -34,12 +34,15 @@
 //!
 //! # Scope
 //!
-//! All catalogued widgets now have Aura design system implementations:
-//! button, text input, checkbox, radio, container, progress bar, icon
-//! button, list tile, dialog, app bar, toggler, slider, rule, scrollable,
-//! overlay menu, pick list, combo box, text editor, float, SVG, QR code,
-//! table, pane grid, and markdown. Every control resolves its style from
-//! Aura's semantic tokens — there is no second, parallel styling path.
+//! Every widget in this crate that declares a `Catalog` has an
+//! implementation here, the mobile set included: accordion, avatar, badge,
+//! bottom nav bar, bottom sheet, carousel, chip, date picker, drawer, pull
+//! to refresh, search bar, segmented control, skeleton, snackbar, stepper,
+//! tabs, and time picker, alongside the controls inherited from the fork.
+//!
+//! That is enforced, not asserted: `tests/design/catalog_coverage.rs` fails
+//! to compile if a `Catalog` exists without an implementation for
+//! [`Theme`], so the two cannot drift apart again.
 
 use crate::core::border;
 use crate::core::{Background, Border, Color, Shadow, Vector};
@@ -59,12 +62,15 @@ use aura_design::icon::Icon;
 use aura_design::state::Interaction;
 use aura_design::theme::Theme;
 use aura_design::tokens::Radius;
+use aura_design::tokens::color::Scheme;
 
 use crate::overlay::menu;
 use crate::{
-    app_bar, button, checkbox, container, dialog, float, icon_button, list_tile, pane_grid,
-    pick_list, progress_bar, radio, rule, scrollable, slider, table, text_editor, text_input,
-    toggler,
+    accordion, app_bar, avatar, badge, bottom_nav_bar, bottom_sheet, button, carousel, checkbox,
+    chip, container, date_picker, dialog, drawer, float, icon_button, list_tile, pane_grid,
+    pick_list, progress_bar, pull_to_refresh, radio, rule, scrollable, search_bar,
+    segmented_control, skeleton, slider, snackbar, stepper, table, tabs, text_editor, text_input,
+    time_picker, toggler,
 };
 
 /// Converts an Aura [`Radius`] into an aura border radius.
@@ -1157,5 +1163,553 @@ impl crate::markdown::Catalog for Theme {
                 snap: crate::core::renderer::CRISP,
             }
         })
+    }
+}
+
+// ---------------------------------------------------------------------
+// The mobile set
+//
+// These are the controls built on top of the fork. Their tokens follow the
+// same doctrine as the controls above: `surface` for anything the user
+// reads content on, `background` for chrome that meets a window edge,
+// `primary` for the one thing on screen asking to be chosen, and elevation
+// expressed as a tint rather than a shadow -- except on the three surfaces
+// that genuinely float over the page, where a shadow is what tells a user
+// the page behind is still there.
+// ---------------------------------------------------------------------
+
+/// The scrim over a page behind a modal surface.
+///
+/// One value, used by every modal, because a scrim that differs between a
+/// drawer and a bottom sheet reads as a bug rather than as a distinction.
+fn scrim() -> Background {
+    Background::Color(Color {
+        a: 0.32,
+        ..Color::BLACK
+    })
+}
+
+/// The shadow cast by a surface that floats over the page.
+fn floating_shadow() -> Shadow {
+    Shadow {
+        color: Color {
+            a: 0.30,
+            ..Color::BLACK
+        },
+        offset: Vector::new(0.0, 4.0),
+        blur_radius: 16.0,
+    }
+}
+
+/// A hairline in the design system's divider colour.
+fn hairline(colors: aura_design::tokens::ColorTokens) -> Border {
+    Border {
+        color: Color {
+            a: 0.14,
+            ..colors.on_surface
+        },
+        width: 1.0,
+        radius: 0.0.into(),
+    }
+}
+
+impl accordion::Catalog for Theme {
+    type Class<'a> = accordion::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            accordion::Style {
+                header: Background::Color(colors.surface),
+                // The open header is tinted rather than raised: two
+                // headers at different elevations would imply the closed
+                // ones are disabled.
+                open_header: Background::Color(Color {
+                    a: 0.08,
+                    ..colors.primary
+                }),
+                chevron_color: colors.on_surface_variant,
+                text_color: colors.on_surface,
+                border: hairline(colors),
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> accordion::Style {
+        class(self)
+    }
+}
+
+impl avatar::Catalog for Theme {
+    type Class<'a> = avatar::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme, hash: u64| {
+            let colors = theme.colors();
+
+            // The hash picks a hue so two people's initials are
+            // distinguishable, but saturation and lightness stay fixed so
+            // every avatar keeps the same contrast against `on_primary`.
+            // Deriving the whole colour from the hash would eventually
+            // produce one no text is readable on.
+            let hue = (hash % 360) as f32;
+            let lightness = match theme.scheme() {
+                Scheme::Dark => 0.42,
+                _ => 0.46,
+            };
+            let background = hsl_to_color(hue, 0.52, lightness);
+
+            avatar::Style {
+                background: Background::Color(background),
+                text_color: colors.on_primary,
+                border: Border::default(),
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>, hash: u64) -> avatar::Style {
+        class(self, hash)
+    }
+}
+
+/// Converts an HSL triple into a colour.
+///
+/// Only [`avatar`] needs this: it is the one control whose colour is
+/// derived at runtime rather than taken from a token.
+fn hsl_to_color(hue: f32, saturation: f32, lightness: f32) -> Color {
+    let c = (1.0 - (2.0 * lightness - 1.0).abs()) * saturation;
+    let h = hue / 60.0;
+    let x = c * (1.0 - (h % 2.0 - 1.0).abs());
+
+    let (r, g, b) = match h as u32 {
+        0 => (c, x, 0.0),
+        1 => (x, c, 0.0),
+        2 => (0.0, c, x),
+        3 => (0.0, x, c),
+        4 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+
+    let m = lightness - c / 2.0;
+
+    Color::from_rgb(r + m, g + m, b + m)
+}
+
+impl badge::Catalog for Theme {
+    type Class<'a> = badge::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            badge::Style {
+                // A badge is a notification count, which is an alert, not
+                // a call to action -- so `error`, not `primary`.
+                background: Background::Color(colors.error),
+                text_color: colors.surface,
+                // The ring is the surface's own colour, which is what
+                // separates the badge from whatever it is pinned to.
+                border: Border {
+                    color: colors.surface,
+                    width: 2.0,
+                    radius: border_radius(Radius::Full),
+                },
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> badge::Style {
+        class(self)
+    }
+}
+
+impl bottom_nav_bar::Catalog for Theme {
+    type Class<'a> = bottom_nav_bar::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            bottom_nav_bar::Style {
+                background: Background::Color(colors.background),
+                text_color: colors.on_surface_variant,
+                selected_text_color: colors.primary,
+                indicator: Background::Color(Color {
+                    a: 0.14,
+                    ..colors.primary
+                }),
+                border: hairline(colors),
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> bottom_nav_bar::Style {
+        class(self)
+    }
+}
+
+impl bottom_sheet::Catalog for Theme {
+    type Class<'a> = bottom_sheet::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            bottom_sheet::Style {
+                scrim: scrim(),
+                background: Background::Color(colors.surface),
+                text_color: colors.on_surface,
+                handle: Background::Color(Color {
+                    a: 0.28,
+                    ..colors.on_surface
+                }),
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: border_radius(Radius::Large),
+                },
+                shadow: floating_shadow(),
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> bottom_sheet::Style {
+        class(self)
+    }
+}
+
+impl carousel::Catalog for Theme {
+    type Class<'a> = carousel::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            carousel::Style {
+                dot: Background::Color(Color {
+                    a: 0.28,
+                    ..colors.on_surface
+                }),
+                active_dot: Background::Color(colors.primary),
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> carousel::Style {
+        class(self)
+    }
+}
+
+impl chip::Catalog for Theme {
+    type Class<'a> = chip::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme, selected: bool| {
+            let colors = theme.colors();
+
+            if selected {
+                chip::Style {
+                    background: Background::Color(colors.primary),
+                    text_color: colors.on_primary,
+                    border: Border {
+                        color: Color::TRANSPARENT,
+                        width: 0.0,
+                        radius: border_radius(Radius::Full),
+                    },
+                }
+            } else {
+                chip::Style {
+                    background: Background::Color(colors.surface),
+                    text_color: colors.on_surface,
+                    border: Border {
+                        radius: border_radius(Radius::Full),
+                        ..hairline(colors)
+                    },
+                }
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>, selected: bool) -> chip::Style {
+        class(self, selected)
+    }
+}
+
+impl date_picker::Catalog for Theme {
+    type Class<'a> = date_picker::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            date_picker::Style {
+                background: Background::Color(colors.surface),
+                selected: Background::Color(colors.primary),
+                // Today is outlined rather than filled, so it stays
+                // distinguishable from the selected day.
+                today_outline: colors.primary,
+                chevron_color: colors.on_surface_variant,
+                text_color: colors.on_surface,
+                border: Border {
+                    radius: border_radius(Radius::Medium),
+                    ..hairline(colors)
+                },
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> date_picker::Style {
+        class(self)
+    }
+}
+
+impl drawer::Catalog for Theme {
+    type Class<'a> = drawer::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            drawer::Style {
+                scrim: scrim(),
+                background: Background::Color(colors.surface),
+                text_color: colors.on_surface,
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: 0.0.into(),
+                },
+                shadow: floating_shadow(),
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> drawer::Style {
+        class(self)
+    }
+}
+
+impl pull_to_refresh::Catalog for Theme {
+    type Class<'a> = pull_to_refresh::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            pull_to_refresh::Style {
+                background: Background::Color(colors.surface),
+                // `armed` is the state where letting go will refresh, so
+                // it takes `primary`: it is a commitment, not a hint.
+                armed: Background::Color(colors.primary),
+                border: Border {
+                    radius: border_radius(Radius::Full),
+                    ..hairline(colors)
+                },
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> pull_to_refresh::Style {
+        class(self)
+    }
+}
+
+impl search_bar::Catalog for Theme {
+    type Class<'a> = search_bar::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            search_bar::Style {
+                background: Background::Color(colors.surface),
+                glyph_color: colors.on_surface_variant,
+                border: Border {
+                    radius: border_radius(Radius::Full),
+                    ..hairline(colors)
+                },
+            }
+        })
+    }
+
+    fn style(&self, class: &<Self as search_bar::Catalog>::Class<'_>) -> search_bar::Style {
+        class(self)
+    }
+}
+
+impl segmented_control::Catalog for Theme {
+    type Class<'a> = segmented_control::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            segmented_control::Style {
+                track: Background::Color(Color {
+                    a: 0.10,
+                    ..colors.on_surface
+                }),
+                thumb: Background::Color(colors.surface),
+                text_color: colors.on_surface_variant,
+                selected_text_color: colors.on_surface,
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: border_radius(Radius::Full),
+                },
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> segmented_control::Style {
+        class(self)
+    }
+}
+
+impl skeleton::Catalog for Theme {
+    type Class<'a> = skeleton::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            skeleton::Style {
+                background: Background::Color(Color {
+                    a: 0.10,
+                    ..colors.on_surface
+                }),
+                // The sweep has to stay subtle: a skeleton is a promise
+                // that content is coming, not something to look at.
+                highlight: Background::Color(Color {
+                    a: 0.18,
+                    ..colors.on_surface
+                }),
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: border_radius(Radius::Small),
+                },
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> skeleton::Style {
+        class(self)
+    }
+}
+
+impl snackbar::Catalog for Theme {
+    type Class<'a> = snackbar::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            snackbar::Style {
+                // A snackbar inverts: it has to read as a message *about*
+                // the page rather than as part of it, and inversion does
+                // that without spending `primary` on a transient.
+                background: Background::Color(colors.on_surface),
+                text_color: colors.surface,
+                action_color: colors.primary,
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: border_radius(Radius::Small),
+                },
+                shadow: floating_shadow(),
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> snackbar::Style {
+        class(self)
+    }
+}
+
+impl stepper::Catalog for Theme {
+    type Class<'a> = stepper::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            stepper::Style {
+                background: Background::Color(colors.surface),
+                glyph_color: colors.on_surface,
+                // A stepper at its limit disables one button. Dimming is
+                // the whole signal, so it has to be visible without
+                // reading as a different control.
+                disabled_glyph_color: Color {
+                    a: 0.38,
+                    ..colors.on_surface
+                },
+                text_color: colors.on_surface,
+                border: Border {
+                    radius: border_radius(Radius::Medium),
+                    ..hairline(colors)
+                },
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> stepper::Style {
+        class(self)
+    }
+}
+
+impl tabs::Catalog for Theme {
+    type Class<'a> = tabs::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            tabs::Style {
+                background: Background::Color(colors.background),
+                text_color: colors.on_surface_variant,
+                selected_text_color: colors.primary,
+                indicator: Background::Color(colors.primary),
+                border: hairline(colors),
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> tabs::Style {
+        class(self)
+    }
+}
+
+impl time_picker::Catalog for Theme {
+    type Class<'a> = time_picker::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|theme: &Theme| {
+            let colors = theme.colors();
+
+            time_picker::Style {
+                background: Background::Color(colors.surface),
+                selection: Background::Color(Color {
+                    a: 0.16,
+                    ..colors.primary
+                }),
+                text_color: colors.on_surface,
+                // The dim colour is what makes the selected row readable
+                // in a scrolling column of numbers.
+                dim_text_color: Color {
+                    a: 0.45,
+                    ..colors.on_surface
+                },
+                border: Border {
+                    radius: border_radius(Radius::Medium),
+                    ..hairline(colors)
+                },
+            }
+        })
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> time_picker::Style {
+        class(self)
     }
 }
