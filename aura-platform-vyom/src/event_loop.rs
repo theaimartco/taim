@@ -8,7 +8,7 @@ use wayland_client::{Connection, Dispatch, EventQueue, Proxy, QueueHandle};
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
 
 use crate::capabilities::{Capabilities, Capability};
-use crate::surface::{SurfaceId, SurfaceLifecycle, SurfaceState};
+use crate::surface::{Damage, SurfaceId, SurfaceLifecycle, SurfaceState};
 
 /// Native backend initialization or dispatch error.
 #[derive(Debug, thiserror::Error)]
@@ -181,6 +181,42 @@ pub struct Toplevel {
 impl Toplevel {
     /// Performs the empty commit required to receive the first configure.
     pub fn initial_commit(&self) {
+        self.surface.commit();
+    }
+
+    /// Submits `damage` and commits, telling the compositor which pixels
+    /// actually changed.
+    ///
+    /// This is the bandwidth half of partial present. `aura_wgpu` already
+    /// scissors *rasterisation* to the damaged region, but every frame is
+    /// still handed to the compositor whole, so it re-reads and re-composites
+    /// the entire surface. `wl_surface.damage_buffer` is what stops that, and
+    /// on a device that is where the power goes.
+    ///
+    /// `lifecycle` clips the region and decides whether it may be submitted
+    /// at all: a damage rectangle outside the surface is a protocol error
+    /// that ends the connection, not a request the compositor ignores.
+    ///
+    /// Passing no damage commits the whole surface, which is the correct
+    /// fallback whenever the region is unknown.
+    pub fn commit_with_damage(&self, lifecycle: &SurfaceLifecycle, damage: Option<Damage>) {
+        match damage.and_then(|damage| lifecycle.clip_damage(damage)) {
+            Some(damage) => {
+                self.surface.damage_buffer(
+                    damage.x as i32,
+                    damage.y as i32,
+                    damage.width as i32,
+                    damage.height as i32,
+                );
+            }
+            // No damage submitted at all means "the whole surface changed",
+            // which is what the protocol assumes and what an unknown region
+            // must fall back to.
+            None => {
+                self.surface.damage_buffer(0, 0, i32::MAX, i32::MAX);
+            }
+        }
+
         self.surface.commit();
     }
 }

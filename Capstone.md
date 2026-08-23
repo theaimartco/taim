@@ -128,6 +128,29 @@ platform) — are untouched by M0 and unchanged.
 | **F-15** Accessibility never reached a screen reader | **Closed.** `atspi::bridge` drains the semantic queue onto the bus from a thread of its own. Verified against the live accessibility bus. |
 | **F-17** No mobile platform | **Not done, and not attemptable here.** See below. |
 
+**The effect pipeline is complete except for shadow.** Blur, backdrop blur,
+colour matrix, saturation, noise and mask all render, each verified against
+pixels. Shadow stays unimplemented deliberately: the quad pipeline draws it
+and knows the shape casting it, so re-deriving one from a rasterised region
+would give every widget a rectangle's shadow whatever its outline.
+
+Two bugs surfaced only because the results were rendered and looked at. The
+mask pipeline first took a third bind group, which is a validation error on
+any device at the portability floor's `max_bind_groups` of 2. And the
+write-back blended rather than replaced, so a mask that erased a pixel left
+the original showing through — the erased half came back at full brightness,
+and the numbers gave no hint.
+
+**F-08's bandwidth half now exists, but is not on any live path.**
+`Toplevel::commit_with_damage` submits `wl_surface.damage_buffer` and commits,
+with `SurfaceLifecycle::clip_damage` deciding what may be submitted — a
+damage rectangle outside the surface is a protocol error that ends the
+connection, not a request the compositor ignores. What it cannot yet do is
+save anything: the VYOM backend creates surfaces and handles configure but
+attaches no buffers, so nothing presents through it. That is F-18, and it is
+the last thing standing between this mechanism and a measurable power saving
+on a device.
+
 **F-08's hard part was not the scissor.** A swapchain hands back one of
 several rotating buffers, holding what was drawn to it *N* frames ago rather
 than last frame, and wgpu reports no buffer age. Confining a frame to this
