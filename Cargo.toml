@@ -22,7 +22,11 @@ all-features = true
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["wgpu", "tiny-skia", "crisp", "hinting", "web-colors", "thread-pool", "linux-theme-detection", "x11", "wayland"]
+# `fira-sans` is default so an Aura application renders identically on every
+# machine. Without it text falls back to whatever the host happens to have
+# installed, which is not a look a framework can claim to control. Costs
+# ~430 KiB in the binary; see scripts/ci/check-budgets.sh.
+default = ["wgpu", "tiny-skia", "crisp", "hinting", "web-colors", "thread-pool", "linux-theme-detection", "x11", "wayland", "fira-sans"]
 # Enables the `wgpu` GPU-accelerated renderer with all its default features (Vulkan, Metal, DX12, OpenGL, and WebGPU)
 wgpu = ["wgpu-bare", "aura_renderer/wgpu"]
 # Enables the `wgpu` GPU-accelerated renderer with the minimum required features (no backends!)

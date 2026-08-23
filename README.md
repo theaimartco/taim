@@ -119,12 +119,27 @@ the fork, each with a theme catalog, semantics, and unit tests.
 
 **Gestures** — `pull_to_refresh`, `mouse_area`, `sensor`
 
+### Icons
+
+36 icons ship as glyphs in the bundled icon font, reachable as typed
+constants:
+
+```rust
+use aura::widget::icon::{self, Icon};
+
+icon::icon(Icon::SEARCH)
+icon::sized(Icon::SETTINGS, 32)
+```
+
+An icon costs one `text` widget and no new dependency — no SVG rasteriser,
+no image decode, no second font. The set is generated from
+`scripts/assets/icon_geometry.py`; re-run `scripts/assets/build-icon-font.py`
+after changing it. `Icon::ALL` enumerates the whole set.
+
 ### Not yet built
 
 Calendar range selection, tree view, pagination, breadcrumb, rating,
-video, web view, and map. Per-day accessibility semantics inside
-`date_picker` — the grid reports one node naming the chosen date, not one
-node per day.
+video, web view, and map.
 
 ---
 
@@ -171,11 +186,11 @@ with `find <crate> -name '*.rs' | xargs cat | wc -l`:
 role, actions, minimum size, and appearance from semantic tokens, and
 `widget/src/aura.rs` maps those onto real widget styles.
 
-That mapping is **incomplete**: 41 widgets declare a `Catalog`, and 24 have an
-implementation for the design-system theme. The 17 that do not are the mobile
-set — `bottom_sheet`, `drawer`, `tabs`, `chip`, `badge`, `avatar`,
-`date_picker`, and the rest — which fall back to the built-in theme. Closing
-that gap is tracked in `Capstone.md` F-13.
+Every widget that declares a `Catalog` has one — the mobile set included.
+That is enforced rather than asserted: `tests/design/catalog_coverage.rs`
+fails to compile if an implementation is removed, and fails at runtime if a
+newly added catalogue has none. It exists because 17 of 41 catalogues were
+uncovered for months without anything noticing.
 
 ---
 

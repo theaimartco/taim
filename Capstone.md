@@ -17,6 +17,22 @@ cargo test --workspace                              PASS  (1,705 passed, 0 faile
 bash scripts/ci/check-budgets.sh                    PASS  (4/4)
 ```
 
+**Closed by M1** — F-13 (all 41 widget catalogues now have an
+`aura_design::Theme` implementation, enforced by
+`tests/design/catalog_coverage.rs`), F-14 (36 original icons, a typed
+`widget::icon` module, and Fira Sans bundled by default under its OFL
+notice), and the `date_picker` half of F-16 (one semantic node per day).
+
+**M1 found a framework-wide rendering bug this audit missed.**
+`graphics/fonts/Aura-Icons.ttf` declared the family `Iced-Icons` — renamed on
+disk when the fork happened, but not inside the file — while
+`wgpu/src/lib.rs` and `tiny_skia/src/lib.rs` both looked it up as
+`Font::new("Aura-Icons")`. Font lookup is by declared family, so it matched
+nothing: **every checkmark, dropdown arrow, and scrollbar arrow in the
+framework resolved to a missing glyph.** Nothing caught it, because F-10 is
+still open — 1,705 tests passed while the framework drew blanks. This is the
+single best argument in this document for the golden image suite.
+
 **Closed by M0** — F-01, F-02, F-03, F-04, F-05, F-06, F-12, F-20, F-21,
 F-22, F-23, and the missing `CREDITS.md` (§9.7). F-11's dead code is gone;
 the *capability* it represented (off-thread image decode) remains unbuilt and

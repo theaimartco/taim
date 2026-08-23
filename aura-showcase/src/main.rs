@@ -9,8 +9,11 @@
 //! gallery that only shows the happy path hides exactly the cases that
 //! decide whether a widget is finished.
 
+use aura::animation::MotionPolicy;
+use aura::theme::palette;
 use aura::widget::bottom_nav_bar::Item as NavItem;
 use aura::widget::date::Date;
+use aura::widget::icon::{self, Icon};
 use aura::widget::segmented_control::Segment;
 use aura::widget::tabs::Tab;
 use aura::widget::time_picker::Time;
@@ -20,7 +23,7 @@ use aura::widget::{
     scrollable, search_bar, segmented_control, skeleton, slider, snackbar, stack, stepper, tabs,
     text, text_input, time_picker, toggler, tooltip,
 };
-use aura::{Center, Element, Fill, Task, Theme};
+use aura::{Center, Color, Element, Fill, Task, Theme};
 
 pub fn main() -> aura::Result {
     aura::application(Showcase::new, Showcase::update, Showcase::view)
@@ -70,6 +73,14 @@ struct Showcase {
     dark: bool,
     group: Group,
 
+    // Accessibility. These are the framework's correctness claims made
+    // visible: a control that ignores reduced motion, clips at a larger
+    // text scale, or vanishes at high contrast is broken, and the only
+    // way to find out is to be able to switch each one on and look.
+    reduced_motion: bool,
+    high_contrast: bool,
+    text_scale: usize,
+
     // Controls
     toggled: bool,
     checked: bool,
@@ -101,6 +112,10 @@ struct Showcase {
 enum Message {
     ThemeToggled(bool),
     GroupSelected(usize),
+
+    ReducedMotionToggled(bool),
+    HighContrastToggled(bool),
+    TextScaleChanged(usize),
 
     Toggled(bool),
     Checked(bool),
@@ -153,13 +168,58 @@ impl Showcase {
                 sheet_open: false,
                 sheet_detent: 0,
                 notice: None,
+
+                reduced_motion: false,
+                high_contrast: false,
+                text_scale: 0,
             },
             Task::none(),
         )
     }
 
     fn theme(&self) -> Theme {
-        if self.dark { Theme::Dark } else { Theme::Light }
+        match (self.high_contrast, self.dark) {
+            // High contrast is not "dark with more saturation": it is a
+            // separate promise about minimum contrast ratio, so it gets a
+            // palette of its own rather than a tweak to another one.
+            (true, true) => Theme::custom(
+                "Aura High Contrast Dark",
+                palette::Seed {
+                    background: Color::BLACK,
+                    text: Color::WHITE,
+                    primary: Color::from_rgb8(120, 190, 255),
+                    success: Color::from_rgb8(0, 255, 128),
+                    warning: Color::from_rgb8(255, 213, 0),
+                    danger: Color::from_rgb8(255, 120, 120),
+                },
+            ),
+            (true, false) => Theme::custom(
+                "Aura High Contrast Light",
+                palette::Seed {
+                    background: Color::WHITE,
+                    text: Color::BLACK,
+                    primary: Color::from_rgb8(0, 51, 153),
+                    success: Color::from_rgb8(0, 92, 46),
+                    warning: Color::from_rgb8(122, 74, 0),
+                    danger: Color::from_rgb8(158, 0, 0),
+                },
+            ),
+            (false, true) => Theme::Dark,
+            (false, false) => Theme::Light,
+        }
+    }
+
+    /// The multiplier every text size in the showcase passes through.
+    ///
+    /// A framework that claims to scale has to survive 200%, which is where
+    /// fixed-height rows and single-line labels break.
+    fn scale(&self) -> f32 {
+        Self::TEXT_SCALES[self.text_scale].0
+    }
+
+    /// Scales a nominal text size.
+    fn sized(&self, size: f32) -> f32 {
+        size * self.scale()
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -168,6 +228,14 @@ impl Showcase {
             Message::GroupSelected(index) => {
                 if let Some(group) = Group::ALL.get(index) {
                     self.group = *group;
+                }
+            }
+
+            Message::ReducedMotionToggled(value) => self.reduced_motion = value,
+            Message::HighContrastToggled(value) => self.high_contrast = value,
+            Message::TextScaleChanged(index) => {
+                if index < Self::TEXT_SCALES.len() {
+                    self.text_scale = index;
                 }
             }
 
@@ -216,6 +284,74 @@ impl Showcase {
         Task::none()
     }
 
+    /// The motion policy every animated control in the showcase honours.
+    ///
+    /// `aura-motion` treats this as policy rather than as a hint: under
+    /// [`MotionPolicy::Reduced`] a shimmer becomes a fade and a transform
+    /// becomes nothing, so a control that keeps moving here is a bug the
+    /// toggle makes visible.
+    fn motion(&self) -> MotionPolicy {
+        if self.reduced_motion {
+            MotionPolicy::Reduced
+        } else {
+            MotionPolicy::Full
+        }
+    }
+
+    /// The text scales the panel offers, with the label each shows.
+    ///
+    /// 200% is the interesting one: it is where a fixed row height or a
+    /// single-line label stops fitting, which is exactly the bug this
+    /// control exists to surface.
+    const TEXT_SCALES: [(f32, &'static str); 4] =
+        [(1.0, "100%"), (1.25, "125%"), (1.5, "150%"), (2.0, "200%")];
+
+    /// The accessibility panel.
+    ///
+    /// Aura enforces roles, touch targets, and reduced-motion policy in its
+    /// component specs, which means those guarantees are real and entirely
+    /// invisible. This makes them switchable so they can be seen -- and so a
+    /// widget that breaks one is caught by looking rather than by reading a
+    /// test name.
+    fn accessibility_panel(&self) -> Element<'_, Message> {
+        let scales = segmented_control(Self::TEXT_SCALES.iter().enumerate().map(
+            |(index, (_, label))| {
+                Segment::new(text(*label).size(self.sized(12.0)), *label)
+                    .on_press(Message::TextScaleChanged(index))
+            },
+        ))
+        .selected(self.text_scale);
+
+        container(
+            column![
+                row![
+                    icon::sized(Icon::VISIBILITY, self.sized(18.0)),
+                    text("Accessibility").size(self.sized(15.0)),
+                ]
+                .spacing(8)
+                .align_y(Center),
+                row![
+                    toggler(self.reduced_motion)
+                        .label("Reduced motion")
+                        .text_size(self.sized(13.0))
+                        .on_toggle(Message::ReducedMotionToggled),
+                    toggler(self.high_contrast)
+                        .label("High contrast")
+                        .text_size(self.sized(13.0))
+                        .on_toggle(Message::HighContrastToggled),
+                ]
+                .spacing(24)
+                .align_y(Center),
+                row![text("Text size").size(self.sized(13.0)), scales]
+                    .spacing(12)
+                    .align_y(Center),
+            ]
+            .spacing(12),
+        )
+        .padding(16)
+        .into()
+    }
+
     fn view(&self) -> Element<'_, Message> {
         let body = scrollable(
             container(match self.group {
@@ -247,7 +383,8 @@ impl Showcase {
 
         let header = container(
             row![
-                text("Aura Showcase").size(20),
+                icon::sized(Icon::HOME, self.sized(20.0)),
+                text("Aura Showcase").size(self.sized(20.0)),
                 toggler(self.dark)
                     .label("Dark")
                     .on_toggle(Message::ThemeToggled),
@@ -257,7 +394,7 @@ impl Showcase {
         )
         .padding(16);
 
-        let page = column![header, body, nav];
+        let page = column![header, self.accessibility_panel(), body, nav];
 
         stack![
             page,
@@ -350,9 +487,18 @@ impl Showcase {
 
         let listing: Element<'_, Message> = if self.loading {
             column![
-                skeleton().width(240).height(16),
-                skeleton().width(200).height(16),
-                skeleton().width(220).height(16),
+                skeleton()
+                    .width(240)
+                    .height(16)
+                    .motion_policy(self.motion()),
+                skeleton()
+                    .width(200)
+                    .height(16)
+                    .motion_policy(self.motion()),
+                skeleton()
+                    .width(220)
+                    .height(16)
+                    .motion_policy(self.motion()),
                 // A still placeholder next to animated ones, so the
                 // difference is visible.
                 skeleton().width(180).height(16).still(),

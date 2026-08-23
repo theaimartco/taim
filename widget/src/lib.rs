@@ -169,6 +169,8 @@ pub mod svg;
 #[doc(no_inline)]
 pub use svg::Svg;
 
+pub mod icon;
+
 #[cfg(feature = "image")]
 pub mod image;
 

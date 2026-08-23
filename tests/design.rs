@@ -1,4 +1,10 @@
 //! Top-level design-system test harness.
+#[path = "design/icon_font.rs"]
+mod icon_font;
+
+#[path = "design/catalog_coverage.rs"]
+mod catalog_coverage;
+
 #[path = "design/icon_button.rs"]
 mod icon_button;
 

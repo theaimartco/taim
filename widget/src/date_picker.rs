@@ -29,13 +29,21 @@
 //! the value as the user browsed, or refuse to show a month other than
 //! the one already chosen.
 //!
-//! # Known gap: per-day semantics
+//! # Per-day semantics
 //!
-//! The grid is one widget, so it reports one node — `Role::Group` named
-//! with the chosen date. A screen-reader user can hear what is selected
-//! but cannot yet walk the grid cell by cell, which needs each day to be
-//! a widget of its own. That is a real limitation and is recorded here
-//! rather than left to be discovered.
+//! The grid is one widget, but it reports one semantic node **per day**:
+//! a `Role::Group` for the month with a `Role::Button` child for every
+//! date in it, each carrying its own bounds, its full spoken name, and
+//! whether it is selected or today.
+//!
+//! Days are children rather than widgets of their own because the
+//! semantic tree models what a screen reader walks, not what the layout
+//! engine lays out. Making each day a widget would multiply the tree by
+//! 42 to express something the day already knows.
+//!
+//! Blank leading and trailing cells emit nothing at all: a cell with no
+//! date is not something a user can land on, and announcing it as empty
+//! would make every month begin with up to six meaningless stops.
 
 use crate::core::border::Border;
 use crate::core::layout;
@@ -187,6 +195,81 @@ where
         (day <= days_in_month(self.visible.year, self.visible.month)).then_some(day)
     }
 
+    /// One semantic node per real day in the visible month.
+    ///
+    /// Separate from `semantics` so it can be tested without standing up a
+    /// `Tree` and a laid-out `Layout`: the interesting behaviour here is
+    /// which days appear and what they are called, neither of which needs
+    /// a widget tree to be true.
+    fn day_nodes(&self, bounds: Rectangle) -> Vec<crate::core::semantics::Node> {
+        use crate::core::semantics::{Actions, Node, Role, State as SemanticState};
+        use crate::core::widget::Id;
+
+        let enabled = self.on_select.is_some();
+        let mut nodes = Vec::new();
+
+        for row in 0..self.rows() {
+            for column in 0..COLUMNS {
+                // A blank cell is not a stop on the way to anything.
+                let Some(day) = self.day_at(row, column) else {
+                    continue;
+                };
+
+                let date = Date {
+                    year: self.visible.year,
+                    month: self.visible.month,
+                    day,
+                };
+
+                // The date is spoken in full rather than as a bare number:
+                // a reader walking the grid hears "14 March 2026", not
+                // "14", which is meaningless once focus has moved between
+                // months.
+                let mut name = format!(
+                    "{} {} {}",
+                    day,
+                    month_name(self.visible.month),
+                    self.visible.year
+                );
+
+                // "today" earns a suffix because it is the one cell whose
+                // outline carries meaning a sighted user gets for free.
+                if self.today == Some(date) {
+                    name.push_str(", today");
+                }
+
+                let mut state = SemanticState::empty();
+
+                if self.selected == Some(date) {
+                    state |= SemanticState::SELECTED;
+                }
+
+                if enabled {
+                    state |= SemanticState::FOCUSABLE;
+                } else {
+                    state |= SemanticState::DISABLED;
+                }
+
+                nodes.push(
+                    Node::new(
+                        Id::unique(),
+                        self.cell_bounds(bounds, row, column),
+                        Role::Button,
+                    )
+                    .with_name(name.as_str())
+                    .with_state(state)
+                    .with_actions(if enabled {
+                        Actions::FOCUS | Actions::ACTIVATE
+                    } else {
+                        Actions::empty()
+                    }),
+                );
+            }
+        }
+
+        nodes
+    }
+
     /// The height the picker needs for the visible month.
     fn height(&self) -> f32 {
         HEADER_HEIGHT + HEADINGS_HEIGHT + self.rows() as f32 * ROW_HEIGHT
@@ -282,21 +365,26 @@ where
         use crate::core::semantics::{Actions, Node, Role, State as SemanticState};
 
         let enabled = self.on_select.is_some();
+        let bounds = layout.bounds();
 
-        Some(
-            Node::new(tree.id().clone(), layout.bounds(), Role::Group)
-                .with_name(self.announcement().as_str())
-                .with_state(if enabled {
-                    SemanticState::FOCUSABLE
-                } else {
-                    SemanticState::DISABLED
-                })
-                .with_actions(if enabled {
-                    Actions::FOCUS | Actions::SET_VALUE
-                } else {
-                    Actions::empty()
-                }),
-        )
+        let mut month = Node::new(tree.id().clone(), bounds, Role::Group)
+            .with_name(self.announcement().as_str())
+            .with_state(if enabled {
+                SemanticState::FOCUSABLE
+            } else {
+                SemanticState::DISABLED
+            })
+            .with_actions(if enabled {
+                Actions::FOCUS | Actions::SET_VALUE
+            } else {
+                Actions::empty()
+            });
+
+        for day in self.day_nodes(bounds) {
+            month = month.with_child(day);
+        }
+
+        Some(month)
     }
 
     fn update(
@@ -743,6 +831,90 @@ mod tests {
             calendar(2026, 8).announcement(),
             "August 2026, no date selected"
         );
+    }
+
+    // ── Per-day semantics ───────────────────────────────────────────
+    //
+    // The grid used to report a single node naming the chosen date, so a
+    // screen-reader user could hear what was selected but could not walk
+    // the month. These pin the replacement.
+
+    const GRID: Rectangle = Rectangle {
+        x: 0.0,
+        y: 0.0,
+        width: 350.0,
+        height: 320.0,
+    };
+
+    #[test]
+    fn every_day_of_the_month_reports_its_own_node() {
+        // March 2026 has 31 days and starts midweek, so it also proves the
+        // leading blanks contribute nothing.
+        let nodes = calendar(2026, 3).day_nodes(GRID);
+
+        assert_eq!(nodes.len(), 31);
+    }
+
+    #[test]
+    fn a_short_month_reports_exactly_its_own_days() {
+        assert_eq!(calendar(2026, 2).day_nodes(GRID).len(), 28);
+        assert_eq!(calendar(2024, 2).day_nodes(GRID).len(), 29);
+    }
+
+    #[test]
+    fn a_day_is_named_in_full_not_as_a_bare_number() {
+        let nodes = calendar(2026, 3).day_nodes(GRID);
+
+        // "14" alone is meaningless once focus has moved between months.
+        assert_eq!(nodes[13].name.as_deref(), Some("14 March 2026"));
+    }
+
+    #[test]
+    fn today_is_announced_because_its_outline_is_otherwise_silent() {
+        let picker = calendar(2026, 3).today(Date {
+            year: 2026,
+            month: 3,
+            day: 9,
+        });
+
+        let nodes = picker.day_nodes(GRID);
+
+        assert_eq!(nodes[8].name.as_deref(), Some("9 March 2026, today"));
+        assert_eq!(nodes[7].name.as_deref(), Some("8 March 2026"));
+    }
+
+    #[test]
+    fn the_chosen_day_is_the_only_one_marked_selected() {
+        use crate::core::semantics::State as SemanticState;
+
+        let picker = calendar(2026, 3).selected(Date {
+            year: 2026,
+            month: 3,
+            day: 20,
+        });
+
+        let nodes = picker.day_nodes(GRID);
+        let selected: Vec<&str> = nodes
+            .iter()
+            .filter(|node| node.state.contains(SemanticState::SELECTED))
+            .filter_map(|node| node.name.as_deref())
+            .collect();
+
+        assert_eq!(selected, vec!["20 March 2026"]);
+    }
+
+    #[test]
+    fn a_days_bounds_are_the_cell_it_is_drawn_in() {
+        let picker = calendar(2026, 3);
+        let nodes = picker.day_nodes(GRID);
+
+        // The first day of March 2026 -- wherever its cell falls.
+        let (row, column) = (0..MAX_ROWS)
+            .flat_map(|row| (0..COLUMNS).map(move |column| (row, column)))
+            .find(|&(row, column)| picker.day_at(row, column) == Some(1))
+            .expect("the month must contain a first day");
+
+        assert_eq!(nodes[0].bounds, picker.cell_bounds(GRID, row, column));
     }
 
     #[test]
