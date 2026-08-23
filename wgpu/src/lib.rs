@@ -764,7 +764,11 @@ impl Renderer {
     }
 
     /// Submits an effect node to the current layer's effect graph.
-    pub fn add_effect(&mut self, effect: crate::effects::Effect, tier: crate::graphics::quality::Tier) -> bool {
+    pub fn add_effect(
+        &mut self,
+        effect: crate::effects::Effect,
+        tier: crate::graphics::quality::Tier,
+    ) -> bool {
         let (layer, _) = self.layers.current_mut();
         layer.effects.push(effect, tier)
     }

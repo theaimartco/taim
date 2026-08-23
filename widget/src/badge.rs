@@ -36,8 +36,8 @@ use crate::core::widget::Operation;
 use crate::core::widget::tree::{self, Tree};
 use crate::core::widget::visit;
 use crate::core::{
-    Background, Color, Element, Event, Layout, Length, Rectangle, Shell, Size, Theme,
-    Vector, Widget,
+    Background, Color, Element, Event, Layout, Length, Rectangle, Shell, Size, Theme, Vector,
+    Widget,
 };
 
 /// The diameter of a badge carrying no count.
@@ -511,7 +511,11 @@ mod tests {
         // But the announcement stays exact: "99+ unread" is a rendering
         // compromise, not something a screen reader should inherit.
         assert_eq!(
-            badge().count(4_000).label("unread").announcement().as_deref(),
+            badge()
+                .count(4_000)
+                .label("unread")
+                .announcement()
+                .as_deref(),
             Some("4000 unread")
         );
     }

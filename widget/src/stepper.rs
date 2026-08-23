@@ -41,8 +41,7 @@ use crate::core::renderer;
 use crate::core::touch;
 use crate::core::widget::tree::{self, Tree};
 use crate::core::{
-    Background, Color, Element, Event, Layout, Length, Point, Rectangle, Shell, Size, Theme,
-    Widget,
+    Background, Color, Element, Event, Layout, Length, Point, Rectangle, Shell, Size, Theme, Widget,
 };
 
 use std::ops::RangeInclusive;
@@ -197,13 +196,9 @@ where
 
     /// Which button, if either, a position landed on.
     fn part_at(&self, bounds: Rectangle, position: Point) -> Option<Part> {
-        for part in [Part::Decrement, Part::Increment] {
-            if self.button_bounds(bounds, part).contains(position) {
-                return Some(part);
-            }
-        }
-
-        None
+        [Part::Decrement, Part::Increment]
+            .into_iter()
+            .find(|&part| self.button_bounds(bounds, part).contains(position))
     }
 }
 
@@ -530,6 +525,9 @@ mod tests {
         assert_eq!(control(-99).range(1..=10).clamped(), 1);
     }
 
+    // The inverted range is the input under test: the point is that a caller
+    // passing `10..=1` gets it normalised rather than rejected.
+    #[expect(clippy::reversed_empty_ranges)]
     #[test]
     fn an_inverted_range_is_normalised_rather_than_rejected() {
         let stepper = control(5).range(10..=1);

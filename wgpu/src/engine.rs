@@ -15,8 +15,6 @@ pub struct Engine {
     pub(crate) queue: wgpu::Queue,
     pub(crate) format: wgpu::TextureFormat,
 
-    pub(crate) pipeline_cache: Arc<RwLock<pipeline_cache::PipelineCache>>,
-
     pub(crate) quad_pipeline: quad::Pipeline,
     pub(crate) text_pipeline: text::Pipeline,
     pub(crate) triangle_pipeline: triangle::Pipeline,
@@ -39,7 +37,7 @@ impl Engine {
         let mut cache = pipeline_cache::PipelineCache::new(32);
         cache.prewarm(format, &device, &queue);
 
-        let quad_pipeline = match cache.get_or_create(
+        let pipeline_cache::CachedPipeline::Quad(quad_pipeline) = cache.get_or_create(
             pipeline_cache::PipelineKey {
                 kind: pipeline_cache::PipelineKind::Quad,
                 format,
@@ -48,12 +46,11 @@ impl Engine {
             },
             &device,
             &queue,
-        ) {
-            pipeline_cache::CachedPipeline::Quad(p) => p,
-            _ => unreachable!(),
+        ) else {
+            unreachable!()
         };
 
-        let text_pipeline = match cache.get_or_create(
+        let pipeline_cache::CachedPipeline::Text(text_pipeline) = cache.get_or_create(
             pipeline_cache::PipelineKey {
                 kind: pipeline_cache::PipelineKind::Text,
                 format,
@@ -62,12 +59,11 @@ impl Engine {
             },
             &device,
             &queue,
-        ) {
-            pipeline_cache::CachedPipeline::Text(p) => p,
-            _ => unreachable!(),
+        ) else {
+            unreachable!()
         };
 
-        let triangle_pipeline = match cache.get_or_create(
+        let pipeline_cache::CachedPipeline::Triangle(triangle_pipeline) = cache.get_or_create(
             pipeline_cache::PipelineKey {
                 kind: pipeline_cache::PipelineKind::Triangle,
                 format,
@@ -76,15 +72,14 @@ impl Engine {
             },
             &device,
             &queue,
-        ) {
-            pipeline_cache::CachedPipeline::Triangle(p) => p,
-            _ => unreachable!(),
+        ) else {
+            unreachable!()
         };
 
         #[cfg(any(feature = "image", feature = "svg"))]
         let image_pipeline = {
             let backend = _adapter.get_info().backend;
-            match cache.get_or_create(
+            let pipeline_cache::CachedPipeline::Image(pipeline) = cache.get_or_create(
                 pipeline_cache::PipelineKey {
                     kind: pipeline_cache::PipelineKind::Image,
                     format,
@@ -93,16 +88,15 @@ impl Engine {
                 },
                 &device,
                 &queue,
-            ) {
-                pipeline_cache::CachedPipeline::Image(p) => p,
-                _ => unreachable!(),
-            }
+            ) else {
+                unreachable!()
+            };
+
+            pipeline
         };
 
         Self {
             format,
-
-            pipeline_cache: Arc::new(RwLock::new(cache)),
 
             quad_pipeline,
             text_pipeline,
@@ -111,8 +105,6 @@ impl Engine {
 
             #[cfg(any(feature = "image", feature = "svg"))]
             image_pipeline,
-            
-
 
             primitive_storage: Arc::new(RwLock::new(primitive::Storage::default())),
 

@@ -16,10 +16,10 @@
 name = "dev-workstation-01"
 description = "Development workstation used to produce the Phase 1 baseline reports"
 cpu = "12th Gen Intel(R) Core(TM) i7-12700H"
-gpu = "integrated (Intel Iris Xe / Vulkan via Mesa)"
+gpu = "integrated Intel Iris Xe (Alder Lake-P GT2), Vulkan via Mesa; a discrete NVIDIA GA107M (RTX 3050 Mobile) is also present, so record which adapter wgpu selected when a report matters"
 memory_gib = 16
 display = "unspecified (headless run; no physical display attached to the benchmark)"
-os = "Linux (Ubuntu-based), kernel 7.0"
+os = "Ubuntu 26.04 LTS, kernel 7.0.0-30-generic"
 compositor = "none (headless)"
 refresh_rate_hz = 60
 power_mode = "powersave (CPU governor unpinned; scripts/perf/run-baseline.sh warns about this and does not change it)"
@@ -31,6 +31,13 @@ not a claim about VYOM target hardware performance. A real VYOM
 reference phone/tablet/desktop/watch profile must be added here before
 any phase makes a hardware-specific performance claim (see phase.md
 section 8).
+
+Provenance note (2026-08-23): the baselines previously committed under
+this device name recorded `environment.os = "macos"`, which contradicts
+this entry and made every one of them unattributable (Capstone.md F-02).
+They were also captured from a dirty worktree (F-03). All 13 have been
+re-captured on this machine, from a clean tree, and `aura_bench --save`
+now refuses both failure modes.
 
 Known limitation: with the governor at `powersave`, the `text_heavy`
 scene's P95 was observed to vary by up to ~30% across repeated runs

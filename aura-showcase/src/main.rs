@@ -231,12 +231,9 @@ impl Showcase {
 
         let nav = bottom_nav_bar(Group::ALL.into_iter().enumerate().map(|(index, group)| {
             NavItem::new(
-                column![
-                    text(group.glyph()).size(18),
-                    text(group.label()).size(11)
-                ]
-                .spacing(2)
-                .align_x(Center),
+                column![text(group.glyph()).size(18), text(group.label()).size(11)]
+                    .spacing(2)
+                    .align_x(Center),
                 group.label(),
             )
             .on_press(Message::GroupSelected(index))
@@ -314,8 +311,7 @@ impl Showcase {
             .align_y(Center),
             heading("Segmented control"),
             segmented_control(MODES.into_iter().enumerate().map(|(index, mode)| {
-                Segment::new(text(mode).size(13), mode)
-                    .on_press(Message::ViewModeChanged(index))
+                Segment::new(text(mode).size(13), mode).on_press(Message::ViewModeChanged(index))
             }))
             .selected(self.view_mode),
             heading("Chips"),
@@ -393,15 +389,21 @@ impl Showcase {
             heading("Pull to refresh"),
             container(
                 pull_to_refresh(
-                    container(text("Drag me down").size(14)).center_x(Fill).padding(24),
+                    container(text("Drag me down").size(14))
+                        .center_x(Fill)
+                        .padding(24),
                     self.loading,
                 )
                 .on_refresh(Message::LoadingToggled),
             )
             .height(120),
             heading("Avatars, badges and skeletons"),
-            button(text(if self.loading { "Show content" } else { "Show loading" }))
-                .on_press(Message::LoadingToggled),
+            button(text(if self.loading {
+                "Show content"
+            } else {
+                "Show loading"
+            }))
+            .on_press(Message::LoadingToggled),
             listing,
             heading("Carousel"),
             container(

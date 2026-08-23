@@ -37,7 +37,11 @@ fn the_gregorian_leap_rule_is_pinned() {
     // The century exception is the part implementations get wrong.
     let leap: Vec<i32> = (1896..=1912).filter(|year| is_leap_year(*year)).collect();
 
-    assert_eq!(leap, vec![1896, 1904, 1908, 1912], "1900 is not a leap year");
+    assert_eq!(
+        leap,
+        vec![1896, 1904, 1908, 1912],
+        "1900 is not a leap year"
+    );
 
     assert!(is_leap_year(2000), "but 2000 is");
     assert!(!is_leap_year(2100));
@@ -125,7 +129,11 @@ fn snapping_a_minute_never_moves_it_forward() {
             let snapped = Time::new(9, minute).snapped(step).minute;
 
             assert!(snapped <= minute, "{minute} snapped forward to {snapped}");
-            assert_eq!(snapped % step, 0, "{snapped} is not on a {step}-minute grid");
+            assert_eq!(
+                snapped % step,
+                0,
+                "{snapped} is not on a {step}-minute grid"
+            );
             assert!(
                 minute - snapped < step,
                 "{minute} snapped further than one step"

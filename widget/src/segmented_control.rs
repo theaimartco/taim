@@ -637,13 +637,7 @@ where
             .zip(tree.children.iter())
             .zip(layout.children())
             .map(|((segment, segment_tree), segment_layout)| {
-                segment.mouse_interaction(
-                    segment_tree,
-                    segment_layout,
-                    cursor,
-                    viewport,
-                    renderer,
-                )
+                segment.mouse_interaction(segment_tree, segment_layout, cursor, viewport, renderer)
             })
             .max()
             .unwrap_or_default()
@@ -788,9 +782,10 @@ mod tests {
     use super::*;
 
     fn control<'a>(count: usize) -> SegmentedControl<'a, ()> {
-        SegmentedControl::new((0..count).map(|index| {
-            Segment::new(crate::text::Text::new("s"), format!("Segment {index}"))
-        }))
+        SegmentedControl::new(
+            (0..count)
+                .map(|index| Segment::new(crate::text::Text::new("s"), format!("Segment {index}"))),
+        )
     }
 
     const TRACK: Rectangle = Rectangle {
@@ -837,7 +832,10 @@ mod tests {
 
         assert_eq!(thumb.x, TRACK.x + THUMB_INSET);
         assert_eq!(thumb.width, 100.0 - 2.0 * THUMB_INSET);
-        assert!(thumb.height < TRACK.height, "the thumb sits inside the track");
+        assert!(
+            thumb.height < TRACK.height,
+            "the thumb sits inside the track"
+        );
     }
 
     #[test]

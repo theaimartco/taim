@@ -334,11 +334,9 @@ where
         let progress = state.progress(self.width, self.side);
         let surface = self.surface_bounds(scrim, progress);
 
-        let content_limits = layout::Limits::new(
-            Size::ZERO,
-            Size::new(surface.width, surface.height),
-        )
-        .shrink(self.padding);
+        let content_limits =
+            layout::Limits::new(Size::ZERO, Size::new(surface.width, surface.height))
+                .shrink(self.padding);
 
         let content = self
             .content
@@ -496,8 +494,7 @@ where
 
         match event {
             Event::Keyboard(keyboard::Event::KeyPressed { key, .. })
-                if progress > 0.0
-                    && *key == keyboard::Key::Named(keyboard::key::Named::Escape) =>
+                if progress > 0.0 && *key == keyboard::Key::Named(keyboard::key::Named::Escape) =>
             {
                 if let Some(on_dismiss) = self.on_dismiss.clone() {
                     shell.publish(on_dismiss);
@@ -518,7 +515,9 @@ where
                 } else if progress > 0.0 {
                     // A press on the scrim: either dismiss, or swallow it
                     // so the inert page behind stays inert.
-                    if self.dismiss_on_scrim && let Some(on_dismiss) = self.on_dismiss.clone() {
+                    if self.dismiss_on_scrim
+                        && let Some(on_dismiss) = self.on_dismiss.clone()
+                    {
                         shell.publish(on_dismiss);
                     }
 
@@ -538,7 +537,10 @@ where
                     // Velocity is sampled between moves rather than over
                     // the whole gesture, so a drag that stalls and then
                     // flicks is read as a flick.
-                    let elapsed = state.now.saturating_duration_since(drag.last_at).as_secs_f32();
+                    let elapsed = state
+                        .now
+                        .saturating_duration_since(drag.last_at)
+                        .as_secs_f32();
 
                     if elapsed > 0.0 {
                         let travelled = match self.side {

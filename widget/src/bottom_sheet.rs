@@ -347,10 +347,7 @@ where
 
         let content_limits = layout::Limits::new(
             Size::ZERO,
-            Size::new(
-                surface.width,
-                (surface.height - handle_height).max(0.0),
-            ),
+            Size::new(surface.width, (surface.height - handle_height).max(0.0)),
         )
         .shrink(self.padding);
 
@@ -546,7 +543,9 @@ where
 
                     shell.capture_event();
                 } else if !surface.is_some_and(|surface| surface.contains(position)) {
-                    if self.dismiss_on_scrim && let Some(on_dismiss) = self.on_dismiss.clone() {
+                    if self.dismiss_on_scrim
+                        && let Some(on_dismiss) = self.on_dismiss.clone()
+                    {
                         shell.publish(on_dismiss);
                     }
 
@@ -561,7 +560,10 @@ where
                 if let Some(drag) = &mut state.drag {
                     drag.current = *position;
 
-                    let elapsed = state.now.saturating_duration_since(drag.last_at).as_secs_f32();
+                    let elapsed = state
+                        .now
+                        .saturating_duration_since(drag.last_at)
+                        .as_secs_f32();
 
                     if elapsed > 0.0 {
                         drag.velocity = (position.y - drag.last.y) / elapsed;

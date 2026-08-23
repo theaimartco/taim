@@ -44,8 +44,7 @@ use crate::core::renderer;
 use crate::core::touch;
 use crate::core::widget::tree::{self, Tree};
 use crate::core::{
-    Background, Color, Element, Event, Layout, Length, Point, Rectangle, Shell, Size, Theme,
-    Widget,
+    Background, Color, Element, Event, Layout, Length, Point, Rectangle, Shell, Size, Theme, Widget,
 };
 
 use crate::date::{Date, Weekday, days_in_month, month_name};

@@ -66,7 +66,13 @@ fn main() -> ExitCode {
             println!("\n{json}");
 
             if let Some(path) = &config.save_to
-                && let Err(message) = save_report(&report, &json, path, config.allow_unidentified)
+                && let Err(message) = save_report(
+                    &report,
+                    &json,
+                    path,
+                    config.allow_unidentified,
+                    config.allow_dirty,
+                )
             {
                 eprintln!("error: {message}");
                 return ExitCode::FAILURE;
@@ -93,6 +99,7 @@ fn save_report(
     json: &str,
     path: &str,
     allow_unidentified: bool,
+    allow_dirty: bool,
 ) -> Result<(), String> {
     let missing = report.environment.missing_identity();
 
@@ -112,6 +119,32 @@ fn save_report(
         eprintln!(
             "warning: saving an unidentified report; {} could not be determined",
             missing.join(", ")
+        );
+    }
+
+    // A `-dirty` commit names a tree that nobody can reconstruct, so the
+    // report cannot be re-derived, re-run, or trusted as a baseline. Every
+    // report in benchmarks/baseline/ was captured this way before this
+    // check existed; see Capstone.md F-03.
+    if report.environment.is_dirty() {
+        if !allow_dirty {
+            return Err(format!(
+                "refusing to save a report captured from a dirty worktree ({}).\n\
+                 The commit recorded does not describe the sources measured, so \
+                 this report cannot be reproduced by anyone, including you.\n\
+                 \x20 - commit or stash your changes, rebuild, and re-run\n\
+                 Pass --allow-dirty to save anyway (the report must not then be \
+                 committed to benchmarks/baseline/ or used in any comparison).",
+                report
+                    .environment
+                    .git_commit
+                    .as_deref()
+                    .unwrap_or("unknown commit"),
+            ));
+        }
+
+        eprintln!(
+            "warning: saving a report captured from a dirty worktree; it is not reproducible"
         );
     }
 
@@ -247,6 +280,7 @@ fn print_usage() {
          \x20   --compare <PATH>     Compare this run's median P95 against a saved report\n\
          \x20   --save <PATH>        Write the JSON report to PATH (requires full identity)\n\
          \x20   --allow-unidentified Permit --save when git/rustc/device cannot be determined\n\
+         \x20   --allow-dirty        Permit --save from a worktree with uncommitted changes\n\
          \x20   -h, --help           Print this message\n\n\
          Available scenes: {}",
         scenes::names().join(", ")
@@ -303,6 +337,7 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
             "--compare" => config.compare_against = Some(value()?),
             "--save" => config.save_to = Some(value()?),
             "--allow-unidentified" => config.allow_unidentified = true,
+            "--allow-dirty" => config.allow_dirty = true,
             "--help" | "-h" => {}
             other => return Err(format!("unknown argument '{other}'")),
         }

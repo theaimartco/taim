@@ -1,4 +1,3 @@
-
 use aura::widget::bottom_nav_bar::Item;
 // Aliased: this example already has its own `Tab` for the bottom bar's
 // destinations, which is a different thing from a tab in a tab bar.
@@ -133,8 +132,7 @@ impl Shell {
         const SECTIONS: [&str; 3] = ["Overview", "Activity", "Settings"];
 
         let sections = tabs(SECTIONS.into_iter().enumerate().map(|(index, section)| {
-            TabItem::new(text(section).size(14), section)
-                .on_press(Message::SectionSelected(index))
+            TabItem::new(text(section).size(14), section).on_press(Message::SectionSelected(index))
         }))
         .selected(self.section);
 
@@ -214,7 +212,12 @@ impl Shell {
             )
             .on_press(Message::TabSelected(index))
         }))
-        .selected(Tab::ALL.iter().position(|tab| *tab == self.tab).unwrap_or(0));
+        .selected(
+            Tab::ALL
+                .iter()
+                .position(|tab| *tab == self.tab)
+                .unwrap_or(0),
+        );
 
         // The snackbar is layered over the whole shell rather than
         // placed inside the body, so it floats above the bottom bar the

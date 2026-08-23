@@ -7,8 +7,6 @@ mod atlas;
 mod raster;
 
 #[cfg(feature = "image")]
-pub mod decode;
-
 #[cfg(feature = "svg")]
 mod vector;
 

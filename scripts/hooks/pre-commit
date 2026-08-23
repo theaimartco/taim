@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+#
+# Blocks a commit that CI would reject anyway, on the two checks that are
+# fast enough to run every time.
+#
+# Install with:
+#   git config core.hooksPath scripts/hooks
+#
+# Bypass with `git commit --no-verify` when you mean to.
+
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+failed=0
+
+if ! cargo fmt --all -- --check; then
+  echo >&2
+  echo "pre-commit: formatting check failed. Run 'cargo fmt --all'." >&2
+  failed=1
+fi
+
+# Deliberately not `--all-targets`: the fast path is the library graph, and a
+# hook that takes two minutes is a hook people disable.
+if ! cargo clippy --workspace -- -D warnings; then
+  echo >&2
+  echo "pre-commit: clippy failed. Fix the lints rather than allowing them." >&2
+  failed=1
+fi
+
+exit "$failed"

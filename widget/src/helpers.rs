@@ -2271,7 +2271,6 @@ where
     crate::bottom_nav_bar::BottomNavigationBar::new(items)
 }
 
-
 /// Creates a new [`Tabs`] bar.
 ///
 /// [`Tabs`]: crate::tabs::Tabs
@@ -2359,8 +2358,7 @@ pub fn search_bar<'a, Message, Theme, Renderer>(
 where
     Message: Clone + 'a,
     Theme: crate::search_bar::Catalog + crate::text_input::Catalog + 'a,
-    <Theme as crate::text_input::Catalog>::Class<'a>:
-        From<crate::text_input::StyleFn<'a, Theme>>,
+    <Theme as crate::text_input::Catalog>::Class<'a>: From<crate::text_input::StyleFn<'a, Theme>>,
     Renderer: crate::core::text::Renderer + 'a,
 {
     crate::search_bar::SearchBar::new(placeholder, value)

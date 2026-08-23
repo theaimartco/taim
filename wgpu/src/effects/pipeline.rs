@@ -1,13 +1,11 @@
 use crate::effects::Graph;
 
 #[derive(Clone)]
-pub struct Pipeline {
-}
+pub struct Pipeline {}
 
 impl Pipeline {
     pub fn new(_device: &wgpu::Device, _format: wgpu::TextureFormat) -> Self {
-        Self {
-        }
+        Self {}
     }
 
     pub fn prepare(&mut self, _graph: &Graph) {
@@ -18,6 +16,5 @@ impl Pipeline {
         // Stub implementation for rendering effects
     }
 
-    pub fn trim(&mut self) {
-    }
+    pub fn trim(&mut self) {}
 }
