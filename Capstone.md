@@ -17,6 +17,28 @@ cargo test --workspace                              PASS  (1,705 passed, 0 faile
 bash scripts/ci/check-budgets.sh                    PASS  (4/4)
 ```
 
+**Six widgets were not rendering what they stored.** Every one was bound to
+`core::Renderer`, which cannot draw text, and every one carried a comment
+explaining the choice — most citing a software fallback or headless tests
+that "have no font loader". That premise is false: `tiny_skia` shapes and
+rasterises text exactly as the GPU renderer does, which the golden suite now
+exercises on every run without a GPU present.
+
+| Widget | What it stored | What it drew |
+|---|---|---|
+| `date_picker` | day numbers, weekday headings, month and year | two tick marks and two circles |
+| `time_picker` | hours and minutes | one grey band |
+| `accordion` | each section's title | a blank bar |
+| `avatar` | the name's initials | a coloured disc |
+| `badge` | the count | a plain dot |
+| `search_bar` | a magnifier and a clear affordance | a 10px dot, and a **plus sign** |
+
+A calendar with no numbers and a time picker with no time are not cosmetic
+defects; those two controls were unusable, and had been for as long as they
+have existed. Nothing detected it, because until M2 nothing in this
+repository had ever looked at a pixel. All six are fixed, and each is now
+pinned by a golden.
+
 **Closed by M2** — F-10. `tests/golden/widget_gallery.rs` renders 20 widget
 cases in both themes through the real `UserInterface` pipeline and compares
 them against 40 committed `.rgba` goldens; `tests/golden/damage_pixels.rs`

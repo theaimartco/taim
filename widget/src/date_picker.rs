@@ -45,10 +45,12 @@
 //! date is not something a user can land on, and announcing it as empty
 //! would make every month begin with up to six meaningless stops.
 
+use crate::core::alignment;
 use crate::core::border::Border;
 use crate::core::layout;
 use crate::core::mouse;
 use crate::core::renderer;
+use crate::core::text;
 use crate::core::touch;
 use crate::core::widget::tree::{self, Tree};
 use crate::core::{
@@ -77,11 +79,17 @@ const COLUMNS: usize = 7;
 /// The width of a paging control at either end of the header.
 const PAGE_BUTTON_WIDTH: f32 = 48.0;
 
-/// The size of the chevrons drawn in those controls.
-const CHEVRON: f32 = 10.0;
+/// The rendered size of the chevrons in those controls.
+const CHEVRON: f32 = 18.0;
 
-/// The stroke weight of the chevrons.
-const CHEVRON_STROKE: f32 = 2.0;
+/// The month-and-year title's text size.
+const TITLE_SIZE: f32 = 16.0;
+
+/// The weekday headings' text size.
+const HEADING_SIZE: f32 = 12.0;
+
+/// A day number's text size.
+const DAY_SIZE: f32 = 14.0;
 
 /// Which paging control a press landed on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -331,7 +339,7 @@ where
 
 impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer> for DatePicker<'_, Message, Theme>
 where
-    Renderer: crate::core::Renderer,
+    Renderer: crate::core::text::Renderer,
     Theme: Catalog,
 {
     fn tag(&self) -> tree::Tag {
@@ -484,7 +492,7 @@ where
         _style: &renderer::Style,
         layout: Layout<'_>,
         _cursor: mouse::Cursor,
-        _viewport: &Rectangle,
+        viewport: &Rectangle,
     ) {
         let appearance = theme.style(&self.class);
         let bounds = layout.bounds();
@@ -498,30 +506,98 @@ where
             appearance.background,
         );
 
-        // The paging chevrons.
+        // The paging chevrons. These were two *vertical* bars each, the
+        // same shape in both directions, so "previous" and "next" were
+        // indistinguishable and neither looked like an arrow.
         for page in [Page::Previous, Page::Next] {
             let button = self.page_bounds(bounds, page);
-            let centre = Point::new(
-                button.x + button.width / 2.0,
-                button.y + button.height / 2.0,
+
+            let glyph = if page == Page::Previous {
+                crate::icon::Icon::CHEVRON_LEFT
+            } else {
+                crate::icon::Icon::CHEVRON_RIGHT
+            };
+
+            renderer.fill_text(
+                text::Text {
+                    content: glyph.codepoint().to_string(),
+                    font: Renderer::ICON_FONT,
+                    size: crate::core::Pixels(CHEVRON),
+                    line_height: text::LineHeight::default(),
+                    bounds: button.size(),
+                    align_x: text::Alignment::Center,
+                    align_y: alignment::Vertical::Center,
+                    shaping: text::Shaping::Basic,
+                    wrapping: text::Wrapping::None,
+                    ellipsis: text::Ellipsis::default(),
+                    hint_factor: None,
+                },
+                button.center(),
+                appearance.chevron_color,
+                *viewport,
             );
+        }
 
-            let direction = if page == Page::Previous { -1.0 } else { 1.0 };
+        // The month and year. A calendar that does not say which month it is
+        // showing is not a calendar; this widget drew paging controls and a
+        // grid of blank discs, because its renderer bound could not draw
+        // text at all.
+        let title = Rectangle {
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: HEADER_HEIGHT,
+        };
 
-            for arm in [-1.0_f32, 1.0] {
-                renderer.fill_quad(
-                    renderer::Quad {
-                        bounds: Rectangle {
-                            x: centre.x + direction * CHEVRON / 4.0 - CHEVRON_STROKE / 2.0,
-                            y: centre.y + arm * CHEVRON / 4.0 - CHEVRON / 4.0,
-                            width: CHEVRON_STROKE,
-                            height: CHEVRON / 2.0,
-                        },
-                        ..renderer::Quad::default()
-                    },
-                    Background::Color(appearance.chevron_color),
-                );
-            }
+        renderer.fill_text(
+            text::Text {
+                content: format!("{} {}", month_name(self.visible.month), self.visible.year),
+                font: renderer.default_font(),
+                size: crate::core::Pixels(TITLE_SIZE),
+                line_height: text::LineHeight::default(),
+                bounds: title.size(),
+                align_x: text::Alignment::Center,
+                align_y: alignment::Vertical::Center,
+                shaping: text::Shaping::Advanced,
+                wrapping: text::Wrapping::None,
+                ellipsis: text::Ellipsis::default(),
+                hint_factor: None,
+            },
+            title.center(),
+            appearance.text_color,
+            *viewport,
+        );
+
+        // The weekday headings.
+        for weekday in Weekday::ALL {
+            let column = weekday.index() as f32;
+            let width = bounds.width / COLUMNS as f32;
+
+            let heading = Rectangle {
+                x: bounds.x + column * width,
+                y: bounds.y + HEADER_HEIGHT,
+                width,
+                height: HEADINGS_HEIGHT,
+            };
+
+            renderer.fill_text(
+                text::Text {
+                    content: weekday.short_name().to_owned(),
+                    font: renderer.default_font(),
+                    size: crate::core::Pixels(HEADING_SIZE),
+                    line_height: text::LineHeight::default(),
+                    bounds: heading.size(),
+                    align_x: text::Alignment::Center,
+                    align_y: alignment::Vertical::Center,
+                    shaping: text::Shaping::Basic,
+                    wrapping: text::Wrapping::None,
+                    ellipsis: text::Ellipsis::default(),
+                    hint_factor: None,
+                },
+                heading.center(),
+                appearance.text_color,
+                *viewport,
+            );
         }
 
         // The day cells. Selection and today are drawn differently on
@@ -569,6 +645,27 @@ where
                         Background::Color(Color::TRANSPARENT),
                     );
                 }
+
+                // The day number itself -- the entire point of the grid,
+                // and previously never drawn.
+                renderer.fill_text(
+                    text::Text {
+                        content: day.to_string(),
+                        font: renderer.default_font(),
+                        size: crate::core::Pixels(DAY_SIZE),
+                        line_height: text::LineHeight::default(),
+                        bounds: disc.size(),
+                        align_x: text::Alignment::Center,
+                        align_y: alignment::Vertical::Center,
+                        shaping: text::Shaping::Basic,
+                        wrapping: text::Wrapping::None,
+                        ellipsis: text::Ellipsis::default(),
+                        hint_factor: None,
+                    },
+                    disc.center(),
+                    appearance.text_color,
+                    *viewport,
+                );
             }
         }
     }
@@ -579,7 +676,7 @@ impl<'a, Message, Theme, Renderer> From<DatePicker<'a, Message, Theme>>
 where
     Message: 'a,
     Theme: 'a + Catalog,
-    Renderer: 'a + crate::core::Renderer,
+    Renderer: 'a + crate::core::text::Renderer,
 {
     fn from(picker: DatePicker<'a, Message, Theme>) -> Self {
         Self::new(picker)

@@ -333,3 +333,173 @@ fn icon_sizes() {
         .into()
     });
 }
+
+// ── The mobile set ────────────────────────────────────────────────────
+//
+// These are the widgets built on top of the fork -- the ones the README
+// leads with, and the ones with the least prior coverage of any kind. The
+// accordion's blank headers and the search bar's plus-shaped "clear" both
+// lived here, unseen, until something rendered them.
+
+#[test]
+fn app_bar_with_title() {
+    check("app_bar", (300, 72), Tolerance::TEXT, || {
+        aura::widget::app_bar(text("Inbox").size(18)).into()
+    });
+}
+
+#[test]
+fn bottom_nav_bar_selected() {
+    use aura::widget::bottom_nav_bar::Item;
+
+    check("bottom_nav_bar", (300, 80), Tolerance::TEXT, || {
+        aura::widget::bottom_nav_bar(
+            [
+                (Icon::HOME, "Home"),
+                (Icon::SEARCH, "Search"),
+                (Icon::PERSON, "Profile"),
+            ]
+            .into_iter()
+            .map(|(glyph, label)| {
+                Item::new(
+                    column![icon::sized(glyph, 20.0), text(label).size(11)]
+                        .spacing(2)
+                        .align_x(Center),
+                    label,
+                )
+                .on_press(())
+            }),
+        )
+        .selected(0)
+        .into()
+    });
+}
+
+#[test]
+fn list_tile_row() {
+    check("list_tile", (300, 72), Tolerance::TEXT, || {
+        aura::widget::list_tile(text("Ada Lovelace").size(15))
+            .on_press(())
+            .into()
+    });
+}
+
+#[test]
+fn snackbar_visible() {
+    check("snackbar", (300, 96), Tolerance::TEXT, || {
+        aura::widget::snackbar(text("Message sent").size(14), true).into()
+    });
+}
+
+#[test]
+fn carousel_dots() {
+    check("carousel", (280, 120), Tolerance::TEXT, || {
+        aura::widget::carousel((0..3).map(|page| {
+            container(text(format!("Page {page}")).size(15))
+                .padding(20)
+                .into()
+        }))
+        .into()
+    });
+}
+
+#[test]
+fn icon_button_glyph() {
+    check("icon_button", (72, 72), Tolerance::TEXT, || {
+        aura::widget::icon_button(Icon::SETTINGS.codepoint(), "Settings")
+            .font(icon::FONT)
+            .on_press(())
+            .into()
+    });
+}
+
+#[test]
+fn date_picker_month() {
+    use aura::widget::date::Date;
+
+    check("date_picker", (320, 300), Tolerance::TEXT, || {
+        aura::widget::date_picker(Date::new(2026, 8, 1))
+            .selected(Date::new(2026, 8, 20))
+            .today(Date::new(2026, 8, 13))
+            .on_select(|_| ())
+            .into()
+    });
+}
+
+#[test]
+fn time_picker_columns() {
+    use aura::widget::time_picker::Time;
+
+    check("time_picker", (240, 200), Tolerance::TEXT, || {
+        aura::widget::time_picker(Time::new(9, 30))
+            .minute_step(15)
+            .on_change(|_| ())
+            .into()
+    });
+}
+
+#[test]
+fn badge_dot_and_count() {
+    check("badge_variants", (280, 96), Tolerance::TEXT, || {
+        container(
+            row![
+                badge(text("Inbox").size(14)).count(3).label("unread"),
+                badge(text("Alerts").size(14)).dot().label("new"),
+            ]
+            .spacing(24)
+            .align_y(Center),
+        )
+        .padding(20)
+        .into()
+    });
+}
+
+#[test]
+fn pull_to_refresh_idle() {
+    check("pull_to_refresh", (280, 120), Tolerance::TEXT, || {
+        aura::widget::pull_to_refresh(container(text("Pull me").size(14)).padding(20), false)
+            .on_refresh(())
+            .into()
+    });
+}
+
+#[test]
+fn stepper_at_its_limit() {
+    // The disabled arm is the state a catalogue is most likely to forget,
+    // and the one a user hits first.
+    check("stepper_at_limit", (220, 64), Tolerance::TEXT, || {
+        stepper(5i32)
+            .range(1..=5)
+            .label("Quantity")
+            .on_change(|_| ())
+            .into()
+    });
+}
+
+#[test]
+fn checkbox_disabled() {
+    check("checkbox_disabled", (200, 48), Tolerance::TEXT, || {
+        checkbox(true).label("Locked").into()
+    });
+}
+
+#[test]
+fn toggler_disabled() {
+    check("toggler_disabled", (200, 48), Tolerance::TEXT, || {
+        toggler(true).label("Locked").into()
+    });
+}
+
+#[test]
+fn progress_extremes() {
+    // Empty and full: both are easy to render as the other by an off-by-one
+    // in a fill width, and neither is visible in a mid-value golden.
+    check("progress_extremes", (240, 72), Tolerance::Exact, || {
+        column![
+            progress_bar(0.0..=1.0, 0.0f32),
+            progress_bar(0.0..=1.0, 1.0f32),
+        ]
+        .spacing(16)
+        .into()
+    });
+}

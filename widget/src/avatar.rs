@@ -29,10 +29,12 @@
 //! stable: it must not change between releases, or every avatar in every
 //! screenshot changes with it.
 
+use crate::core::alignment;
 use crate::core::border::Border;
 use crate::core::layout;
 use crate::core::mouse;
 use crate::core::renderer;
+use crate::core::text;
 use crate::core::widget::tree::{self, Tree};
 use crate::core::{Background, Color, Element, Layout, Length, Rectangle, Size, Theme, Widget};
 
@@ -115,7 +117,7 @@ where
 
 impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer> for Avatar<'_, Theme>
 where
-    Renderer: crate::core::Renderer,
+    Renderer: crate::core::text::Renderer,
     Theme: Catalog,
 {
     fn tag(&self) -> tree::Tag {
@@ -162,7 +164,7 @@ where
         _style: &renderer::Style,
         layout: Layout<'_>,
         _cursor: mouse::Cursor,
-        _viewport: &Rectangle,
+        viewport: &Rectangle,
     ) {
         let appearance = theme.style(&self.class, self.hash());
         let bounds = layout.bounds();
@@ -179,12 +181,32 @@ where
             appearance.background,
         );
 
-        // The initials themselves need a text-capable renderer, which
-        // this widget's `Renderer` bound deliberately does not require --
-        // an avatar has to work in the software fallback and in headless
-        // tests. The name is carried by `semantics`, and callers that
-        // want glyphs compose `avatar` with `text` in a `stack`.
-        let _ = self.initials();
+        // The initials. This used to be `let _ = self.initials();`, on the
+        // reasoning that "an avatar has to work in the software fallback and
+        // in headless tests" -- so the widget rendered a coloured disc and
+        // nothing else, for every caller, forever. The premise was wrong:
+        // `tiny_skia` draws text exactly as the GPU renderer does, which the
+        // golden suite now exercises on every run without a GPU present.
+        renderer.fill_text(
+            text::Text {
+                content: self.initials(),
+                font: renderer.default_font(),
+                // Proportional to the circle, so an avatar reads the same at
+                // any size a caller picks.
+                size: crate::core::Pixels(bounds.height * 0.4),
+                line_height: text::LineHeight::default(),
+                bounds: bounds.size(),
+                align_x: text::Alignment::Center,
+                align_y: alignment::Vertical::Center,
+                shaping: text::Shaping::Advanced,
+                wrapping: text::Wrapping::None,
+                ellipsis: text::Ellipsis::default(),
+                hint_factor: None,
+            },
+            bounds.center(),
+            appearance.text_color,
+            *viewport,
+        );
     }
 }
 
@@ -192,7 +214,7 @@ impl<'a, Message, Theme, Renderer> From<Avatar<'a, Theme>> for Element<'a, Messa
 where
     Message: 'a,
     Theme: 'a + Catalog,
-    Renderer: 'a + crate::core::Renderer,
+    Renderer: 'a + crate::core::text::Renderer,
 {
     fn from(avatar: Avatar<'a, Theme>) -> Self {
         Self::new(avatar)
