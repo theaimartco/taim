@@ -55,8 +55,14 @@ if [[ -z "$device" ]]; then
   exit 1
 fi
 
-echo "Building aura_bench (release)..."
-cargo build --release -p aura_bench
+# `profiling` switches on the counting allocator behind
+# `metrics::allocations`. Without it every allocation field in the saved
+# report reads zero because it was never measured, not because zero
+# allocations occurred -- which is exactly how the previous baselines came
+# to record `allocation_counting_active: false` while the README quoted
+# allocation figures (Capstone.md F-04).
+echo "Building aura_bench (release, profiling)..."
+cargo build --release -p aura_bench --features profiling
 
 readonly BENCH="target/release/aura_bench"
 
