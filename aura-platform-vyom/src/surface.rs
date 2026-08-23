@@ -127,6 +127,48 @@ impl SurfaceLifecycle {
     pub const fn may_attach_buffer(&self) -> bool {
         matches!(self.state, SurfaceState::Configured { .. })
     }
+
+    /// Clips `damage` to the configured surface, in buffer coordinates.
+    ///
+    /// This is the region handed to `wl_surface.damage_buffer`, and it is the
+    /// half of partial present that saves *bandwidth* rather than shading:
+    /// the compositor reads only what changed instead of the whole surface,
+    /// which on a device is where the power actually goes.
+    ///
+    /// Returns `None` when there is nothing to submit -- before the first
+    /// configure, when the region is empty, or when it falls entirely outside
+    /// the surface. A damage rectangle outside the surface is a protocol
+    /// error, not a no-op, so clipping here is not defensive tidiness.
+    pub fn clip_damage(&self, damage: Damage) -> Option<Damage> {
+        let SurfaceState::Configured { width, height, .. } = self.state else {
+            return None;
+        };
+
+        let x = damage.x.min(width);
+        let y = damage.y.min(height);
+        let right = damage.x.saturating_add(damage.width).min(width);
+        let bottom = damage.y.saturating_add(damage.height).min(height);
+
+        (right > x && bottom > y).then_some(Damage {
+            x,
+            y,
+            width: right - x,
+            height: bottom - y,
+        })
+    }
+}
+
+/// A rectangle of changed pixels, in buffer coordinates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Damage {
+    /// Left edge, in buffer pixels.
+    pub x: u32,
+    /// Top edge, in buffer pixels.
+    pub y: u32,
+    /// Width, in buffer pixels.
+    pub width: u32,
+    /// Height, in buffer pixels.
+    pub height: u32,
 }
 
 #[cfg(test)]
@@ -135,6 +177,80 @@ mod tests {
 
     fn id() -> SurfaceId {
         SurfaceId::new(1).unwrap()
+    }
+
+    fn configured() -> SurfaceLifecycle {
+        let mut lifecycle = SurfaceLifecycle::new(id());
+        let _ = lifecycle.configure(1, 800, 600);
+        lifecycle
+    }
+
+    #[test]
+    fn damage_is_not_submitted_before_the_first_configure() {
+        // Before configure there is no surface size, so every rectangle is
+        // out of bounds -- and an out-of-bounds damage rectangle is a
+        // protocol error that kills the connection, not a no-op.
+        let lifecycle = SurfaceLifecycle::new(id());
+
+        assert_eq!(
+            lifecycle.clip_damage(Damage {
+                x: 0,
+                y: 0,
+                width: 10,
+                height: 10,
+            }),
+            None
+        );
+    }
+
+    #[test]
+    fn damage_is_clipped_to_the_configured_surface() {
+        let lifecycle = configured();
+
+        assert_eq!(
+            lifecycle.clip_damage(Damage {
+                x: 700,
+                y: 500,
+                width: 400,
+                height: 400,
+            }),
+            Some(Damage {
+                x: 700,
+                y: 500,
+                width: 100,
+                height: 100,
+            })
+        );
+    }
+
+    #[test]
+    fn damage_entirely_outside_the_surface_is_dropped() {
+        let lifecycle = configured();
+
+        assert_eq!(
+            lifecycle.clip_damage(Damage {
+                x: 900,
+                y: 700,
+                width: 10,
+                height: 10,
+            }),
+            None
+        );
+    }
+
+    #[test]
+    fn empty_damage_is_dropped() {
+        let lifecycle = configured();
+
+        assert_eq!(
+            lifecycle.clip_damage(Damage {
+                x: 10,
+                y: 10,
+                width: 0,
+                height: 5,
+            }),
+            None
+        );
     }
 
     #[test]
