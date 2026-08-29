@@ -4,6 +4,7 @@ mod solid;
 use gradient::Gradient;
 use solid::Solid;
 
+use crate::core::material::SceneLight;
 use crate::core::{Background, Rectangle, Transformation};
 use crate::graphics;
 use crate::graphics::color;
@@ -44,6 +45,14 @@ pub struct Quad {
 
     /// Whether the [`Quad`] should be snapped to the pixel grid.
     pub snap: u32,
+
+    /// Material parameters, packed as
+    /// `(roughness, thickness_mm, ior, dispersion)`.
+    ///
+    /// Packed rather than a struct because this is an instance attribute and
+    /// a `vec4<f32>` is one vertex location; `transmission` is absent because
+    /// nothing samples a backdrop yet.
+    pub material: [f32; 4],
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +82,7 @@ impl State {
         quads: &Batch,
         transformation: Transformation,
         scale: f32,
+        light: SceneLight,
     ) {
         if self.layers.len() <= self.prepare_layer {
             self.layers
@@ -80,7 +90,7 @@ impl State {
         }
 
         let layer = &mut self.layers[self.prepare_layer];
-        layer.prepare(device, encoder, belt, quads, transformation, scale);
+        layer.prepare(device, encoder, belt, quads, transformation, scale, light);
 
         self.prepare_layer += 1;
     }
@@ -147,7 +157,9 @@ impl Pipeline {
             label: Some("aura_wgpu::quad uniforms layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                // The fragment stage reads the scene light from here, so this
+                // is no longer vertex-only.
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -209,8 +221,9 @@ impl Layer {
         quads: &Batch,
         transformation: Transformation,
         scale: f32,
+        light: SceneLight,
     ) {
-        self.update(encoder, belt, transformation, scale);
+        self.update(encoder, belt, transformation, scale, light);
 
         if !quads.solids.is_empty() {
             self.solid.prepare(device, encoder, belt, &quads.solids);
@@ -228,8 +241,9 @@ impl Layer {
         belt: &mut wgpu::util::StagingBelt,
         transformation: Transformation,
         scale: f32,
+        light: SceneLight,
     ) {
-        let uniforms = Uniforms::new(transformation, scale);
+        let uniforms = Uniforms::new(transformation, scale, light);
         let bytes = bytemuck::bytes_of(&uniforms);
 
         belt.write_buffer(
@@ -265,11 +279,17 @@ impl Batch {
     }
 
     /// Adds a [`Quad`] with the provided `Background` type to the quad [`Layer`].
-    pub fn add(&mut self, quad: Quad, background: &Background) {
+    ///
+    /// `luminance` scales the light the fill emits; see
+    /// [`aura_core::renderer::Quad::luminance`]. Gradients are not scaled:
+    /// their stops are packed into a shared representation whose components
+    /// are read by the gradient shader, and brightening one is a change to
+    /// that shader rather than to this call.
+    pub fn add(&mut self, quad: Quad, background: &Background, luminance: f32) {
         let kind = match background {
             Background::Color(color) => {
                 self.solids.push(Solid {
-                    color: color::pack(*color),
+                    color: scale_light(color::pack(*color), luminance),
                     quad,
                 });
 
@@ -333,17 +353,34 @@ fn color_target_state(format: wgpu::TextureFormat) -> [Option<wgpu::ColorTargetS
 struct Uniforms {
     transform: [f32; 16],
     scale: f32,
-    // Uniforms must be aligned to their largest member,
-    // this uses a mat4x4<f32> which aligns to 16, so align to that
+    /// Uniforms align to their largest member. `mat4x4<f32>` aligns to 16, so
+    /// `scale` is followed by twelve bytes of padding before anything that
+    /// also aligns to 16.
     _padding: [f32; 3],
+    /// The scene's key light direction, normalised, in `xyz`.
+    ///
+    /// A `vec4` rather than a `vec3` because WGSL aligns `vec3<f32>` to 16
+    /// bytes anyway: declaring three floats and writing three floats produces
+    /// a struct the shader reads as 96 bytes and the host writes as 80, which
+    /// fails pipeline validation rather than merely reading the wrong values.
+    ///
+    /// One light for every surface in the interface. A per-application light
+    /// produces surfaces that disagree about where the window is, which reads
+    /// as inconsistency rather than as lighting.
+    light: [f32; 4],
 }
 
 impl Uniforms {
-    fn new(transformation: Transformation, scale: f32) -> Uniforms {
+    fn new(transformation: Transformation, scale: f32, light: SceneLight) -> Uniforms {
         Self {
             transform: *transformation.as_ref(),
             scale,
             _padding: [0.0; 3],
+            light: {
+                let [x, y, z] = light.unit_direction();
+
+                [x, y, z, 0.0]
+            },
         }
     }
 }
@@ -354,8 +391,26 @@ impl Default for Uniforms {
             transform: *Transformation::IDENTITY.as_ref(),
             scale: 1.0,
             _padding: [0.0; 3],
+            light: {
+                let [x, y, z] = SceneLight::KEY.unit_direction();
+
+                [x, y, z, 0.0]
+            },
         }
     }
+}
+
+/// Applies a luminance multiplier to a packed color.
+///
+/// A no-op at `1.0`, which is every quad the framework draws today, and a
+/// no-op under `web-colors` where the pack is sRGB-encoded rather than linear
+/// and scaling its components would change hue rather than brightness.
+fn scale_light(packed: color::Packed, luminance: f32) -> color::Packed {
+    if !color::GAMMA_CORRECTION || (luminance - 1.0).abs() < f32::EPSILON {
+        return packed;
+    }
+
+    packed.scale_light(luminance)
 }
 
 #[cfg(test)]
@@ -383,7 +438,60 @@ mod batching_tests {
             shadow_offset: [0.0, 0.0],
             shadow_blur_radius: 0.0,
             snap: 0,
+            material: [1.0, 0.0, 1.0, 0.0],
         }
+    }
+
+    /// A luminance multiplier must reach the packed fill.
+    ///
+    /// Proved here rather than through the integration suite because that
+    /// suite cannot turn `web-colors` off -- the root crate lists itself as
+    /// a dev-dependency with default features, and `web-colors` is one of
+    /// them -- so it can only ever check that the multiplier is *ignored*.
+    /// This crate's own tests build on the linear path, where it applies.
+    #[test]
+    fn a_luminance_multiplier_scales_the_packed_fill() {
+        if !color::GAMMA_CORRECTION {
+            eprintln!("skipped: compositing is not linear in this build");
+            return;
+        }
+
+        let mut plain = Batch::default();
+        plain.add(quad(), &Background::Color(Color::WHITE), 1.0);
+
+        let mut emitting = Batch::default();
+        emitting.add(quad(), &Background::Color(Color::WHITE), 4.926);
+
+        let ordinary = plain.solids[0].color.components();
+        let bright = emitting.solids[0].color.components();
+
+        for channel in 0..3 {
+            assert!(
+                (bright[channel] / ordinary[channel] - 4.926).abs() < 1e-3,
+                "channel {channel}: {} against {}",
+                bright[channel],
+                ordinary[channel]
+            );
+        }
+
+        // Alpha is coverage, not light, and must not move.
+        assert!((bright[3] - ordinary[3]).abs() < 1e-6);
+    }
+
+    /// The default must be bit-identical to having no multiplier at all.
+    #[test]
+    fn the_default_multiplier_changes_nothing() {
+        let mut batch = Batch::default();
+        batch.add(
+            quad(),
+            &Background::Color(Color::from_rgb(0.3, 0.6, 0.9)),
+            1.0,
+        );
+
+        assert_eq!(
+            batch.solids[0].color.components(),
+            color::pack(Color::from_rgb(0.3, 0.6, 0.9)).components()
+        );
     }
 
     /// Proves `Batch::add`'s incremental `order` accumulation is
@@ -404,7 +512,7 @@ mod batching_tests {
                 )),
             };
 
-            batch.add(quad(), &background);
+            batch.add(quad(), &background, 1.0);
         }
 
         let expected_runs = batch::group(kinds);

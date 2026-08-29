@@ -19,6 +19,22 @@ impl Packed {
         self.0[3] *= factor.clamp(0.0, 1.0);
         self
     }
+
+    /// Multiplies the light the packed color emits, leaving alpha alone.
+    ///
+    /// Not clamped: a value above `1.0` is the whole point, and whether it
+    /// survives is a property of the surface it is written to rather than of
+    /// this operation.
+    ///
+    /// Only meaningful on a linear pack. With the `web-colors` feature the
+    /// components are sRGB-encoded and scaling them is not a luminance
+    /// change, so [`GAMMA_CORRECTION`] gates whether a caller should use it.
+    pub fn scale_light(mut self, factor: f32) -> Self {
+        self.0[0] *= factor;
+        self.0[1] *= factor;
+        self.0[2] *= factor;
+        self
+    }
 }
 
 /// A flag that indicates whether the renderer should perform gamma correction.

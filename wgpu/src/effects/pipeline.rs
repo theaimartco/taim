@@ -233,6 +233,13 @@ pub struct Pipeline {
     /// How many uniform slots `uniforms` currently holds.
     capacity: u64,
     targets: Option<Targets>,
+    /// Byte accounting for the intermediates in `targets`.
+    ///
+    /// The budget comes from the active `quality::Tier`, so thermal and
+    /// battery pressure reach the renderer as a smaller ceiling here. Before
+    /// this existed the pool had no production caller at all and
+    /// `Policy::texture_budget_bytes` was read by nothing.
+    pool: crate::effects::pool::Pool,
     /// Effects that read what is *behind* a layer, applied before the layer
     /// draws over them.
     backdrop: Vec<Queued>,
@@ -258,6 +265,9 @@ impl Clone for Pipeline {
             blit: self.blit.clone(),
             mask: self.mask.clone(),
             masks: self.masks.clone(),
+            // A clone is a second renderer with its own intermediates, so it
+            // starts with an empty ledger at the same budget.
+            pool: crate::effects::pool::Pool::new(self.pool.budget_bytes()),
             uniforms: self.uniforms.clone(),
             capacity: self.capacity,
             targets: None,
@@ -428,6 +438,11 @@ impl Pipeline {
             uniforms,
             capacity: 24,
             targets: None,
+            pool: crate::effects::pool::Pool::new(
+                crate::graphics::quality::Tier::default()
+                    .policy()
+                    .texture_budget_bytes,
+            ),
             backdrop: Vec::new(),
             foreground: Vec::new(),
         }
@@ -449,6 +464,11 @@ impl Pipeline {
         tier: crate::graphics::quality::Tier,
         target: (u32, u32),
     ) {
+        // Before anything else, and before any early return: the ledger
+        // follows the tier even on a frame that queues no effects, so
+        // telemetry never reports a budget the renderer is no longer using.
+        self.sync_budget(tier);
+
         for effect in graph.effects() {
             let Some(bounds) = effect.bounds(source, surface, tier) else {
                 continue;
@@ -488,8 +508,121 @@ impl Pipeline {
             return;
         }
 
-        self.ensure_targets(device, target);
+        // Ask the budget before allocating. Under pressure this returns a
+        // smaller size, and when even the floor will not fit it returns
+        // `None` and the queued effects are dropped -- which is the point:
+        // `Policy::texture_budget_bytes` now decides what the renderer does.
+        let Some(granted) = self.admit_targets(tier, target) else {
+            log::debug!(
+                "effect intermediates for {}x{} do not fit the {} byte budget at {tier:?}; \
+                 dropping {} queued effect(s) this frame",
+                target.0,
+                target.1,
+                tier.policy().texture_budget_bytes,
+                self.backdrop.len() + self.foreground.len(),
+            );
+
+            self.backdrop.clear();
+            self.foreground.clear();
+
+            return;
+        };
+
+        self.ensure_targets(device, granted);
         self.ensure_uniform_capacity(device);
+    }
+
+    /// Points the ledger at the tier's budget, discarding intermediates that
+    /// no longer fit.
+    ///
+    /// Called once per frame by the renderer, unconditionally.
+    ///
+    /// Called on every `prepare`, including frames that queue no effects: a
+    /// device that has just dropped to `Recovery` under thermal pressure
+    /// should be reporting `Recovery`'s budget immediately, not on whenever
+    /// the next blur happens to appear.
+    pub fn sync_budget(&mut self, tier: crate::graphics::quality::Tier) {
+        let budget = tier.policy().texture_budget_bytes;
+
+        if self.pool.budget_bytes() == budget {
+            return;
+        }
+
+        self.pool = crate::effects::pool::Pool::new(budget);
+
+        // The old ledger was only ever tracking the current pair, so dropping
+        // both together leaks nothing; they are re-admitted on the next frame
+        // that needs them, at whatever size the new budget allows.
+        self.targets = None;
+    }
+
+    /// Returns the intermediate size the budget allows, at or below
+    /// `requested`, or `None` when even the smallest useful pair will not fit.
+    ///
+    /// Two intermediates are needed, because every effect here ping-pongs
+    /// between a pair. Halving both dimensions quarters the cost, so the
+    /// search converges in a handful of steps.
+    fn admit_targets(
+        &mut self,
+        tier: crate::graphics::quality::Tier,
+        requested: (u32, u32),
+    ) -> Option<(u32, u32)> {
+        use crate::effects::pool::Descriptor;
+
+        let _ = tier;
+
+        // Release whatever the current pair costs before re-admitting, or a
+        // steady-state frame would charge itself again every time.
+        if let Some(existing) = &self.targets {
+            let descriptor = Descriptor::new(existing.width, existing.height, self.format);
+
+            self.pool.release(descriptor);
+            self.pool.release(descriptor);
+        }
+
+        let (mut width, mut height) = (requested.0.max(1), requested.1.max(1));
+
+        loop {
+            let descriptor = Descriptor::new(width, height, self.format);
+
+            if self.pool.acquire(descriptor) {
+                if self.pool.acquire(descriptor) {
+                    return Some((width, height));
+                }
+
+                // Only one of the pair fitted, which is no use.
+                self.pool.release(descriptor);
+            }
+
+            // A 64px floor: below this an effect is not a reduced-quality
+            // version of itself, it is a different image, and skipping it
+            // outright is the more honest degradation.
+            if width <= 64 || height <= 64 {
+                return None;
+            }
+
+            width = (width / 2).max(1);
+            height = (height / 2).max(1);
+        }
+    }
+
+    /// Bytes of effect intermediates currently accounted, and the budget
+    /// they are accounted against.
+    ///
+    /// Telemetry, in the same spirit as the renderer's retained-layer
+    /// statistics: it is what makes "the budget changed what was rendered" an
+    /// assertion rather than a claim.
+    pub fn memory(&self) -> (u64, u64) {
+        (self.pool.footprint_bytes(), self.pool.budget_bytes())
+    }
+
+    /// The size the intermediates were actually allocated at, if any.
+    ///
+    /// Smaller than the requested size when the budget forced a downscale.
+    pub fn target_size(&self) -> Option<(u32, u32)> {
+        self.targets
+            .as_ref()
+            .map(|targets| (targets.width, targets.height))
     }
 
     /// Whether `layer` has backdrop effects waiting.

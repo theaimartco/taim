@@ -347,6 +347,7 @@ where
                         },
                         shadow: crate::core::Shadow::default(),
                         snap: false,
+                        ..renderer::Quad::default()
                     },
                     Background::Color(Color::TRANSPARENT),
                 );

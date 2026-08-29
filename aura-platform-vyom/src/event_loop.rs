@@ -3,10 +3,13 @@
 use std::collections::{BTreeMap, VecDeque};
 
 use wayland_client::globals::{GlobalList, GlobalListContents, registry_queue_init};
-use wayland_client::protocol::{wl_compositor, wl_registry, wl_surface};
+use wayland_client::protocol::{
+    wl_buffer, wl_compositor, wl_registry, wl_shm, wl_shm_pool, wl_surface,
+};
 use wayland_client::{Connection, Dispatch, EventQueue, Proxy, QueueHandle};
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
 
+use crate::buffer::BufferId;
 use crate::capabilities::{Capabilities, Capability};
 use crate::surface::{Damage, SurfaceId, SurfaceLifecycle, SurfaceState};
 
@@ -51,6 +54,12 @@ pub enum PlatformEvent {
     },
     /// The compositor requested that a surface close.
     CloseRequested(SurfaceId),
+    /// The compositor has finished reading a buffer, which is now safe to
+    /// render into again.
+    ///
+    /// Feed this to [`crate::buffer::BufferPool::release`]. Dropping it stalls
+    /// the surface after `BufferPool::DEFAULT_DEPTH` frames.
+    BufferReleased(BufferId),
 }
 
 struct State {
@@ -86,6 +95,51 @@ impl Dispatch<wl_surface::WlSurface, SurfaceId> for State {
         _surface: &wl_surface::WlSurface,
         _event: wl_surface::Event,
         _id: &SurfaceId,
+        _connection: &Connection,
+        _queue: &QueueHandle<Self>,
+    ) {
+    }
+}
+
+/// The compositor has finished with a buffer.
+///
+/// Without this the pool never sees a release, every buffer stays `InFlight`,
+/// and the surface stalls permanently after `BufferPool::DEFAULT_DEPTH`
+/// frames. It is the half of the buffer cycle that is easy to omit, because
+/// omitting it works for exactly three frames.
+impl Dispatch<wl_buffer::WlBuffer, BufferId> for State {
+    fn event(
+        state: &mut Self,
+        _buffer: &wl_buffer::WlBuffer,
+        event: wl_buffer::Event,
+        id: &BufferId,
+        _connection: &Connection,
+        _queue: &QueueHandle<Self>,
+    ) {
+        if matches!(event, wl_buffer::Event::Release) {
+            state.events.push_back(PlatformEvent::BufferReleased(*id));
+        }
+    }
+}
+
+impl Dispatch<wl_shm::WlShm, ()> for State {
+    fn event(
+        _state: &mut Self,
+        _shm: &wl_shm::WlShm,
+        _event: wl_shm::Event,
+        _data: &(),
+        _connection: &Connection,
+        _queue: &QueueHandle<Self>,
+    ) {
+    }
+}
+
+impl Dispatch<wl_shm_pool::WlShmPool, ()> for State {
+    fn event(
+        _state: &mut Self,
+        _pool: &wl_shm_pool::WlShmPool,
+        _event: wl_shm_pool::Event,
+        _data: &(),
         _connection: &Connection,
         _queue: &QueueHandle<Self>,
     ) {
@@ -199,6 +253,50 @@ impl Toplevel {
     ///
     /// Passing no damage commits the whole surface, which is the correct
     /// fallback whenever the region is unknown.
+    ///
+    /// Commits **without attaching a buffer**, which is correct only for a
+    /// surface whose content has not changed. To present pixels, use
+    /// [`Toplevel::attach_and_commit`].
+    ///
+    /// ---
+    ///
+    /// Attaches `buffer`, submits `damage`, and commits.
+    ///
+    /// **This is the call that makes a frame appear.**
+    /// [`Toplevel::commit_with_damage`] does everything except attach, and a
+    /// commit with no buffer presents nothing — which is why nothing has ever
+    /// appeared on a screen through this backend.
+    ///
+    /// Refuses before the first configure is acknowledged: attaching then is a
+    /// protocol error that ends the connection, not a request the compositor
+    /// ignores.
+    ///
+    /// The caller must have taken `buffer` from a
+    /// [`crate::buffer::BufferPool`] and must feed
+    /// [`PlatformEvent::BufferReleased`] back to it, or the surface stalls
+    /// once every buffer is in flight.
+    pub fn attach_and_commit(
+        &self,
+        lifecycle: &SurfaceLifecycle,
+        buffer: &wl_buffer::WlBuffer,
+        damage: Option<Damage>,
+    ) -> bool {
+        if !lifecycle.may_attach_buffer() {
+            return false;
+        }
+
+        // Offset (0, 0): the buffer covers the surface. A non-zero offset is
+        // for the deprecated attach-and-move behaviour, which xdg_shell
+        // forbids.
+        self.surface.attach(Some(buffer), 0, 0);
+        self.commit_with_damage(lifecycle, damage);
+
+        true
+    }
+
+    /// Submits `damage` and commits, without attaching a buffer.
+    ///
+    /// See [`Toplevel::attach_and_commit`] for the call that presents pixels.
     pub fn commit_with_damage(&self, lifecycle: &SurfaceLifecycle, damage: Option<Damage>) {
         match damage.and_then(|damage| lifecycle.clip_damage(damage)) {
             Some(damage) => {

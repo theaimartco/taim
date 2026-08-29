@@ -81,6 +81,8 @@ impl Pipeline {
             let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("aura_wgpu.quad.gradient.shader"),
                 source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(concat!(
+                    include_str!("../shader/material.wgsl"),
+                    "\n",
                     include_str!("../shader/quad.wgsl"),
                     "\n",
                     include_str!("../shader/vertex.wgsl"),
@@ -125,6 +127,8 @@ impl Pipeline {
                             9 => Float32,
                             // Snap
                             10 => Uint32,
+                            // Material: roughness, thickness, ior, dispersion
+                            11 => Float32x4,
                         ),
                     }],
                     compilation_options: wgpu::PipelineCompilationOptions::default(),

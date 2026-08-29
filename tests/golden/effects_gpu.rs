@@ -82,6 +82,37 @@ fn intermediate(rgba: &[u8]) -> usize {
         .count()
 }
 
+/// Total linear light in a screenshot's red channel.
+///
+/// A screenshot is **sRGB-encoded**, so summing its bytes does not measure
+/// light -- it measures a perceptual encoding of light, and the two disagree
+/// by the transfer function. Both conservation tests below originally summed
+/// raw bytes and called the result luminance. That happened to hold while the
+/// renderer blended in gamma space (`web-colors`, then a default feature),
+/// because a blur of encoded values conserves encoded values.
+///
+/// It stopped holding the moment compositing became linear, and the failure
+/// was the test's premise rather than the kernel: averaging in linear light
+/// and re-encoding gives a *brighter* edge than averaging encoded values --
+/// a 50/50 mix is 187/255, not 127/255 -- so the byte sum rises by ~13% while
+/// the light is conserved exactly.
+///
+/// Measuring what the tests actually mean requires decoding first.
+fn linear_luminance(rgba: &[u8]) -> f64 {
+    rgba.chunks_exact(4)
+        .map(|pixel| {
+            let encoded = f64::from(pixel[0]) / 255.0;
+
+            // sRGB EOTF, matching `aura_core::color::space::Transfer::Srgb`.
+            if encoded <= 0.04045 {
+                encoded / 12.92
+            } else {
+                ((encoded + 0.055) / 1.055).powf(2.4)
+            }
+        })
+        .sum()
+}
+
 #[test]
 fn a_blur_softens_an_edge_that_was_hard() {
     needs_gpu!(renderer);
@@ -124,19 +155,16 @@ fn a_blur_conserves_the_image_it_blurs() {
     // destroying it. A kernel whose weights do not sum to one shows up here
     // as an image that got brighter or darker overall -- the classic bug, and
     // invisible in a single screenshot.
-    let total =
-        |rgba: &[u8]| -> u64 { rgba.chunks_exact(4).map(|pixel| u64::from(pixel[0])).sum() };
-
     // Non-vacuous: identical images have identical totals, and this test
     // would then pass while proving nothing.
     assert_ne!(sharp, blurred, "the blur changed nothing at all");
 
-    let before = total(&sharp);
-    let after = total(&blurred);
+    let before = linear_luminance(&sharp);
+    let after = linear_luminance(&blurred);
 
-    println!("luminance: sharp={before} blurred={after}");
+    println!("linear luminance: sharp={before:.1} blurred={after:.1}");
 
-    let drift = (after as f64 - before as f64).abs() / before as f64;
+    let drift = (after - before).abs() / before;
 
     assert!(
         drift < 0.10,
@@ -208,12 +236,10 @@ fn noise_perturbs_a_flat_fill_without_shifting_it() {
 
     assert_ne!(flat, grainy, "noise changed nothing at all");
 
-    // Grain is signed, so it must not move the image's overall brightness.
-    let total =
-        |rgba: &[u8]| -> u64 { rgba.chunks_exact(4).map(|pixel| u64::from(pixel[0])).sum() };
-
-    let before = total(&flat) as f64;
-    let after = total(&grainy) as f64;
+    // Grain is signed, so it must not move the image's overall brightness --
+    // measured in light, not in encoded bytes. See `linear_luminance`.
+    let before = linear_luminance(&flat);
+    let after = linear_luminance(&grainy);
     let drift = (after - before).abs() / before;
 
     println!("noise luminance drift: {:.3}%", drift * 100.0);

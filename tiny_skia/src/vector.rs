@@ -183,18 +183,36 @@ impl Cache {
             }
 
             if let Some([r, g, b, _]) = key.color {
-                // Apply color filter
+                // Apply color filter. The filter colour is authored sRGB and
+                // is used straight, so it decodes like any other colour; the
+                // rendered alpha is coverage and is kept.
+                let (r, g, b) = (
+                    crate::engine::decode_channel(r),
+                    crate::engine::decode_channel(g),
+                    crate::engine::decode_channel(b),
+                );
+
                 for pixel in bytemuck::cast_slice_mut::<u8, u32>(image.data_mut()) {
                     *pixel = bytemuck::cast(
                         tiny_skia::ColorU8::from_rgba(b, g, r, (*pixel >> 24) as u8).premultiply(),
                     );
                 }
             } else {
-                // Swap R and B channels for `softbuffer` presentation
+                // `resvg` writes premultiplied sRGB. Decode into the working
+                // space and swap R and B for `softbuffer` presentation.
                 for pixel in bytemuck::cast_slice_mut::<u8, u32>(image.data_mut()) {
-                    *pixel = *pixel & 0xFF00_FF00
-                        | ((0x0000_00FF & *pixel) << 16)
-                        | ((0x00FF_0000 & *pixel) >> 16);
+                    let value = *pixel;
+
+                    let red = (value & 0xFF) as u8;
+                    let green = ((value >> 8) & 0xFF) as u8;
+                    let blue = ((value >> 16) & 0xFF) as u8;
+                    let alpha = value & 0xFF00_0000;
+
+                    let (red, green, blue) =
+                        crate::engine::decode_premultiplied(red, green, blue, (value >> 24) as u8);
+
+                    *pixel =
+                        alpha | (u32::from(red) << 16) | (u32::from(green) << 8) | u32::from(blue);
                 }
             }
 

@@ -11,6 +11,7 @@ struct GradientVertexInput {
     @location(8) border_radius: vec4<f32>,
     @location(9) border_width: f32,
     @location(10) snap: u32,
+    @location(11) material: vec4<f32>,
 }
 
 struct GradientVertexOutput {
@@ -25,6 +26,7 @@ struct GradientVertexOutput {
     @location(8) border_color: vec4<f32>,
     @location(9) border_radius: vec4<f32>,
     @location(10) border_width: f32,
+    @location(11) @interpolate(flat) material: vec4<f32>,
 }
 
 @vertex
@@ -68,6 +70,7 @@ fn gradient_vs_main(input: GradientVertexInput) -> GradientVertexOutput {
     out.border_color = premultiply(input.border_color);
     out.border_radius = border_radius * globals.scale;
     out.border_width = input.border_width * globals.scale;
+    out.material = input.material;
 
     return out;
 }
@@ -166,8 +169,10 @@ fn gradient_fs_main(input: GradientVertexOutput) -> @location(0) vec4<f32> {
     let pos = input.position_and_scale.xy;
     let scale = input.position_and_scale.zw;
 
+    let sdf_point = -(input.position.xy - pos - scale / 2.0) * 2.0;
+
     var dist: f32 = rounded_box_sdf(
-        -(input.position.xy - pos - scale / 2.0) * 2.0,
+        sdf_point,
         scale,
         input.border_radius * 2.0
     ) / 2.0;
@@ -180,5 +185,17 @@ fn gradient_fs_main(input: GradientVertexOutput) -> @location(0) vec4<f32> {
         );
     }
 
-    return mixed_color * clamp(0.5-dist, 0.0, 1.0);
+    let coverage = clamp(0.5 - dist, 0.0, 1.0);
+
+    // Material shading, identical to the solid pipeline: `sdf_point` is scaled
+    // by -2 relative to screen space, so its gradient is negated.
+    let highlight = quad_specular(
+        dist,
+        -rounded_box_gradient(sdf_point, scale, input.border_radius * 2.0),
+        input.material,
+        globals.light.xyz
+    );
+
+    // Additive light, premultiplied by coverage. Alpha is untouched.
+    return mixed_color * coverage + vec4<f32>(vec3<f32>(highlight * coverage), 0.0);
 }

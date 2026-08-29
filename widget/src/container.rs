@@ -444,6 +444,7 @@ where
                 border: style.border,
                 shadow: style.shadow,
                 snap: style.snap,
+                ..renderer::Quad::default()
             },
             style
                 .background

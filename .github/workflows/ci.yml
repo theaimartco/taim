@@ -99,9 +99,31 @@ jobs:
       - run: cargo check -p aura --target wasm32-unknown-unknown --no-default-features --features "wgpu,webgl,web-colors"
 
   test:
-    name: test
+    name: test (${{ matrix.configuration.name }})
     runs-on: ubuntu-latest
     needs: [fmt, check, clippy]
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration:
+          # The production configuration: linear-light compositing.
+          - name: default
+            args: ""
+          # No default features at all. This is only a meaningful command
+          # because the `aura` dev-dependency sets `default-features = false`
+          # at the workspace definition -- without that it silently re-enabled
+          # every default, and `web-colors` in particular, so this job would
+          # have tested the same thing as `default` while claiming otherwise.
+          - name: no-default-features
+            args: "--no-default-features"
+          # The legacy Web colour-management mode. Blends in gamma space by
+          # design; `tests/color/contract.rs` and `tests/gpu/color_output.rs`
+          # assert that it does, so the two modes cannot drift into each
+          # other unnoticed.
+          - name: legacy-web-colors
+            args: "--features web-colors"
+          - name: all-features
+            args: "--all-features"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -110,7 +132,45 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
-      - run: cargo test --workspace
+      - run: cargo test --workspace ${{ matrix.configuration.args }}
+
+  colour-contract:
+    name: colour contract (${{ matrix.configuration.name }})
+    runs-on: ubuntu-latest
+    needs: [fmt]
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration:
+          - name: linear-default
+            args: ""
+          - name: legacy-web-colors
+            args: "--features web-colors"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Linux GUI/Wayland/X11 dev packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+      # Fails loudly if `web-colors` re-enters the default feature set or is
+      # dragged in by a dependency edge. That is not a hypothetical: it is
+      # exactly how gamma-space blending became the shipping default and stayed
+      # invisible behind a passing suite.
+      - name: The build under test composites in the colour space it claims
+        run: cargo test --test color ${{ matrix.configuration.args }} -- --nocapture
+
+      # GPU-dependent cases skip rather than fail without an adapter, and a
+      # skip must be visible: a silently skipped rendering test looks exactly
+      # like a passing one in a summary.
+      - name: Report skipped GPU cases
+        run: |
+          cargo test --test gpu ${{ matrix.configuration.args }} -- --nocapture 2>&1 | tee gpu.log
+          if grep -q "skipped: no wgpu adapter available" gpu.log; then
+            echo "::warning title=GPU tests skipped::No wgpu adapter on this runner; \
+            colour output and target-format tests did NOT run."
+          fi
 
   accessibility:
     name: AT-SPI over a real bus

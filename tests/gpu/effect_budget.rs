@@ -13,11 +13,13 @@ use aura_wgpu::effects::pool::{Descriptor, Pool};
 use aura_wgpu::effects::{Effect, Graph, blur::Blur};
 
 fn descriptor(width: u32, height: u32) -> Descriptor {
-    Descriptor {
-        width,
-        height,
-        bytes_per_pixel: 4,
-    }
+    Descriptor::new(width, height, aura_wgpu::wgpu::TextureFormat::Rgba8Unorm)
+}
+
+/// The same shape as [`descriptor`], in the half-float format HDR
+/// compositing uses for its intermediates.
+fn half_float(width: u32, height: u32) -> Descriptor {
+    Descriptor::new(width, height, aura_wgpu::wgpu::TextureFormat::Rgba16Float)
 }
 
 // ---------------------------------------------------------------------
@@ -319,4 +321,160 @@ fn frame_pressure_slides_its_window() {
         fp.record(Duration::from_millis(5));
     }
     assert_eq!(fp.missed_frame_ratio(), 0.0);
+}
+
+// ---------------------------------------------------------------------
+// Format-aware accounting (§8, §9)
+// ---------------------------------------------------------------------
+
+/// The defect: cost was `width * height * 4`, regardless of format.
+///
+/// A half-float intermediate is exactly twice an 8-bit one at the same
+/// dimensions, so a budget priced against RGBA8 permitted twice the memory it
+/// intended the moment HDR compositing switched the intermediates to
+/// `Rgba16Float`.
+#[test]
+fn a_half_float_intermediate_costs_twice_an_eight_bit_one() {
+    let eight_bit = descriptor(256, 256);
+    let half = half_float(256, 256);
+
+    assert_eq!(eight_bit.bytes(), 256 * 256 * 4);
+    assert_eq!(half.bytes(), eight_bit.bytes() * 2);
+}
+
+#[test]
+fn accounting_follows_the_format_across_the_range_aura_uses() {
+    use aura_wgpu::wgpu::TextureFormat;
+
+    // Every format the renderer can select for a surface or an intermediate,
+    // priced per texel at a fixed size.
+    for (format, bytes_per_texel) in [
+        (TextureFormat::R8Unorm, 1),
+        (TextureFormat::Rgba8Unorm, 4),
+        (TextureFormat::Bgra8Unorm, 4),
+        (TextureFormat::Rgba8UnormSrgb, 4),
+        (TextureFormat::Bgra8UnormSrgb, 4),
+        (TextureFormat::Rgb10a2Unorm, 4),
+        (TextureFormat::R16Float, 2),
+        (TextureFormat::Rg16Float, 4),
+        (TextureFormat::Rgba16Float, 8),
+        (TextureFormat::Rgba32Float, 16),
+    ] {
+        let descriptor = Descriptor::new(64, 64, format);
+
+        assert_eq!(
+            descriptor.bytes(),
+            64 * 64 * bytes_per_texel,
+            "{format:?} was priced wrongly"
+        );
+    }
+}
+
+#[test]
+fn accounting_includes_samples_layers_and_mips() {
+    use aura_wgpu::wgpu::TextureFormat;
+
+    let base = Descriptor::new(64, 64, TextureFormat::Rgba8Unorm);
+
+    // Multisampling multiplies the texel count.
+    let msaa = Descriptor {
+        sample_count: 4,
+        ..base
+    };
+    assert_eq!(msaa.bytes(), base.bytes() * 4);
+
+    // Array layers multiply it too.
+    let layered = Descriptor { layers: 6, ..base };
+    assert_eq!(layered.bytes(), base.bytes() * 6);
+
+    // A full mip chain adds strictly less than another whole level, and
+    // strictly more than nothing -- the classic 1/3 tail.
+    let mipped = Descriptor {
+        mip_level_count: 7,
+        ..base
+    };
+    assert!(mipped.bytes() > base.bytes());
+    assert!(mipped.bytes() < base.bytes() * 2);
+}
+
+#[test]
+fn depth_formats_are_priced_rather_than_treated_as_free() {
+    use aura_wgpu::wgpu::TextureFormat;
+
+    // Depth and stencil formats report no whole-texture block size, only a
+    // per-aspect one. An implementation that took `None` as zero would
+    // account every depth attachment as free.
+    for format in [
+        TextureFormat::Depth32Float,
+        TextureFormat::Depth24Plus,
+        TextureFormat::Depth24PlusStencil8,
+    ] {
+        let descriptor = Descriptor::new(64, 64, format);
+
+        assert!(
+            descriptor.bytes() >= 64 * 64,
+            "{format:?} was accounted as {} bytes",
+            descriptor.bytes()
+        );
+    }
+}
+
+#[test]
+fn a_half_float_pool_admits_half_as_many_intermediates() {
+    // The budget behaviour that follows from the accounting: the same byte
+    // budget holds half as many half-float intermediates. This is the
+    // property a renderer switching to HDR actually experiences.
+    let eight_bit = descriptor(256, 256);
+    let half = half_float(256, 256);
+
+    let budget = eight_bit.bytes() * 2;
+
+    let mut pool = Pool::new(budget);
+    assert!(pool.acquire(eight_bit));
+    assert!(pool.acquire(eight_bit));
+    assert!(!pool.acquire(eight_bit), "the budget did not bound at two");
+
+    let mut pool = Pool::new(budget);
+    assert!(pool.acquire(half));
+    assert!(
+        !pool.acquire(half),
+        "two half-float intermediates fitted a budget sized for two 8-bit ones"
+    );
+}
+
+#[test]
+fn releasing_a_half_float_intermediate_reclaims_its_full_cost() {
+    let half = half_float(128, 128);
+    let mut pool = Pool::new(half.bytes() * 2);
+
+    assert!(pool.acquire(half));
+    assert_eq!(pool.used_bytes(), half.bytes());
+
+    pool.release(half);
+    assert_eq!(pool.used_bytes(), 0);
+    assert_eq!(pool.reserved_bytes(), half.bytes());
+
+    // Reuse must not allocate again.
+    assert!(pool.acquire(half));
+    assert_eq!(pool.footprint_bytes(), half.bytes());
+}
+
+#[test]
+fn textures_of_different_formats_do_not_substitute_for_one_another() {
+    // Reuse is only sound between textures that could actually stand in for
+    // each other. Same dimensions, different format, is not that.
+    let eight_bit = descriptor(128, 128);
+    let half = half_float(128, 128);
+
+    let mut pool = Pool::new(eight_bit.bytes() + half.bytes());
+
+    assert!(pool.acquire(eight_bit));
+    pool.release(eight_bit);
+
+    assert!(pool.acquire(half));
+
+    // The 8-bit texture is still idle rather than having been handed out as
+    // a half-float one.
+    assert_eq!(pool.reserved_bytes(), eight_bit.bytes());
+    assert_eq!(pool.used_bytes(), half.bytes());
 }

@@ -23,23 +23,135 @@
 //! footprint grew monotonically and the budget exhausted even under
 //! perfect reuse.
 
-use std::collections::BTreeMap;
+use rustc_hash::FxHashMap;
+
+/// Returns the accounted byte size of a texture.
+///
+/// # Why this is not `width * height * 4`
+///
+/// It was. `Descriptor` previously carried a `bytes_per_pixel: u8` that was
+/// only ever set in tests, and only ever set to `4`. That is wrong for every
+/// format Aura uses outside 8-bit colour, and wrong by exactly 2x for the
+/// half-float intermediates HDR compositing depends on -- so a budget sized
+/// against it would permit twice the memory it intended the moment HDR was
+/// switched on.
+///
+/// # This is an estimate, and says so
+///
+/// `wgpu` cannot report committed device memory: drivers pad, tile, align and
+/// sometimes alias allocations, none of which is observable through the API.
+/// What this computes is the *accounted* size -- texel data summed across
+/// every mip level, layer and sample. That is the right basis for a budget
+/// because it is deterministic, monotonic in the things a caller controls,
+/// and identical on every driver. Do not present it as VRAM usage.
+#[must_use]
+pub fn estimated_texture_bytes(descriptor: &wgpu::TextureDescriptor<'_>) -> u64 {
+    let format = descriptor.format;
+    let (block_width, block_height) = format.block_dimensions();
+
+    // Depth and stencil formats report no size for the texture as a whole,
+    // only per aspect, so sum the aspects that exist: a combined
+    // depth-plus-stencil attachment costs both.
+    let bytes_per_block = match format.block_copy_size(None) {
+        Some(size) => u64::from(size),
+        None => {
+            let depth = format
+                .block_copy_size(Some(wgpu::TextureAspect::DepthOnly))
+                .unwrap_or(0);
+            let stencil = format
+                .block_copy_size(Some(wgpu::TextureAspect::StencilOnly))
+                .unwrap_or(0);
+
+            match u64::from(depth) + u64::from(stencil) {
+                // An unrecognised format is better accounted pessimistically
+                // than as free: a budget that under-counts bounds nothing.
+                0 => 4,
+                combined => combined,
+            }
+        }
+    };
+
+    let mut total = 0u64;
+
+    for level in 0..descriptor.mip_level_count.max(1) {
+        let size = descriptor.size.mip_level_size(level, descriptor.dimension);
+
+        total += u64::from(size.width.div_ceil(block_width))
+            * u64::from(size.height.div_ceil(block_height))
+            * u64::from(size.depth_or_array_layers)
+            * bytes_per_block;
+    }
+
+    total * u64::from(descriptor.sample_count.max(1))
+}
 
 /// A texture descriptor used for reusable effect intermediates.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+///
+/// Carries enough of the real texture's shape to price it: two textures that
+/// differ only in format are different entries, because they cost different
+/// amounts and cannot substitute for one another.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Descriptor {
     /// Texture width in physical pixels.
     pub width: u32,
     /// Texture height in physical pixels.
     pub height: u32,
-    /// Bytes per pixel of the texture format.
-    pub bytes_per_pixel: u8,
+    /// The texture's format, which decides its cost per texel.
+    pub format: wgpu::TextureFormat,
+    /// Samples per texel. `1` for everything that is not an MSAA attachment.
+    pub sample_count: u32,
+    /// Mip levels. `1` for a render target.
+    pub mip_level_count: u32,
+    /// Array layers or depth slices.
+    pub layers: u32,
 }
 
 impl Descriptor {
-    /// Returns the byte footprint of one texture of this descriptor.
+    /// A single-sample, single-mip, single-layer 2D texture.
+    ///
+    /// The shape every effect intermediate actually has.
+    #[must_use]
+    pub const fn new(width: u32, height: u32, format: wgpu::TextureFormat) -> Self {
+        Self {
+            width,
+            height,
+            format,
+            sample_count: 1,
+            mip_level_count: 1,
+            layers: 1,
+        }
+    }
+
+    /// Describes the texture `descriptor` would allocate.
+    #[must_use]
+    pub fn of(descriptor: &wgpu::TextureDescriptor<'_>) -> Self {
+        Self {
+            width: descriptor.size.width,
+            height: descriptor.size.height,
+            format: descriptor.format,
+            sample_count: descriptor.sample_count,
+            mip_level_count: descriptor.mip_level_count,
+            layers: descriptor.size.depth_or_array_layers,
+        }
+    }
+
+    /// Returns the accounted byte footprint of one such texture.
+    #[must_use]
     pub fn bytes(self) -> u64 {
-        u64::from(self.width) * u64::from(self.height) * u64::from(self.bytes_per_pixel)
+        estimated_texture_bytes(&wgpu::TextureDescriptor {
+            label: None,
+            size: wgpu::Extent3d {
+                width: self.width,
+                height: self.height,
+                depth_or_array_layers: self.layers,
+            },
+            mip_level_count: self.mip_level_count,
+            sample_count: self.sample_count,
+            dimension: wgpu::TextureDimension::D2,
+            format: self.format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        })
     }
 }
 
@@ -50,7 +162,7 @@ pub struct Pool {
     budget: u64,
     used: u64,
     reserved: u64,
-    free: BTreeMap<Descriptor, usize>,
+    free: FxHashMap<Descriptor, usize>,
 }
 
 impl Pool {
@@ -60,7 +172,7 @@ impl Pool {
             budget,
             used: 0,
             reserved: 0,
-            free: BTreeMap::new(),
+            free: FxHashMap::default(),
         }
     }
 
@@ -119,9 +231,12 @@ impl Pool {
     /// within `target_reserved_ceiling`, or nothing idle remains.
     fn evict_until(&mut self, target_reserved_ceiling: u64) {
         while self.reserved > target_reserved_ceiling {
-            // Evict the largest idle descriptor first for the biggest
-            // reclaim per eviction.
-            let Some((&descriptor, _)) = self.free.iter().next_back() else {
+            // Evict the largest idle descriptor first for the biggest reclaim
+            // per eviction. Chosen by byte cost explicitly: the free list is
+            // keyed by shape, and the largest *texture* is not the largest
+            // key in any ordering the key type could derive.
+            let Some(descriptor) = self.free.keys().copied().max_by_key(|entry| entry.bytes())
+            else {
                 break;
             };
 
@@ -160,11 +275,12 @@ mod tests {
     use super::*;
 
     fn descriptor(width: u32, height: u32) -> Descriptor {
-        Descriptor {
-            width,
-            height,
-            bytes_per_pixel: 4,
-        }
+        Descriptor::new(width, height, wgpu::TextureFormat::Rgba8Unorm)
+    }
+
+    /// The same shape in half float, which costs exactly twice as much.
+    pub(super) fn half_float(width: u32, height: u32) -> Descriptor {
+        Descriptor::new(width, height, wgpu::TextureFormat::Rgba16Float)
     }
 
     #[test]
@@ -227,5 +343,37 @@ mod tests {
         pool.release(d);
         assert!(pool.acquire(d));
         assert!(pool.footprint_bytes() <= pool.budget_bytes());
+    }
+}
+
+#[cfg(test)]
+mod format_tests {
+    use super::tests::*;
+    use super::*;
+
+    #[test]
+    fn a_half_float_intermediate_costs_twice_an_eight_bit_one() {
+        // The accounting defect this module's `estimated_texture_bytes`
+        // documentation describes: cost used to be `width * height * 4`
+        // regardless of format, so a budget sized for 8-bit intermediates
+        // admitted twice the memory it intended once HDR compositing moved
+        // them to half float.
+        let eight_bit = Descriptor::new(256, 256, wgpu::TextureFormat::Rgba8Unorm);
+        let half = half_float(256, 256);
+
+        assert_eq!(eight_bit.bytes(), 256 * 256 * 4);
+        assert_eq!(half.bytes(), eight_bit.bytes() * 2);
+    }
+
+    #[test]
+    fn the_budget_admits_half_as_many_half_float_intermediates() {
+        let half = half_float(128, 128);
+        let mut pool = Pool::new(half.bytes());
+
+        assert!(pool.acquire(half));
+        assert!(
+            !pool.acquire(half),
+            "a budget sized for one half-float intermediate admitted two"
+        );
     }
 }

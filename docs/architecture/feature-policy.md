@@ -13,8 +13,8 @@ the feature combinations `scripts/ci/check-workspace.sh` and
 ### `default`
 
 ```text
-wgpu, tiny-skia, crisp, hinting, web-colors, thread-pool,
-linux-theme-detection, x11, wayland
+wgpu, tiny-skia, crisp, hinting, thread-pool,
+linux-theme-detection, x11, wayland, fira-sans
 ```
 
 This is the VYOM production profile: Vulkan-capable `wgpu` renderer with a
@@ -24,6 +24,20 @@ thread-pool executor, Linux system theme detection, and both X11 and
 Wayland windowing backends enabled during the transition window before the
 native VYOM/Smithay backend (Phase 14) lands.
 
+**`web-colors` was removed from this list.** It disables linear-light
+compositing, so while it was a default the shipping renderer blended
+gamma-encoded components — Cargo.toml's own description of the feature calls
+that behaviour broken. It is now opt-in legacy compatibility; see
+`docs/architecture/color-pipeline.md` §7.
+
+The removal was paired with a second fix, because the feature was not merely
+wrong but *unobservable*: the `aura` crate lists itself in its own
+`[dev-dependencies]`, so every integration test inherited the full default set
+and `cargo test --no-default-features` was a no-op. The workspace dependency
+now sets `default-features = false`, which Cargo requires to be declared there
+rather than at the dev-dependency. `tests/color/contract.rs` fails if either
+half regresses.
+
 ### `minimal-headless`
 
 No default features. Compiles `aura` with only the renderer-neutral core,
@@ -31,6 +45,10 @@ runtime, and widget crates reachable — no GPU backend, no windowing
 backend, no software rasterizer. This is the profile CI uses to catch
 accidental default-feature bleed into `core`/`runtime`/`widget` and is
 exercised by `tests/smoke/workspace.rs`.
+
+This command means what it says only because of the `default-features = false`
+noted above. Before that, the `aura` dev-dependency re-enabled every default
+behind it.
 
 ```bash
 cargo check -p aura --no-default-features
