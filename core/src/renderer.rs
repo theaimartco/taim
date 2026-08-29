@@ -148,6 +148,51 @@ pub struct Quad {
 
     /// Whether the [`Quad`] should be snapped to the pixel grid.
     pub snap: bool,
+
+    /// How much light this [`Quad`] emits, relative to SDR diffuse white.
+    ///
+    /// `1.0` -- the default -- is an ordinary surface, and is what every
+    /// widget in the framework draws today. Larger values emit: on a
+    /// half-float surface a `4.93` white is a 1,000-nit highlight, brighter
+    /// than the page it sits on rather than merely lighter.
+    ///
+    /// Use [`aura_core::color::space::nits_to_scene`] to convert an absolute
+    /// luminance into this scale.
+    ///
+    /// Applies to the fill and the border, which are the quad's own surfaces.
+    /// It deliberately does *not* apply to the shadow: a shadow is where
+    /// light is missing, and a glowing one is not a thing.
+    ///
+    /// What this [`Quad`] is made of.
+    ///
+    /// [`Material::OPAQUE`] by default, which is what every widget already
+    /// is and which shades exactly as it did before materials existed.
+    ///
+    /// A material makes the quad respond to the scene light: its bevel
+    /// catches a specular highlight whose shape comes from the material's
+    /// roughness and whose strength comes from its index of refraction. The
+    /// bevel is analytic, derived from the same rounded-rectangle signed
+    /// distance field the quad is already drawn with, so a lit edge costs no
+    /// geometry and no extra attachment.
+    ///
+    /// Ignored, like [`Quad::luminance`], when the renderer is not
+    /// compositing in linear light: a specular highlight added to
+    /// gamma-encoded components is not a highlight.
+    pub material: crate::material::Material,
+
+    /// Values above `1.0` are only preserved when two things hold, and both
+    /// are currently opt-in:
+    ///
+    /// - The surface can carry them. Every `Unorm` format clamps at `1.0`
+    ///   whatever its precision, so on a standard-range surface this
+    ///   brightens up to white and no further.
+    /// - The renderer composites in linear light. The `web-colors` feature
+    ///   packs sRGB-encoded components and blends those directly, and
+    ///   scaling a gamma-encoded component changes hue rather than
+    ///   luminance -- so this is ignored under it rather than applied
+    ///   wrongly. `web-colors` is a default feature of the `aura` crate
+    ///   today, which means the default build ignores this field.
+    pub luminance: f32,
 }
 
 impl Default for Quad {
@@ -157,6 +202,8 @@ impl Default for Quad {
             border: Border::default(),
             shadow: Shadow::default(),
             snap: CRISP,
+            luminance: 1.0,
+            material: crate::material::Material::OPAQUE,
         }
     }
 }

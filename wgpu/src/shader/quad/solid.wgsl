@@ -10,6 +10,7 @@ struct SolidVertexInput {
     @location(7) shadow_offset: vec2<f32>,
     @location(8) shadow_blur_radius: f32,
     @location(9) snap: u32,
+    @location(10) material: vec4<f32>,
 }
 
 struct SolidVertexOutput {
@@ -23,6 +24,7 @@ struct SolidVertexOutput {
     @location(6) shadow_color: vec4<f32>,
     @location(7) shadow_offset: vec2<f32>,
     @location(8) shadow_blur_radius: f32,
+    @location(9) @interpolate(flat) material: vec4<f32>,
 }
 
 @vertex
@@ -59,6 +61,7 @@ fn solid_vs_main(input: SolidVertexInput) -> SolidVertexOutput {
     out.shadow_color = premultiply(input.shadow_color);
     out.shadow_offset = input.shadow_offset * globals.scale;
     out.shadow_blur_radius = input.shadow_blur_radius * globals.scale;
+    out.material = input.material;
 
     return out;
 }
@@ -69,8 +72,10 @@ fn solid_fs_main(
 ) -> @location(0) vec4<f32> {
     var mixed_color: vec4<f32> = input.color;
 
+    let sdf_point = -(input.position.xy - input.pos - input.scale * 0.5) * 2.0;
+
     var dist = rounded_box_sdf(
-        -(input.position.xy - input.pos - input.scale * 0.5) * 2.0,
+        sdf_point,
         input.scale,
         input.border_radius * 2.0
     ) / 2.0;
@@ -85,7 +90,20 @@ fn solid_fs_main(
 
     var quad_alpha: f32 = clamp(0.5-dist, 0.0, 1.0);
 
-    let quad_color = mixed_color * quad_alpha;
+    var quad_color = mixed_color * quad_alpha;
+
+    // Material shading. `sdf_point` is scaled by -2 relative to screen space,
+    // so its gradient is negated to point outwards on screen.
+    let highlight = quad_specular(
+        dist,
+        -rounded_box_gradient(sdf_point, input.scale, input.border_radius * 2.0),
+        input.material,
+        globals.light.xyz
+    );
+
+    // Additive light, premultiplied by coverage to match `quad_color`. Alpha
+    // is untouched: a highlight adds light, not opacity.
+    quad_color = quad_color + vec4<f32>(vec3<f32>(highlight * quad_alpha), 0.0);
 
     if input.shadow_color.a > 0.0 {
         var shadow_dist: f32 = rounded_box_sdf(

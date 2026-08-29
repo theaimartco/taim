@@ -73,6 +73,8 @@ impl Pipeline {
             source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(concat!(
                 include_str!("../shader/color.wgsl"),
                 "\n",
+                include_str!("../shader/material.wgsl"),
+                "\n",
                 include_str!("../shader/quad.wgsl"),
                 "\n",
                 include_str!("../shader/vertex.wgsl"),
@@ -111,6 +113,8 @@ impl Pipeline {
                         8 => Float32,
                         // Snap
                         9 => Uint32,
+                        // Material: roughness, thickness, ior, dispersion
+                        10 => Float32x4,
                     ),
                 }],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),

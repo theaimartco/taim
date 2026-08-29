@@ -44,6 +44,12 @@ pub enum Capability {
     IdleNotify,
     /// Idle inhibition.
     IdleInhibit,
+    /// Per-output colour description: primaries, transfer, luminance range.
+    ///
+    /// Without it the backend cannot know what panel it is presenting to, and
+    /// the renderer tone maps into an assumed standard-range display — giving
+    /// up an HDR panel's entire headroom.
+    ColorManagement,
     /// Authenticated VYOM secure-shell extension.
     VyomSecureShell,
     /// VYOM power and thermal extension.
@@ -71,6 +77,7 @@ impl Capability {
             Self::SessionLock => ("ext_session_lock_manager_v1", 1),
             Self::IdleNotify => ("ext_idle_notifier_v1", 1),
             Self::IdleInhibit => ("zwp_idle_inhibit_manager_v1", 1),
+            Self::ColorManagement => ("wp_color_manager_v1", 1),
             Self::VyomSecureShell => ("vyom_secure_shell_v1", 1),
             Self::VyomPower => ("vyom_power_manager_v1", 1),
             Self::VyomAccessibility => ("vyom_accessibility_manager_v1", 1),

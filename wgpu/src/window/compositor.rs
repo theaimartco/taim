@@ -1,6 +1,7 @@
 //! Connect a window with a renderer.
 use crate::core::Color;
 use crate::core::backend;
+use crate::core::color::Display;
 use crate::core::renderer;
 use crate::graphics::color;
 use crate::graphics::compositor;
@@ -9,6 +10,72 @@ use crate::{Engine, Renderer};
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+
+/// How the compositor should pick a surface format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ColorPolicy {
+    /// Standard dynamic range: an 8-bit surface, the way every user interface
+    /// framework has presented since the 1990s.
+    #[default]
+    Sdr,
+    /// Prefer a high-dynamic-range surface when the platform offers one, and
+    /// fall back to [`ColorPolicy::Sdr`] when it does not.
+    ///
+    /// This asks for [`wgpu::TextureFormat::Rgba16Float`] specifically. It is
+    /// the only widely available surface format in which a component greater
+    /// than `1.0` survives to the compositor at all: every `Unorm` format,
+    /// including the 10-bit ones, clamps. A surface that clamps cannot show a
+    /// highlight brighter than paper no matter how much precision it has.
+    ///
+    /// The rest of the pipeline needs no change to feed it. Aura's fragment
+    /// shaders already emit linear light and rely on an sRGB surface to encode
+    /// it in hardware, so pointing them at a half-float target simply stops
+    /// discarding the range they were always producing.
+    PreferHdr,
+}
+
+/// Chooses a surface format out of what the platform offers.
+///
+/// Split out of [`Compositor::request`] so that it can be tested without a
+/// GPU. Format selection is a rule table, rule tables are where the bugs live,
+/// and a rule that only executes on a machine with the right panel attached is
+/// a rule that never gets tested.
+fn select_format(
+    available: &[wgpu::TextureFormat],
+    policy: ColorPolicy,
+) -> Option<wgpu::TextureFormat> {
+    // Formats needing an opt-in feature cannot be assumed, and the packed
+    // 10-bit formats are excluded because they are not a dependable surface
+    // target across this crate's backends. `Rgb10a2Uint` in particular is not
+    // blendable at all.
+    const BLACKLIST: &[wgpu::TextureFormat] = &[
+        wgpu::TextureFormat::Rgb10a2Unorm,
+        wgpu::TextureFormat::Rgb10a2Uint,
+    ];
+
+    let usable = || {
+        available.iter().copied().filter(|format| {
+            format.required_features() == wgpu::Features::empty() && !BLACKLIST.contains(format)
+        })
+    };
+
+    if policy == ColorPolicy::PreferHdr {
+        if let Some(format) = usable().find(|format| *format == wgpu::TextureFormat::Rgba16Float) {
+            return Some(format);
+        }
+
+        log::info!(
+            "HDR was requested but no half-float surface is available; \
+             falling back to standard dynamic range"
+        );
+    }
+
+    if color::GAMMA_CORRECTION {
+        usable().find(wgpu::TextureFormat::is_srgb)
+    } else {
+        usable().find(|format| !wgpu::TextureFormat::is_srgb(format))
+    }
+}
 
 /// A window graphics backend for aura powered by `wgpu`.
 pub struct Compositor {
@@ -110,27 +177,9 @@ impl Compositor {
             .and_then(|surface| {
                 let capabilities = surface.get_capabilities(&adapter);
 
-                let formats = capabilities.formats.iter().copied();
+                log::info!("Available formats: {:#?}", capabilities.formats);
 
-                log::info!("Available formats: {formats:#?}");
-
-                const BLACKLIST: &[wgpu::TextureFormat] = &[
-                    wgpu::TextureFormat::Rgb10a2Unorm,
-                    wgpu::TextureFormat::Rgb10a2Uint,
-                ];
-
-                let mut formats = formats.filter(|format| {
-                    format.required_features() == wgpu::Features::empty()
-                        && !BLACKLIST.contains(format)
-                });
-
-                let format = if color::GAMMA_CORRECTION {
-                    formats.find(wgpu::TextureFormat::is_srgb)
-                } else {
-                    formats.find(|format| !wgpu::TextureFormat::is_srgb(format))
-                };
-
-                let format = format.or_else(|| {
+                let format = select_format(&capabilities.formats, settings.color).or_else(|| {
                     log::warn!("No format found!");
 
                     capabilities.formats.first().copied()
@@ -268,19 +317,67 @@ pub fn present(
     background_color: Color,
     on_pre_present: impl FnOnce(),
 ) -> Result<(), compositor::SurfaceError> {
+    present_to(
+        renderer,
+        surface,
+        viewport,
+        background_color,
+        Display::SDR,
+        on_pre_present,
+    )
+}
+
+/// Presents onto `display`, applying its transform when the surface can carry
+/// the extra range.
+///
+/// The panel is a parameter because nothing negotiates it yet: Wayland's
+/// `wp_color_management_v1` is what will eventually report a real one, and
+/// until then a caller who knows what their panel is has to say so. The
+/// default in [`present`] is [`Display::SDR`], which is what every surface
+/// that is not half-float actually is.
+pub fn present_to(
+    renderer: &mut Renderer,
+    surface: &mut wgpu::Surface<'static>,
+    viewport: &Viewport,
+    background_color: Color,
+    display: Display,
+    on_pre_present: impl FnOnce(),
+) -> Result<(), compositor::SurfaceError> {
     match surface.get_current_texture() {
         wgpu::CurrentSurfaceTexture::Success(frame) => {
             let view = &frame
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default());
 
-            let _submission = renderer.present(
-                Some(background_color),
-                frame.texture.format(),
-                view,
-                &frame.texture,
-                viewport,
-            );
+            let format = frame.texture.format();
+
+            // Two conditions. A half-float surface is only ever selected
+            // under `ColorPolicy::PreferHdr`, so its presence signals that
+            // the extra range was asked for and can be delivered.
+            //
+            // The second decides whether any of it means anything: under the
+            // `web-colors` compatibility feature the renderer blends
+            // gamma-encoded components, so there is no linear light in the
+            // pipeline to carry a value above diffuse white and a luminance
+            // multiplier would change hue rather than brightness. HDR
+            // requires the linear path, which is the production default.
+            //
+            // There is deliberately no longer a condition on the engine's
+            // format: pipelines are resolved per target, so an engine created
+            // for an 8-bit surface can still render an HDR frame.
+            let hdr = format == crate::display::Target::FORMAT && color::GAMMA_CORRECTION;
+
+            let _submission = if hdr {
+                renderer.present_hdr(Some(background_color), view, format, viewport, display)
+            } else {
+                renderer.present(
+                    Some(background_color),
+                    format,
+                    view,
+                    &frame.texture,
+                    viewport,
+                )
+            };
 
             // Present the frame
             on_pre_present();
@@ -518,6 +615,12 @@ pub struct Settings {
     /// raising it is left to a caller that has gathered it for their own
     /// target hardware.
     pub desired_maximum_frame_latency: u32,
+
+    /// How the surface format should be chosen.
+    ///
+    /// By default, [`ColorPolicy::Sdr`], which reproduces the format this
+    /// crate has always selected.
+    pub color: ColorPolicy,
 }
 
 impl Default for Settings {
@@ -528,6 +631,7 @@ impl Default for Settings {
             power_preference: backend::PowerPreference::None,
             antialiasing: None,
             desired_maximum_frame_latency: 1,
+            color: ColorPolicy::Sdr,
         }
     }
 }
@@ -557,6 +661,7 @@ impl From<backend::Settings> for Settings {
             backends,
             power_preference: settings.power_preference,
             desired_maximum_frame_latency: Settings::default().desired_maximum_frame_latency,
+            color: Settings::default().color,
         }
     }
 }
@@ -642,5 +747,91 @@ mod settings_tests {
             converted.desired_maximum_frame_latency,
             Settings::default().desired_maximum_frame_latency
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use wgpu::TextureFormat;
+
+    /// What a mainstream desktop surface reports today.
+    const TYPICAL: &[TextureFormat] = &[
+        TextureFormat::Bgra8Unorm,
+        TextureFormat::Bgra8UnormSrgb,
+        TextureFormat::Rgba8Unorm,
+        TextureFormat::Rgba8UnormSrgb,
+    ];
+
+    /// The same surface on a display that can actually show the extra range.
+    const WITH_HDR: &[TextureFormat] = &[
+        TextureFormat::Bgra8Unorm,
+        TextureFormat::Bgra8UnormSrgb,
+        TextureFormat::Rgba16Float,
+    ];
+
+    #[test]
+    fn sdr_picks_what_this_crate_has_always_picked() {
+        // The default must not move. Every committed golden was rendered
+        // through the format this returns.
+        let format = select_format(TYPICAL, ColorPolicy::Sdr)
+            .expect("a typical surface must yield a format");
+
+        assert_eq!(format.is_srgb(), color::GAMMA_CORRECTION);
+    }
+
+    #[test]
+    fn hdr_is_taken_when_it_is_offered() {
+        assert_eq!(
+            select_format(WITH_HDR, ColorPolicy::PreferHdr),
+            Some(TextureFormat::Rgba16Float)
+        );
+    }
+
+    #[test]
+    fn hdr_falls_back_rather_than_failing() {
+        // A device with no half-float surface must still start. Refusing to
+        // run because a panel is ordinary would be a worse failure than
+        // presenting in standard range.
+        let fallback =
+            select_format(TYPICAL, ColorPolicy::PreferHdr).expect("HDR must fall back, not fail");
+
+        assert_eq!(fallback, select_format(TYPICAL, ColorPolicy::Sdr).unwrap());
+    }
+
+    #[test]
+    fn sdr_never_takes_a_half_float_surface() {
+        // The inverse guard: asking for standard range must not silently
+        // hand back an HDR surface just because one was listed first.
+        assert_ne!(
+            select_format(WITH_HDR, ColorPolicy::Sdr),
+            Some(TextureFormat::Rgba16Float)
+        );
+    }
+
+    #[test]
+    fn the_packed_ten_bit_formats_stay_excluded() {
+        // `Rgb10a2Uint` is not blendable, and neither packed format is a
+        // dependable target across this crate's backends. Both were excluded
+        // before this function existed; keep it that way.
+        let only_packed = &[TextureFormat::Rgb10a2Unorm, TextureFormat::Rgb10a2Uint];
+
+        assert_eq!(select_format(only_packed, ColorPolicy::Sdr), None);
+        assert_eq!(select_format(only_packed, ColorPolicy::PreferHdr), None);
+    }
+
+    #[test]
+    fn an_empty_surface_selects_nothing() {
+        assert_eq!(select_format(&[], ColorPolicy::Sdr), None);
+        assert_eq!(select_format(&[], ColorPolicy::PreferHdr), None);
+    }
+
+    #[test]
+    fn the_default_policy_is_standard_range() {
+        // Opting in to HDR must be a decision someone made, because it
+        // changes what the compositor receives.
+        assert_eq!(ColorPolicy::default(), ColorPolicy::Sdr);
+        assert_eq!(Settings::default().color, ColorPolicy::Sdr);
     }
 }

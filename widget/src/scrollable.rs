@@ -1357,6 +1357,7 @@ where
                     border: style.border,
                     shadow: style.shadow,
                     snap: false,
+                    ..renderer::Quad::default()
                 },
                 style.background,
             );

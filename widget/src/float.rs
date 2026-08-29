@@ -155,6 +155,7 @@ where
                         shadow: style.shadow,
                         border: border::rounded(style.shadow_border_radius),
                         snap: false,
+                        ..renderer::Quad::default()
                     },
                     style.shadow.color,
                 );
@@ -354,6 +355,7 @@ where
                                 shadow: style.shadow,
                                 border: border::rounded(style.shadow_border_radius),
                                 snap: false,
+                                ..renderer::Quad::default()
                             },
                             style.shadow.color,
                         );

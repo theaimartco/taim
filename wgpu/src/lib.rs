@@ -22,6 +22,7 @@
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(missing_docs)]
+pub mod display;
 pub mod layer;
 pub mod primitive;
 pub mod window;
@@ -117,6 +118,36 @@ pub struct Renderer {
     /// The region this frame is confined to, if it is a partial one.
     frame_damage: Option<Rectangle<u32>>,
 
+    /// The active visual-quality tier.
+    ///
+    /// Gates effect cost in two ways: `Effect::allowed`/`bounds` clamp blur
+    /// radius and backdrop area, and `Policy::texture_budget_bytes` bounds
+    /// what the effect intermediates may allocate. Previously
+    /// `Tier::default()` was passed literally at the call site, so no
+    /// application could ever select another one and thermal or battery
+    /// pressure had nowhere to land.
+    quality: crate::graphics::quality::Tier,
+
+    /// The one light every material in the interface responds to.
+    ///
+    /// Frame-level rather than per-widget: a per-application light produces
+    /// surfaces that disagree about where the window is, which reads as
+    /// inconsistency rather than as lighting. Set it from
+    /// `aura_design::tokens::MaterialTokens::light`.
+    light: core::material::SceneLight,
+
+    /// Pipelines compatible with the format currently being drawn into.
+    ///
+    /// Re-resolved by [`Renderer::use_format`] when the target's format
+    /// changes, which is what lets one engine serve an SDR and an HDR display
+    /// without being rebuilt.
+    pipelines: engine::Pipelines,
+
+    /// The half-float frame HDR presentation draws into, and the transform
+    /// that resolves it onto the surface. `None` on the standard-range path,
+    /// which draws straight to the surface exactly as it always has.
+    hdr: Option<(display::Target, core::color::DisplayTransform)>,
+
     quad: quad::State,
     triangle: triangle::State,
     text: text::State,
@@ -136,7 +167,11 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new(engine: Engine, settings: renderer::Settings) -> Self {
+        let pipelines = engine.pipelines(engine.format);
+
         Self {
+            quality: crate::graphics::quality::Tier::default(),
+            pipelines: pipelines.clone(),
             settings,
             layers: layer::Stack::new(),
             scale_factor: None,
@@ -146,11 +181,13 @@ impl Renderer {
             retained_layer_statistics: core::renderer::RetainedLayerStatistics::default(),
             damage_history: std::collections::VecDeque::new(),
             frame_damage: None,
+            light: core::material::SceneLight::KEY,
+            hdr: None,
 
             quad: quad::State::new(),
-            triangle: triangle::State::new(&engine.device, &engine.triangle_pipeline),
+            triangle: triangle::State::new(&engine.device, &pipelines.triangle),
             text: text::State::new(),
-            text_viewport: engine.text_pipeline.create_viewport(&engine.device),
+            text_viewport: pipelines.text.create_viewport(&engine.device),
 
             #[cfg(any(feature = "svg", feature = "image"))]
             image: image::State::new(),
@@ -195,6 +232,16 @@ impl Renderer {
         target_texture: &wgpu::Texture,
         viewport: &Viewport,
     ) -> wgpu::CommandEncoder {
+        // The target is the authority on what pipelines are compatible. This
+        // is the line that replaces `Engine`'s single global format.
+        self.use_format(target_texture.format());
+
+        // Once per frame, unconditionally. A frame that queues no effects --
+        // because the tier rejected them all, which is exactly what
+        // `Recovery` does -- must still move the ledger to the tier's budget,
+        // or telemetry reports a budget the renderer is no longer using.
+        self.pipelines.effect.sync_budget(self.quality);
+
         self.metrics.reset();
 
         let mut encoder =
@@ -236,6 +283,183 @@ impl Renderer {
         self.staging_belt.finish();
         let submission = self.engine.queue.submit([encoder.finish()]);
         self.staging_belt.recall();
+        submission
+    }
+
+    /// Returns the bytes of effect intermediates currently accounted, and
+    /// the budget they are accounted against.
+    ///
+    /// The budget comes from the active [`Renderer::quality`] tier.
+    pub fn effect_memory(&self) -> (u64, u64) {
+        self.pipelines.effect.memory()
+    }
+
+    /// Returns the size the effect intermediates were allocated at.
+    ///
+    /// Smaller than the surface when the budget forced a downscale, and
+    /// `None` when no effect has been prepared or the budget refused the
+    /// smallest useful pair.
+    pub fn effect_target_size(&self) -> Option<(u32, u32)> {
+        self.pipelines.effect.target_size()
+    }
+
+    /// Returns the active visual-quality tier.
+    pub const fn quality(&self) -> crate::graphics::quality::Tier {
+        self.quality
+    }
+
+    /// Sets the visual-quality tier.
+    ///
+    /// Takes effect on the next frame. Lowering it both restricts which
+    /// effects are admitted and shrinks the budget their intermediates are
+    /// allowed to occupy, so a caller responding to thermal pressure or a
+    /// battery signal has one lever rather than several.
+    pub fn set_quality(&mut self, tier: crate::graphics::quality::Tier) {
+        if self.quality != tier {
+            log::info!("visual quality tier: {:?} -> {tier:?}", self.quality);
+        }
+
+        self.quality = tier;
+    }
+
+    /// Ensures this renderer's pipelines are compatible with `format`.
+    ///
+    /// A no-op in the steady state -- one integer comparison per frame. When
+    /// the format really has changed, this rebuilds only what depends on it:
+    /// the pipelines themselves, the triangle pipeline's MSAA state, and the
+    /// text pipeline's glyph atlas viewport. Nothing device-global is touched,
+    /// so a window moving between an SDR and an HDR display keeps its caches,
+    /// its images, and its primitive storage.
+    ///
+    /// Before this existed, drawing into a differently formatted target
+    /// produced a `wgpu` render-pass validation error naming pipeline
+    /// compatibility, which said nothing about the actual cause.
+    fn use_format(&mut self, format: wgpu::TextureFormat) {
+        if self.pipelines.format == format {
+            return;
+        }
+
+        log::info!(
+            "render target format changed from {:?} to {:?}; selecting compatible pipelines",
+            self.pipelines.format,
+            format
+        );
+
+        self.pipelines = self.engine.pipelines(format);
+
+        // Both of these are derived from a pipeline rather than from the
+        // device, so they follow the format. Missing either is a validation
+        // error at the next draw.
+        self.triangle = triangle::State::new(&self.engine.device, &self.pipelines.triangle);
+        self.text_viewport = self.pipelines.text.create_viewport(&self.engine.device);
+    }
+
+    /// Sets the light every material responds to.
+    ///
+    /// Takes effect on the next frame. There is deliberately one per renderer
+    /// rather than one per widget.
+    pub fn set_light(&mut self, light: core::material::SceneLight) {
+        self.light = light;
+    }
+
+    /// Returns the light every material responds to.
+    pub fn light(&self) -> core::material::SceneLight {
+        self.light
+    }
+
+    /// Returns the format this renderer's pipelines currently target.
+    ///
+    /// Fixed when the [`Engine`] is built, and the same for every pipeline it
+    /// owns, so any intermediate render target has to match it.
+    pub fn frame_format(&self) -> wgpu::TextureFormat {
+        self.pipelines.format
+    }
+
+    /// Returns the [`wgpu::Device`] this renderer draws with.
+    pub fn device(&self) -> &wgpu::Device {
+        &self.engine.device
+    }
+
+    /// Returns the [`wgpu::Queue`] this renderer submits to.
+    pub fn queue(&self) -> &wgpu::Queue {
+        &self.engine.queue
+    }
+
+    /// Presents through the high-dynamic-range path.
+    ///
+    /// Draws the frame into a half-float target rather than straight onto the
+    /// surface, then resolves it through `display`'s transform. The extra
+    /// target is what keeps a highlight brighter than paper: the renderer
+    /// emits linear light, and every `Unorm` surface clamps it at `1.0`.
+    ///
+    /// One encoder and one submission, same as [`Renderer::present`] — the
+    /// resolve is appended to the frame's own encoder rather than costing a
+    /// second submit.
+    pub fn present_hdr(
+        &mut self,
+        clear_color: Option<Color>,
+        surface: &wgpu::TextureView,
+        surface_format: wgpu::TextureFormat,
+        viewport: &Viewport,
+        display: core::color::Display,
+    ) -> wgpu::SubmissionIndex {
+        // Always half float, regardless of what the surface or the engine
+        // prefer. This is only correct because pipelines are now resolved
+        // from the target being drawn into rather than from one engine-global
+        // format: `draw` sees a half-float intermediate and builds pipelines
+        // for it. Before that, an engine created for an 8-bit surface could
+        // not draw here at all, and HDR required the surface to have been
+        // half float when the engine was built.
+        let format = display::Target::FORMAT;
+
+        let size = viewport.physical_size();
+
+        let stale = match &self.hdr {
+            Some((target, _)) => !target.fits(size.width, size.height),
+            None => true,
+        };
+
+        if stale {
+            self.hdr = Some((
+                display::Target::new(
+                    &self.engine.device,
+                    size.width,
+                    size.height,
+                    format,
+                    surface_format,
+                ),
+                display::transform_for(surface_format, display),
+            ));
+        }
+
+        // Taken out for the duration so that `draw` can borrow `self` mutably.
+        // Put back before returning, so the target survives to the next frame
+        // and a steady-state frame allocates nothing.
+        let Some((target, _)) = self.hdr.take() else {
+            unreachable!("the target was just ensured to exist")
+        };
+
+        // Rebuilt every frame rather than cached: it is a handful of matrix
+        // rows, and a stale one would keep tone mapping to the panel the
+        // window used to be on.
+        let transform = display::transform_for(surface_format, display);
+
+        let mut encoder = self.draw(clear_color, target.view(), target.texture(), viewport);
+
+        target.resolve(
+            &self.engine.device,
+            &self.engine.queue,
+            &mut encoder,
+            surface,
+            &transform,
+        );
+
+        self.staging_belt.finish();
+        let submission = self.engine.queue.submit([encoder.finish()]);
+        self.staging_belt.recall();
+
+        self.hdr = Some((target, transform));
+
         submission
     }
 
@@ -381,13 +605,14 @@ impl Renderer {
                 self.metrics.increment(metrics::Metric::Upload);
 
                 self.quad.prepare(
-                    &self.engine.quad_pipeline,
+                    &self.pipelines.quad,
                     &self.engine.device,
                     &mut self.staging_belt,
                     encoder,
                     &layer.quads,
                     viewport.projection(),
                     scale_factor,
+                    self.light,
                 );
 
                 prepare_span.finish();
@@ -399,7 +624,7 @@ impl Renderer {
                 self.metrics.increment(metrics::Metric::Upload);
 
                 self.triangle.prepare(
-                    &self.engine.triangle_pipeline,
+                    &self.pipelines.triangle,
                     &self.engine.device,
                     &mut self.staging_belt,
                     encoder,
@@ -443,7 +668,7 @@ impl Renderer {
                 self.metrics.increment(metrics::Metric::Upload);
 
                 self.image.prepare(
-                    &self.engine.image_pipeline,
+                    &self.pipelines.image,
                     &self.engine.device,
                     &mut self.staging_belt,
                     encoder,
@@ -462,7 +687,7 @@ impl Renderer {
                 self.metrics.increment(metrics::Metric::Upload);
 
                 self.text.prepare(
-                    &self.engine.text_pipeline,
+                    &self.pipelines.text,
                     &self.engine.device,
                     &self.engine.queue,
                     &self.text_viewport,
@@ -482,13 +707,13 @@ impl Renderer {
                     physical.height as f32,
                 ));
 
-                self.engine.effect_pipeline.prepare(
+                self.pipelines.effect.prepare(
                     &self.engine.device,
                     index,
                     &layer.effects,
                     layer.bounds * scale_factor,
                     surface,
-                    crate::graphics::quality::Tier::default(),
+                    self.quality,
                     (physical.width, physical.height),
                 );
             }
@@ -574,12 +799,12 @@ impl Renderer {
             // before it draws over them. A backdrop blur frosts the page
             // behind a sheet; running it after the sheet has drawn would
             // blur the sheet instead.
-            if self.engine.effect_pipeline.has_backdrop(index) {
+            if self.pipelines.effect.has_backdrop(index) {
                 let physical = viewport.physical_size();
 
                 let _ = ManuallyDrop::into_inner(render_pass);
 
-                self.engine.effect_pipeline.render_backdrop(
+                self.pipelines.effect.render_backdrop(
                     &self.engine.device,
                     &self.engine.queue,
                     encoder,
@@ -610,7 +835,7 @@ impl Renderer {
             if !layer.quads.is_empty() {
                 let render_span = debug::render(debug::Primitive::Quad);
                 self.quad.render(
-                    &self.engine.quad_pipeline,
+                    &self.pipelines.quad,
                     quad_layer,
                     scissor_rect,
                     &layer.quads,
@@ -627,7 +852,7 @@ impl Renderer {
 
                 let render_span = debug::render(debug::Primitive::Triangle);
                 mesh_layer += self.triangle.render(
-                    &self.engine.triangle_pipeline,
+                    &self.pipelines.triangle,
                     encoder,
                     frame,
                     mesh_layer,
@@ -751,7 +976,7 @@ impl Renderer {
             if !layer.images.is_empty() {
                 let render_span = debug::render(debug::Primitive::Image);
                 self.image.render(
-                    &self.engine.image_pipeline,
+                    &self.pipelines.image,
                     image_layer,
                     scissor_rect,
                     &mut render_pass,
@@ -764,7 +989,7 @@ impl Renderer {
             if !layer.text.is_empty() {
                 let render_span = debug::render(debug::Primitive::Text);
                 text_layer += self.text.render(
-                    &self.engine.text_pipeline,
+                    &self.pipelines.text,
                     &self.text_viewport,
                     text_layer,
                     &layer.text,
@@ -778,7 +1003,7 @@ impl Renderer {
                 let _ = ManuallyDrop::into_inner(render_pass);
                 let physical = viewport.physical_size();
 
-                self.engine.effect_pipeline.render(
+                self.pipelines.effect.render(
                     &self.engine.device,
                     &self.engine.queue,
                     encoder,
@@ -847,8 +1072,10 @@ impl Renderer {
     /// See [`effects::pipeline::Pipeline::upload_mask`]; the mask must be
     /// [`Renderer::mask_size`] square, one byte of coverage per pixel.
     pub fn upload_mask(&self, slot: u32, coverage: &[u8]) -> Option<u32> {
-        self.engine
-            .effect_pipeline
+        // The mask atlas belongs to the effect pipeline currently resolved,
+        // which is the one this frame's effects will read from.
+        self.pipelines
+            .effect
             .upload_mask(&self.engine.queue, slot, coverage)
     }
 

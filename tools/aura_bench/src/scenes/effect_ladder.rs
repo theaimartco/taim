@@ -25,6 +25,7 @@ use aura_core::{Point, Rectangle, Size};
 use aura_graphics::quality::Tier;
 use aura_wgpu::effects::blur::Blur;
 use aura_wgpu::effects::pool::Descriptor;
+use aura_wgpu::wgpu;
 use aura_widget::{column, container, text};
 
 /// Command-line scene name.
@@ -186,14 +187,13 @@ impl EffectLadder {
         let per_layer = blur.separable_sample_cost(source, policy.max_blur_radius);
 
         // The working copy is the source region at the downsample factor
-        // this radius selects, in RGBA8.
+        // this radius selects. The format is the accounting axis that used to
+        // be a hard-coded 4 bytes per pixel: a half-float intermediate costs
+        // twice an 8-bit one, so a cost model that assumed RGBA8 under-priced
+        // every HDR frame by exactly half.
         let factor = u32::from(blur.downsample()).max(1);
         let edge = (rung.edge as u32).div_ceil(factor).max(1);
-        let intermediate = Descriptor {
-            width: edge,
-            height: edge,
-            bytes_per_pixel: 4,
-        };
+        let intermediate = Descriptor::new(edge, edge, wgpu::TextureFormat::Rgba8Unorm);
 
         Cost {
             samples: per_layer.saturating_mul(u64::from(rung.layers)),

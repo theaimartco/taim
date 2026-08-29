@@ -3,6 +3,12 @@
 pub mod window;
 
 mod engine;
+
+/// The colour-space conversions this backend composites through.
+///
+/// Exposed so `tests/color/contract.rs` can pin them: they are the pair that
+/// decides whether authored bytes reach the working space correctly.
+pub use engine::{decode_channel, decode_premultiplied, encode_channel};
 mod layer;
 mod primitive;
 mod text;

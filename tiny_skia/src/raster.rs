@@ -110,7 +110,16 @@ impl Cache {
             for (i, pixel) in image.pixels().enumerate() {
                 let [r, g, b, a] = pixel.0;
 
-                buffer[i] = bytemuck::cast(tiny_skia::ColorU8::from_rgba(b, g, r, a).premultiply());
+                // Decoded image samples are sRGB. Alpha is coverage.
+                buffer[i] = bytemuck::cast(
+                    tiny_skia::ColorU8::from_rgba(
+                        crate::engine::decode_channel(b),
+                        crate::engine::decode_channel(g),
+                        crate::engine::decode_channel(r),
+                        a,
+                    )
+                    .premultiply(),
+                );
             }
 
             let _ = entry.insert(Some(Entry {

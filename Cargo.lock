@@ -388,6 +388,7 @@ dependencies = [
  "aura_graphics",
  "aura_renderer",
  "aura_runtime",
+ "aura_tiny_skia",
  "aura_wgpu",
  "aura_widget",
  "aura_winit",

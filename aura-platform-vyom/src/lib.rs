@@ -6,8 +6,10 @@
 //! the corresponding authenticated global.
 
 pub mod accessibility;
+pub mod buffer;
 pub mod capabilities;
 pub mod clipboard;
+pub mod color_management;
 pub mod drag_drop;
 pub mod event_loop;
 pub mod frame_clock;
@@ -15,9 +17,12 @@ pub mod gesture_bridge;
 pub mod ime;
 pub mod input;
 pub mod power;
+pub mod shm;
 pub mod surface;
 pub mod window_protocol;
 
+pub use buffer::{BufferId, BufferPool, BufferState};
 pub use capabilities::{Capabilities, Capability, Global};
+pub use color_management::PanelDescription;
 pub use event_loop::{Backend, Error, PlatformEvent};
 pub use surface::{SurfaceId, SurfaceLifecycle, SurfaceState};

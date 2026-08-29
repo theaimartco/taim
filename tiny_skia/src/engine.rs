@@ -143,16 +143,7 @@ impl Engine {
                             .into_iter()
                             .flatten()
                             .map(|stop| {
-                                tiny_skia::GradientStop::new(
-                                    stop.offset,
-                                    tiny_skia::Color::from_rgba(
-                                        stop.color.b,
-                                        stop.color.g,
-                                        stop.color.r,
-                                        stop.color.a,
-                                    )
-                                    .expect("Create color"),
-                                )
+                                tiny_skia::GradientStop::new(stop.offset, into_color(stop.color))
                             })
                             .collect();
 
@@ -607,10 +598,142 @@ impl Engine {
     }
 }
 
+/// Converts an authored colour into the space this backend composites in.
+///
+/// Note the channel swap: this backend's pixmaps are BGRA.
 pub fn into_color(color: Color) -> tiny_skia::Color {
-    tiny_skia::Color::from_rgba(color.b, color.g, color.r, color.a)
+    let [red, green, blue, alpha] = working_components(color);
+
+    tiny_skia::Color::from_rgba(blue, green, red, alpha)
         .expect("Convert color from aura to tiny_skia")
 }
+
+/// Returns a colour's components in the compositing working space.
+///
+/// With `GAMMA_CORRECTION` -- the production default -- that is linear light,
+/// matching the `wgpu` backend. Without it, the `web-colors` compatibility
+/// mode blends gamma-encoded components directly.
+///
+/// The two backends must agree: a golden rendered here describes what the GPU
+/// path does only if both composite in the same space.
+pub fn working_components(color: Color) -> [f32; 4] {
+    if crate::graphics::color::GAMMA_CORRECTION {
+        color.into_linear()
+    } else {
+        [color.r, color.g, color.b, color.a]
+    }
+}
+
+/// Encodes a composited 8-bit channel for presentation.
+///
+/// The inverse of the decode in [`working_components`], applied once when a
+/// frame leaves the backend.
+///
+/// # The precision this costs
+///
+/// `tiny_skia` blends in `f32` but **stores** 8-bit, so a linear working
+/// space is quantised to 8 bits on every draw. Linear 8-bit spends its codes
+/// evenly across the range while perception does not: sRGB 0..=31 maps onto
+/// only four distinct linear codes, and a round trip through the storage moves
+/// a dark value by up to 6/255.
+///
+/// That is the whole reason transfer functions exist, and it is why this
+/// applies only to the presented result rather than being something the
+/// backend could avoid. See `docs/architecture/color-pipeline.md` §8.
+#[must_use]
+pub fn encode_channel(linear: u8) -> u8 {
+    ENCODE[linear as usize]
+}
+
+/// Decodes an 8-bit authored channel into the working space.
+///
+/// The inverse of [`encode_channel`], for pixel data that arrives already
+/// quantised: decoded image samples, colour glyph bitmaps, and rasterised SVG.
+/// Those never pass through [`into_color`], so without this they would be
+/// treated as if they were already linear and every one of them would present
+/// far too bright — an sRGB 128 sample would leave as 188.
+///
+/// Coverage is **not** put through this. A glyph's alpha or an image's alpha
+/// is a fraction of a pixel, not a quantity of light.
+#[must_use]
+pub fn decode_channel(encoded: u8) -> u8 {
+    if crate::graphics::color::GAMMA_CORRECTION {
+        DECODE[encoded as usize]
+    } else {
+        encoded
+    }
+}
+
+/// Decodes a **premultiplied** sRGB pixel into the premultiplied working
+/// space.
+///
+/// Decoding a premultiplied component is not the same operation as decoding a
+/// colour: the alpha has already been folded in, and a transfer function is
+/// not linear, so `decode(c * a) != decode(c) * a`. The component has to be
+/// un-premultiplied, decoded, and re-premultiplied.
+///
+/// Used for `resvg` output, which is the only premultiplied source this
+/// backend takes pixels from.
+#[must_use]
+pub fn decode_premultiplied(red: u8, green: u8, blue: u8, alpha: u8) -> (u8, u8, u8) {
+    if !crate::graphics::color::GAMMA_CORRECTION || alpha == 0 {
+        return (red, green, blue);
+    }
+
+    let coverage = f32::from(alpha) / 255.0;
+
+    let convert = |component: u8| {
+        let straight = (f32::from(component) / 255.0 / coverage).clamp(0.0, 1.0);
+
+        let linear = if straight <= 0.04045 {
+            straight / 12.92
+        } else {
+            ((straight + 0.055) / 1.055).powf(2.4)
+        };
+
+        (linear * coverage * 255.0).round().clamp(0.0, 255.0) as u8
+    };
+
+    (convert(red), convert(green), convert(blue))
+}
+
+/// sRGB decode for every 8-bit authored value, built once.
+static DECODE: std::sync::LazyLock<[u8; 256]> = std::sync::LazyLock::new(|| {
+    let mut table = [0u8; 256];
+
+    for (value, slot) in table.iter_mut().enumerate() {
+        let encoded = value as f32 / 255.0;
+
+        let linear = if encoded <= 0.04045 {
+            encoded / 12.92
+        } else {
+            ((encoded + 0.055) / 1.055).powf(2.4)
+        };
+
+        *slot = (linear * 255.0).round().clamp(0.0, 255.0) as u8;
+    }
+
+    table
+});
+
+/// sRGB encode for every 8-bit linear value, built once.
+static ENCODE: std::sync::LazyLock<[u8; 256]> = std::sync::LazyLock::new(|| {
+    let mut table = [0u8; 256];
+
+    for (value, slot) in table.iter_mut().enumerate() {
+        let linear = value as f32 / 255.0;
+
+        let encoded = if linear <= 0.003_130_8 {
+            12.92 * linear
+        } else {
+            1.055 * linear.powf(1.0 / 2.4) - 0.055
+        };
+
+        *slot = (encoded * 255.0).round().clamp(0.0, 255.0) as u8;
+    }
+
+    table
+});
 
 fn into_transform(transformation: Transformation) -> tiny_skia::Transform {
     let translation = transformation.translation();

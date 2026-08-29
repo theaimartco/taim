@@ -270,7 +270,15 @@ impl GlyphCache {
         font_system: &mut cosmic_text::FontSystem,
         swash: &mut cosmic_text::SwashCache,
     ) -> Option<(&[u8], cosmic_text::Placement)> {
+        // The colour is authored sRGB; the working space is linear. Coverage
+        // (`image.data`) is deliberately left alone: it is a fraction of a
+        // pixel, not light.
         let [r, g, b, _a] = color.into_rgba8();
+        let (r, g, b) = (
+            crate::engine::decode_channel(r),
+            crate::engine::decode_channel(g),
+            crate::engine::decode_channel(b),
+        );
         let key = (cache_key, [r, g, b]);
 
         if let hash_map::Entry::Vacant(entry) = self.entries.entry(key) {
@@ -309,9 +317,9 @@ impl GlyphCache {
                             // TODO: Blend alpha
                             buffer[i >> 2] = bytemuck::cast(
                                 tiny_skia::ColorU8::from_rgba(
-                                    image.data[i + 2],
-                                    image.data[i + 1],
-                                    image.data[i],
+                                    crate::engine::decode_channel(image.data[i + 2]),
+                                    crate::engine::decode_channel(image.data[i + 1]),
+                                    crate::engine::decode_channel(image.data[i]),
                                     image.data[i + 3],
                                 )
                                 .premultiply(),

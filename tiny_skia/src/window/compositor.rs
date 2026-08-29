@@ -18,6 +18,20 @@ pub struct Surface {
     clip_mask: tiny_skia::Mask,
     frames: VecDeque<Frame>,
     max_age: u8,
+
+    /// The compositing buffer, held in the working space.
+    ///
+    /// Separate from the presentation buffer because the two are in different
+    /// colour spaces and both persist. Damage-based redraw reuses what the
+    /// last frame left behind, and blending reads it back as the destination
+    /// -- so the buffer a frame accumulates into has to stay in the space
+    /// blending happens in. Encoding the presentation buffer in place would
+    /// feed the next frame's blends an sRGB destination and compound the
+    /// error every frame the damage did not cover.
+    ///
+    /// Empty when the working space is already the presentation space, which
+    /// is the `web-colors` compatibility case.
+    working: Vec<u32>,
 }
 
 #[derive(Clone)]
@@ -66,6 +80,7 @@ impl crate::graphics::Compositor for Compositor {
             clip_mask: tiny_skia::Mask::new(1, 1).expect("Create clip mask"),
             frames: VecDeque::new(),
             max_age: 0,
+            working: Vec::new(),
         };
 
         if width > 0 && height > 0 {
@@ -86,6 +101,11 @@ impl crate::graphics::Compositor for Compositor {
 
         surface.clip_mask = tiny_skia::Mask::new(width, height).expect("Create clip mask");
         surface.frames.clear();
+
+        if crate::graphics::color::GAMMA_CORRECTION {
+            surface.working.resize(width as usize * height as usize, 0);
+            surface.working.fill(0);
+        }
     }
 
     fn information(&self) -> Information {
@@ -182,24 +202,107 @@ pub fn present(
 
         let damage = damage::group(damage, Rectangle::with_size(viewport.logical_size()));
 
-        let mut pixels = tiny_skia::PixmapMut::from_bytes(
-            bytemuck::cast_slice_mut(&mut buffer),
-            physical_size.width,
-            physical_size.height,
-        )
-        .expect("Create pixel map");
+        if crate::graphics::color::GAMMA_CORRECTION {
+            // Composite in the working space, then encode into what the
+            // window actually presents.
+            surface.working.resize(
+                physical_size.width as usize * physical_size.height as usize,
+                0,
+            );
 
-        renderer.draw(
-            &mut pixels,
-            &mut surface.clip_mask,
-            viewport,
-            &damage,
-            background,
-        );
+            let mut pixels = tiny_skia::PixmapMut::from_bytes(
+                bytemuck::cast_slice_mut(&mut surface.working),
+                physical_size.width,
+                physical_size.height,
+            )
+            .expect("Create pixel map");
+
+            renderer.draw(
+                &mut pixels,
+                &mut surface.clip_mask,
+                viewport,
+                &damage,
+                background,
+            );
+
+            encode_damage(
+                &surface.working,
+                &mut buffer,
+                physical_size,
+                &damage,
+                viewport.scale_factor(),
+            );
+        } else {
+            let mut pixels = tiny_skia::PixmapMut::from_bytes(
+                bytemuck::cast_slice_mut(&mut buffer),
+                physical_size.width,
+                physical_size.height,
+            )
+            .expect("Create pixel map");
+
+            renderer.draw(
+                &mut pixels,
+                &mut surface.clip_mask,
+                viewport,
+                &damage,
+                background,
+            );
+        }
     }
 
     on_pre_present();
     buffer.present().map_err(|_| compositor::SurfaceError::Lost)
+}
+
+/// Encodes one pixel from the working space into the presentation space.
+///
+/// Alpha is coverage, not light, and is copied through untouched.
+#[inline]
+fn encode_pixel(source: u32) -> u32 {
+    let alpha = source & 0xFF_00_00_00;
+    let red = crate::engine::encode_channel(((source >> 16) & 0xFF) as u8);
+    let green = crate::engine::encode_channel(((source >> 8) & 0xFF) as u8);
+    let blue = crate::engine::encode_channel((source & 0xFF) as u8);
+
+    alpha | (u32::from(red) << 16) | (u32::from(green) << 8) | u32::from(blue)
+}
+
+/// Encodes the damaged region of a working-space buffer into the presentation
+/// buffer.
+///
+/// Only the damaged region, because the whole point of damage tracking is that
+/// an idle frame touches almost nothing. Encoding the full buffer would undo
+/// that: at 1920x1080 it is six million table lookups per frame whether or not
+/// anything moved, which costs more than the drawing did.
+///
+/// The presentation buffer persists between frames, so pixels outside the
+/// damage still hold the correctly encoded result of the frame that drew them.
+fn encode_damage(
+    working: &[u32],
+    presented: &mut [u32],
+    size: Size<u32>,
+    damage: &[Rectangle],
+    scale_factor: f32,
+) {
+    for region in damage {
+        // Damage is logical; the buffers are physical. Round outwards so a
+        // fractional scale factor never leaves a seam of stale pixels.
+        let left = ((region.x * scale_factor).floor().max(0.0) as u32).min(size.width);
+        let top = ((region.y * scale_factor).floor().max(0.0) as u32).min(size.height);
+        let right =
+            (((region.x + region.width) * scale_factor).ceil().max(0.0) as u32).min(size.width);
+        let bottom =
+            (((region.y + region.height) * scale_factor).ceil().max(0.0) as u32).min(size.height);
+
+        for y in top..bottom {
+            let row = (y * size.width) as usize;
+            let span = row + left as usize..row + right as usize;
+
+            for index in span {
+                presented[index] = encode_pixel(working[index]);
+            }
+        }
+    }
 }
 
 pub fn screenshot(
@@ -242,7 +345,17 @@ pub fn screenshot(
             let g = ((G_MASK & pixel) >> 8) as u8;
             let b = (B_MASK & pixel) as u8;
 
-            acc.extend([r, g, b, a]);
+            // The pixmap holds the working space, which is linear light on
+            // the production path. Encode once, here, as the frame leaves.
+            let encode = |channel: u8| {
+                if crate::graphics::color::GAMMA_CORRECTION {
+                    crate::engine::encode_channel(channel)
+                } else {
+                    channel
+                }
+            };
+
+            acc.extend([encode(r), encode(g), encode(b), a]);
             acc
         },
     )

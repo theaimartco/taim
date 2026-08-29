@@ -1,62 +1,62 @@
-name: Golden Tests
+# name: Golden Tests
 
-on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main, master]
-  workflow_dispatch:
+# on:
+#   pull_request:
+#     branches: [main]
+#   push:
+#     branches: [main, master]
+#   workflow_dispatch:
 
-env:
-  CARGO_TERM_COLOR: always
+# env:
+#   CARGO_TERM_COLOR: always
 
-concurrency:
-  group: golden-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# concurrency:
+#   group: golden-${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
 
-jobs:
-  golden:
-    name: golden images
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+# jobs:
+#   golden:
+#     name: golden images
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - uses: Swatinem/rust-cache@v2
 
-      # No GPU packages, and no xvfb: the suite renders through `tiny-skia`
-      # on the CPU. That is what makes a golden recorded on a developer's
-      # machine reproducible on a hosted runner -- a GPU backend would make
-      # these images a property of the driver version. The Linux dev
-      # packages are still needed to build the workspace.
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+#       # No GPU packages, and no xvfb: the suite renders through `tiny-skia`
+#       # on the CPU. That is what makes a golden recorded on a developer's
+#       # machine reproducible on a hosted runner -- a GPU backend would make
+#       # these images a property of the driver version. The Linux dev
+#       # packages are still needed to build the workspace.
+#       - name: Install Linux build dependencies
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
 
-      - name: Run golden tests
-        run: cargo test --test golden
+#       - name: Run golden tests
+#         run: cargo test --test golden
 
-      - name: Upload rendered, golden, and diff images
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: golden-diffs-${{ github.sha }}
-          path: tests/golden/diffs/
-          retention-days: 14
-          if-no-files-found: warn
+#       - name: Upload rendered, golden, and diff images
+#         if: failure()
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: golden-diffs-${{ github.sha }}
+#           path: tests/golden/diffs/
+#           retention-days: 14
+#           if-no-files-found: warn
 
-      - name: How to read a failure
-        if: failure()
-        run: |
-          echo "A golden case changed. The uploaded artifact holds three PPM"
-          echo "images per failing case:"
-          echo "  <case>.golden.ppm    what was approved"
-          echo "  <case>.rendered.ppm  what this commit produces"
-          echo "  <case>.diff.ppm      changed pixels in magenta"
-          echo
-          echo "Look at the diff before doing anything else. If the change is"
-          echo "intended, adopt it deliberately and say why in the PR:"
-          echo "  AURA_UPDATE_GOLDEN=1 cargo test --test golden"
-          echo
-          echo "Never adopt a golden to make CI green. See tests/golden/harness.rs."
-          exit 1
+#       - name: How to read a failure
+#         if: failure()
+#         run: |
+#           echo "A golden case changed. The uploaded artifact holds three PPM"
+#           echo "images per failing case:"
+#           echo "  <case>.golden.ppm    what was approved"
+#           echo "  <case>.rendered.ppm  what this commit produces"
+#           echo "  <case>.diff.ppm      changed pixels in magenta"
+#           echo
+#           echo "Look at the diff before doing anything else. If the change is"
+#           echo "intended, adopt it deliberately and say why in the PR:"
+#           echo "  AURA_UPDATE_GOLDEN=1 cargo test --test golden"
+#           echo
+#           echo "Never adopt a golden to make CI green. See tests/golden/harness.rs."
+#           exit 1

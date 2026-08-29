@@ -1,4 +1,12 @@
 //! Manage colors in different color spaces.
+pub mod display;
+pub mod radiance;
+pub mod space;
+
+pub use display::{Display, DisplayTransform, GamutMap, ToneMap};
+pub use radiance::Radiance;
+pub use space::{ColorSpace, Primaries, Transfer, WhitePoint};
+
 use crate::animation::Interpolable;
 
 /// A color in the `sRGB` color space.

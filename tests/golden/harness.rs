@@ -114,6 +114,19 @@ pub struct Difference {
     pub total: usize,
     /// The largest per-channel difference seen.
     pub worst_channel: u8,
+    /// Mean absolute per-channel error, over every channel of every pixel.
+    ///
+    /// Separates "a few pixels moved a long way" from "everything moved a
+    /// little", which is exactly the distinction between a real regression
+    /// and a precision change, and which neither `pixels` nor `worst_channel`
+    /// can express on its own.
+    pub mean_absolute_error: f64,
+    /// Root-mean-square per-channel error.
+    ///
+    /// Weights large excursions more heavily than [`Difference::mean_absolute_error`],
+    /// so a localised but severe change stays visible in the number even when
+    /// it is a small fraction of the image.
+    pub root_mean_square_error: f64,
 }
 
 impl Difference {
@@ -129,6 +142,17 @@ impl Difference {
     /// Whether anything differed.
     pub fn any(&self) -> bool {
         self.pixels > 0
+    }
+
+    /// A one-line summary of every metric, for a classification report.
+    pub fn summary(&self) -> String {
+        format!(
+            "{:.2}% of pixels, worst channel {}, MAE {:.3}, RMSE {:.3}",
+            self.ratio() * 100.0,
+            self.worst_channel,
+            self.mean_absolute_error,
+            self.root_mean_square_error
+        )
     }
 
     /// Whether this difference is within `tolerance`.
@@ -193,18 +217,15 @@ impl Outcome {
     pub fn report(&self, case: &str) -> String {
         match self {
             Outcome::Matched => format!("{case}: matched"),
-            Outcome::Tolerated(difference) => format!(
-                "{case}: within tolerance ({:.2}% of pixels, worst channel {})",
-                difference.ratio() * 100.0,
-                difference.worst_channel
-            ),
+            Outcome::Tolerated(difference) => {
+                format!("{case}: within tolerance ({})", difference.summary())
+            }
             Outcome::Differed(difference) => format!(
-                "{case}: DIFFERED -- {:.2}% of pixels, worst channel {}.\n\
+                "{case}: DIFFERED -- {}.\n\
                  Look at the diff before doing anything else. If the change is intended, it needs \
                  a rendered diff, a design reason, and a performance report on the pull request. \
                  Then adopt it with {UPDATE_ENV}=1.",
-                difference.ratio() * 100.0,
-                difference.worst_channel
+                difference.summary()
             ),
             Outcome::Missing => format!(
                 "{case}: NO GOLDEN.\n\
@@ -245,12 +266,19 @@ impl Image {
 
         let mut pixels = 0;
         let mut worst_channel = 0u8;
+        let mut absolute_error = 0u64;
+        let mut squared_error = 0u64;
+        let mut channels = 0u64;
 
         for (a, b) in self.rgba.chunks_exact(4).zip(other.rgba.chunks_exact(4)) {
             let mut differed = false;
 
             for (a, b) in a.iter().zip(b.iter()) {
                 let delta = a.abs_diff(*b);
+
+                channels += 1;
+                absolute_error += u64::from(delta);
+                squared_error += u64::from(delta) * u64::from(delta);
 
                 if delta > 0 {
                     differed = true;
@@ -263,10 +291,14 @@ impl Image {
             }
         }
 
+        let channels = channels.max(1) as f64;
+
         Ok(Difference {
             pixels,
             total: (self.width * self.height) as usize,
             worst_channel,
+            mean_absolute_error: absolute_error as f64 / channels,
+            root_mean_square_error: (squared_error as f64 / channels).sqrt(),
         })
     }
 }
@@ -491,6 +523,8 @@ impl Harness {
                     pixels: 0,
                     total: (rendered.width * rendered.height) as usize,
                     worst_channel: 0,
+                    mean_absolute_error: 0.0,
+                    root_mean_square_error: 0.0,
                 });
             }
 
@@ -824,6 +858,8 @@ mod tests {
             pixels: 19,
             total: 1000,
             worst_channel: 1,
+            mean_absolute_error: 0.0,
+            root_mean_square_error: 0.0,
         })
         .report("text_hinting");
 
