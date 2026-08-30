@@ -1,6 +1,6 @@
 [package]
-name = "aura_program"
-description = "The definition of an aura program"
+name = "taim_program"
+description = "The definition of an taim program"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -19,5 +19,5 @@ debug = []
 time-travel = []
 
 [dependencies]
-aura_graphics.workspace = true
-aura_runtime.workspace = true
+taim_graphics.workspace = true
+taim_runtime.workspace = true

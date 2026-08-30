@@ -2,9 +2,9 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-//! use aura::widget::{tabs, tabs::Tab, text};
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+//! use taim::widget::{tabs, tabs::Tab, text};
 //!
 //! #[derive(Clone)]
 //! enum Message {
@@ -27,7 +27,7 @@
 //! The selection indicator animates between tabs rather than jumping.
 //! That is not decoration: the movement is what tells the user *which*
 //! tab the selection came from, which a cut cannot convey. It is driven
-//! by an [`Animation<f32>`](aura_core::animation::Animation) over the
+//! by an [`Animation<f32>`](taim_core::animation::Animation) over the
 //! selected index, so an interrupted change picks up from wherever the
 //! indicator currently is instead of restarting.
 //!
@@ -736,7 +736,7 @@ impl Catalog for Theme {
     }
 }
 
-/// The default styling of a [`Tabs`] bar for aura's own theme.
+/// The default styling of a [`Tabs`] bar for taim's own theme.
 pub fn default(theme: &Theme) -> Style {
     let palette = theme.palette();
 

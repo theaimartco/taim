@@ -1,5 +1,5 @@
 //! Store images.
-use aura_core::Size;
+use taim_core::Size;
 
 use std::fmt::Debug;
 

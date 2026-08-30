@@ -1,8 +1,8 @@
-# Aura motion language
+# Taim motion language
 
-Aura motion is driven only by the runtime's per-window monotonic frame clock.
+Taim motion is driven only by the runtime's per-window monotonic frame clock.
 Widgets never create timers or render loops. A transition registers work while
-it is active and unregisters immediately when settled, preserving Aura's idle
+it is active and unregisters immediately when settled, preserving Taim's idle
 zero-submission rule.
 
 Use 100–200 ms for direct feedback, 200–400 ms for hierarchy changes, and a

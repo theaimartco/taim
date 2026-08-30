@@ -1,4 +1,4 @@
-//! Stress tests for Aura.
+//! Stress tests for Taim.
 mod stress {
     mod navigation;
     mod resource_pressure;

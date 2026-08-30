@@ -1,15 +1,15 @@
-# Aura
+# Taim
 
 **A GPU-first UI framework in Rust.**
 
-Aura is a fork of [iced](https://github.com/iced-rs/iced), extended with a
+Taim is a fork of [iced](https://github.com/iced-rs/iced), extended with a
 damage-driven renderer, a gesture arena, a retained semantic tree, a
 token-based design system, and a mobile component set. The upstream
 architecture and a large part of the widget and renderer code originate
 there; see `CREDITS.md`.
 
 ```bash
-cargo run -p aura-showcase     # every widget, both themes
+cargo run -p taim-showcase     # every widget, both themes
 cargo run -p mobile_shell      # a mobile app shell
 ```
 
@@ -54,7 +54,7 @@ RSS in MiB:
 
 ```bash
 scripts/perf/run-baseline.sh --device dev-workstation-01   # all 13, as committed
-cargo run -p aura_bench --release --features profiling -- --scene ten_thousand_rows
+cargo run -p taim_bench --release --features profiling -- --scene ten_thousand_rows
 ```
 
 **Frame cost is `update + draw`** — the work the framework does to turn
@@ -125,7 +125,7 @@ the fork, each with a theme catalog, semantics, and unit tests.
 constants:
 
 ```rust
-use aura::widget::icon::{self, Icon};
+use taim::widget::icon::{self, Icon};
 
 icon::icon(Icon::SEARCH)
 icon::sized(Icon::SETTINGS, 32)
@@ -157,8 +157,8 @@ video, web view, and map.
 │                    core                          │
 │  types · layout · text · input · semantics       │
 ├─────────────────────────────────────────────────┤
-│  aura-design · aura-motion · aura-gesture        │
-│  aura-accessibility · aura-profiler              │
+│  taim-design · taim-motion · taim-gesture        │
+│  taim-accessibility · taim-profiler              │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -172,19 +172,19 @@ with `find <crate> -name '*.rs' | xargs cat | wc -l`:
 | `wgpu` | GPU renderer: batching, pipeline cache, atlas | 10,215 |
 | `runtime` | Reconciliation, frame scheduling, hit testing, routing | 8,012 |
 | `graphics` | Renderer-neutral primitives, damage tracking, caches | 7,881 |
-| `aura-accessibility` | Retained semantic tree, focus, AT-SPI, live regions | 4,904 |
+| `taim-accessibility` | Retained semantic tree, focus, AT-SPI, live regions | 4,904 |
 | `winit` | Desktop shell integration | 4,293 |
-| `aura-gesture` | Arena, tap, pan, pinch, rotate, swipe, nested scroll | 3,844 |
+| `taim-gesture` | Arena, tap, pan, pinch, rotate, swipe, nested scroll | 3,844 |
 | `tiny_skia` | Software renderer fallback | 3,326 |
-| `aura-design` | Token and component specs driving widget appearance | 2,501 |
-| `aura-highlighter` | Dependency-free syntax highlighting | 1,868 |
-| `aura-profiler` | Low-overhead telemetry, Chrome trace export | 1,640 |
-| `aura-platform-vyom` | Native Wayland/Smithay backend (not the default path) | 1,608 |
-| `aura-motion` | Springs, tweens, decay, keyframes, transitions | 1,081 |
+| `taim-design` | Token and component specs driving widget appearance | 2,501 |
+| `taim-highlighter` | Dependency-free syntax highlighting | 1,868 |
+| `taim-profiler` | Low-overhead telemetry, Chrome trace export | 1,640 |
+| `taim-platform-vyom` | Native Wayland/Smithay backend (not the default path) | 1,608 |
+| `taim-motion` | Springs, tweens, decay, keyframes, transitions | 1,081 |
 
-`aura-design` is a **specification** layer: each component declares its
+`taim-design` is a **specification** layer: each component declares its
 role, actions, minimum size, and appearance from semantic tokens, and
-`widget/src/aura.rs` maps those onto real widget styles.
+`widget/src/taim.rs` maps those onto real widget styles.
 
 Every widget that declares a `Catalog` has one — the mobile set included.
 That is enforced rather than asserted: `tests/design/catalog_coverage.rs`
@@ -198,12 +198,12 @@ uncovered for months without anything noticing.
 
 ```toml
 [dependencies]
-aura = { version = "0.15.0-dev", features = ["wgpu"] }
+taim = { version = "0.15.0-dev", features = ["wgpu"] }
 ```
 
 ```rust
-use aura::widget::{button, column, text};
-use aura::{Element, Task};
+use taim::widget::{button, column, text};
+use taim::{Element, Task};
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -233,19 +233,19 @@ impl Counter {
     }
 }
 
-fn main() -> aura::Result {
-    aura::application(|| (Counter { value: 0 }, Task::none()), Counter::update, Counter::view)
+fn main() -> taim::Result {
+    taim::application(|| (Counter { value: 0 }, Task::none()), Counter::update, Counter::view)
         .run()
 }
 ```
 
 ---
 
-## How Aura compares
+## How Taim compares
 
 Honest positioning, since the temptation is to overclaim.
 
-**Where Aura is genuinely ahead**
+**Where Taim is genuinely ahead**
 
 - **No garbage collector.** Rust's ownership model, not a GC pause budget.
 - **Zero idle work.** No frames are produced when nothing changes. The
@@ -266,7 +266,7 @@ Honest positioning, since the temptation is to overclaim.
 - **Hiring.** Dart and JavaScript developer pools are far larger.
 
 **Unproven either way.** Memory footprint, cold start, and energy draw
-are the axes where a no-GC framework should win, and Aura measures its
+are the axes where a no-GC framework should win, and Taim measures its
 own side of all three. None of them has been compared against Flutter or
 React Native on identical hardware, so no comparison is claimed.
 

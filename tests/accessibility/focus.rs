@@ -2,18 +2,18 @@
 //! unintentionally**, plus the required behavior that "focus order is
 //! deterministic in LTR/RTL and with virtualized content".
 //!
-//! `aura-accessibility`'s own unit tests cover the mechanics. These cover
+//! `taim-accessibility`'s own unit tests cover the mechanics. These cover
 //! the scenarios that actually strand users: a dialog torn down without
 //! cleanup, a virtualized row scrolling out from under the caret, a
 //! mirrored layout, and a form whose controls disable themselves as it is
 //! filled in.
 
-use aura_accessibility::focus::{Direction, Focus, Scope};
-use aura_accessibility::tree::Tree;
+use taim_accessibility::focus::{Direction, Focus, Scope};
+use taim_accessibility::tree::Tree;
 
-use aura_core::semantics::{Actions, Node, Role, State};
-use aura_core::widget::Id;
-use aura_core::{Point, Rectangle, Size};
+use taim_core::semantics::{Actions, Node, Role, State};
+use taim_core::widget::Id;
+use taim_core::{Point, Rectangle, Size};
 
 fn control(id: &Id, x: f32, y: f32) -> Node {
     Node::new(

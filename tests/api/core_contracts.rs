@@ -8,10 +8,10 @@
 //! as it did before those methods existed ("all existing widgets compile
 //! unchanged" and "no mandatory `Widget` method is introduced").
 
-use aura::advanced::widget::{self, Widget};
-use aura::advanced::{Layout, mouse, renderer};
-use aura::{Element, Length, Point, Rectangle, Size, Theme};
-use aura_renderer::Renderer;
+use taim::advanced::widget::{self, Widget};
+use taim::advanced::{Layout, mouse, renderer};
+use taim::{Element, Length, Point, Rectangle, Size, Theme};
+use taim_renderer::Renderer;
 
 /// A widget that overrides nothing beyond the mandatory methods, to
 /// prove the four new defaulted methods are reachable and behave as
@@ -27,9 +27,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Bare {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &aura::advanced::layout::Limits,
-    ) -> aura::advanced::layout::Node {
-        aura::advanced::layout::Node::new(Size::new(40.0, 20.0))
+        _limits: &taim::advanced::layout::Limits,
+    ) -> taim::advanced::layout::Node {
+        taim::advanced::layout::Node::new(Size::new(40.0, 20.0))
     }
 
     fn draw(
@@ -45,8 +45,8 @@ impl<Message> Widget<Message, Theme, Renderer> for Bare {
     }
 }
 
-fn layout_at(bounds: Rectangle) -> aura::advanced::layout::Node {
-    aura::advanced::layout::Node::new(bounds.size()).move_to(bounds.position())
+fn layout_at(bounds: Rectangle) -> taim::advanced::layout::Node {
+    taim::advanced::layout::Node::new(bounds.size()).move_to(bounds.position())
 }
 
 #[test]
@@ -140,9 +140,9 @@ fn element_construction_from_a_bare_widget_still_works() {
 /// checking a basic invariant); a full behavioral test for each type
 /// lives alongside its definition in `core/src/`.
 mod public_surface {
-    use aura::advanced::widget::Id;
-    use aura::advanced::widget::tree::{DirtyFlags, Revision};
-    use aura_core::{cache, damage, frame, semantics};
+    use taim::advanced::widget::Id;
+    use taim::advanced::widget::tree::{DirtyFlags, Revision};
+    use taim_core::{cache, damage, frame, semantics};
 
     #[test]
     fn widget_id_keyed_is_part_of_the_public_api() {
@@ -180,7 +180,7 @@ mod public_surface {
     fn core_semantics_is_part_of_the_public_api() {
         let node = semantics::Node::new(
             Id::unique(),
-            aura::Rectangle::new(aura::Point::ORIGIN, aura::Size::new(1.0, 1.0)),
+            taim::Rectangle::new(taim::Point::ORIGIN, taim::Size::new(1.0, 1.0)),
             semantics::Role::Button,
         );
 

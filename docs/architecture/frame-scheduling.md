@@ -9,7 +9,7 @@
 ## Clock ownership
 
 Exactly one clock exists per running application: `std::time::Instant`
-(re-exported, on native targets, unchanged, as `aura_core::time::Instant`
+(re-exported, on native targets, unchanged, as `taim_core::time::Instant`
 via `web_time`). `Scheduler` never calls `Instant::now()` itself --
 every method that needs "now" takes it as an explicit parameter. This is
 not a style preference; it is the whole reason `Scheduler`'s 17+
@@ -121,10 +121,10 @@ work was actually submitted -- but cannot detect a frame accepted by the
 presentation engine and then displayed late or dropped after `present`
 already returned control to the process.
 
-`aura_bench` (Phase 1's benchmark tool) has the same gap one level up:
+`taim_bench` (Phase 1's benchmark tool) has the same gap one level up:
 it runs entirely headlessly with no compositor at all, so
-`tools/aura_bench/src/metrics/pacing.rs`'s `PacingSamples` -- built to
-consume real `aura_core::frame::Feedback` values -- has nothing real to
+`tools/taim_bench/src/metrics/pacing.rs`'s `PacingSamples` -- built to
+consume real `taim_core::frame::Feedback` values -- has nothing real to
 consume in this tool today. `main.rs`'s `measure` function synthesizes a
 `Feedback`-shaped sample from what it *does* measure (CPU frame time
 against the target budget) as the best available proxy, documented
@@ -132,7 +132,7 @@ inline at the synthesis site and in `RunSummary::pacing`'s own field
 documentation. `PacingSample::from_feedback`/`PacingSamples::
 extend_from_feedback` are kept and unit-tested as the real bridge a
 future scene driving an actual windowed compositor would use instead,
-rather than deleted for being currently unreachable from `aura_bench`
+rather than deleted for being currently unreachable from `taim_bench`
 itself.
 
 ## What Phase 6 does not close
@@ -146,8 +146,8 @@ create frame instability"):
 |---|---|---|
 | "idle gate passes" | **Met** | `tests/runtime/idle.rs`: a fresh `Scheduler` never produces a frame; a real, unchanging `UserInterface` re-`update`d with no events re-runs no layout and reports `is_animating() == false`. |
 | "occlusion stops submissions" | **Met** | `tests/runtime/occlusion.rs` plus the real `winit`/`wgpu` wiring described above (both signal sources tested to reach `Scheduler::suspend`, and a stale `RedrawRequested` is guarded against). |
-| "animation cadence has no periodic beat/jitter defect" | **Partially met** | `Scheduler`'s own state machine is proven not to introduce beat/jitter itself (an `Animating` scheduler produces a frame on every tick it is asked about, with no artificial delay). Real-world cadence measurement (`aura_bench`'s new `pacing` metrics) exists but, per the gap above, is currently synthesized from CPU time, not real presentation feedback -- so this clause is verified for the scheduler's own logic, not yet for an actual windowed run's measured cadence. |
-| "queue depth stays within policy" | **Partially met** | `wgpu::window::compositor::Settings::desired_maximum_frame_latency` is now a real, configurable field (previously hardcoded to `1`, the lowest-latency value, which remains the default). `PacingSummary::max_queue_depth`/`mean_queue_depth` exist to check this against a real run, but nothing in this phase populates `PacingSample::queue_depth` from a real submission-tracking source yet (it is `0` in every `aura_bench` sample today, since that tool has no real submission queue to observe depth in). |
+| "animation cadence has no periodic beat/jitter defect" | **Partially met** | `Scheduler`'s own state machine is proven not to introduce beat/jitter itself (an `Animating` scheduler produces a frame on every tick it is asked about, with no artificial delay). Real-world cadence measurement (`taim_bench`'s new `pacing` metrics) exists but, per the gap above, is currently synthesized from CPU time, not real presentation feedback -- so this clause is verified for the scheduler's own logic, not yet for an actual windowed run's measured cadence. |
+| "queue depth stays within policy" | **Partially met** | `wgpu::window::compositor::Settings::desired_maximum_frame_latency` is now a real, configurable field (previously hardcoded to `1`, the lowest-latency value, which remains the default). `PacingSummary::max_queue_depth`/`mean_queue_depth` exist to check this against a real run, but nothing in this phase populates `PacingSample::queue_depth` from a real submission-tracking source yet (it is `0` in every `taim_bench` sample today, since that tool has no real submission queue to observe depth in). |
 | "input-latency improvement does not create frame instability" | **Not attempted** | This phase did not lower `desired_maximum_frame_latency` below its already-lowest-latency default of `1`, or otherwise attempt an input-latency optimization to check for a stability regression -- "lower-latency modes require evidence on every supported target GPU/compositor" (`phase.md`), and no such evidence was gathered this phase. Recorded here as explicitly not attempted, not as a failure of an attempted change. |
 
 ## Follow-ups carried forward
@@ -156,7 +156,7 @@ create frame instability"):
    the actual per-frame presentation timing this phase's `pacing`
    metrics and `Scheduler`'s `target_error` tracking are designed to
    consume once one exists.
-2. `aura_bench` driving a real windowed `Compositor` (rather than only
+2. `taim_bench` driving a real windowed `Compositor` (rather than only
    the headless `Renderer` path), so `metrics::pacing` measures real
    presentation cadence instead of a CPU-time proxy.
 3. An evidence-backed evaluation of lower-latency present modes/

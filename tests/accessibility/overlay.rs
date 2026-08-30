@@ -1,7 +1,7 @@
 //! Overlays report semantics.
 //!
 //! Before `Overlay::semantics` existed, **every overlay was invisible to
-//! the accessibility engine**: `aura_runtime::semantics::build` walks the
+//! the accessibility engine**: `taim_runtime::semantics::build` walks the
 //! widget tree, and an overlay is reached through `Widget::overlay`
 //! instead, so nothing ever asked it.
 //!
@@ -11,13 +11,13 @@
 //! exists, forwards correctly, and is actually implemented where it
 //! mattered.
 
-use aura::advanced::widget::{self, Widget};
-use aura::advanced::{Layout, layout, mouse, overlay};
-use aura::widget::pick_list;
-use aura::{Point, Rectangle, Size, Theme, Vector};
-use aura_core::semantics::{Node, Role, State};
-use aura_core::widget::Id;
-use aura_renderer::Renderer;
+use taim::advanced::widget::{self, Widget};
+use taim::advanced::{Layout, layout, mouse, overlay};
+use taim::widget::pick_list;
+use taim::{Point, Rectangle, Size, Theme, Vector};
+use taim_core::semantics::{Node, Role, State};
+use taim_core::widget::Id;
+use taim_renderer::Renderer;
 
 type Message = &'static str;
 
@@ -27,9 +27,9 @@ const WINDOW: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -61,7 +61,7 @@ impl overlay::Overlay<Message, Theme, Renderer> for Reporting {
         &self,
         _renderer: &mut Renderer,
         _theme: &Theme,
-        _style: &aura::advanced::renderer::Style,
+        _style: &taim::advanced::renderer::Style,
         _layout: Layout<'_>,
         _cursor: mouse::Cursor,
     ) {
@@ -169,16 +169,16 @@ impl OpenPickList<'_> {
     /// Clicks the control, which is what opens the dropdown.
     fn click(&mut self) {
         let mut messages = Vec::new();
-        let mut shell = aura::advanced::Shell::new(
-            &aura_core::window::Headless,
-            aura_core::shell::Waker::noop(),
+        let mut shell = taim::advanced::Shell::new(
+            &taim_core::window::Headless,
+            taim_core::shell::Waker::noop(),
             &mut messages,
         );
 
         Widget::<Message, Theme, Renderer>::update(
             &mut self.widget,
             &mut self.tree,
-            &aura::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            &taim::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
             Layout::new(&self.node),
             mouse::Cursor::Available(Layout::new(&self.node).bounds().center()),
             &self.renderer,

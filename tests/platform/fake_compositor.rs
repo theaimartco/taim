@@ -1,4 +1,4 @@
-use aura_platform_vyom::{Capabilities, Capability, Global};
+use taim_platform_vyom::{Capabilities, Capability, Global};
 
 pub fn complete_standard_globals() -> Capabilities {
     Capabilities::new([

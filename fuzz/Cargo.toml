@@ -1,5 +1,5 @@
 [package]
-name = "aura-fuzz"
+name = "taim-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2021"
@@ -9,6 +9,6 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-aura_core = { path = "../core" }
-aura_graphics = { path = "../graphics" }
-aura-gesture = { path = "../aura-gesture" }
+taim_core = { path = "../core" }
+taim_graphics = { path = "../graphics" }
+taim-gesture = { path = "../taim-gesture" }

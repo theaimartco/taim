@@ -3,15 +3,15 @@ set -e
 
 echo "Starting framework comparison benchmark..."
 
-# Build aura_bench
-echo "Building aura_bench..."
-cargo build -p tools/aura_bench --release
+# Build taim_bench
+echo "Building taim_bench..."
+cargo build -p tools/taim_bench --release
 
-# Run Aura
-echo "Running Aura benchmark..."
-# ./target/release/aura_bench --report-json > aura_results.json
+# Run Taim
+echo "Running Taim benchmark..."
+# ./target/release/taim_bench --report-json > taim_results.json
 
 # (Placeholder for running competitor frameworks like Qt or Flutter)
 
 echo "Comparison complete. Generating report..."
-# generate_report aura_results.json qt_results.json ...
+# generate_report taim_results.json qt_results.json ...

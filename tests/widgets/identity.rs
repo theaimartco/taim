@@ -1,25 +1,25 @@
 //! List reorder, insertion, removal, and preserved-state tests.
 //!
-//! These tests exercise `aura_widget::keyed::Column`'s reconciliation,
-//! which as of Phase 3 is backed by `aura_runtime::reconcile::reconcile`
+//! These tests exercise `taim_widget::keyed::Column`'s reconciliation,
+//! which as of Phase 3 is backed by `taim_runtime::reconcile::reconcile`
 //! -- a real, `O(n)` keyed diff. This is a behavior change from Phase 2:
 //! that phase's version of this file documented (and tested) a
 //! narrower, boundary-splice-only contract
-//! (`aura_core::widget::tree::diff_children_custom_with_search`) that did
+//! (`taim_core::widget::tree::diff_children_custom_with_search`) that did
 //! not consult keys at all when the list's length was unchanged, and
 //! never relocated a slot to follow its key across a full reorder. Both
 //! limitations are gone: every test below holds regardless of how the
 //! key set is rearranged, grown, or shrunk, because [`reconcile`] looks
 //! up every new key against every old key (not just the boundaries).
 //!
-//! [`reconcile`]: aura_runtime::reconcile::reconcile
+//! [`reconcile`]: taim_runtime::reconcile::reconcile
 
-use aura::advanced::widget::{self, Widget};
-use aura::advanced::{Layout, mouse, renderer};
-use aura::widget::keyed::Column;
-use aura::{Element, Length, Rectangle, Size, Theme};
-use aura_renderer::Renderer;
-use aura_runtime::user_interface::{self, UserInterface};
+use taim::advanced::widget::{self, Widget};
+use taim::advanced::{Layout, mouse, renderer};
+use taim::widget::keyed::Column;
+use taim::{Element, Length, Rectangle, Size, Theme};
+use taim_renderer::Renderer;
+use taim_runtime::user_interface::{self, UserInterface};
 
 /// A widget whose only job is to hold an identifiable counter in its
 /// [`widget::Tree`] state, incremented once when the widget is first
@@ -40,9 +40,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Marker {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &aura::advanced::layout::Limits,
-    ) -> aura::advanced::layout::Node {
-        aura::advanced::layout::Node::new(Size::new(20.0, 20.0))
+        _limits: &taim::advanced::layout::Limits,
+    ) -> taim::advanced::layout::Node {
+        taim::advanced::layout::Node::new(Size::new(20.0, 20.0))
     }
 
     fn tag(&self) -> widget::tree::Tag {
@@ -78,9 +78,9 @@ fn marker_state(tree: &widget::Tree, index: usize) -> u32 {
 }
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )

@@ -438,12 +438,12 @@ impl Key {
 struct ShouldReset(bool);
 
 /// Reset the [`Animation`] of a [`Transition`].
-pub fn reset<Message>(id: impl Into<widget::Id>) -> aura_runtime::Task<Message>
+pub fn reset<Message>(id: impl Into<widget::Id>) -> taim_runtime::Task<Message>
 where
-    Message: aura_runtime::futures::MaybeSend + 'static,
+    Message: taim_runtime::futures::MaybeSend + 'static,
 {
     let id = id.into();
-    aura_runtime::task::widget(reset_raw(id)).discard()
+    taim_runtime::task::widget(reset_raw(id)).discard()
 }
 
 /// An [`Operation`] to reset the [`Animation`] of a [`Transition`].

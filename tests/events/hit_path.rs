@@ -1,18 +1,18 @@
 //! Overlapping, clipped, transformed, and captured path tests for
-//! `aura_runtime::hit_test`.
+//! `taim_runtime::hit_test`.
 //!
 //! These tests exercise the linear hit-test oracle
-//! (`aura_runtime::hit_test::hit_test`) two ways:
+//! (`taim_runtime::hit_test::hit_test`) two ways:
 //!
 //! - Directly against real widget layouts via [`Widget::hit_test`]
 //!   (Phase 2's per-widget hit-test method, defaulted to a rectangular
 //!   bounds check), for the "does this point register as hit at all"
 //!   question a real application asks every frame.
-//! - Through `aura_core::widget::visit::Widgets` -- the same adapter
+//! - Through `taim_core::widget::visit::Widgets` -- the same adapter
 //!   `UserInterface::hit_test` uses -- to prove the path-producing
 //!   oracle agrees with those same widgets' bounds, since
 //!   `hit_test::hit_test`'s own unit tests only exercise a synthetic
-//!   `Node` type, not real `aura_core::Widget`s.
+//!   `Node` type, not real `taim_core::Widget`s.
 //!
 //! These used to walk a hand-built `Shape` mirroring the real tree,
 //! because `Widget` had no way to enumerate children; each test
@@ -20,17 +20,17 @@
 //! to match. `Widget::visit_children` removed the need, so what is
 //! walked here is now the tree itself.
 
-use aura::advanced::Layout;
-use aura::advanced::widget::{self, Widget};
-use aura::{Element, Length, Point, Rectangle, Size, Theme, Vector};
-use aura_core::widget::visit;
-use aura_renderer::Renderer;
-use aura_runtime::hit_test;
+use taim::advanced::Layout;
+use taim::advanced::widget::{self, Widget};
+use taim::{Element, Length, Point, Rectangle, Size, Theme, Vector};
+use taim_core::widget::visit;
+use taim_renderer::Renderer;
+use taim_runtime::hit_test;
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -51,9 +51,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Probe {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &aura::advanced::layout::Limits,
-    ) -> aura::advanced::layout::Node {
-        aura::advanced::layout::Node::new(Size::new(self.size, self.size))
+        _limits: &taim::advanced::layout::Limits,
+    ) -> taim::advanced::layout::Node {
+        taim::advanced::layout::Node::new(Size::new(self.size, self.size))
     }
 
     fn draw(
@@ -61,9 +61,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Probe {
         _tree: &widget::Tree,
         _renderer: &mut Renderer,
         _theme: &Theme,
-        _style: &aura::advanced::renderer::Style,
+        _style: &taim::advanced::renderer::Style,
         _layout: Layout<'_>,
-        _cursor: aura::advanced::mouse::Cursor,
+        _cursor: taim::advanced::mouse::Cursor,
         _viewport: &Rectangle,
     ) {
     }
@@ -83,7 +83,7 @@ fn path_to(root: &mut Element<'_, ()>, point: Point) -> Option<hit_test::Path> {
     let mut tree = widget::Tree::new(root.as_widget());
     tree.diff(root.as_widget_mut());
 
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
     let node = root.as_widget_mut().layout(&mut tree, &renderer, &limits);
 
     hit_test::hit_test(
@@ -94,7 +94,7 @@ fn path_to(root: &mut Element<'_, ()>, point: Point) -> Option<hit_test::Path> {
 
 #[test]
 fn overlapping_siblings_resolve_to_the_topmost_via_the_oracle() {
-    use aura::widget::stack;
+    use taim::widget::stack;
 
     let mut root: Element<'_, ()> = stack([probe(50.0), probe(50.0)]).into();
 
@@ -104,7 +104,7 @@ fn overlapping_siblings_resolve_to_the_topmost_via_the_oracle() {
     assert_eq!(
         path.indices(),
         &[1],
-        "the later (topmost) sibling must win, matching aura's own back-to-front draw order"
+        "the later (topmost) sibling must win, matching taim's own back-to-front draw order"
     );
 }
 
@@ -117,7 +117,7 @@ fn a_point_outside_every_widget_is_not_hit() {
     let mut tree = widget::Tree::new(root.as_widget());
     tree.diff(root.as_widget_mut());
 
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
     let node = root.as_widget_mut().layout(&mut tree, &renderer, &limits);
     let layout = Layout::new(&node);
 
@@ -139,7 +139,7 @@ fn a_translated_layout_hit_tests_at_its_new_position_not_the_old_one() {
     let mut tree = widget::Tree::new(root.as_widget());
     tree.diff(root.as_widget_mut());
 
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
     let node = root
         .as_widget_mut()
         .layout(&mut tree, &renderer, &limits)
@@ -162,7 +162,7 @@ fn a_translated_layout_hit_tests_at_its_new_position_not_the_old_one() {
 
 #[test]
 fn content_clipped_outside_a_scrollables_bounds_is_not_hit() {
-    use aura::widget::{container, scrollable};
+    use taim::widget::{container, scrollable};
 
     let renderer = headless_renderer();
 
@@ -178,7 +178,7 @@ fn content_clipped_outside_a_scrollables_bounds_is_not_hit() {
     let mut tree = widget::Tree::new(root.as_widget());
     tree.diff(root.as_widget_mut());
 
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
     let node = root.as_widget_mut().layout(&mut tree, &renderer, &limits);
     let layout = Layout::new(&node);
 
@@ -195,7 +195,7 @@ fn content_clipped_outside_a_scrollables_bounds_is_not_hit() {
 
 #[test]
 fn a_nested_child_reached_through_two_levels_returns_the_full_path() {
-    use aura::widget::row;
+    use taim::widget::row;
 
     let mut root: Element<'_, ()> =
         row([row([probe(10.0), probe(10.0)]).into(), probe(10.0)]).into();

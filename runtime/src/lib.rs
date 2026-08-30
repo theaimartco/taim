@@ -1,13 +1,13 @@
 //! A renderer-agnostic native GUI runtime.
 //!
-//! `aura_runtime` turns an [`aura_core`] widget tree into a running
+//! `taim_runtime` turns an [`taim_core`] widget tree into a running
 //! application frame: event dispatch, layout, semantic updates, paint
 //! preparation, input-method coordination, and background tasks.
 //!
-//! [`aura_core`]: https://github.com/theaimartco/vyom-aura/tree/main/core
+//! [`taim_core`]: https://github.com/theaimartco/taim/tree/main/core
 
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 pub mod backend;
@@ -32,8 +32,8 @@ pub mod user_interface;
 pub mod widget;
 pub mod window;
 
-pub use aura_core as core;
-pub use aura_futures as futures;
+pub use taim_core as core;
+pub use taim_futures as futures;
 
 pub use task::Task;
 pub use user_interface::UserInterface;
@@ -42,7 +42,7 @@ use crate::core::Event;
 
 use std::fmt;
 
-/// An action that the aura runtime can perform.
+/// An action that the taim runtime can perform.
 pub enum Action<T> {
     /// Output some value.
     Output(T),
@@ -144,7 +144,7 @@ where
     }
 }
 
-/// Creates a [`Task`] that exits the aura runtime.
+/// Creates a [`Task`] that exits the taim runtime.
 ///
 /// This will normally close any application windows and
 /// terminate the runtime loop.

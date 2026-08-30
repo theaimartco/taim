@@ -15,13 +15,13 @@
 //! them answers differently. A per-subsystem suite cannot catch a
 //! disagreement between subsystems; only a table can.
 
-use aura_core::security::{Audience, Classified, Privacy};
-use aura_core::semantics::{Node, Role, Value};
-use aura_core::widget::Id;
-use aura_core::{Rectangle, Size};
+use taim_core::security::{Audience, Classified, Privacy};
+use taim_core::semantics::{Node, Role, Value};
+use taim_core::widget::Id;
+use taim_core::{Rectangle, Size};
 
-use aura_profiler::events::{Event, Redacted};
-use aura_profiler::{Collector, export};
+use taim_profiler::events::{Event, Redacted};
+use taim_profiler::{Collector, export};
 
 const PASSWORD: &str = "hunter2-correct-horse";
 const NOTIFICATION: &str = "Your test results are ready";
@@ -29,7 +29,7 @@ const NOTIFICATION: &str = "Your test results are ready";
 fn node(role: Role) -> Node {
     Node::new(
         Id::unique(),
-        Rectangle::new(aura_core::Point::ORIGIN, Size::new(10.0, 10.0)),
+        Rectangle::new(taim_core::Point::ORIGIN, Size::new(10.0, 10.0)),
         role,
     )
 }
@@ -162,11 +162,11 @@ fn a_private_notification_still_reaches_a_screen_reader() {
 
 #[test]
 fn the_profiler_and_the_classification_are_the_same_vocabulary() {
-    // Not "agree" -- *are*. `aura_profiler::Sensitivity` is a re-export of
+    // Not "agree" -- *are*. `taim_profiler::Sensitivity` is a re-export of
     // `security::Privacy`. An earlier draft had a parallel enum with the
     // same four variants, which is the exact failure this whole design is
     // about: two vocabularies is how five paths agree and the sixth leaks.
-    let profiler: aura_profiler::Sensitivity = Privacy::Secret;
+    let profiler: taim_profiler::Sensitivity = Privacy::Secret;
 
     assert_eq!(profiler, Privacy::Secret);
 }
@@ -182,7 +182,7 @@ fn a_secure_fields_length_never_reaches_a_trace() {
         content: Redacted::new(PASSWORD.len(), Role::SecureField.privacy()),
     });
 
-    let trace = export::aura(&collector);
+    let trace = export::taim(&collector);
 
     assert!(!trace.contains(PASSWORD), "{trace}");
     assert!(!trace.contains("\"length\""), "{trace}");
@@ -201,7 +201,7 @@ fn a_protected_surfaces_size_reaches_a_trace_but_its_pixels_cannot() {
         content: Redacted::new(1920 * 1080 * 4, Privacy::Protected),
     });
 
-    let trace = export::aura(&collector);
+    let trace = export::taim(&collector);
 
     assert!(trace.contains("\"length\":8294400"), "{trace}");
     assert!(trace.contains("\"sensitivity\":\"protected\""), "{trace}");

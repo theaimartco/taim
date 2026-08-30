@@ -1,17 +1,17 @@
 //! Per-frame GPU hot-path counters.
 //!
-//! Mirrors `aura_runtime::diagnostics::Counters`'s exact shape and
+//! Mirrors `taim_runtime::diagnostics::Counters`'s exact shape and
 //! zero-cost-when-disabled contract, for the same reason: phase.md's
 //! Phase 5 optimization order starts with "instrument current
 //! primitive, batch, upload, atlas miss, pipeline switch, and draw
 //! counts" *before* any allocation/batching/persistence work, so later
 //! steps have a concrete "how much work did we actually avoid" number
-//! rather than only a wall-clock time (which `aura_debug`'s existing
+//! rather than only a wall-clock time (which `taim_debug`'s existing
 //! `prepare`/`render` spans already provide, but do not count anything
 //! by themselves).
 //!
 //! [`Counters`] is reset once per frame (unlike
-//! `aura_runtime::diagnostics::Counters`, which accumulates for the
+//! `taim_runtime::diagnostics::Counters`, which accumulates for the
 //! lifetime of whatever holds it): a GPU frame's cost is inherently
 //! per-frame -- carrying counts across frames would conflate "this
 //! frame did N draw calls" with "N draw calls have happened since the

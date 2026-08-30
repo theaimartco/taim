@@ -1,5 +1,5 @@
-use aura_core::text::paragraph::{Direction, ShapingKey};
-use aura_core::text::{FallbackChain, LineBreakPolicy, Script};
+use taim_core::text::paragraph::{Direction, ShapingKey};
+use taim_core::text::{FallbackChain, LineBreakPolicy, Script};
 
 const CORPUS: &[(&str, Script)] = &[
     ("English text", Script::Latin),

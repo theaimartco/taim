@@ -1,6 +1,6 @@
 [package]
-name = "aura_futures"
-description = "Commands, subscriptions, and future executors for aura"
+name = "taim_futures"
+description = "Commands, subscriptions, and future executors for taim"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -21,7 +21,7 @@ all-features = true
 thread-pool = ["futures/thread-pool"]
 
 [dependencies]
-aura_core.workspace = true
+taim_core.workspace = true
 futures.workspace = true
 log.workspace = true
 rustc-hash.workspace = true

@@ -3,7 +3,7 @@
 # # Phase 0 scope: prove the existing `benches/` targets still build and run
 # # to completion, and retain their raw output as an artifact. This is
 # # intentionally NOT a regression gate yet -- phase.md Phase 1 introduces
-# # `tools/aura_bench`, `benchmarks/devices.toml`, and the methodology
+# # `tools/taim_bench`, `benchmarks/devices.toml`, and the methodology
 # # needed before any PR-blocking performance comparison is trustworthy.
 # # Doing that here, on a shared hosted runner with no locked-down hardware,
 # # would produce noisy numbers nobody should trust (roadmap rule 1: measure

@@ -61,10 +61,10 @@ fi
 # allocations occurred -- which is exactly how the previous baselines came
 # to record `allocation_counting_active: false` while the README quoted
 # allocation figures (Capstone.md F-04).
-echo "Building aura_bench (release, profiling)..."
-cargo build --release -p aura_bench --features profiling
+echo "Building taim_bench (release, profiling)..."
+cargo build --release -p taim_bench --features profiling
 
-readonly BENCH="target/release/aura_bench"
+readonly BENCH="target/release/taim_bench"
 
 mkdir -p "$BASELINE_DIR"
 

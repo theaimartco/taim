@@ -2,7 +2,7 @@
 //!
 //! The [`Controller`] maps runtime [`Pressure`] signals (GPU load,
 //! missed frames, thermal state, GPU-recovery) to an
-//! [`aura_graphics::quality::Tier`], applying a minimum-residency
+//! [`taim_graphics::quality::Tier`], applying a minimum-residency
 //! hysteresis so ordinary tier changes cannot oscillate frame-to-frame
 //! around a threshold (`phase.md` Phase 12: "use hysteresis and minimum
 //! residency time when changing quality tiers; prevent visual
@@ -25,7 +25,7 @@
 #![allow(missing_docs)]
 
 use crate::core::time::{Duration, Instant};
-use aura_graphics::quality::Tier;
+use taim_graphics::quality::Tier;
 
 /// The default minimum time a tier must be resident before an ordinary
 /// (non-emergency) change is allowed.

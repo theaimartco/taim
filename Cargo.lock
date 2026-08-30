@@ -371,316 +371,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
-name = "aura"
-version = "0.15.0-dev"
-dependencies = [
- "aura",
- "aura-accessibility",
- "aura-design",
- "aura-gesture",
- "aura-highlighter",
- "aura-motion",
- "aura-platform-vyom",
- "aura-profiler",
- "aura_core",
- "aura_debug",
- "aura_futures",
- "aura_graphics",
- "aura_renderer",
- "aura_runtime",
- "aura_tiny_skia",
- "aura_wgpu",
- "aura_widget",
- "aura_winit",
- "criterion",
- "image",
- "serde_json",
- "thiserror 2.0.19",
-]
-
-[[package]]
-name = "aura-accessibility"
-version = "0.15.0-dev"
-dependencies = [
- "aura_core",
- "bitflags 2.13.1",
- "log",
- "rustc-hash 2.1.3",
- "serde",
- "smol_str 0.2.2",
- "zbus",
-]
-
-[[package]]
-name = "aura-design"
-version = "0.15.0-dev"
-dependencies = [
- "aura-motion",
- "aura_core",
- "aura_graphics",
- "bitflags 2.13.1",
-]
-
-[[package]]
-name = "aura-gesture"
-version = "0.15.0-dev"
-dependencies = [
- "aura_core",
- "rustc-hash 2.1.3",
- "smallvec",
-]
-
-[[package]]
-name = "aura-highlighter"
-version = "0.15.0-dev"
-dependencies = [
- "aura_core",
-]
-
-[[package]]
-name = "aura-motion"
-version = "0.15.0-dev"
-dependencies = [
- "libm",
-]
-
-[[package]]
-name = "aura-platform-vyom"
-version = "0.15.0-dev"
-dependencies = [
- "aura-accessibility",
- "aura-gesture",
- "aura_core",
- "rustc-hash 2.1.3",
- "thiserror 2.0.19",
- "wayland-client",
- "wayland-protocols",
-]
-
-[[package]]
-name = "aura-profiler"
-version = "0.15.0-dev"
-dependencies = [
- "aura_core",
- "rustc-hash 2.1.3",
- "smol_str 0.2.2",
-]
-
-[[package]]
-name = "aura-showcase"
-version = "0.1.0"
-dependencies = [
- "aura",
-]
-
-[[package]]
-name = "aura_bench"
-version = "0.1.0"
-dependencies = [
- "aura-motion",
- "aura_core",
- "aura_futures",
- "aura_graphics",
- "aura_renderer",
- "aura_runtime",
- "aura_wgpu",
- "aura_widget",
- "futures",
- "log",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "aura_core"
-version = "0.15.0-dev"
-dependencies = [
- "aura-motion",
- "bitflags 2.13.1",
- "bytes",
- "glam",
- "lilt",
- "log",
- "num-traits",
- "raw-window-handle",
- "rustc-hash 2.1.3",
- "serde",
- "smallvec",
- "smol_str 0.2.2",
- "thiserror 2.0.19",
- "web-time",
-]
-
-[[package]]
-name = "aura_debug"
-version = "0.15.0-dev"
-dependencies = [
- "aura_core",
- "aura_futures",
- "cargo-hot-protocol",
- "log",
-]
-
-[[package]]
-name = "aura_futures"
-version = "0.15.0-dev"
-dependencies = [
- "aura_core",
- "futures",
- "log",
- "rustc-hash 2.1.3",
- "smol",
- "tokio",
- "wasm-bindgen-futures",
- "wasmtimer",
-]
-
-[[package]]
-name = "aura_graphics"
-version = "0.15.0-dev"
-dependencies = [
- "aura_core",
- "aura_futures",
- "bitflags 2.13.1",
- "bytemuck",
- "cosmic-text",
- "half",
- "image",
- "kamadak-exif",
- "log",
- "lyon_path",
- "raw-window-handle",
- "rustc-hash 2.1.3",
- "smallvec",
- "thiserror 2.0.19",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "aura_lab"
-version = "0.1.0"
-dependencies = [
- "aura",
- "aura-profiler",
- "aura_core",
- "aura_futures",
- "aura_renderer",
- "aura_runtime",
-]
-
-[[package]]
-name = "aura_program"
-version = "0.15.0-dev"
-dependencies = [
- "aura_graphics",
- "aura_runtime",
-]
-
-[[package]]
-name = "aura_renderer"
-version = "0.15.0-dev"
-dependencies = [
- "aura_graphics",
- "aura_tiny_skia",
- "aura_wgpu",
- "log",
- "thiserror 2.0.19",
-]
-
-[[package]]
-name = "aura_runtime"
-version = "0.15.0-dev"
-dependencies = [
- "aura-accessibility",
- "aura-gesture",
- "aura-profiler",
- "aura_core",
- "aura_futures",
- "aura_graphics",
- "bytes",
- "rustc-hash 2.1.3",
- "sipper",
- "thiserror 2.0.19",
-]
-
-[[package]]
-name = "aura_tiny_skia"
-version = "0.15.0-dev"
-dependencies = [
- "aura_debug",
- "aura_graphics",
- "bytemuck",
- "cosmic-text",
- "kurbo 0.10.4",
- "log",
- "resvg",
- "rustc-hash 2.1.3",
- "softbuffer",
- "tiny-skia",
-]
-
-[[package]]
-name = "aura_wgpu"
-version = "0.15.0-dev"
-dependencies = [
- "aura_debug",
- "aura_graphics",
- "bitflags 2.13.1",
- "bytemuck",
- "cryoglyph",
- "futures",
- "guillotiere",
- "image",
- "log",
- "lyon",
- "resvg",
- "rustc-hash 2.1.3",
- "thiserror 2.0.19",
- "wgpu",
-]
-
-[[package]]
-name = "aura_widget"
-version = "0.15.0-dev"
-dependencies = [
- "aura-design",
- "aura-highlighter",
- "aura-motion",
- "aura_renderer",
- "aura_runtime",
- "log",
- "num-traits",
- "ouroboros",
- "pulldown-cmark",
- "qrcode",
- "rustc-hash 2.1.3",
- "thiserror 2.0.19",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "aura_winit"
-version = "0.15.0-dev"
-dependencies = [
- "arboard",
- "aura-accessibility",
- "aura-gesture",
- "aura_debug",
- "aura_program",
- "aura_runtime",
- "log",
- "mundy",
- "objc2 0.5.2",
- "rustc-hash 2.1.3",
- "sysinfo",
- "thiserror 2.0.19",
- "tracing",
- "wasm-bindgen-futures",
- "web-sys",
- "winit",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2306,7 +1996,7 @@ dependencies = [
 name = "mobile_shell"
 version = "0.1.0"
 dependencies = [
- "aura",
+ "taim",
 ]
 
 [[package]]
@@ -4101,6 +3791,316 @@ dependencies = [
  "ntapi",
  "rayon",
  "windows 0.57.0",
+]
+
+[[package]]
+name = "taim"
+version = "0.15.0-dev"
+dependencies = [
+ "criterion",
+ "image",
+ "serde_json",
+ "taim",
+ "taim-accessibility",
+ "taim-design",
+ "taim-gesture",
+ "taim-highlighter",
+ "taim-motion",
+ "taim-platform-vyom",
+ "taim-profiler",
+ "taim_core",
+ "taim_debug",
+ "taim_futures",
+ "taim_graphics",
+ "taim_renderer",
+ "taim_runtime",
+ "taim_tiny_skia",
+ "taim_wgpu",
+ "taim_widget",
+ "taim_winit",
+ "thiserror 2.0.19",
+]
+
+[[package]]
+name = "taim-accessibility"
+version = "0.15.0-dev"
+dependencies = [
+ "bitflags 2.13.1",
+ "log",
+ "rustc-hash 2.1.3",
+ "serde",
+ "smol_str 0.2.2",
+ "taim_core",
+ "zbus",
+]
+
+[[package]]
+name = "taim-design"
+version = "0.15.0-dev"
+dependencies = [
+ "bitflags 2.13.1",
+ "taim-motion",
+ "taim_core",
+ "taim_graphics",
+]
+
+[[package]]
+name = "taim-gesture"
+version = "0.15.0-dev"
+dependencies = [
+ "rustc-hash 2.1.3",
+ "smallvec",
+ "taim_core",
+]
+
+[[package]]
+name = "taim-highlighter"
+version = "0.15.0-dev"
+dependencies = [
+ "taim_core",
+]
+
+[[package]]
+name = "taim-motion"
+version = "0.15.0-dev"
+dependencies = [
+ "libm",
+]
+
+[[package]]
+name = "taim-platform-vyom"
+version = "0.15.0-dev"
+dependencies = [
+ "rustc-hash 2.1.3",
+ "taim-accessibility",
+ "taim-gesture",
+ "taim_core",
+ "thiserror 2.0.19",
+ "wayland-client",
+ "wayland-protocols",
+]
+
+[[package]]
+name = "taim-profiler"
+version = "0.15.0-dev"
+dependencies = [
+ "rustc-hash 2.1.3",
+ "smol_str 0.2.2",
+ "taim_core",
+]
+
+[[package]]
+name = "taim-showcase"
+version = "0.1.0"
+dependencies = [
+ "taim",
+]
+
+[[package]]
+name = "taim_bench"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "log",
+ "serde",
+ "serde_json",
+ "taim-motion",
+ "taim_core",
+ "taim_futures",
+ "taim_graphics",
+ "taim_renderer",
+ "taim_runtime",
+ "taim_wgpu",
+ "taim_widget",
+]
+
+[[package]]
+name = "taim_core"
+version = "0.15.0-dev"
+dependencies = [
+ "bitflags 2.13.1",
+ "bytes",
+ "glam",
+ "lilt",
+ "log",
+ "num-traits",
+ "raw-window-handle",
+ "rustc-hash 2.1.3",
+ "serde",
+ "smallvec",
+ "smol_str 0.2.2",
+ "taim-motion",
+ "thiserror 2.0.19",
+ "web-time",
+]
+
+[[package]]
+name = "taim_debug"
+version = "0.15.0-dev"
+dependencies = [
+ "cargo-hot-protocol",
+ "log",
+ "taim_core",
+ "taim_futures",
+]
+
+[[package]]
+name = "taim_futures"
+version = "0.15.0-dev"
+dependencies = [
+ "futures",
+ "log",
+ "rustc-hash 2.1.3",
+ "smol",
+ "taim_core",
+ "tokio",
+ "wasm-bindgen-futures",
+ "wasmtimer",
+]
+
+[[package]]
+name = "taim_graphics"
+version = "0.15.0-dev"
+dependencies = [
+ "bitflags 2.13.1",
+ "bytemuck",
+ "cosmic-text",
+ "half",
+ "image",
+ "kamadak-exif",
+ "log",
+ "lyon_path",
+ "raw-window-handle",
+ "rustc-hash 2.1.3",
+ "smallvec",
+ "taim_core",
+ "taim_futures",
+ "thiserror 2.0.19",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "taim_lab"
+version = "0.1.0"
+dependencies = [
+ "taim",
+ "taim-profiler",
+ "taim_core",
+ "taim_futures",
+ "taim_renderer",
+ "taim_runtime",
+]
+
+[[package]]
+name = "taim_program"
+version = "0.15.0-dev"
+dependencies = [
+ "taim_graphics",
+ "taim_runtime",
+]
+
+[[package]]
+name = "taim_renderer"
+version = "0.15.0-dev"
+dependencies = [
+ "log",
+ "taim_graphics",
+ "taim_tiny_skia",
+ "taim_wgpu",
+ "thiserror 2.0.19",
+]
+
+[[package]]
+name = "taim_runtime"
+version = "0.15.0-dev"
+dependencies = [
+ "bytes",
+ "rustc-hash 2.1.3",
+ "sipper",
+ "taim-accessibility",
+ "taim-gesture",
+ "taim-profiler",
+ "taim_core",
+ "taim_futures",
+ "taim_graphics",
+ "thiserror 2.0.19",
+]
+
+[[package]]
+name = "taim_tiny_skia"
+version = "0.15.0-dev"
+dependencies = [
+ "bytemuck",
+ "cosmic-text",
+ "kurbo 0.10.4",
+ "log",
+ "resvg",
+ "rustc-hash 2.1.3",
+ "softbuffer",
+ "taim_debug",
+ "taim_graphics",
+ "tiny-skia",
+]
+
+[[package]]
+name = "taim_wgpu"
+version = "0.15.0-dev"
+dependencies = [
+ "bitflags 2.13.1",
+ "bytemuck",
+ "cryoglyph",
+ "futures",
+ "guillotiere",
+ "image",
+ "log",
+ "lyon",
+ "resvg",
+ "rustc-hash 2.1.3",
+ "taim_debug",
+ "taim_graphics",
+ "thiserror 2.0.19",
+ "wgpu",
+]
+
+[[package]]
+name = "taim_widget"
+version = "0.15.0-dev"
+dependencies = [
+ "log",
+ "num-traits",
+ "ouroboros",
+ "pulldown-cmark",
+ "qrcode",
+ "rustc-hash 2.1.3",
+ "taim-design",
+ "taim-highlighter",
+ "taim-motion",
+ "taim_renderer",
+ "taim_runtime",
+ "thiserror 2.0.19",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "taim_winit"
+version = "0.15.0-dev"
+dependencies = [
+ "arboard",
+ "log",
+ "mundy",
+ "objc2 0.5.2",
+ "rustc-hash 2.1.3",
+ "sysinfo",
+ "taim-accessibility",
+ "taim-gesture",
+ "taim_debug",
+ "taim_program",
+ "taim_runtime",
+ "thiserror 2.0.19",
+ "tracing",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "winit",
 ]
 
 [[package]]

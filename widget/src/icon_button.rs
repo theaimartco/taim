@@ -2,9 +2,9 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-//! use aura::widget::icon_button;
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+//! use taim::widget::icon_button;
 //!
 //! #[derive(Clone)]
 //! enum Message {
@@ -25,7 +25,7 @@
 //! a control that is impossible to build without a name cannot ship
 //! without one.
 //!
-//! This is `aura_design::components::icon_button::IconButton`'s contract
+//! This is `taim_design::components::icon_button::IconButton`'s contract
 //! made real -- that type's `has_accessible_name` states the rule; this
 //! widget is where it cannot be broken.
 
@@ -41,10 +41,10 @@ use crate::core::{
 };
 
 /// The default edge length of an icon button, which is also the smallest
-/// touch target Aura allows.
+/// touch target Taim allows.
 ///
 /// Taken from [`touch::MIN_TARGET`] rather than restated, so this widget
-/// cannot drift from `aura-design`'s `MIN_TOUCH_TARGET`.
+/// cannot drift from `taim-design`'s `MIN_TOUCH_TARGET`.
 const DEFAULT_SIZE: f32 = touch::MIN_TARGET;
 
 /// A button whose content is a single icon glyph.
@@ -393,7 +393,7 @@ impl Catalog for Theme {
     }
 }
 
-/// The default styling of an [`IconButton`] for aura's own theme.
+/// The default styling of an [`IconButton`] for taim's own theme.
 pub fn default(theme: &Theme, status: Status) -> Style {
     let palette = theme.palette();
     let text = palette.background.base.text;

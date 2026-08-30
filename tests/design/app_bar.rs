@@ -1,27 +1,27 @@
 //! The `app_bar` widget: slot layout, collapse, and container semantics.
 //!
-//! Realises `aura_design::components::app_bar::AppBar`. That contract was
+//! Realises `taim_design::components::app_bar::AppBar`. That contract was
 //! *corrected* during Phase 11 — it originally claimed `ACTIVATE` with no
 //! focusable target behind it — so the most important thing here is that
 //! the widget is a container: no actions, no focus, affordances delegated
 //! to real controls in its slots.
 
-use aura::advanced::widget::{self, Widget};
-use aura::advanced::{Layout, layout};
-use aura::widget::{app_bar, icon_button, space, text};
-use aura::{Element, Rectangle, Size, Theme};
-use aura_core::semantics::Role;
-use aura_renderer::Renderer;
-use aura_widget::app_bar as app_bar_mod;
+use taim::advanced::widget::{self, Widget};
+use taim::advanced::{Layout, layout};
+use taim::widget::{app_bar, icon_button, space, text};
+use taim::{Element, Rectangle, Size, Theme};
+use taim_core::semantics::Role;
+use taim_renderer::Renderer;
+use taim_widget::app_bar as app_bar_mod;
 
 type Message = &'static str;
 
 const WIDTH: f32 = 400.0;
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -63,7 +63,7 @@ impl<'a> Harness<'a> {
             .collect()
     }
 
-    fn semantics(&self) -> Option<aura_core::semantics::Node> {
+    fn semantics(&self) -> Option<taim_core::semantics::Node> {
         Widget::<Message, Theme, Renderer>::semantics(
             &self.widget,
             &self.tree,
@@ -102,7 +102,7 @@ fn an_app_bar_is_a_container_with_no_actions_and_no_focus() {
 
 #[test]
 fn each_kind_reserves_the_height_the_contract_declares() {
-    use aura_design::components::app_bar::AppBarKind;
+    use taim_design::components::app_bar::AppBarKind;
 
     for (kind, contract) in [
         (app_bar_mod::Kind::Standard, AppBarKind::Standard),

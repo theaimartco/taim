@@ -5,21 +5,21 @@
 //! "use hysteresis and minimum residency time when changing quality
 //! tiers; prevent visual oscillation").
 
-use aura_core::time::{Duration, Instant};
-use aura_core::{Point, Rectangle, Size};
-use aura_graphics::quality::Tier;
-use aura_runtime::quality_controller::{Controller, FramePressure, Pressure};
-use aura_wgpu::effects::pool::{Descriptor, Pool};
-use aura_wgpu::effects::{Effect, Graph, blur::Blur};
+use taim_core::time::{Duration, Instant};
+use taim_core::{Point, Rectangle, Size};
+use taim_graphics::quality::Tier;
+use taim_runtime::quality_controller::{Controller, FramePressure, Pressure};
+use taim_wgpu::effects::pool::{Descriptor, Pool};
+use taim_wgpu::effects::{Effect, Graph, blur::Blur};
 
 fn descriptor(width: u32, height: u32) -> Descriptor {
-    Descriptor::new(width, height, aura_wgpu::wgpu::TextureFormat::Rgba8Unorm)
+    Descriptor::new(width, height, taim_wgpu::wgpu::TextureFormat::Rgba8Unorm)
 }
 
 /// The same shape as [`descriptor`], in the half-float format HDR
 /// compositing uses for its intermediates.
 fn half_float(width: u32, height: u32) -> Descriptor {
-    Descriptor::new(width, height, aura_wgpu::wgpu::TextureFormat::Rgba16Float)
+    Descriptor::new(width, height, taim_wgpu::wgpu::TextureFormat::Rgba16Float)
 }
 
 // ---------------------------------------------------------------------
@@ -343,8 +343,8 @@ fn a_half_float_intermediate_costs_twice_an_eight_bit_one() {
 }
 
 #[test]
-fn accounting_follows_the_format_across_the_range_aura_uses() {
-    use aura_wgpu::wgpu::TextureFormat;
+fn accounting_follows_the_format_across_the_range_taim_uses() {
+    use taim_wgpu::wgpu::TextureFormat;
 
     // Every format the renderer can select for a surface or an intermediate,
     // priced per texel at a fixed size.
@@ -372,7 +372,7 @@ fn accounting_follows_the_format_across_the_range_aura_uses() {
 
 #[test]
 fn accounting_includes_samples_layers_and_mips() {
-    use aura_wgpu::wgpu::TextureFormat;
+    use taim_wgpu::wgpu::TextureFormat;
 
     let base = Descriptor::new(64, 64, TextureFormat::Rgba8Unorm);
 
@@ -399,7 +399,7 @@ fn accounting_includes_samples_layers_and_mips() {
 
 #[test]
 fn depth_formats_are_priced_rather_than_treated_as_free() {
-    use aura_wgpu::wgpu::TextureFormat;
+    use taim_wgpu::wgpu::TextureFormat;
 
     // Depth and stencil formats report no whole-texture block size, only a
     // per-aspect one. An implementation that took `None` as zero would

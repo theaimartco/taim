@@ -23,22 +23,22 @@
 //! skipped. `tests/gpu/display_transform.rs` asks the same question of the GPU
 //! path.
 
-use aura_core::renderer::Quad;
-use aura_core::{Color, Rectangle, Renderer as _, Size};
-use aura_tiny_skia::Renderer;
+use taim_core::renderer::Quad;
+use taim_core::{Color, Rectangle, Renderer as _, Size};
+use taim_tiny_skia::Renderer;
 
 const SIZE: u32 = 32;
 
 /// Renders one scene and returns the presented RGBA bytes.
 fn present(background: Color, draw: impl FnOnce(&mut Renderer)) -> Vec<u8> {
-    let mut renderer = Renderer::new(aura_core::renderer::Settings::default());
+    let mut renderer = Renderer::new(taim_core::renderer::Settings::default());
 
     let bounds = Rectangle::with_size(Size::new(SIZE as f32, SIZE as f32));
-    aura_core::Renderer::reset(&mut renderer, bounds);
+    taim_core::Renderer::reset(&mut renderer, bounds);
 
     draw(&mut renderer);
 
-    aura_core::renderer::Headless::screenshot(&mut renderer, Size::new(SIZE, SIZE), 1.0, background)
+    taim_core::renderer::Headless::screenshot(&mut renderer, Size::new(SIZE, SIZE), 1.0, background)
 }
 
 /// The channel values at the centre of the frame.

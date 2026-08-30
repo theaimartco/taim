@@ -37,17 +37,17 @@
 //! code. [`Harness`] pins the renderer backend and the clear colour; the
 //! caller pins scale and content.
 
-use aura::{Color, Rectangle, Size};
-use aura_core::Renderer as _;
-use aura_core::renderer::Headless as _;
-use aura_renderer::Renderer;
+use taim::{Color, Rectangle, Size};
+use taim_core::Renderer as _;
+use taim_core::renderer::Headless as _;
+use taim_renderer::Renderer;
 
 /// The environment variable that permits adopting a golden.
 ///
 /// Deliberately awkward and deliberately explicit. It exists so that
 /// adopting a golden is an act, recorded in a shell history, rather than
 /// a side effect of running the suite.
-pub const UPDATE_ENV: &str = "AURA_UPDATE_GOLDEN";
+pub const UPDATE_ENV: &str = "TAIM_UPDATE_GOLDEN";
 
 /// The clear colour every case renders against.
 ///
@@ -374,9 +374,9 @@ impl Harness {
         // on one machine is reproducible on any other. A GPU backend --
         // llvmpipe included -- would make these images a property of the
         // driver version.
-        let mut renderer = aura_futures::futures::executor::block_on(
-            <Renderer as aura_core::renderer::Headless>::new(
-                aura_core::renderer::Settings::default(),
+        let mut renderer = taim_futures::futures::executor::block_on(
+            <Renderer as taim_core::renderer::Headless>::new(
+                taim_core::renderer::Settings::default(),
                 Some("tiny-skia"),
             ),
         )?;
@@ -429,23 +429,23 @@ impl Harness {
     pub fn render_element<'a, Message>(
         size: Size<u32>,
         scale: f32,
-        theme: &aura::Theme,
-        element: impl Into<aura_core::Element<'a, Message, aura::Theme, Renderer>>,
+        theme: &taim::Theme,
+        element: impl Into<taim_core::Element<'a, Message, taim::Theme, Renderer>>,
     ) -> Option<Image>
     where
         Message: 'a,
     {
-        use aura_core::theme::Base as _;
+        use taim_core::theme::Base as _;
 
         // Both the clear colour and the text colour come from the theme,
-        // exactly as `aura_winit` derives them for a real window. Using
+        // exactly as `taim_winit` derives them for a real window. Using
         // `Style::default()` means black text, which against the default
         // black clear renders an invisible, entirely plausible-looking blank.
         let base = theme.base();
 
-        let mut renderer = aura_futures::futures::executor::block_on(
-            <Renderer as aura_core::renderer::Headless>::new(
-                aura_core::renderer::Settings::default(),
+        let mut renderer = taim_futures::futures::executor::block_on(
+            <Renderer as taim_core::renderer::Headless>::new(
+                taim_core::renderer::Settings::default(),
                 Some("tiny-skia"),
             ),
         )?;
@@ -454,10 +454,10 @@ impl Harness {
 
         renderer.reset(Rectangle::with_size(logical));
 
-        let mut interface = aura_runtime::UserInterface::build(
+        let mut interface = taim_runtime::UserInterface::build(
             element.into(),
             logical,
-            aura_runtime::user_interface::Cache::new(),
+            taim_runtime::user_interface::Cache::new(),
             &mut renderer,
         );
 
@@ -478,12 +478,12 @@ impl Harness {
         let mut messages = Vec::new();
 
         let _ = interface.update(
-            &aura_core::window::Headless,
-            &aura_core::shell::Waker::noop(),
-            &[aura_core::Event::Window(
-                aura_core::window::Event::RedrawRequested(aura_core::time::Instant::now()),
+            &taim_core::window::Headless,
+            &taim_core::shell::Waker::noop(),
+            &[taim_core::Event::Window(
+                taim_core::window::Event::RedrawRequested(taim_core::time::Instant::now()),
             )],
-            aura_core::mouse::Cursor::Unavailable,
+            taim_core::mouse::Cursor::Unavailable,
             &mut renderer,
             &mut messages,
         );
@@ -491,10 +491,10 @@ impl Harness {
         interface.draw(
             &mut renderer,
             theme,
-            &aura_core::renderer::Style {
+            &taim_core::renderer::Style {
                 text_color: base.text_color,
             },
-            aura_core::mouse::Cursor::Unavailable,
+            taim_core::mouse::Cursor::Unavailable,
         );
 
         // Still in scope. See the note above.
@@ -677,7 +677,7 @@ mod tests {
 
     fn scratch() -> Harness {
         let directory = std::env::temp_dir().join(format!(
-            "aura-golden-{}-{:?}",
+            "taim-golden-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));
@@ -872,10 +872,10 @@ mod tests {
         // produce the same bytes. If this fails, every other golden test
         // is noise.
         let draw = |renderer: &mut Renderer| {
-            <Renderer as aura_core::Renderer>::fill_quad(
+            <Renderer as taim_core::Renderer>::fill_quad(
                 renderer,
-                aura_core::renderer::Quad {
-                    bounds: Rectangle::new(aura_core::Point::new(4.0, 4.0), Size::new(24.0, 16.0)),
+                taim_core::renderer::Quad {
+                    bounds: Rectangle::new(taim_core::Point::new(4.0, 4.0), Size::new(24.0, 16.0)),
                     ..Default::default()
                 },
                 Color::WHITE,
@@ -893,10 +893,10 @@ mod tests {
         // Guards the guard: a harness whose `render` silently produced a
         // blank image would make every exact case pass forever.
         let image = Harness::render(Size::new(32, 32), 1.0, |renderer| {
-            <Renderer as aura_core::Renderer>::fill_quad(
+            <Renderer as taim_core::Renderer>::fill_quad(
                 renderer,
-                aura_core::renderer::Quad {
-                    bounds: Rectangle::new(aura_core::Point::ORIGIN, Size::new(32.0, 32.0)),
+                taim_core::renderer::Quad {
+                    bounds: Rectangle::new(taim_core::Point::ORIGIN, Size::new(32.0, 32.0)),
                     ..Default::default()
                 },
                 Color::WHITE,

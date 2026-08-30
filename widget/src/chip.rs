@@ -2,9 +2,9 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-//! use aura::widget::{chip, row, text};
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+//! use taim::widget::{chip, row, text};
 //!
 //! #[derive(Clone)]
 //! enum Message {
@@ -26,12 +26,12 @@
 //! # A chip's role follows what it does
 //!
 //! A chip that can be selected is a two-state control, and reports
-//! [`Role::Checkbox`](aura_core::semantics::Role::Checkbox) with the
+//! [`Role::Checkbox`](taim_core::semantics::Role::Checkbox) with the
 //! `CHECKED` flag -- the same role a
 //! [`toggler`](crate::toggler) uses, for the same reason: platform
 //! accessibility APIs model "two states, one control" as a checkbox
 //! regardless of how it is drawn. A chip that merely performs an action
-//! reports [`Role::Button`](aura_core::semantics::Role::Button), and one
+//! reports [`Role::Button`](taim_core::semantics::Role::Button), and one
 //! that does neither is inert presentation.
 //!
 //! # The pill is 32px; the target is 48px
@@ -533,7 +533,7 @@ impl Catalog for Theme {
     }
 }
 
-/// The default styling of a [`Chip`] for aura's own theme.
+/// The default styling of a [`Chip`] for taim's own theme.
 pub fn default(theme: &Theme, selected: bool) -> Style {
     let palette = theme.palette();
 

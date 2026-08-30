@@ -1,6 +1,6 @@
-# Aura Future — The Twenty-Five Year Architecture
+# Taim Future — The Twenty-Five Year Architecture
 
-**Repository:** `vyom-aura` · **Branch:** `capstone-open-findings` · **Head:** `9f9167e4`
+**Repository:** `taim` · **Branch:** `capstone-open-findings` · **Head:** `9f9167e4`
 **Written:** 2026-08-24 · **Revised:** 2026-08-25 · **Horizon:** 2051
 **Toolchain verified:** `cargo test --workspace` → **1,851 passed, 0 failed**, 64 binaries, this tree.
 
@@ -16,7 +16,7 @@
 
 ## 0. How to read this document
 
-`Capstone.md` answers *"can Aura catch and pass Flutter and React Native?"* It is a
+`Capstone.md` answers *"can Taim catch and pass Flutter and React Native?"* It is a
 catch-up plan, and it is correct as far as it goes. This document answers a different
 question: **"what does a UI framework have to be, structurally, so that Flutter and
 React Native read as period pieces?"**
@@ -55,12 +55,12 @@ So the framing that actually wins is:
 >
 > Flutter and React Native are *guests* on somebody else's compositor, somebody else's
 > colour pipeline, somebody else's input stack, somebody else's power manager. They will
-> be guests forever, because portability is their entire product. **Aura runs on VYOM,
+> be guests forever, because portability is their entire product. **Taim runs on VYOM,
 > which you own.** That is not a small advantage to be exploited at the margins. It is
 > the only structural advantage in this repository that money cannot buy and a bigger
 > team cannot copy, and every single pillar below is built to compound it.
 
-The gap that makes Flutter look eighty years old is not "Aura renders a list faster." It
+The gap that makes Flutter look eighty years old is not "Taim renders a list faster." It
 is a user putting a VYOM device next to a flagship Android phone and seeing that one of
 them shows *light* and the other shows *pictures of light*, and that one of them responds
 to a finger before the other has finished sampling the touch.
@@ -70,7 +70,7 @@ document is how.
 
 ---
 
-# PART I — AUDIT: WHERE AURA STANDS, 2026-08-24
+# PART I — AUDIT: WHERE TAIM STANDS, 2026-08-24
 
 ## 2. What was verified
 
@@ -94,16 +94,16 @@ Crate sizes, measured:
 | `widget` | 96 | 52,273 | 75 public constructors |
 | `core` | 94 | 19,686 | types, layout, text, input, semantics |
 | `wgpu` | 40 | 11,493 | GPU backend |
-| `tools` | 34 | 8,489 | bench harness, Aura Lab, profiler CLI |
+| `tools` | 34 | 8,489 | bench harness, Taim Lab, profiler CLI |
 | `runtime` | 23 | 8,012 | reconcile, schedule, hit-test |
 | `graphics` | 31 | 7,881 | damage, layers, display list |
-| `aura-accessibility` | 15 | 5,203 | semantic tree + AT-SPI bridge |
+| `taim-accessibility` | 15 | 5,203 | semantic tree + AT-SPI bridge |
 | `winit` | 7 | 4,314 | shell, event loop |
-| `aura-gesture` | 12 | 3,844 | arena and recognisers |
+| `taim-gesture` | 12 | 3,844 | arena and recognisers |
 | `tiny_skia` | 10 | 3,326 | CPU renderer, golden backend |
-| `aura-design` | 31 | 2,501 | tokens + 17 component styles |
-| `aura-platform-vyom` | 13 | 1,760 | Wayland/Smithay backend |
-| `aura-motion` | 11 | 1,081 | springs, decay, timelines |
+| `taim-design` | 31 | 2,501 | tokens + 17 component styles |
+| `taim-platform-vyom` | 13 | 1,760 | Wayland/Smithay backend |
+| `taim-motion` | 11 | 1,081 | springs, decay, timelines |
 
 ## 3. What is genuinely strong
 
@@ -140,7 +140,7 @@ connection, not a request the compositor ignores. **Nobody scaffolds this correc
 accident.**
 
 **3.5 The semantic tree is built every frame regardless of whether anyone is listening,
-and it now reaches a real bus.** `aura-accessibility/tests/atspi_bus.rs` serves the tree
+and it now reaches a real bus.** `taim-accessibility/tests/atspi_bus.rs` serves the tree
 over a live D-Bus session and queries it as a screen reader would, including that a
 retired node stops answering. This is the single most under-valued asset in the
 repository, and Pillar X is built entirely on it.
@@ -149,7 +149,7 @@ repository, and Pillar X is built entirely on it.
 golden suite renders through the real `UserInterface` pipeline on `tiny-skia`, on the CPU,
 with no GPU and no driver — so a golden reproduces on any machine. It found that the
 bundled icon font declared the family `Iced-Icons` while both renderers looked up
-`Aura-Icons`, meaning every checkmark and dropdown arrow in the framework had been
+`Taim-Icons`, meaning every checkmark and dropdown arrow in the framework had been
 resolving to a missing glyph while 1,705 tests passed.
 
 **3.7 The discipline is unusual.** `unsafe_code = "deny"` and `missing_docs = "deny"` at
@@ -204,7 +204,7 @@ frame path:
 
 Layout, paint recording, primitive batching, and GPU submission all happen on one thread,
 in sequence. Flutter has had a separate raster thread since 2015 and Impeller compiles
-shaders concurrently. **Aura is competing against a two-thread pipeline with one thread
+shaders concurrently. **Taim is competing against a two-thread pipeline with one thread
 and winning on frame cost anyway** — which tells you exactly how much is left on the
 table. See Pillar VIII.
 
@@ -220,7 +220,7 @@ table. See Pillar VIII.
 >
 > **Corrected 2026-08-25, and it is worse than this section originally said.** The
 > paragraph below described the pipeline as compositing in sRGB. It does not composite in
-> linear sRGB at all. `web-colors` is a **default feature** of the `aura` crate, and
+> linear sRGB at all. `web-colors` is a **default feature** of the `taim` crate, and
 > Cargo.toml describes it in its own words as *"broken 'sRGB linear' blending to reproduce
 > color management of the Web"*. With it on, `graphics::color::GAMMA_CORRECTION` is
 > `false`, `pack()` hands the GPU gamma-encoded components, and every blend in the
@@ -374,7 +374,7 @@ This is cheap to fix now (a format-keyed pipeline cache, which
 
 ### Ceiling 7 — Nothing presents through VYOM
 
-`aura-platform-vyom` creates surfaces, negotiates capabilities, handles configure, and
+`taim-platform-vyom` creates surfaces, negotiates capabilities, handles configure, and
 can submit `wl_surface.damage_buffer`. It **attaches no buffers**. Nothing has ever
 appeared on a screen through this backend.
 
@@ -394,7 +394,7 @@ correctly refuses to quote anything else.
 But frame cost is the axis where a GC-free native framework is *expected* to win, and it
 is not the axis buyers decide on. The three that are:
 
-| Axis | Aura | Flutter | Status |
+| Axis | Taim | Flutter | Status |
 |---|---|---|---|
 | Cold start to first pixel | **unmeasured** | ~300–800 ms typical | no harness exists |
 | Steady-state app memory | **unmeasured** (196.7 MiB is the *harness*) | 60–120 MiB typical | no harness exists |
@@ -426,7 +426,7 @@ it is Section 15.
 
 Ratings are against Flutter 3.x and React Native 0.7x as of 2026-08.
 
-| Axis | Aura | Flutter | RN | Note |
+| Axis | Taim | Flutter | RN | Note |
 |---|:--:|:--:|:--:|---|
 | Frame cost, framework-side | **A** | B | C | 224× margin at 60 Hz, worst p99 |
 | Damage / partial redraw | **A−** | C | D | correct swapchain-depth accumulation |
@@ -489,7 +489,7 @@ Four consequences follow, and every one of them is fatal to a framework built on
 
 ## 7. The thesis, in one sentence
 
-> **Aura wins by treating a user interface as a scene of physically-grounded, light-emitting
+> **Taim wins by treating a user interface as a scene of physically-grounded, light-emitting
 > materials, resolved analytically on GPU compute, composited in scene-referred HDR,
 > updated only where state actually changed, and presented in phase with a compositor it
 > owns — so that the number a user feels is finger-to-photon latency and the thing a user
@@ -505,7 +505,7 @@ Every pillar below is a clause of that sentence.
 
 ---
 
-## Pillar I — A compute rasteriser (`aura-raster`)
+## Pillar I — A compute rasteriser (`taim-raster`)
 
 **Ceiling addressed:** 4. **Horizon:** H2. **Cost:** 6–9 months, 1–2 engineers.
 
@@ -528,14 +528,14 @@ stage 4  fine        compute: one workgroup per tile. Evaluate the command list,
                      HDR (Pillar II), write the G-buffer (Pillar III).
 ```
 
-New crate `aura-raster`, sitting under `aura_graphics`, behind a
+New crate `taim-raster`, sitting under `taim_graphics`, behind a
 `renderer::Settings::rasteriser` enum so the existing quad/triangle path stays as the
 fallback for devices below the compute floor. `tiny_skia` remains the golden backend
 untouched — which is the whole reason the golden suite was worth building.
 
 ### What it buys
 
-| | today | with `aura-raster` |
+| | today | with `taim-raster` |
 |---|---|---|
 | AA quality | MSAA 4×, conflation artifacts at seams | exact analytic coverage, no conflation |
 | Cost vs path complexity | linear in triangles | ~flat; complexity moves to the tile list |
@@ -660,10 +660,10 @@ Then, in order:
    primaries, then tone-map via BT.2390 EETF to its peak luminance, then encode to its
    transfer function. One extra full-screen pass, or folded into the existing blit.
    Under the scissor, so it costs damage area, not screen area.
-4. **The token system gains luminance.** `aura-design/src/tokens/color.rs` gets a
+4. **The token system gains luminance.** `taim-design/src/tokens/color.rs` gets a
    `nits` field. `elevation.rs` — which today means a shadow — becomes a *physical*
    quantity: how far a surface floats, and therefore how much light it catches.
-5. **VYOM negotiates the display.** `aura-platform-vyom` learns the
+5. **VYOM negotiates the display.** `taim-platform-vyom` learns the
    `wp_color_management_v1` protocol and reports the panel's real primaries and peak
    luminance into `ColorSpace`, so the display transform targets the actual panel rather
    than an assumption. **Flutter cannot do this. It is a guest.**
@@ -679,8 +679,8 @@ and hands the result to an OS that can only tone-map what it was given.
 
 ### The proof gate
 
-Render the same scene through Aura and through Flutter on the same HDR panel. Photograph
-both with a fixed-exposure camera. **Gate: the Aura highlight measures above 1,000 nits
+Render the same scene through Taim and through Flutter on the same HDR panel. Photograph
+both with a fixed-exposure camera. **Gate: the Taim highlight measures above 1,000 nits
 on a luminance meter and the Flutter one measures at panel SDR white.** This is the
 single most persuasive demo available to this project and it costs ten weeks.
 
@@ -696,7 +696,7 @@ single most persuasive demo available to this project and it costs ten weeks.
 > Built: `core/src/material.rs` (Fresnel/Schlick, GGX, slab refraction, dispersion,
 > `F0` derived from IOR), `wgpu/src/shader/material.wgsl` as its mirror,
 > `tests/gpu/material_shading.rs` proving they agree across every material at every
-> viewing angle on real hardware, and `aura-design`'s `MaterialTokens` for the semantic
+> viewing angle on real hardware, and `taim-design`'s `MaterialTokens` for the semantic
 > roles. 25 tests. See `docs/architecture/material-pipeline.md`.
 >
 > Not built: no primitive carries a `Material`, there is no lighting pass, and nothing
@@ -738,7 +738,7 @@ RT2  R8Uint        material id → indexes a GPU material table
 region. Then one lighting pass:
 
 ```wgsl
-// aura-raster/shader/light.wgsl  (sketch)
+// taim-raster/shader/light.wgsl  (sketch)
 let n     = decode_octahedral(rt1.rg);
 let v     = view_dir(uv);
 let mat   = materials[rt2];
@@ -760,7 +760,7 @@ out = mix(behind, scene_light.color * spec, fres) + rt0.rgb;
 ```
 
 The design system gains **one global light** — direction, colour, intensity in nits —
-declared in `aura-design/src/tokens/`. Every surface in the OS responds to it coherently.
+declared in `taim-design/src/tokens/`. Every surface in the OS responds to it coherently.
 Tilt the device, the light moves, and **every highlight in every application moves
 together**, because the compositor owns the light and you own the compositor.
 
@@ -771,8 +771,8 @@ out of the same lighting pass for free.
 
 ### The proof gate
 
-Two surfaces, one glass panel over a moving photograph, in Aura and in Flutter. **Gate:
-the Aura panel shows parallax between the backdrop and the panel edge as content moves
+Two surfaces, one glass panel over a moving photograph, in Taim and in Flutter. **Gate:
+the Taim panel shows parallax between the backdrop and the panel edge as content moves
 behind it, and chromatic separation at the bevel. The Flutter one shows a blur that
 translates rigidly.** Anyone can see the difference in a two-second video, which is
 exactly the point.
@@ -827,7 +827,7 @@ hold, the path does not ship. Text regressions are how frameworks lose trust per
 
 ### The problem
 
-`aura-motion` is good — springs, decay, keyframes, timelines, shared elements,
+`taim-motion` is good — springs, decay, keyframes, timelines, shared elements,
 reduced-motion. But it is an *application-level* library. It produces a number each frame
 and hands it to a widget. The renderer has no idea anything is moving, and neither does
 the compositor.
@@ -840,7 +840,7 @@ the compositor.
    the previous and current bounds of moving content. With velocity it can damage the
    *swept* region, and more importantly it can tell the compositor where content will be
    next frame.
-3. **Frames can be re-timed.** `aura-platform-vyom/src/frame_clock.rs` already computes
+3. **Frames can be re-timed.** `taim-platform-vyom/src/frame_clock.rs` already computes
    `target_error` from real presentation feedback. With trajectories, a frame that is
    going to miss its deadline can be **re-evaluated at the actual presentation time**
    instead of being presented late and wrong. This is the mechanism that makes 0.000%
@@ -850,7 +850,7 @@ the compositor.
    smooth rather than as strobing.
 5. **Reduced motion becomes a renderer transform, not an app concern.** One user setting
    scales every velocity in the scene, coherently, in every application, without a single
-   app opting in. `aura-motion/src/reduced_motion.rs` becomes system policy.
+   app opting in. `taim-motion/src/reduced_motion.rs` becomes system policy.
 
 ### The proof gate
 
@@ -876,7 +876,7 @@ copy.**
 Touch-to-photon on a modern Android flagship is 60–100 ms. On iOS, 50–70 ms. Users cannot
 name it and can feel every millisecond of it. The budget breaks down roughly:
 
-| Stage | typical | Aura on VYOM, achievable |
+| Stage | typical | Taim on VYOM, achievable |
 |---|---:|---:|
 | Sensor → kernel | 8–16 ms (120 Hz sampling) | 1 ms (1 kHz sampling) |
 | Kernel → compositor → app | 8–16 ms (one frame) | 0.5 ms (shared memory, no round trip) |
@@ -894,7 +894,7 @@ doing.**
 ### The design
 
 1. **High-rate input sampling decoupled from the frame.** VYOM delivers input events at
-   sensor rate with hardware timestamps. `aura-gesture`'s arena consumes them on a
+   sensor rate with hardware timestamps. `taim-gesture`'s arena consumes them on a
    dedicated thread and maintains a *current* pointer state that the frame samples, rather
    than a queue the frame drains.
 2. **Present-time-anchored scheduling.** Every frame is rendered *for* a predicted
@@ -908,11 +908,11 @@ doing.**
    goes straight to the display controller plane. Zero composite. Zero copy. Measurable in
    both latency and battery.
 5. **Speculative input.** For a drag, render the predicted next position and correct on
-   arrival. `aura-gesture/src/velocity.rs` already computes what the predictor needs.
+   arrival. `taim-gesture/src/velocity.rs` already computes what the predictor needs.
 
 ### The proof gate
 
-A high-speed camera at 1,000 fps, a capacitive test rig, and a bar chart. **Gate: Aura on
+A high-speed camera at 1,000 fps, a capacitive test rig, and a bar chart. **Gate: Taim on
 VYOM measures under 15 ms touch-to-photon on the same physical panel where Android
 measures over 50 ms.** Publish the video. That single video is worth more than every
 microbenchmark in `benchmarks/baseline/`, because it is the only performance claim a
@@ -920,7 +920,7 @@ non-engineer can verify with their own eyes.
 
 ---
 
-## Pillar VII — Zero-rebuild reactivity (`aura-signal`)
+## Pillar VII — Zero-rebuild reactivity (`taim-signal`)
 
 **Ceiling addressed:** 1. **Horizon:** H1. **Cost:** 4–6 months. **Largest measurable
 performance win available. Do this before Pillar I.**
@@ -985,7 +985,7 @@ in list length instead of linear.**
 
 Do not break the Elm API. Add signals alongside it:
 
-1. `aura-signal` ships standalone with its own tests. No framework changes.
+1. `taim-signal` ships standalone with its own tests. No framework changes.
 2. `Signal<T>` becomes usable as a widget property anywhere a value is taken today.
 3. A signal-driven `view` becomes an opt-in `Program` variant.
 4. Elm-style `view()` is reimplemented *on top of* signals — a single root signal that
@@ -1063,7 +1063,7 @@ is stable and only deltas move:
 long-term position in this document and it is nearly free, because the asset already
 exists.**
 
-Aura builds a retained semantic tree **every frame, whether or not anyone is listening.**
+Taim builds a retained semantic tree **every frame, whether or not anyone is listening.**
 No other framework does this; in Flutter and RN the accessibility tree is an export
 generated on demand when a screen reader attaches, and it is perpetually, structurally
 out of date.
@@ -1086,7 +1086,7 @@ That last point deserves emphasis. By 2051 the dominant consumer of user interfa
 not be a human eye. A framework that ships a live semantic graph as a first-class output
 is positioned for that; a framework that ships pixels is not.
 
-**Gate: drive the full `aura-showcase` end to end with the screen off, through the
+**Gate: drive the full `taim-showcase` end to end with the screen off, through the
 semantic tree alone, with no visual renderer instantiated.** If that works, the inversion
 is real.
 
@@ -1122,13 +1122,13 @@ it is 1,000+. Four uses that are real engineering rather than a press release:
 1. **Effect upscaling.** Render backdrop blur and refraction at quarter resolution,
    reconstruct with a small network. `graphics/src/quality.rs`'s `Tier` system is already
    the right place to hang it: a new `Tier::Neural` above `Ultra`.
-2. **Input prediction.** A 2-layer model over `aura-gesture/src/velocity.rs`'s history
+2. **Input prediction.** A 2-layer model over `taim-gesture/src/velocity.rs`'s history
    beats linear extrapolation for finger trajectories, and directly buys milliseconds in
    Pillar VI's budget.
 3. **Layout adaptation.** `responsive` and `adaptive` widgets exist. A model that has
    learned which layout a *particular user* actually reaches for, on this device, at this
    size, is a better breakpoint system than any set of hand-written thresholds.
-4. **Per-user motion tuning.** `aura-motion`'s spring constants are currently a designer's
+4. **Per-user motion tuning.** `taim-motion`'s spring constants are currently a designer's
    guess. Learn the damping a specific user reads as responsive rather than frantic. This
    is accessibility as personalisation rather than as a binary toggle.
 
@@ -1146,7 +1146,7 @@ framework.
 competitor has — **resolve the static parts of a UI at compile time**:
 
 - A `const` layout solver for subtrees whose constraints are known statically.
-- Design tokens folded to constants; `aura-design`'s whole token graph collapses.
+- Design tokens folded to constants; `taim-design`'s whole token graph collapses.
 - Shader specialisation per material — no runtime branches for features an app never uses.
 - Widget-set dead-code elimination: an app that never constructs a `pane_grid` should not
   link one.
@@ -1169,7 +1169,7 @@ An engine nobody can build with is a research project. Four things, in priority 
 1. **State-preserving hot reload.** `hot` exists as an experimental feature. Signals make
    it genuinely tractable: swap the view function, keep the signal graph. **Sub-100 ms
    edit-to-pixel or it does not count.**
-2. **The frame inspector.** `aura-profiler` and Aura Lab exist. What is missing is the
+2. **The frame inspector.** `taim-profiler` and Taim Lab exist. What is missing is the
    thing Flutter DevTools does best: click a pixel, see the widget, see its layout
    constraints, see its GPU cost, see why it invalidated. **"Why did this repaint?" should
    be one click**, and with a signal graph the answer is exactly a path through that graph.
@@ -1177,7 +1177,7 @@ An engine nobody can build with is a research project. Four things, in priority 
    Rust constants; the golden suite proves nothing else moved. Pillar II makes this
    physical — tokens carry nits and material parameters, so a design system becomes a
    lighting specification.
-4. **`aura new` and `aura run` that work on the first try.** Unglamorous. Decides adoption.
+4. **`taim new` and `taim run` that work on the first try.** Unglamorous. Decides adoption.
 
 ---
 
@@ -1201,7 +1201,7 @@ frame on a device has no users, and a twenty-five year plan with no users is a h
 ### H1 — The visible generation gap (3–12 months)
 
 - **Pillar II — HDR compositing.** Highest value per week in the document.
-- **Pillar VII — `aura-signal`.** Largest measurable performance win.
+- **Pillar VII — `taim-signal`.** Largest measurable performance win.
 - **Pillar VI part 1** — high-rate input, present-time anchoring, direct scanout.
 - **Pillar V** — velocity in the scene, present-time re-timing.
 - **Pillar XIV part 1** — state-preserving hot reload.
@@ -1213,7 +1213,7 @@ any phone on the market, and holds a flat cost curve on lists a competitor choke
 
 ### H2 — The engine nobody else has (1–2.5 years)
 
-- **Pillar I — `aura-raster` compute rasteriser.**
+- **Pillar I — `taim-raster` compute rasteriser.**
 - **Pillar III — materials and lighting.**
 - **Pillar IV — GPU vector text.**
 - **Pillar VIII — parallel frame graph.**
@@ -1259,7 +1259,7 @@ is the most credible paragraph in the repository. Keep that standard.
 
 | # | Gate | Unlocks the claim |
 |---|---|---|
-| 1 | A VYOM device presents an Aura frame, daily-driven by a real person | *"It ships."* |
+| 1 | A VYOM device presents an Taim frame, daily-driven by a real person | *"It ships."* |
 | 2 | Touch-to-photon under 15 ms, high-speed camera, same panel as Android | *"Fastest UI on any device."* |
 | 3 | HDR highlight measures >1,000 nits where Flutter measures SDR white | *"The only UI framework that shows light."* |
 | 4 | One row changed in 1,000,000 costs the same as idle | *"Cost scales with change, not size."* |
@@ -1300,7 +1300,7 @@ Ranked by how much time each one will cost you, worst first.
    engineer on one forum, destroys it permanently.
 
 5. **Do not port to iOS and Android to chase reach.** It is the obvious move and it is
-   the wrong one. The moment Aura is a guest on someone else's compositor, Pillars II, III,
+   the wrong one. The moment Taim is a guest on someone else's compositor, Pillars II, III,
    VI, XI, and the entire moat evaporate, and you are competing with Flutter *on Flutter's
    terms* with 1% of its team. **Ship on VYOM. Let the device be the argument.** A port is
    a decision to be a worse Flutter.
@@ -1383,7 +1383,7 @@ grep -rn "layout_with_cache" --include="*.rs" . | grep -v target | grep -v tests
 # → zero production call sites.
 
 # Ceiling 7 — nothing presents
-grep -n "attach" aura-platform-vyom/src/surface.rs
+grep -n "attach" taim-platform-vyom/src/surface.rs
 # → may_attach_buffer(), a protocol-correctness predicate, and its test.
 #   No call to wl_surface.attach exists anywhere in the crate.
 
@@ -1392,5 +1392,5 @@ cargo check --workspace --all-targets                        # exit 0
 ```
 
 *Companion documents: `Capstone.md` (competitive audit and the catch-up plan),
-`phase.md` (execution roadmap through Aura 1.0), `audit.md` (the first audit, superseded),
+`phase.md` (execution roadmap through Taim 1.0), `audit.md` (the first audit, superseded),
 `README.md` (measured baselines), `benchmarks/competitors/README.md` (comparison rules).*

@@ -32,7 +32,7 @@ impl std::fmt::Debug for Value {
     /// Length is deliberately withheld too: this crate already holds that
     /// "bullets or a length-preserving mask ... still disclose[]
     /// information" (see
-    /// [`input_method::SurroundingText`](aura_core::input_method::SurroundingText)),
+    /// [`input_method::SurroundingText`](taim_core::input_method::SurroundingText)),
     /// and a password's length is exactly the kind of thing that
     /// principle exists to protect. Call [`Value::len`] if you need it.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

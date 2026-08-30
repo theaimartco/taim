@@ -1,18 +1,18 @@
-# Getting Started with Aura
+# Getting Started with Taim
 
-Welcome to **Aura**, a fast, declarative, and highly customizable GUI framework for Rust. Aura is built on top of the Elm architecture, providing a robust and predictable way to build cross-platform desktop applications.
+Welcome to **Taim**, a fast, declarative, and highly customizable GUI framework for Rust. Taim is built on top of the Elm architecture, providing a robust and predictable way to build cross-platform desktop applications.
 
-This guide will walk you through everything you need to know to build your first Aura application, from installing dependencies to structuring a real-world project. By the end of this guide, you will have a solid understanding of how Aura works and how to leverage its powerful builder API.
+This guide will walk you through everything you need to know to build your first Taim application, from installing dependencies to structuring a real-world project. By the end of this guide, you will have a solid understanding of how Taim works and how to leverage its powerful builder API.
 
 ---
 
 ## 1. Prerequisites
 
-Before you can start building with Aura, you need to ensure your development environment is properly configured.
+Before you can start building with Taim, you need to ensure your development environment is properly configured.
 
 ### Rust
 
-Aura requires **Rust 1.80** or later. If you don't have Rust installed, the easiest way to install it is via `rustup`.
+Taim requires **Rust 1.80** or later. If you don't have Rust installed, the easiest way to install it is via `rustup`.
 
 Open your terminal and run:
 
@@ -34,11 +34,11 @@ rustup update
 
 ### GPU Requirements
 
-Aura leverages hardware acceleration for fast, smooth rendering. You need a modern GPU that supports Vulkan, Metal (macOS), or DX12 (Windows).
+Taim leverages hardware acceleration for fast, smooth rendering. You need a modern GPU that supports Vulkan, Metal (macOS), or DX12 (Windows).
 
 ### Linux Headers & Dependencies
 
-If you are developing on Linux, you will need to install a few development libraries. Aura uses Wayland or X11 for windowing.
+If you are developing on Linux, you will need to install a few development libraries. Taim uses Wayland or X11 for windowing.
 
 **Ubuntu / Debian:**
 
@@ -63,40 +63,40 @@ sudo pacman -S --needed pkgconf libx11 libxkbcommon wayland
 
 ## 2. Installation
 
-With your environment set up, you can now add Aura to your project.
+With your environment set up, you can now add Taim to your project.
 
 ### Creating a New Project
 
 Create a new Rust binary project:
 
 ```bash
-cargo new my_aura_app
-cd my_aura_app
+cargo new my_taim_app
+cd my_taim_app
 ```
 
-### Adding Aura
+### Adding Taim
 
-You can add Aura using `cargo add`:
+You can add Taim using `cargo add`:
 
 ```bash
-cargo add aura
+cargo add taim
 ```
 
 Alternatively, you can manually edit your `Cargo.toml`:
 
 ```toml
 [package]
-name = "my_aura_app"
+name = "my_taim_app"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-aura = "0.1" # Replace with the latest version
+taim = "0.1" # Replace with the latest version
 ```
 
 ### Feature Flags
 
-Aura is highly modular. Depending on your needs, you might want to enable or disable certain features. Here is an overview:
+Taim is highly modular. Depending on your needs, you might want to enable or disable certain features. Here is an overview:
 
 | Feature Flag | Default | Description | When to use |
 | :--- | :---: | :--- | :--- |
@@ -112,20 +112,20 @@ To enable specific features in `Cargo.toml`:
 
 ```toml
 [dependencies]
-aura = { version = "0.1", default-features = false, features = ["tokio", "svg", "wayland"] }
+taim = { version = "0.1", default-features = false, features = ["tokio", "svg", "wayland"] }
 ```
 
 ---
 
 ## 3. Your First App
 
-Let's build the classic counter application. This is the simplest way to understand how Aura ties State, Messages, and Views together.
+Let's build the classic counter application. This is the simplest way to understand how Taim ties State, Messages, and Views together.
 
 Replace the contents of `src/main.rs` with the following:
 
 ```rust
-use aura::{Element, Task};
-use aura::widget::{button, column, text, container};
+use taim::{Element, Task};
+use taim::widget::{button, column, text, container};
 
 // 1. The State
 #[derive(Default)]
@@ -161,7 +161,7 @@ fn view(state: &Counter) -> Element<Message> {
             button("Decrement").on_press(Message::Decrement),
         ]
         .spacing(20)
-        .align_items(aura::Alignment::Center)
+        .align_items(taim::Alignment::Center)
     )
     .center_x()
     .center_y()
@@ -169,25 +169,25 @@ fn view(state: &Counter) -> Element<Message> {
 }
 
 // 5. The Entry Point
-fn main() -> aura::Result {
-    aura::run(update, view)
+fn main() -> taim::Result {
+    taim::run(update, view)
 }
 ```
 
 ### Line-by-Line Explanation
 
-1. **Imports:** We import `Element` and `Task` from `aura`, along with common widgets from `aura::widget`.
-2. **State:** We define a struct `Counter`. It derives `Default`, which `aura::run` requires to initialize the application state automatically (in this case, `value` defaults to `0`).
+1. **Imports:** We import `Element` and `Task` from `taim`, along with common widgets from `taim::widget`.
+2. **State:** We define a struct `Counter`. It derives `Default`, which `taim::run` requires to initialize the application state automatically (in this case, `value` defaults to `0`).
 3. **Messages:** The `Message` enum defines every possible event that can occur in our application. `Increment` and `Decrement` are our two actions. It must implement `Debug`, `Clone`, and often `Copy`.
 4. **Update Logic:** The `update` function takes a mutable reference to our state (`&mut Counter`) and a `Message`. We match on the message to mutate the state accordingly. Since we are not performing any asynchronous work, we don't need to return a `Task` here.
 5. **View Logic:** The `view` function takes an immutable reference to our state (`&Counter`) and returns an `Element<Message>`. We use a `column!` macro to stack our widgets vertically. `button("...").on_press(...)` creates a button that emits a specific message when clicked. `container` is used to center everything on the screen.
-6. **Entry Point:** The `main` function uses `aura::run(update, view)`. This is the simplest way to start an Aura application. It automatically sets up the window and event loop.
+6. **Entry Point:** The `main` function uses `taim::run(update, view)`. This is the simplest way to start an Taim application. It automatically sets up the window and event loop.
 
 ---
 
 ## 4. How The Elm Architecture Works
 
-Aura is built heavily on the principles of **The Elm Architecture (TEA)**. TEA provides a strictly unidirectional data flow, which makes debugging and understanding your app's state incredibly straightforward.
+Taim is built heavily on the principles of **The Elm Architecture (TEA)**. TEA provides a strictly unidirectional data flow, which makes debugging and understanding your app's state incredibly straightforward.
 
 ### Data Flow Diagram
 
@@ -231,7 +231,7 @@ Aura is built heavily on the principles of **The Elm Architecture (TEA)**. TEA p
 
 In MVC (Model-View-Controller) or MVVM (Model-View-ViewModel), data bindings can often be bi-directional. A view can modify a model directly, or a model can trigger arbitrary view updates. This can lead to "spaghetti state", where it's hard to track *why* a particular value changed.
 
-In Aura (and TEA):
+In Taim (and TEA):
 1. **State is the single source of truth.**
 2. **State can ONLY be modified in the `update` function.**
 3. **The `update` function is ONLY triggered by explicit `Messages`.**
@@ -246,8 +246,8 @@ This makes rendering predictable. If you know your state, you know exactly what 
 While the `Counter` example used a single `i32`, real applications have complex states. You define your state as a standard Rust `struct`.
 
 ```rust
-use aura::{Element, Task};
-use aura::widget::text;
+use taim::{Element, Task};
+use taim::widget::text;
 
 #[derive(Default)]
 struct AppState {
@@ -270,8 +270,8 @@ fn view(state: &AppState) -> Element<Message> {
     text(format!("Welcome, {}!", state.user_name)).into()
 }
 
-fn main() -> aura::Result {
-    aura::run(update, view)
+fn main() -> taim::Result {
+    taim::run(update, view)
 }
 ```
 
@@ -284,8 +284,8 @@ By deriving `Default`, you instruct Rust on how to create the initial version of
 Messages aren't just simple flags; they can carry data payloads. This is essential for handling text input, selections, or incoming network data.
 
 ```rust
-use aura::{Element, Task, Color};
-use aura::widget::{text_input, column, text, pick_list};
+use taim::{Element, Task, Color};
+use taim::widget::{text_input, column, text, pick_list};
 
 #[derive(Default)]
 struct ProfileEditor {
@@ -324,8 +324,8 @@ fn view(state: &ProfileEditor) -> Element<Message> {
     ].into()
 }
 
-fn main() -> aura::Result {
-    aura::run(update, view)
+fn main() -> taim::Result {
+    taim::run(update, view)
 }
 ```
 
@@ -335,15 +335,15 @@ Notice how `Message::NameChanged` expects a `String`. The `on_input` method of `
 
 ## 7. The Application Builder
 
-For anything beyond a simple prototype, `aura::run` is not enough. You need control over the window size, title, themes, fonts, and initialization logic.
+For anything beyond a simple prototype, `taim::run` is not enough. You need control over the window size, title, themes, fonts, and initialization logic.
 
-This is where `aura::application()` comes in. It returns an Application Builder that lets you configure every aspect of your app.
+This is where `taim::application()` comes in. It returns an Application Builder that lets you configure every aspect of your app.
 
 Here is a comprehensive example using all builder methods:
 
 ```rust
-use aura::{application, Element, Task, Theme, Size, window};
-use aura::widget::text;
+use taim::{application, Element, Task, Theme, Size, window};
+use taim::widget::text;
 
 struct MyComplexApp {
     data: String,
@@ -376,7 +376,7 @@ fn view(state: &MyComplexApp) -> Element<Message> {
     text(&state.data).into()
 }
 
-fn main() -> aura::Result {
+fn main() -> taim::Result {
     application(boot, update, view)
         // Set a static string for the window title
         .title("My Awesome App")
@@ -415,7 +415,7 @@ fn main() -> aura::Result {
         // .font(include_bytes!("../assets/fonts/Inter-Regular.ttf").as_slice())
         
         // Subscribe to global events (keyboard, mouse, time)
-        // .subscription(|state| aura::time::every(...))
+        // .subscription(|state| taim::time::every(...))
         
         // Force a specific scale factor (usually handled by the OS)
         // .scale_factor(|_window_id| 1.5)
@@ -468,7 +468,7 @@ cargo run --release
 
 ## 9. Feature Flags (Detailed)
 
-Here is the complete table of feature flags for `aura`:
+Here is the complete table of feature flags for `taim`:
 
 | Feature | Default | Description | When to Use |
 | :--- | :---: | :--- | :--- |
@@ -487,9 +487,9 @@ Here is the complete table of feature flags for `aura`:
 
 ## 10. All Built-in Themes
 
-Aura ships with a massive collection of high-quality, pre-defined themes out of the box. 
+Taim ships with a massive collection of high-quality, pre-defined themes out of the box. 
 
-You can set the theme programmatically via `.theme(Theme::...)` or use the environment variable `AURA_THEME`.
+You can set the theme programmatically via `.theme(Theme::...)` or use the environment variable `TAIM_THEME`.
 
 ### Standard Themes
 - **`Light`**: A clean, high-contrast light theme (default).
@@ -513,7 +513,7 @@ You can set the theme programmatically via `.theme(Theme::...)` or use the envir
 Users can override your app's hardcoded theme (if you allow it) by setting:
 
 ```bash
-export AURA_THEME=CatppuccinMocha
+export TAIM_THEME=CatppuccinMocha
 cargo run
 ```
 
@@ -522,13 +522,13 @@ cargo run
 If none of the built-in themes fit your brand, you can create your own.
 
 ```rust
-use aura::Theme;
+use taim::Theme;
 
 // Option 1: Load from a palette structure
-let my_theme = Theme::custom(aura::theme::Palette {
-    background: aura::Color::from_rgb(0.1, 0.1, 0.1),
-    text: aura::Color::WHITE,
-    primary: aura::Color::from_rgb(0.9, 0.4, 0.4),
+let my_theme = Theme::custom(taim::theme::Palette {
+    background: taim::Color::from_rgb(0.1, 0.1, 0.1),
+    text: taim::Color::WHITE,
+    primary: taim::Color::from_rgb(0.9, 0.4, 0.4),
     // ... define other colors
     ..Default::default()
 });
@@ -547,10 +547,10 @@ let advanced_theme = Theme::custom_with_fn(|_widget_type| {
 
 For a "Hello World", putting everything in `main.rs` is fine. For a real application, you should organize your code into modules. 
 
-Here is the recommended folder structure for an Aura project:
+Here is the recommended folder structure for an Taim project:
 
 ```text
-my_aura_app/
+my_taim_app/
 ├── Cargo.toml
 └── src/
     ├── main.rs       // Entry point, builder config, module declarations
@@ -569,7 +569,7 @@ my_aura_app/
 
 **`src/app.rs`**:
 ```rust
-use aura::{Element, Task};
+use taim::{Element, Task};
 use crate::screens::{home, settings};
 
 pub struct App {
@@ -603,7 +603,7 @@ impl App {
 
     pub fn view(&self) -> Element<Message> {
         // Render the current screen
-        use aura::widget::text;
+        use taim::widget::text;
         text("Routing example").into()
     }
 }
@@ -615,10 +615,10 @@ mod app;
 mod screens;
 mod widgets;
 
-use aura::application;
+use taim::application;
 use app::App;
 
-fn main() -> aura::Result {
+fn main() -> taim::Result {
     application(App::new, App::update, App::view)
         .title("Structured App")
         .run()
@@ -631,7 +631,7 @@ This structure keeps your code clean, modular, and easy to test.
 
 ## 12. Next Steps
 
-Congratulations! You now have a solid understanding of the Aura framework. From here, you can dive deeper into specific topics:
+Congratulations! You now have a solid understanding of the Taim framework. From here, you can dive deeper into specific topics:
 
 - **[Layout and Widgets](./layout.md)** — Master `row!`, `column!`, `container`, and flexbox styling.
 - **[Handling State and Tasks](./tasks.md)** — Learn how to make HTTP requests, read files, and handle asynchronous data.

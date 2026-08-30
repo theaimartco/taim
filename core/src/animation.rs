@@ -1,13 +1,13 @@
 //! Animate your applications.
 use crate::time::{Duration, Instant};
 
-pub use aura_motion::{
+pub use taim_motion::{
     Effect as MotionEffect, Interpolate as MotionInterpolate, MotionPolicy, Spring, SpringConfig,
     Timestamp as MotionTimestamp,
 };
 pub use lilt::{Easing, FloatRepresentable as Float, Interpolable};
 
-/// An adapter from Aura's monotonic clock to Aura Motion's frame-clock API.
+/// An adapter from Taim's monotonic clock to Taim Motion's frame-clock API.
 ///
 /// Create one clock per application or window and use [`Self::at`] to convert
 /// redraw timestamps. Motion calculations use the elapsed duration from this
@@ -23,30 +23,30 @@ impl MotionClock {
         Self { origin }
     }
 
-    /// Converts an Aura redraw timestamp to an Aura Motion timestamp.
+    /// Converts an Taim redraw timestamp to an Taim Motion timestamp.
     pub fn at(&self, instant: Instant) -> MotionTimestamp {
         MotionTimestamp::from_seconds(instant.saturating_duration_since(self.origin).as_secs_f64())
     }
 }
 
-impl aura_motion::Clock for MotionClock {
+impl taim_motion::Clock for MotionClock {
     fn now(&self) -> MotionTimestamp {
         self.at(Instant::now())
     }
 }
 
-/// A compatibility adapter that lets existing transition widgets drive Aura
-/// Motion's interruptible tween engine from Aura redraw timestamps.
+/// A compatibility adapter that lets existing transition widgets drive Taim
+/// Motion's interruptible tween engine from Taim redraw timestamps.
 ///
-/// Unlike [`Animation`], this type uses Aura Motion's typed interpolation and
+/// Unlike [`Animation`], this type uses Taim Motion's typed interpolation and
 /// preserves its sampled value when a target is replaced. It remains opt-in so
 /// existing applications retain the established `lilt`-backed API.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Motion<T: MotionInterpolate> {
     clock: MotionClock,
-    transition: aura_motion::Transition<T>,
+    transition: taim_motion::Transition<T>,
     duration: Duration,
-    easing: aura_motion::Easing,
+    easing: taim_motion::Easing,
 }
 
 impl<T: MotionInterpolate> Motion<T> {
@@ -57,9 +57,9 @@ impl<T: MotionInterpolate> Motion<T> {
 
         Self {
             clock,
-            transition: aura_motion::Transition::new(value, MotionTimestamp::from_seconds(0.0)),
+            transition: taim_motion::Transition::new(value, MotionTimestamp::from_seconds(0.0)),
             duration: Duration::from_millis(100),
-            easing: aura_motion::Easing::Linear,
+            easing: taim_motion::Easing::Linear,
         }
     }
 
@@ -70,7 +70,7 @@ impl<T: MotionInterpolate> Motion<T> {
     }
 
     /// Sets this motion's easing curve.
-    pub fn easing(mut self, easing: aura_motion::Easing) -> Self {
+    pub fn easing(mut self, easing: taim_motion::Easing) -> Self {
         self.easing = easing;
         self
     }

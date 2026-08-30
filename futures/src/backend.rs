@@ -1,4 +1,4 @@
-//! The underlying implementations of the `aura_futures` contract!
+//! The underlying implementations of the `taim_futures` contract!
 pub mod null;
 
 #[cfg(not(target_arch = "wasm32"))]

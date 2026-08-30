@@ -1,6 +1,6 @@
 [package]
-name = "aura_winit"
-description = "A runtime for aura on top of winit"
+name = "taim_winit"
+description = "A runtime for taim on top of winit"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -20,21 +20,21 @@ sysinfo = ["dep:sysinfo"]
 hinting = []
 unconditional-rendering = []
 linux-theme-detection = ["dep:mundy", "mundy/async-io", "mundy/color-scheme"]
-image = ["aura_runtime/image", "arboard/image-data"]
+image = ["taim_runtime/image", "arboard/image-data"]
 # Connects the retained semantic tree to the platform's assistive technology
 # over AT-SPI. Off by default because it pulls in zbus and an async runtime,
 # which an embedder that supplies its own accessibility layer should not have
-# to carry. See aura-accessibility/src/atspi/bridge.rs.
-accessibility = ["aura-accessibility/atspi"]
+# to carry. See taim-accessibility/src/atspi/bridge.rs.
+accessibility = ["taim-accessibility/atspi"]
 x11 = ["winit/x11"]
 wayland = ["winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita", "arboard/wayland-data-control"]
 
 [dependencies]
-aura_debug.workspace = true
-aura-accessibility.workspace = true
-aura_program.workspace = true
-aura_runtime.workspace = true
-aura-gesture.workspace = true
+taim_debug.workspace = true
+taim-accessibility.workspace = true
+taim_program.workspace = true
+taim_runtime.workspace = true
+taim-gesture.workspace = true
 
 log.workspace = true
 rustc-hash.workspace = true

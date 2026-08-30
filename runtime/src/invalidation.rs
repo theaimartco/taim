@@ -15,7 +15,7 @@
 //!   container's own `Widget::layout`/`Widget::semantics`
 //!   implementation's responsibility to decide, same as today).
 //! - [`Aggregator`] merges [`damage::Request`]s the way
-//!   [`aura_core::Shell::request_damage`] already collects them, except
+//!   [`taim_core::Shell::request_damage`] already collects them, except
 //!   bounded: once more than [`Aggregator::MAX_REGIONS`] distinct areas
 //!   have accumulated, it gives up trying to track them individually and
 //!   reports [`damage::Region::Full`] instead. Unbounded per-region
@@ -59,7 +59,7 @@ pub fn propagate(root: &mut Tree, path: &[usize]) {
 /// falling back to [`damage::Region::Full`] once more than
 /// [`Aggregator::MAX_REGIONS`] distinct areas have been recorded.
 ///
-/// This mirrors [`aura_core::Shell::damage_requests`]' accumulation
+/// This mirrors [`taim_core::Shell::damage_requests`]' accumulation
 /// (append-only, one entry per widget-reported request) but adds the
 /// bound that vocabulary deliberately left to a later phase: `Shell`
 /// itself does no merging or capping, by design (Phase 2's "define the
@@ -172,7 +172,7 @@ impl Aggregator {
 
     /// Records every [`damage::Request`] in `requests`, as a convenience
     /// over calling [`Aggregator::record`] in a loop (e.g. directly on
-    /// [`aura_core::Shell::damage_requests`]'s output).
+    /// [`taim_core::Shell::damage_requests`]'s output).
     pub fn record_all<'a>(&mut self, requests: impl IntoIterator<Item = &'a damage::Request>) {
         for request in requests {
             self.record(*request);

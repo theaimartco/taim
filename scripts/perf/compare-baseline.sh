@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Re-runs every scene that has a committed baseline and fails if any has
-# regressed beyond the tolerance `aura_bench --compare` enforces.
+# regressed beyond the tolerance `taim_bench --compare` enforces.
 #
 # This is the regression gate. It is only trustworthy on the same locked
 # hardware the baselines were captured on, so it is not wired into the
@@ -54,10 +54,10 @@ if [[ ! -d "$BASELINE_DIR" ]] || [[ -z "$(ls -A "$BASELINE_DIR" 2>/dev/null)" ]]
   exit 1
 fi
 
-echo "Building aura_bench (release)..."
-cargo build --release -p aura_bench
+echo "Building taim_bench (release)..."
+cargo build --release -p taim_bench
 
-readonly BENCH="target/release/aura_bench"
+readonly BENCH="target/release/taim_bench"
 
 regressions=0
 compared=0

@@ -2,9 +2,9 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-//! use aura::widget::{bottom_nav_bar, bottom_nav_bar::Item, text};
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+//! use taim::widget::{bottom_nav_bar, bottom_nav_bar::Item, text};
 //!
 //! #[derive(Clone)]
 //! enum Message {
@@ -25,10 +25,10 @@
 //! # Selection is visible *and* reported
 //!
 //! Each [`Item`] is a widget in its own right, reporting
-//! [`Role::Tab`](aura_core::semantics::Role::Tab) with the
-//! [`SELECTED`](aura_core::semantics::State::SELECTED) flag, so the
+//! [`Role::Tab`](taim_core::semantics::Role::Tab) with the
+//! [`SELECTED`](taim_core::semantics::State::SELECTED) flag, so the
 //! selected tab is announced as selected rather than merely tinted. The
-//! bar itself is a [`Role::Group`](aura_core::semantics::Role::Group)
+//! bar itself is a [`Role::Group`](taim_core::semantics::Role::Group)
 //! that owns the indicator and the equal-width layout -- the same split
 //! `app_bar` uses, where the container is a container and the controls
 //! inside it carry the roles and the touch targets.
@@ -707,7 +707,7 @@ impl Catalog for Theme {
     }
 }
 
-/// The default styling of a [`BottomNavigationBar`] for aura's own theme.
+/// The default styling of a [`BottomNavigationBar`] for taim's own theme.
 pub fn default(theme: &Theme) -> Style {
     let palette = theme.palette();
 

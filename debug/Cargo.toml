@@ -1,6 +1,6 @@
 [package]
-name = "aura_debug"
-description = "A pluggable API for debugging aura applications"
+name = "taim_debug"
+description = "A pluggable API for debugging taim applications"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -14,8 +14,8 @@ keywords.workspace = true
 hot = ["dep:cargo-hot"]
 
 [dependencies]
-aura_core.workspace = true
-aura_futures.workspace = true
+taim_core.workspace = true
+taim_futures.workspace = true
 log.workspace = true
 
 cargo-hot.workspace = true

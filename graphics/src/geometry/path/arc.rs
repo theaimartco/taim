@@ -1,5 +1,5 @@
 //! Build and draw curves.
-use aura_core::{Point, Radians, Vector};
+use taim_core::{Point, Radians, Vector};
 
 /// A segment of a differentiable curve.
 #[derive(Debug, Clone, Copy)]

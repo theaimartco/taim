@@ -19,7 +19,7 @@ version = 2
 yanked = "deny"
 ignore = [
     # quick-xml v0.39.4, pulled in transitively by `wayland-scanner`
-    # (wayland-client -> smithay-client-toolkit -> winit -> aura_winit),
+    # (wayland-client -> smithay-client-toolkit -> winit -> taim_winit),
     # is used only to parse `wayland-scanner`'s bundled, build-time
     # Wayland protocol XML -- never attacker-controlled input at runtime.
     # No path to a fix without an upstream `wayland-scanner`/`winit`
@@ -51,7 +51,7 @@ allow = [
     "CC0-1.0",
     "MPL-2.0",
     # OSI-approved and FSF-listed free/libre; used by `clipboard-win` and
-    # `error-code` (Windows clipboard support, via arboard -> aura_winit).
+    # `error-code` (Windows clipboard support, via arboard -> taim_winit).
     "BSL-1.0",
 ]
 confidence-threshold = 0.8
@@ -64,7 +64,7 @@ license-files = []
 # Bans: source and duplicate-version policy.
 [bans]
 multiple-versions = "warn"
-# "warn" rather than "deny": every `aura_*` crate in this workspace
+# "warn" rather than "deny": every `taim_*` crate in this workspace
 # depends on its siblings via `{ version = "...", path = "..." }`, and
 # cargo-deny's wildcard check flags that pattern for any crate that is
 # itself published to crates.io (all of them, here), independent of

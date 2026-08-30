@@ -1,12 +1,12 @@
 # Tasks and Subscriptions
 
-When building applications with Vyom-Aura, you often need to perform side effects: fetching data from the network, reading files, interacting with the system clipboard, or listening to continuous events like time and keyboard input. The framework manages all of these through two powerful concepts: **Tasks** and **Subscriptions**.
+When building applications with Vyom-Taim, you often need to perform side effects: fetching data from the network, reading files, interacting with the system clipboard, or listening to continuous events like time and keyboard input. The framework manages all of these through two powerful concepts: **Tasks** and **Subscriptions**.
 
 In the Elm architecture, side effects are not performed directly inside your `update` function. Instead, your `update` function remains pure: it takes the current state and a message, and returns the new state along with a description of the side effects to be executed by the runtime.
 
 ## 1. What are Tasks?
 
-A `Task` in Vyom-Aura is a declarative description of an asynchronous operation that the runtime should perform on your behalf. When the operation completes, the runtime can feed the result back into your application by producing a new `Message`, which will be passed to your `update` function.
+A `Task` in Vyom-Taim is a declarative description of an asynchronous operation that the runtime should perform on your behalf. When the operation completes, the runtime can feed the result back into your application by producing a new `Message`, which will be passed to your `update` function.
 
 Because tasks are declarative descriptions, merely creating a task does not execute it. It must be returned from your `update` function to the runtime. This separation ensures that your application logic remains pure and easily testable.
 
@@ -46,7 +46,7 @@ This is the most common return value in typical UI interactions like toggling a 
 To execute an asynchronous future, you use `Task::perform()`. It takes a future and a function that maps the result of the future into your application's `Message` type.
 
 ```rust
-use aura::Task;
+use taim::Task;
 use reqwest;
 
 #[derive(Debug, Clone)]
@@ -118,7 +118,7 @@ Message::SettingsMessage(settings_msg) => {
 
 Sometimes you need to perform tasks sequentially, where the second task depends on the successful completion of the first, but you don't want to pollute your application state with intermediate messages.
 
-While Vyom-Aura doesn't have a direct `.then()` on `Task` (as tasks are meant to be mapped to messages), you can achieve sequential execution entirely within the async future provided to `Task::perform()`:
+While Vyom-Taim doesn't have a direct `.then()` on `Task` (as tasks are meant to be mapped to messages), you can achieve sequential execution entirely within the async future provided to `Task::perform()`:
 
 ```rust
 Message::LoginAndFetchProfile => {
@@ -138,7 +138,7 @@ Message::LoginAndFetchProfile => {
 Sometimes tasks take a long time, and the user might cancel the operation (e.g., by navigating away from the page). You can make tasks cancellable using a `Handle`.
 
 ```rust
-use aura::task::Handle;
+use taim::task::Handle;
 
 pub struct State {
     download_handle: Option<Handle>,
@@ -173,10 +173,10 @@ pub fn update(&mut self, message: Message) -> Task<Message> {
 
 ## 8. Window Tasks
 
-Vyom-Aura provides specialized tasks for interacting with the application window. These are typically found in the `window` module.
+Vyom-Taim provides specialized tasks for interacting with the application window. These are typically found in the `window` module.
 
 ```rust
-use aura::window;
+use taim::window;
 
 pub fn update(&mut self, message: Message) -> Task<Message> {
     match message {
@@ -200,8 +200,8 @@ pub fn update(&mut self, message: Message) -> Task<Message> {
 Certain widgets require imperative operations, such as focusing a text input, scrolling to a specific element, or selecting text. These are also managed via tasks to maintain the pure nature of the `update` function.
 
 ```rust
-use aura::widget::text_input;
-use aura::widget::scrollable;
+use taim::widget::text_input;
+use taim::widget::scrollable;
 
 pub fn update(&mut self, message: Message) -> Task<Message> {
     match message {
@@ -228,7 +228,7 @@ pub fn update(&mut self, message: Message) -> Task<Message> {
 Interacting with the system clipboard is an asynchronous operation, handled by tasks.
 
 ```rust
-use aura::clipboard;
+use taim::clipboard;
 
 pub fn update(&mut self, message: Message) -> Task<Message> {
     match message {
@@ -268,7 +268,7 @@ impl Application for MyApp {
 A common use case is listening to the passing of time, useful for clocks, timers, or animations.
 
 ```rust
-use aura::time;
+use taim::time;
 use std::time::{Duration, Instant};
 
 fn subscription(&self) -> Subscription<Message> {
@@ -287,7 +287,7 @@ fn subscription(&self) -> Subscription<Message> {
 You can subscribe to keyboard events globally, regardless of which widget has focus. This is essential for implementing keyboard shortcuts.
 
 ```rust
-use aura::keyboard;
+use taim::keyboard;
 
 fn subscription(&self) -> Subscription<Message> {
     keyboard::listen(|event| {
@@ -310,7 +310,7 @@ fn subscription(&self) -> Subscription<Message> {
 You can subscribe to window-level events like resizing or close requests.
 
 ```rust
-use aura::window;
+use taim::window;
 
 fn subscription(&self) -> Subscription<Message> {
     window::events().map(|event| match event {
@@ -326,7 +326,7 @@ fn subscription(&self) -> Subscription<Message> {
 For integrations with external continuous data sources (like WebSockets, long-polling, or hardware sensors), you can create custom subscriptions using `Subscription::run`.
 
 ```rust
-use aura::subscription;
+use taim::subscription;
 use futures::stream::StreamExt;
 
 fn websocket_subscription() -> Subscription<Message> {
@@ -381,8 +381,8 @@ fn subscription(&self) -> Subscription<Message> {
 Here is a complete example of a Stopwatch application that heavily utilizes both Tasks and Subscriptions.
 
 ```rust
-use aura::time;
-use aura::{Application, Task, Subscription, Element, widget::{column, button, text}};
+use taim::time;
+use taim::{Application, Task, Subscription, Element, widget::{column, button, text}};
 use std::time::{Duration, Instant};
 
 pub struct Stopwatch {

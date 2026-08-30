@@ -6,7 +6,7 @@ use crate::time::Instant;
 use crate::window;
 use crate::{Element, Program, Settings, Subscription, Task};
 
-use aura_debug as debug;
+use taim_debug as debug;
 
 /// Creates an [`Application`] with an `update` function that also
 /// takes the [`Instant`] of each `Message`.
@@ -16,9 +16,9 @@ use aura_debug as debug;
 ///
 /// Purity is needed when you want your application to end up in the
 /// same exact state given the same history of messages. This property
-/// enables proper time-traveling debugging with [`Aura Lab`][`comet`].
+/// enables proper time-traveling debugging with [`Taim Lab`][`comet`].
 ///
-/// [`comet`]: https://github.com/theaimartco/vyom-aura/tree/main/tools/aura_lab
+/// [`comet`]: https://github.com/theaimartco/taim/tree/main/tools/taim_lab
 pub fn timed<State, Message, Theme, Renderer>(
     boot: impl BootFn<State, Message>,
     update: impl UpdateFn<State, Message>,
@@ -59,7 +59,7 @@ where
         type Message = (Message, Instant);
         type Theme = Theme;
         type Renderer = Renderer;
-        type Executor = aura_futures::backend::default::Executor;
+        type Executor = taim_futures::backend::default::Executor;
 
         fn name() -> &'static str {
             let name = std::any::type_name::<State>();
@@ -71,7 +71,7 @@ where
             Settings::default()
         }
 
-        fn window(&self) -> Option<aura_core::window::Settings> {
+        fn window(&self) -> Option<taim_core::window::Settings> {
             Some(window::Settings::default())
         }
 

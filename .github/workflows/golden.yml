@@ -56,7 +56,7 @@
 #           echo
 #           echo "Look at the diff before doing anything else. If the change is"
 #           echo "intended, adopt it deliberately and say why in the PR:"
-#           echo "  AURA_UPDATE_GOLDEN=1 cargo test --test golden"
+#           echo "  TAIM_UPDATE_GOLDEN=1 cargo test --test golden"
 #           echo
 #           echo "Never adopt a golden to make CI green. See tests/golden/harness.rs."
 #           exit 1

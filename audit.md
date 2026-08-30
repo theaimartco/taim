@@ -1,21 +1,21 @@
-# VYOM Aura GUI Competitive Audit
+# VYOM Taim GUI Competitive Audit
 
 **Audit date:** 2026-08-01  
-**Repository:** `theaimartco/vyom-aura`  
+**Repository:** `theaimartco/taim`  
 **Audited commit:** `30b5e969f3db0123721597dbbc894aca63a69af9` (`main`)  
-**Primary question:** VYOM Aura GUI quality, performance, and developer workflow me Flutter aur React Native ko kaise beat kar sakta hai?
+**Primary question:** VYOM Taim GUI quality, performance, and developer workflow me Flutter aur React Native ko kaise beat kar sakta hai?
 
 ## 1. Executive verdict
 
-VYOM Aura ke paas unusually strong low-level foundation hai: Rust ownership model, `wgpu` renderer, software fallback, incremental layout/semantics primitives, gesture arena, bounded caches, frame scheduler, design tokens, accessibility engine, profiler, and a very large automated test surface. Is codebase ko “just another unfinished UI toolkit” kehna unfair hoga.
+VYOM Taim ke paas unusually strong low-level foundation hai: Rust ownership model, `wgpu` renderer, software fallback, incremental layout/semantics primitives, gesture arena, bounded caches, frame scheduler, design tokens, accessibility engine, profiler, and a very large automated test surface. Is codebase ko “just another unfinished UI toolkit” kehna unfair hoga.
 
-Lekin **aaj ki state me Aura Flutter ya React Native ko GUI framework ke roop me beat nahi karta**. Current repository ek strong collection of individually tested engines hai; abhi tak ek fully integrated, visually proven, developer-friendly product nahi hai.
+Lekin **aaj ki state me Taim Flutter ya React Native ko GUI framework ke roop me beat nahi karta**. Current repository ek strong collection of individually tested engines hai; abhi tak ek fully integrated, visually proven, developer-friendly product nahi hai.
 
 Main reason code volume ya missing algorithms nahi hai. Main reason hai **live-path integration and proof gap**:
 
 - retained layers/display lists implemented hain, but live `UserInterface::draw` unhe consume nahi karta;
 - GPU effect graph and budgets implemented hain, but actual render path effect graph execute nahi karta;
-- VYOM Wayland backend crate implemented hai, but public `aura::application(...).run()` path abhi `aura_winit` use karta hai;
+- VYOM Wayland backend crate implemented hai, but public `taim::application(...).run()` path abhi `taim_winit` use karta hai;
 - semantics and AT-SPI pieces exist, but running application path semantic tree platform adapter ko deliver nahi karta;
 - gesture router exists, but standard widgets/backend real gesture arenas start nahi karte;
 - design contracts extensive hain, but visual gallery, approved component screenshots, icon pack, and end-to-end pixel goldens absent hain;
@@ -30,7 +30,7 @@ Main reason code volume ya missing algorithms nahi hai. Main reason hai **live-p
 | Core architecture | 7.5/10 | Strong primitives and separation |
 | Live renderer integration | 3.5/10 | Important optimizations are not on the production path |
 | Visual design system | 5.0/10 | Good token/contracts, insufficient visual proof |
-| Production component library | 4.5/10 | Broad inherited widget set, incomplete Aura-native behavior/semantics |
+| Production component library | 4.5/10 | Broad inherited widget set, incomplete Taim-native behavior/semantics |
 | Motion/navigation | 3.5/10 | Good motion math, incomplete/duplicated page-transition integration |
 | Text/IME/internationalization | 6.5/10 | Strong contracts and security work, limited real-device proof |
 | Accessibility | 5.0/10 | Strong retained semantics core, incomplete end-to-end delivery |
@@ -42,7 +42,7 @@ Main reason code volume ya missing algorithms nahi hai. Main reason hai **live-p
 
 ### Best strategic answer
 
-Aura ko Flutter aur React Native dono ki full cross-platform breadth copy nahi karni chahiye. Sabse credible winning strategy hai:
+Taim ko Flutter aur React Native dono ki full cross-platform breadth copy nahi karni chahiye. Sabse credible winning strategy hai:
 
 > **“The best GUI runtime for VYOM OS and Wayland-native system applications”** — compositor-aware, Vulkan-first, zero-idle-work, secure by construction, fully deterministic, and deeply profiled.
 
@@ -78,7 +78,7 @@ Observed facts:
 
 ### What was not verified
 
-- Aura Lab ko visually judge karne ke liye interactive GUI launch/human design review nahi kiya gaya.
+- Taim Lab ko visually judge karne ke liye interactive GUI launch/human design review nahi kiya gaya.
 - No physical VYOM reference device was available.
 - No real Wayland/Smithay compositor integration run was demonstrated.
 - No screen-reader session, touch hardware session, thermal signal, suspend/resume, or device-loss recovery was tested end-to-end.
@@ -92,19 +92,19 @@ Therefore this audit distinguishes **implemented type/model**, **tested isolated
 
 ```text
 Application API
-  -> aura_winit runtime today
-     -> aura_runtime::UserInterface
-        -> aura_widget tree
-        -> aura_renderer
-           -> aura_wgpu / aura_tiny_skia
+  -> taim_winit runtime today
+     -> taim_runtime::UserInterface
+        -> taim_widget tree
+        -> taim_renderer
+           -> taim_wgpu / taim_tiny_skia
 
 Parallel capability crates
-  -> aura-design
-  -> aura-motion
-  -> aura-gesture
-  -> aura-accessibility
-  -> aura-profiler
-  -> aura-platform-vyom
+  -> taim-design
+  -> taim-motion
+  -> taim-gesture
+  -> taim-accessibility
+  -> taim-profiler
+  -> taim-platform-vyom
 ```
 
 ### 3.1 Type-safe application model
@@ -136,17 +136,17 @@ Strong implemented pieces include:
 - cached spatial hit-test index;
 - adaptive, responsive, safe-area, constraint, grid, table, stack, and pane widgets.
 
-This is one of Aura's strongest technical areas. Remaining gaps are multi-sliver composition, off-window focus/bring-into-view, and finer invalidation after `diff`.
+This is one of Taim's strongest technical areas. Remaining gaps are multi-sliver composition, off-window focus/bring-into-view, and finer invalidation after `diff`.
 
 ### 3.4 Input and gesture primitives
 
-`aura-gesture` is not toy code. It contains arena competition, teams/priorities, tap, pan, pinch, rotate, swipe, edge swipe, long press, velocity, and nested-scroll handoff with deterministic replay tests.
+`taim-gesture` is not toy code. It contains arena competition, teams/priorities, tap, pan, pinch, rotate, swipe, edge swipe, long press, velocity, and nested-scroll handoff with deterministic replay tests.
 
 The gap is product integration: the default widget/backend flow does not yet turn normal pointer streams into these recognizers automatically.
 
 ### 3.5 Design contracts
 
-`aura-design` provides:
+`taim-design` provides:
 
 - semantic color schemes: light, dark, high contrast;
 - typography, spacing, radius, elevation, and motion tokens;
@@ -156,7 +156,7 @@ The gap is product integration: the default widget/backend flow does not yet tur
 - contrast and touch-target tests;
 - component contracts for buttons, cards, dialogs, menus, navigation, notifications, selection controls, text fields, tooltips, bottom sheets, window chrome, and more.
 
-`widget/src/aura.rs` now implements Aura theme catalogs for many real widgets, and real Aura-native widgets exist for `app_bar`, `dialog`, `icon_button`, and `list_tile` in addition to inherited widgets.
+`widget/src/taim.rs` now implements Taim theme catalogs for many real widgets, and real Taim-native widgets exist for `app_bar`, `dialog`, `icon_button`, and `list_tile` in addition to inherited widgets.
 
 This is a strong consistency system. It is not yet the same thing as a visually reviewed component library.
 
@@ -178,7 +178,7 @@ This can become a real differentiator for a system framework if the final platfo
 
 ### 3.7 Observability
 
-`aura-profiler` and Aura Lab have real value:
+`taim-profiler` and Taim Lab have real value:
 
 - bounded event collection;
 - phase spans and missed-frame causes;
@@ -213,7 +213,7 @@ The architecture promises unchanged subtrees with zero widget paint work, but th
 - Draw records display lists per cacheable subtree.
 - Unchanged subtree replays without `Widget::draw`.
 - Theme, scale, clip, transform, text atlas, and device generation invalidate correctly.
-- Aura Lab shows actual retained hit/miss/eviction events.
+- Taim Lab shows actual retained hit/miss/eviction events.
 - An integration test proves a real UI changes one leaf without painting unrelated siblings.
 
 ### P0-2: Damage tracking mostly reports reasons; it does not yet deliver partial rendering/present
@@ -240,7 +240,7 @@ The architecture promises unchanged subtrees with zero widget paint work, but th
 
 - `wgpu/src/effects` implements bounds, blur cost/downsampling policy, graph admission, quality tiers, and texture-pool budgeting.
 - The effect graph is referenced only by its own module/tests.
-- `docs/performance/effect-budgets.md` explicitly says the graph is not connected to the actual `aura_wgpu` render path.
+- `docs/performance/effect-budgets.md` explicitly says the graph is not connected to the actual `taim_wgpu` render path.
 
 **Impact**
 
@@ -250,7 +250,7 @@ Blur, backdrop blur, masks, noise, color matrices, and tiered degradation cannot
 
 - Implement real shaders and pass scheduling.
 - Bind effect nodes to retained layers.
-- Show real pixels in Aura Gallery.
+- Show real pixels in Taim Gallery.
 - Capture GPU time and intermediate texture bytes.
 - Verify Recovery tier produces a coherent UI with effects disabled.
 
@@ -258,10 +258,10 @@ Blur, backdrop blur, masks, noise, color matrices, and tiered degradation cannot
 
 **Evidence**
 
-- `aura-platform-vyom` has direct Wayland connection, XDG toplevel lifecycle, capability types, input/IME/clipboard/drag-drop/accessibility/power/window-role models.
-- Root `aura` includes it only as a dev-dependency.
-- No root feature or `Application::run` path selects `aura-platform-vyom`.
-- Production application flow still uses `aura_winit`.
+- `taim-platform-vyom` has direct Wayland connection, XDG toplevel lifecycle, capability types, input/IME/clipboard/drag-drop/accessibility/power/window-role models.
+- Root `taim` includes it only as a dev-dependency.
+- No root feature or `Application::run` path selects `taim-platform-vyom`.
+- Production application flow still uses `taim_winit`.
 - Platform integration tests mostly exercise models/fake globals rather than a running Smithay compositor.
 
 **Impact**
@@ -280,9 +280,9 @@ The most important differentiator—deep VYOM compositor integration—is not us
 **Evidence**
 
 - `UserInterface::semantics()` builds a semantic forest.
-- `aura-accessibility` implements retained trees, focus, actions, live regions, and AT-SPI code.
-- Neither `aura_winit` nor the root application loop calls `UserInterface::semantics()`.
-- `aura-platform-vyom::accessibility::Transport` is a bounded in-memory transport, not a connected compositor service.
+- `taim-accessibility` implements retained trees, focus, actions, live regions, and AT-SPI code.
+- Neither `taim_winit` nor the root application loop calls `UserInterface::semantics()`.
+- `taim-platform-vyom::accessibility::Transport` is a bounded in-memory transport, not a connected compositor service.
 - Default test run executes `atspi_bus` with zero tests because the optional AT-SPI feature is not active.
 - Only about 15 widget implementations currently define a direct `semantics()` method; many complex widgets still expose no semantics.
 
@@ -302,8 +302,8 @@ Accessibility is a strong internal design but not an end-user feature yet.
 **Evidence**
 
 - `UserInterface` owns a pointer router and exposes `route_pointer`.
-- `aura_winit` does not call that method.
-- Standard widgets do not register `aura-gesture` recognizers.
+- `taim_winit` does not call that method.
+- Standard widgets do not register `taim-gesture` recognizers.
 - The API expects a caller to provide the hit path and construct an arena.
 
 **Impact**
@@ -314,9 +314,9 @@ Touch feel will not beat Flutter/RN until recognizers, nested scrolling, fling, 
 
 **Evidence**
 
-- `aura-motion` has `Transition`, springs, decay, timelines, keyframes, reduced-motion policy, page-transition math, and shared-element bookkeeping.
-- `core::animation` bridges some `aura-motion` functionality into widgets.
-- `widget/src/navigator.rs` defines a second self-contained `PageTransition` instead of using `aura-motion::PageTransition`.
+- `taim-motion` has `Transition`, springs, decay, timelines, keyframes, reduced-motion policy, page-transition math, and shared-element bookkeeping.
+- `core::animation` bridges some `taim-motion` functionality into widgets.
+- `widget/src/navigator.rs` defines a second self-contained `PageTransition` instead of using `taim-motion::PageTransition`.
 - Navigator exposes `push` but no `pop`, back-stack controller, route identity, deep-link state, or gesture-driven progress.
 - Navigator computes opacity but draw only applies translation; opacity is used as a binary draw/no-draw threshold.
 - “ZoomFade” in the widget navigator does not apply scale.
@@ -328,7 +328,7 @@ This is below the expected motion quality of mature Flutter/RN navigation stacks
 
 **Required outcome**
 
-- One page-transition type, sourced from `aura-motion`.
+- One page-transition type, sourced from `taim-motion`.
 - Real opacity/scale/clip/layer transforms.
 - push, pop, replace, modal, nested navigator, interrupted reverse, predictive back, shared elements.
 - Gesture progress and velocity handoff into spring.
@@ -344,21 +344,21 @@ This is below the expected motion quality of mature Flutter/RN navigation stacks
 - No real component screenshots are checked in.
 - `assets/icons` contains a manifest for two names but no SVG geometry; licenses are still `TBD-before-asset-import`.
 - No licensed deterministic test fonts are checked in.
-- `docs/design/aura-language.md` explicitly says human visual review is unmet.
+- `docs/design/taim-language.md` explicitly says human visual review is unmet.
 
 **Impact**
 
-There is no evidence that Aura is beautiful, coherent, or visually stable across profiles. Passing contrast and token tests is necessary but insufficient.
+There is no evidence that Taim is beautiful, coherent, or visually stable across profiles. Passing contrast and token tests is necessary but insufficient.
 
 **Required outcome**
 
-Create an Aura Gallery and an approved pixel corpus covering every component/state/theme/density/DPI/script. Human review is a required gate.
+Create an Taim Gallery and an approved pixel corpus covering every component/state/theme/density/DPI/script. Human review is a required gate.
 
 ### P0-9: Benchmark reports cannot support competitive claims
 
 **Evidence**
 
-- `aura_bench` is entirely headless.
+- `taim_bench` is entirely headless.
 - “Present” time is screenshot/readback time, not compositor presentation.
 - Pacing feedback is synthesized from CPU frame time.
 - Queue depth and several metrics are unmeasured or zero placeholders.
@@ -392,14 +392,14 @@ Local quality is strong, but nothing prevents a broken main branch, formatting r
 
 - Root `README.md` is absent.
 - `examples/` is absent.
-- No `cargo aura new`, starter template, gallery, reference shell, or minimal project exists.
-- Root crate docs still point to `aura.rs`/book URLs and upstream authorship/repository metadata, while Git remote is the VYOM fork.
-- Several docs describe older phase state and contradict newer code. Example: design docs say only six widgets have Aura theme integration, while current `widget/src/aura.rs` has many more catalog implementations; accessibility docs say no platform adapter exists while AT-SPI source now exists.
+- No `cargo taim new`, starter template, gallery, reference shell, or minimal project exists.
+- Root crate docs still point to `taim.rs`/book URLs and upstream authorship/repository metadata, while Git remote is the VYOM fork.
+- Several docs describe older phase state and contradict newer code. Example: design docs say only six widgets have Taim theme integration, while current `widget/src/taim.rs` has many more catalog implementations; accessibility docs say no platform adapter exists while AT-SPI source now exists.
 - `highlighter` is declared as an empty feature which is documented as “must never be enabled”; public feature flags should not contain intentional build traps.
 
 **Impact**
 
-Even a strong Rust developer cannot discover, start, style, debug, package, and ship a VYOM Aura app through a clear supported workflow.
+Even a strong Rust developer cannot discover, start, style, debug, package, and ship a VYOM Taim app through a clear supported workflow.
 
 ### P1: Reviewability and roadmap discipline
 
@@ -417,18 +417,18 @@ Current widget inventory is broad, but production completeness is uneven.
 |---|---|---|
 | Basic layout | Strong | Polish RTL, focus, diagnostics, pixel proof |
 | Button/input/selection | Functional and themed | Complete semantics, state/motion goldens, haptics |
-| App bar/dialog/icon button/list tile | Real Aura-native widgets | Visual review and device testing |
+| App bar/dialog/icon button/list tile | Real Taim-native widgets | Visual review and device testing |
 | Bottom sheet/navigation/notification/toast/window chrome | Design contracts exist | Real widgets, focus/gesture/semantics/platform behavior |
-| Menus/pickers/combo boxes | Inherited widget styling exists | Unified Aura behavior, keyboard/typeahead, screen-reader tests |
+| Menus/pickers/combo boxes | Inherited widget styling exists | Unified Taim behavior, keyboard/typeahead, screen-reader tests |
 | Lists/scrolling | Good primitives and VirtualList | Real gesture/fling integration, sliver composition, offscreen focus |
 | Rich text/editor | Strong inherited base | Full semantics, IME matrix, undo/redo policy, selection handles |
 | Media/platform views | Images/SVG/canvas exist | Video, camera, web/native surface embedding, clipping/compositing rules |
 | Navigation | Experimental Navigator | Production router, back handling, restoration, deep links, transitions |
-| Icons | Font/inherited assets plus empty Aura SVG set | Licensed, coherent, variable-size icon library |
+| Icons | Font/inherited assets plus empty Taim SVG set | Licensed, coherent, variable-size icon library |
 
 ### 5.2 Touch target policy inconsistency
 
-`phase.md` sets a 48×48 logical-pixel default target. `aura-design::MIN_TOUCH_TARGET` is 44 px, although density helpers often return 48 or more. Choose one policy and enforce it everywhere. For VYOM touch-first system UI, 48 px is the safer default; 44 px can be an explicit platform compatibility mode.
+`phase.md` sets a 48×48 logical-pixel default target. `taim-design::MIN_TOUCH_TARGET` is 44 px, although density helpers often return 48 or more. Choose one policy and enforce it everywhere. For VYOM touch-first system UI, 48 px is the safer default; 44 px can be an explicit platform compatibility mode.
 
 ### 5.3 Typography
 
@@ -452,7 +452,7 @@ Gaps:
 
 ### 5.4 Responsive/adaptive GUI
 
-Aura has compact/medium/expanded viewport classes, densities, safe area, responsive/adaptive widgets, and a watch profile inside Aura Lab. However, the main design contract exposes only three viewport classes and docs still state watch visual review is absent. The framework needs a single canonical device/profile system used by widgets, gallery, tests, and tooling.
+Taim has compact/medium/expanded viewport classes, densities, safe area, responsive/adaptive widgets, and a watch profile inside Taim Lab. However, the main design contract exposes only three viewport classes and docs still state watch visual review is absent. The framework needs a single canonical device/profile system used by widgets, gallery, tests, and tooling.
 
 ---
 
@@ -470,7 +470,7 @@ Flutter already has:
 - DevTools frame charts, UI/raster timing, widget build/layout/paint tracking, timeline import/export, and jank diagnosis ([Flutter Performance view](https://docs.flutter.dev/tools/devtools/performance));
 - unit, widget, and device integration testing workflows ([Flutter testing overview](https://docs.flutter.dev/testing/overview)).
 
-Therefore Aura cannot win merely by having a GPU renderer, declarative widgets, hot reload flag, or frame profiler. Those are table stakes.
+Therefore Taim cannot win merely by having a GPU renderer, declarative widgets, hot reload flag, or frame profiler. Those are table stakes.
 
 ### 6.2 React Native baseline
 
@@ -483,11 +483,11 @@ React Native already has:
 - Android TalkBack and iOS VoiceOver integration ([Accessibility](https://reactnative.dev/docs/accessibility));
 - native-thread scrolling/navigation options even when the JavaScript thread is busy ([Performance overview](https://reactnative.dev/docs/performance)).
 
-Aura cannot win on ecosystem size or mobile platform coverage in the short term.
+Taim cannot win on ecosystem size or mobile platform coverage in the short term.
 
-### 6.3 Where Aura can realistically win
+### 6.3 Where Taim can realistically win
 
-| Dimension | Flutter | React Native | Aura winning opportunity |
+| Dimension | Flutter | React Native | Taim winning opportunity |
 |---|---|---|---|
 | VYOM compositor integration | Generic embedder | Native-module/platform-view integration | Direct Smithay/Wayland/Vulkan contract with privileged VYOM roles |
 | Idle power | Mature but general-purpose | Native views plus JS runtime | Prove zero submissions/wakeups and lower memory on VYOM hardware |
@@ -502,13 +502,13 @@ Aura cannot win on ecosystem size or mobile platform coverage in the short term.
 
 ## 7. Winning product thesis
 
-### 7.1 Do not position Aura as “Flutter but in Rust”
+### 7.1 Do not position Taim as “Flutter but in Rust”
 
 That pitch creates an impossible checklist: iOS, Android, web, desktop, thousands of packages, IDEs, hot reload, add-to-app, platform views, and years of compatibility.
 
 Position it as:
 
-> **Aura is the native application and system-UI framework for VYOM OS: visually coherent, compositor-aware, energy efficient, accessible, and secure by construction.**
+> **Taim is the native application and system-UI framework for VYOM OS: visually coherent, compositor-aware, energy efficient, accessible, and secure by construction.**
 
 ### 7.2 Win one reference experience first
 
@@ -531,7 +531,7 @@ This one app should be the visual gallery, benchmark workload, accessibility fix
 
 ### 7.3 Beat on measured outcomes
 
-Aura should claim leadership only after meeting all of these on named VYOM reference hardware:
+Taim should claim leadership only after meeting all of these on named VYOM reference hardware:
 
 | Outcome | Proposed release gate |
 |---|---|
@@ -566,7 +566,7 @@ Assumption: 3–5 experienced engineers. Solo execution will likely take 2–3×
 
 **Exit gate:** clean clone can run documented commands; CI is required; a new developer reaches a window in under 10 minutes.
 
-### Milestone 1 — Build Aura Gallery and visual truth (2–4 weeks)
+### Milestone 1 — Build Taim Gallery and visual truth (2–4 weeks)
 
 1. Create `examples/vyom_gallery` as the canonical app.
 2. Render every real component in every meaningful state.
@@ -582,15 +582,15 @@ Assumption: 3–5 experienced engineers. Solo execution will likely take 2–3×
 1. Integrate tree revisions, display-list recording, and retained-layer replay.
 2. Propagate precise damage from widget invalidation through renderer/compositor.
 3. Connect the effect graph, texture pool, shaders, and quality tiers.
-4. Wire resource metrics into Aura Lab.
+4. Wire resource metrics into Taim Lab.
 5. Complete device-loss rebuild and software fallback escalation.
 6. Prove static subtrees do no paint/upload work.
 
-**Exit gate:** Aura Gallery visibly uses these systems; real trace proves their work reduction; no test-only architecture is presented as shipped.
+**Exit gate:** Taim Gallery visibly uses these systems; real trace proves their work reduction; no test-only architecture is presented as shipped.
 
 ### Milestone 3 — Production motion and touch (4–6 weeks, overlaps Milestone 2 after interfaces settle)
 
-1. Replace Navigator's local transition engine with `aura-motion`.
+1. Replace Navigator's local transition engine with `taim-motion`.
 2. Add pop/replace/modal/nested/deep-link/restoration APIs.
 3. Implement actual opacity, scale, transform origin, clip, and retained surface transitions.
 4. Wire gesture arenas into buttons, scrolling, sliders, sheets, menus, and navigation.
@@ -601,7 +601,7 @@ Assumption: 3–5 experienced engineers. Solo execution will likely take 2–3×
 
 ### Milestone 4 — VYOM backend end-to-end (6–10 weeks)
 
-1. Make `aura-platform-vyom` selectable by the public app API.
+1. Make `taim-platform-vyom` selectable by the public app API.
 2. Bind required Wayland protocols and actual VYOM authenticated protocols.
 3. Connect surface configure/scale/damage/frame feedback.
 4. Connect seats, keyboard, multitouch, IME, clipboard, drag-drop.
@@ -618,9 +618,9 @@ Assumption: 3–5 experienced engineers. Solo execution will likely take 2–3×
 3. Capture raw CPU/GPU/presentation/input/power/memory samples.
 4. Populate every benchmark environment field automatically; reject `null` identity fields.
 5. Add windowed compositor benchmark mode and real presentation feedback.
-6. Add `cargo aura new`, project template, packaging, deploy, logs, and device selection.
+6. Add `cargo taim new`, project template, packaging, deploy, logs, and device selection.
 7. Add stateful UI preview/hot patching and error recovery.
-8. Add remote Aura Lab attachment, GPU resources, overdraw, and trace export.
+8. Add remote Taim Lab attachment, GPU resources, overdraw, and trace export.
 
 **Exit gate:** reproducible third-party-runnable benchmark package supports every public comparison claim.
 
@@ -632,16 +632,16 @@ Assumption: 3–5 experienced engineers. Solo execution will likely take 2–3×
 |---:|---|---|---|
 | 1 | Enable CI | `.github/workflows/*.yml` | Required checks run on every PR |
 | 2 | Canonical capability matrix | `README.md`, `docs/status.md` | “model/test/live” state for every subsystem |
-| 3 | Aura Gallery | `examples/vyom_gallery/` | Every shipped component/state is visible |
+| 3 | Taim Gallery | `examples/vyom_gallery/` | Every shipped component/state is visible |
 | 4 | Real visual goldens | `tests/golden/images/`, harness | Component screenshots fail on unintended pixel drift |
 | 5 | Retained draw integration | `runtime/user_interface`, `graphics/display_list`, `graphics/retained_layer` | Unchanged subtree skips `Widget::draw` |
 | 6 | Damage-to-present chain | runtime + `wgpu/window` + VYOM surface | Small leaf update produces bounded compositor damage |
 | 7 | Live effects | `wgpu/effects`, layer/engine shaders | Blur/shadow/mask render and obey quality budgets |
-| 8 | Navigator unification | `widget/navigator`, `aura-motion` | push/pop/reverse with real opacity/scale and interruption |
+| 8 | Navigator unification | `widget/navigator`, `taim-motion` | push/pop/reverse with real opacity/scale and interruption |
 | 9 | Gesture integration | widgets + runtime + platform backends | Standard controls automatically use gesture arena |
-| 10 | VYOM public backend | root API + `aura-platform-vyom` | Normal app runs directly on VYOM backend |
+| 10 | VYOM public backend | root API + `taim-platform-vyom` | Normal app runs directly on VYOM backend |
 | 11 | Accessibility delivery | runtime + accessibility + platform | Orca/VYOM AT can enumerate and operate Gallery |
-| 12 | Windowed comparative bench | `tools/aura_bench`, competitor fixtures | Real input-to-photon/presentation metrics on named device |
+| 12 | Windowed comparative bench | `tools/taim_bench`, competitor fixtures | Real input-to-photon/presentation metrics on named device |
 
 Tickets 5–12 should not be merged as one large “modified” commit. Each needs a focused benchmark, visual check, and rollback boundary.
 
@@ -691,17 +691,17 @@ Tickets 5–12 should not be merged as one large “modified” commit. Each nee
 
 Flutter and RN win many teams before runtime performance matters because the first screen, reload loop, documentation, packages, and debugging are easy.
 
-Aura needs this supported path:
+Taim needs this supported path:
 
 ```text
-cargo install aura-cli
-aura new settings_app --platform vyom
+cargo install taim-cli
+taim new settings_app --platform vyom
 cd settings_app
-aura run --device vyom-emulator
+taim run --device vyom-emulator
 # edit -> state-preserving refresh
-aura inspect
-aura test --golden
-aura package
+taim inspect
+taim test --golden
+taim package
 ```
 
 Minimum DX deliverables:
@@ -748,7 +748,7 @@ It becomes a go only when:
 
 - VYOM backend is the actual app path;
 - retained rendering, damage, effects, recovery, gestures, and semantics are live;
-- Aura Gallery proves visual quality;
+- Taim Gallery proves visual quality;
 - CI is mandatory;
 - named reference hardware produces real windowed/presentation metrics;
 - equivalent Flutter/RN implementations and raw results are public;
@@ -757,7 +757,7 @@ It becomes a go only when:
 
 The first credible headline should be narrow and provable, for example:
 
-> “On VYOM reference hardware, Aura's system-settings workload delivers lower P95 input-to-photon latency, zero idle GPU submissions, and lower steady-state memory than the equivalent Flutter and React Native builds.”
+> “On VYOM reference hardware, Taim's system-settings workload delivers lower P95 input-to-photon latency, zero idle GPU submissions, and lower steady-state memory than the equivalent Flutter and React Native builds.”
 
 Only publish it if the data actually says so.
 
@@ -770,13 +770,13 @@ The codebase does not need another giant feature phase. It needs a **product-int
 Recommended order:
 
 1. enable CI and repair public project truth;
-2. ship Aura Gallery with real pixel goldens;
+2. ship Taim Gallery with real pixel goldens;
 3. wire retained/damage/effects into live rendering;
 4. fix navigation/motion and standardize gesture use;
 5. make VYOM backend and accessibility end-to-end;
 6. build the developer loop;
 7. run fair physical-device comparisons.
 
-If this order is followed, Aura can plausibly beat Flutter/RN **for VYOM-native GUI and system UI**. If the project instead keeps adding isolated engines, contracts, and tests without moving them onto the live path, it will remain technically impressive but visually and commercially non-competitive.
+If this order is followed, Taim can plausibly beat Flutter/RN **for VYOM-native GUI and system UI**. If the project instead keeps adding isolated engines, contracts, and tests without moving them onto the live path, it will remain technically impressive but visually and commercially non-competitive.
 
 **Confidence:** high for repository findings; medium for delivery estimates; competitive claims require the missing physical-device measurements.

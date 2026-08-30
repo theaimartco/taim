@@ -68,7 +68,7 @@ where
         let renderer = compositor.create_renderer(renderer_settings);
 
         let waker = shell::Waker::new(move || {
-            proxy.send_action(aura_runtime::Action::Event {
+            proxy.send_action(taim_runtime::Action::Event {
                 window: id,
                 event: core::Event::Waken,
             });
@@ -78,10 +78,10 @@ where
         // adapter, and so the window's title can be read before `window` is
         // moved in.
         let accessibility =
-            aura_accessibility::Session::new(aura_accessibility::atspi::adapter::Adapter::new());
+            taim_accessibility::Session::new(taim_accessibility::atspi::adapter::Adapter::new());
 
         #[cfg(feature = "accessibility")]
-        let accessibility_bridge = aura_accessibility::atspi::bridge::Bridge::spawn(
+        let accessibility_bridge = taim_accessibility::atspi::bridge::Bridge::spawn(
             accessibility.adapter().store().clone(),
             accessibility.adapter().events().clone(),
             window.title(),
@@ -225,7 +225,7 @@ where
     /// Retained accessibility session for this window. The in-memory AT-SPI
     /// adapter is updated on the UI thread; platform bus delivery can drain
     /// its bounded event queue without blocking rendering.
-    pub accessibility: aura_accessibility::Session<aura_accessibility::atspi::adapter::Adapter>,
+    pub accessibility: taim_accessibility::Session<taim_accessibility::atspi::adapter::Adapter>,
     /// The thread carrying [`Window::accessibility`]'s queue to the platform
     /// accessibility bus.
     ///
@@ -233,7 +233,7 @@ where
     /// thread to stop. Without it the semantic tree is diffed every frame
     /// into a queue nothing reads (`Capstone.md` F-15).
     #[cfg(feature = "accessibility")]
-    _accessibility_bridge: aura_accessibility::atspi::bridge::Bridge,
+    _accessibility_bridge: taim_accessibility::atspi::bridge::Bridge,
     preedit: Option<Preedit<P::Renderer>>,
     ime_state: Option<(Rectangle, input_method::Purpose)>,
 }

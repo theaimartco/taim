@@ -1,4 +1,4 @@
-use aura_motion::{
+use taim_motion::{
     Effect, Keyframe, Keyframes, KeyframesError, MotionPolicy, Segment, SharedElementId,
     SharedElements, Snapshot, Timeline,
 };

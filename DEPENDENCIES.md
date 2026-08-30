@@ -1,6 +1,6 @@
 # Dependencies
 
-Aura requires some system dependencies to work, and not
+Taim requires some system dependencies to work, and not
 all operating systems come with them installed.
 
 You can follow the provided instructions for your system to

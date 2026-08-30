@@ -1,6 +1,6 @@
 // The display transform: scene-referred light in, panel signal out.
 //
-// This is a line-by-line mirror of `aura_core::color::display`. The two
+// This is a line-by-line mirror of `taim_core::color::display`. The two
 // implementations must agree, because one of them decides what a screenshot
 // looks like and the other decides what a person looks at, and a divergence
 // between them is invisible until someone photographs a panel.

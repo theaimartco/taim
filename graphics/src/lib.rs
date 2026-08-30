@@ -1,11 +1,11 @@
 //! A bunch of backend-agnostic types that can be leveraged to build a renderer
-//! for [`aura`].
+//! for [`taim`].
 //!
-//! ![The native path of the Aura ecosystem](https://github.com/theaimartco/vyom-aura/blob/main/docs/graphs/native.png?raw=true)
+//! ![The native path of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/native.png?raw=true)
 //!
-//! [`aura`]: https://github.com/theaimartco/vyom-aura
+//! [`taim`]: https://github.com/theaimartco/taim
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 mod antialiasing;
@@ -40,5 +40,5 @@ pub use shell::Shell;
 pub use text::Text;
 pub use viewport::Viewport;
 
-pub use aura_core as core;
-pub use aura_futures as futures;
+pub use taim_core as core;
+pub use taim_futures as futures;

@@ -7,17 +7,17 @@
 //! `UserInterface::semantics` existed, they were not: every call site of
 //! `runtime::semantics::build` in the workspace was a test, and
 //! `UserInterface` had no semantics method at all. A screen reader
-//! attached to a real Aura application would have found nothing.
+//! attached to a real Taim application would have found nothing.
 //!
 //! These tests call the same public method an application calls, on a
 //! real `UserInterface` built from real widgets.
 
-use aura::widget::{button, checkbox, column, container, float, pick_list, pin, row, space, text};
-use aura::{Element, Point, Size, Theme};
-use aura_core::mouse;
-use aura_core::semantics::{Node, Role, State};
-use aura_renderer::Renderer;
-use aura_runtime::user_interface::{Cache, UserInterface};
+use taim::widget::{button, checkbox, column, container, float, pick_list, pin, row, space, text};
+use taim::{Element, Point, Size, Theme};
+use taim_core::mouse;
+use taim_core::semantics::{Node, Role, State};
+use taim_renderer::Renderer;
+use taim_runtime::user_interface::{Cache, UserInterface};
 
 type Message = &'static str;
 
@@ -27,9 +27,9 @@ const WINDOW: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -342,9 +342,9 @@ fn an_open_dropdown_reaches_the_application_through_its_overlay() {
     // Click it open, the way a user does.
     let mut messages = Vec::new();
     let _ = ui.update(
-        &aura_core::window::Headless,
-        &aura_core::shell::Waker::noop(),
-        &[aura::Event::Mouse(mouse::Event::ButtonPressed(
+        &taim_core::window::Headless,
+        &taim_core::shell::Waker::noop(),
+        &[taim::Event::Mouse(mouse::Event::ButtonPressed(
             mouse::Button::Left,
         ))],
         mouse::Cursor::Available(Point::new(20.0, 10.0)),

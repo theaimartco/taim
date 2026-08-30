@@ -18,7 +18,7 @@ pub enum Script {
     Tamil,
     /// Emoji and pictographic sequences.
     Emoji,
-    /// A script not covered by Aura's deterministic baseline.
+    /// A script not covered by Taim's deterministic baseline.
     Other,
 }
 
@@ -49,7 +49,7 @@ pub struct FallbackChain {
 }
 
 impl FallbackChain {
-    /// Returns Aura's deterministic family order for `script`.
+    /// Returns Taim's deterministic family order for `script`.
     pub const fn for_script(script: Script) -> Self {
         let families: &'static [&'static str] = match script {
             Script::Latin => &["Noto Sans", "sans-serif"],

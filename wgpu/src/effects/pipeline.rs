@@ -159,7 +159,7 @@ impl Masks {
 
     fn new(device: &wgpu::Device) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("aura_wgpu.effect.mask_atlas"),
+            label: Some("taim_wgpu.effect.mask_atlas"),
             size: wgpu::Extent3d {
                 width: Self::SIZE,
                 height: Self::SIZE,
@@ -176,7 +176,7 @@ impl Masks {
         let views = (0..Self::SLOTS)
             .map(|slot| {
                 texture.create_view(&wgpu::TextureViewDescriptor {
-                    label: Some("aura_wgpu.effect.mask_slot"),
+                    label: Some("taim_wgpu.effect.mask_slot"),
                     dimension: Some(wgpu::TextureViewDimension::D2),
                     base_array_layer: slot,
                     array_layer_count: Some(1),
@@ -199,7 +199,7 @@ impl Masks {
         };
 
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("aura_wgpu.effect.mask_layout"),
+            label: Some("taim_wgpu.effect.mask_layout"),
             entries: &[
                 entry,
                 wgpu::BindGroupLayoutEntry {
@@ -280,7 +280,7 @@ impl Clone for Pipeline {
 impl Pipeline {
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("aura_wgpu.effect.sampler"),
+            label: Some("taim_wgpu.effect.sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -291,7 +291,7 @@ impl Pipeline {
         });
 
         let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("aura_wgpu.effect.uniform_layout"),
+            label: Some("taim_wgpu.effect.uniform_layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -315,7 +315,7 @@ impl Pipeline {
         });
 
         let texture_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("aura_wgpu.effect.texture_layout"),
+            label: Some("taim_wgpu.effect.texture_layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::FRAGMENT,
@@ -329,13 +329,13 @@ impl Pipeline {
         });
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("aura_wgpu.effect.pipeline_layout"),
+            label: Some("taim_wgpu.effect.pipeline_layout"),
             bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout)],
             immediate_size: 0,
         });
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("aura_wgpu.effect.shader"),
+            label: Some("taim_wgpu.effect.shader"),
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("../shader/effect.wgsl"))),
         });
 
@@ -385,13 +385,13 @@ impl Pipeline {
         // Its own pipeline layout, carrying the mask atlas as group 2, so no
         // other pass pays for a binding it never reads.
         let mask_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("aura_wgpu.effect.mask_pipeline_layout"),
+            label: Some("taim_wgpu.effect.mask_pipeline_layout"),
             bind_group_layouts: &[Some(&uniform_layout), Some(&masks.layout)],
             immediate_size: 0,
         });
 
         let mask = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("aura_wgpu.effect.mask"),
+            label: Some("taim_wgpu.effect.mask"),
             layout: Some(&mask_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -417,7 +417,7 @@ impl Pipeline {
         });
 
         let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("aura_wgpu.effect.uniforms"),
+            label: Some("taim_wgpu.effect.uniforms"),
             size: Uniforms::STRIDE * 24,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -428,11 +428,11 @@ impl Pipeline {
             sampler,
             uniform_layout,
             texture_layout,
-            blur: build("aura_wgpu.effect.blur", "fs_blur"),
-            color_matrix: build("aura_wgpu.effect.color_matrix", "fs_color_matrix"),
-            noise: build("aura_wgpu.effect.noise", "fs_noise"),
+            blur: build("taim_wgpu.effect.blur", "fs_blur"),
+            color_matrix: build("taim_wgpu.effect.color_matrix", "fs_color_matrix"),
+            noise: build("taim_wgpu.effect.noise", "fs_noise"),
             // Replace, not blend: see `build_with`.
-            blit: build_with("aura_wgpu.effect.blit", "fs_blit", None),
+            blit: build_with("taim_wgpu.effect.blit", "fs_blit", None),
             mask,
             masks,
             uniforms,
@@ -921,7 +921,7 @@ impl Pipeline {
         mask: Option<u32>,
     ) {
         let uniform_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("aura_wgpu.effect.uniform_bind_group"),
+            label: Some("taim_wgpu.effect.uniform_bind_group"),
             layout: &self.uniform_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -943,7 +943,7 @@ impl Pipeline {
         // its own layout; every other pass binds the source alone.
         let texture_group = match mask {
             Some(slot) => device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("aura_wgpu.effect.mask_bind_group"),
+                label: Some("taim_wgpu.effect.mask_bind_group"),
                 layout: &self.masks.layout,
                 entries: &[
                     wgpu::BindGroupEntry {
@@ -959,7 +959,7 @@ impl Pipeline {
                 ],
             }),
             None => device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("aura_wgpu.effect.texture_bind_group"),
+                label: Some("taim_wgpu.effect.texture_bind_group"),
                 layout: &self.texture_layout,
                 entries: &[wgpu::BindGroupEntry {
                     binding: 0,
@@ -969,7 +969,7 @@ impl Pipeline {
         };
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("aura_wgpu.effect.pass"),
+            label: Some("taim_wgpu.effect.pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: destination,
                 depth_slice: None,
@@ -1033,8 +1033,8 @@ impl Pipeline {
         };
 
         let textures = [
-            make("aura_wgpu.effect.target.0"),
-            make("aura_wgpu.effect.target.1"),
+            make("taim_wgpu.effect.target.0"),
+            make("taim_wgpu.effect.target.1"),
         ];
         let views = [
             textures[0].create_view(&wgpu::TextureViewDescriptor::default()),
@@ -1061,7 +1061,7 @@ impl Pipeline {
         let capacity = needed.next_power_of_two();
 
         self.uniforms = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("aura_wgpu.effect.uniforms"),
+            label: Some("taim_wgpu.effect.uniforms"),
             size: Uniforms::STRIDE * capacity,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,

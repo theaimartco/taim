@@ -46,7 +46,7 @@ jobs:
           - name: default
             args: --workspace --all-targets
           - name: minimal-headless
-            args: -p aura_core -p aura_runtime -p aura_widget --no-default-features
+            args: -p taim_core -p taim_runtime -p taim_widget --no-default-features
           - name: hot
             args: --workspace --all-targets --features hot
           - name: all-widgets
@@ -96,7 +96,7 @@ jobs:
       # Default features are off deliberately: `x11`, `wayland` and
       # `thread-pool` are meaningless on the web and would fail the build
       # for reasons that say nothing about wasm support.
-      - run: cargo check -p aura --target wasm32-unknown-unknown --no-default-features --features "wgpu,webgl,web-colors"
+      - run: cargo check -p taim --target wasm32-unknown-unknown --no-default-features --features "wgpu,webgl,web-colors"
 
   test:
     name: test (${{ matrix.configuration.name }})
@@ -110,7 +110,7 @@ jobs:
           - name: default
             args: ""
           # No default features at all. This is only a meaningful command
-          # because the `aura` dev-dependency sets `default-features = false`
+          # because the `taim` dev-dependency sets `default-features = false`
           # at the workspace definition -- without that it silently re-enabled
           # every default, and `web-colors` in particular, so this job would
           # have tested the same thing as `default` while claiming otherwise.
@@ -188,14 +188,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y dbus dbus-x11
-      # AURA_ATSPI_REQUIRE_BUS turns "no bus, skip" into "no bus, fail".
+      # TAIM_ATSPI_REQUIRE_BUS turns "no bus, skip" into "no bus, fail".
       # Without it this job could go green on a runner where D-Bus failed
       # to start, which is the precise shape of the bug F-15 was: a
       # transport nobody noticed was doing nothing.
       - name: Test the AT-SPI transport
         env:
-          AURA_ATSPI_REQUIRE_BUS: "1"
-        run: dbus-run-session -- cargo test -p aura-accessibility --features atspi --test atspi_bus
+          TAIM_ATSPI_REQUIRE_BUS: "1"
+        run: dbus-run-session -- cargo test -p taim-accessibility --features atspi --test atspi_bus
 
   budgets:
     name: budgets

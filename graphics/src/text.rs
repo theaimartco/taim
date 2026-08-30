@@ -12,7 +12,7 @@ pub use cosmic_text;
 /// Whether a renderer can report its text-shaping [`cache::Statistics`].
 ///
 /// A trait, rather than a method every renderer must implement, because
-/// not every renderer *has* this cache: `aura_wgpu` shapes glyphs
+/// not every renderer *has* this cache: `taim_wgpu` shapes glyphs
 /// through `cryoglyph`'s own GPU-side cache instead, which is a
 /// different structure this module knows nothing about. The default
 /// `None` is that renderer's honest answer, not a stub waiting to be
@@ -21,7 +21,7 @@ pub use cosmic_text;
 /// This lives here, rather than on `Cache` itself, because a renderer
 /// does not hold a bare `Cache` — it holds a `text::Pipeline` that owns
 /// one behind a few more layers (an `Engine`, a `RefCell`). The trait is
-/// the seam a fallback wrapper (`aura_renderer::fallback::Renderer<A,
+/// the seam a fallback wrapper (`taim_renderer::fallback::Renderer<A,
 /// B>`) can bound on without caring which layer either `A` or `B` buries
 /// its cache under.
 pub trait CacheStatistics {
@@ -31,7 +31,7 @@ pub trait CacheStatistics {
     /// cache — not "not implemented yet". A caller must not treat it as
     /// zero activity; there is a difference between "nothing happened"
     /// and "this question does not apply here", and `gpu_resources`
-    /// (`aura_lab`) exists specifically to keep that distinction visible.
+    /// (`taim_lab`) exists specifically to keep that distinction visible.
     fn text_cache_statistics(&self) -> Option<cache::Statistics> {
         None
     }
@@ -163,7 +163,7 @@ pub fn font_system() -> &'static RwLock<FontSystem> {
         #[allow(unused_mut)]
         let mut raw = cosmic_text::FontSystem::new_with_fonts([
             cosmic_text::fontdb::Source::Binary(Arc::new(
-                include_bytes!("../fonts/Aura-Icons.ttf").as_slice(),
+                include_bytes!("../fonts/Taim-Icons.ttf").as_slice(),
             )),
             #[cfg(feature = "fira-sans")]
             cosmic_text::fontdb::Source::Binary(Arc::new(
@@ -457,7 +457,7 @@ pub fn hint_factor(_size: Pixels, _scale_factor: Option<f32>) -> Option<f32> {
     None // Disable all text hinting for now
 }
 
-/// A text renderer coupled to `aura_graphics`.
+/// A text renderer coupled to `taim_graphics`.
 pub trait Renderer {
     /// Draws the given [`Raw`] text.
     fn fill_raw(&mut self, raw: Raw);

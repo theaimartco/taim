@@ -8,19 +8,19 @@
 //! that is focused should stay focused even if the widget tree
 //! changes slightly.
 //!
-//! Continuity is tricky in `aura` and the Elm Architecture because
+//! Continuity is tricky in `taim` and the Elm Architecture because
 //! the whole widget tree is rebuilt during every `view` call. This is
 //! very convenient from a developer perspective because you can build
 //! extremely dynamic interfaces without worrying about changing state.
 //!
 //! However, the tradeoff is that determining what changed becomes hard
-//! for `aura`. If you have a list of things, adding an element at the
+//! for `taim`. If you have a list of things, adding an element at the
 //! top may cause a loss of continuity on every element on the list!
 //!
 //! # How can we keep continuity?
 //! The good news is that user interfaces generally have a static widget
 //! structure. This structure can be relied on to ensure some degree of
-//! continuity. `aura` already does this.
+//! continuity. `taim` already does this.
 //!
 //! However, sometimes you have a certain part of your interface that is
 //! quite dynamic. For instance, a list of things where items may be added
@@ -47,10 +47,10 @@ pub use column::Column;
 ///
 /// # Example
 /// ```no_run
-/// # mod aura { pub mod widget { pub use aura_widget::*; } }
+/// # mod taim { pub mod widget { pub use taim_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-/// use aura::widget::keyed_column;
+/// # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+/// use taim::widget::keyed_column;
 ///
 /// enum Message {
 ///     // ...

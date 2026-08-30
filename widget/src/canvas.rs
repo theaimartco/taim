@@ -2,13 +2,13 @@
 //!
 //! # Example: Drawing a Simple Circle
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
 //! # pub type State = ();
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
 //! #
-//! use aura::mouse;
-//! use aura::widget::canvas;
-//! use aura::{Color, Rectangle, Renderer, Theme};
+//! use taim::mouse;
+//! use taim::widget::canvas;
+//! use taim::{Color, Rectangle, Renderer, Theme};
 //!
 //! // First, we define the data we need for drawing
 //! #[derive(Debug)]
@@ -87,13 +87,13 @@ pub type Frame<Renderer = crate::Renderer> = geometry::Frame<Renderer>;
 ///
 /// # Example: Drawing a Simple Circle
 /// ```no_run
-/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
+/// # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
 /// #
-/// use aura::mouse;
-/// use aura::widget::canvas;
-/// use aura::{Color, Rectangle, Renderer, Theme};
+/// use taim::mouse;
+/// use taim::widget::canvas;
+/// use taim::{Color, Rectangle, Renderer, Theme};
 ///
 /// // First, we define the data we need for drawing
 /// #[derive(Debug)]

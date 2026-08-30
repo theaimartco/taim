@@ -1,5 +1,5 @@
-use aura_core::text::Selection;
-use aura_widget::text_input::Value;
+use taim_core::text::Selection;
+use taim_widget::text_input::Value;
 
 #[test]
 fn text_input_value_keeps_combining_and_emoji_sequences_as_graphemes() {

@@ -9,8 +9,8 @@
 //! that the reported damage regions fully cover all areas that would
 //! differ between the old and new frame.
 
-use aura_graphics::core::{Point, Rectangle, Size};
-use aura_graphics::damage::DamageRegion;
+use taim_graphics::core::{Point, Rectangle, Size};
+use taim_graphics::damage::DamageRegion;
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle::new(Point::new(x, y), Size::new(w, h))

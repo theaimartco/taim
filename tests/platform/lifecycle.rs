@@ -1,4 +1,4 @@
-use aura_platform_vyom::{SurfaceId, SurfaceLifecycle, SurfaceState};
+use taim_platform_vyom::{SurfaceId, SurfaceLifecycle, SurfaceState};
 
 #[test]
 fn repeated_configure_suspend_resume_destroy_is_terminal_safe() {

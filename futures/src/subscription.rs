@@ -74,7 +74,7 @@ pub type Hasher = rustc_hash::FxHasher;
 ///
 /// # The Lifetime of a [`Subscription`]
 /// Much like a [`Future`] or a [`Stream`], a [`Subscription`] does not produce any effects
-/// on its own. For a [`Subscription`] to run, it must be returned to the aura runtime—normally
+/// on its own. For a [`Subscription`] to run, it must be returned to the taim runtime—normally
 /// in the `subscription` function of an `application` or a `daemon`.
 ///
 /// When a [`Subscription`] is provided to the runtime for the first time, the runtime will
@@ -85,29 +85,29 @@ pub type Hasher = rustc_hash::FxHasher;
 /// to build a certain [`Stream`] together with some way to _identify_ it.
 ///
 /// Identification is important because when a specific [`Subscription`] stops being returned to the
-/// aura runtime, the runtime will kill its associated [`Stream`]. The runtime uses the identity of a
+/// taim runtime, the runtime will kill its associated [`Stream`]. The runtime uses the identity of a
 /// [`Subscription`] to keep track of it.
 ///
-/// This way, aura allows you to declaratively __subscribe__ to particular streams of data temporarily
+/// This way, taim allows you to declaratively __subscribe__ to particular streams of data temporarily
 /// and whenever necessary.
 ///
 /// ```
-/// # mod aura {
+/// # mod taim {
 /// #     pub mod time {
 /// #         pub use std::time::{Duration, Instant};
 /// #
-/// #         // Available as `aura::time::every` when the `tokio` or `smol`
+/// #         // Available as `taim::time::every` when the `tokio` or `smol`
 /// #         // feature is enabled; stubbed here so this example does not
 /// #         // depend on either being active.
-/// #         pub fn every(_duration: Duration) -> aura_futures::Subscription<Instant> {
-/// #             aura_futures::Subscription::none()
+/// #         pub fn every(_duration: Duration) -> taim_futures::Subscription<Instant> {
+/// #             taim_futures::Subscription::none()
 /// #         }
 /// #     }
 /// #
-/// #     pub use aura_futures::Subscription;
+/// #     pub use taim_futures::Subscription;
 /// # }
-/// use aura::time::{self, Duration, Instant};
-/// use aura::Subscription;
+/// use taim::time::{self, Duration, Instant};
+/// use taim::Subscription;
 ///
 /// struct State {
 ///     timer_enabled: bool,
@@ -142,22 +142,22 @@ impl<T> Subscription<T> {
     /// # Creating an asynchronous worker with bidirectional communication
     /// You can leverage this helper to create a [`Subscription`] that spawns
     /// an asynchronous worker in the background and establish a channel of
-    /// communication with an `aura` application.
+    /// communication with an `taim` application.
     ///
     /// You can achieve this by creating an `mpsc` channel inside the closure
     /// and returning the `Sender` as a `Message` for the `Application`:
     ///
     /// ```
-    /// # mod aura {
-    /// #     pub use aura_futures::Subscription;   
-    /// #     pub use aura_futures::futures;
-    /// #     pub use aura_futures::stream;
+    /// # mod taim {
+    /// #     pub use taim_futures::Subscription;   
+    /// #     pub use taim_futures::futures;
+    /// #     pub use taim_futures::stream;
     /// # }
-    /// use aura::futures::channel::mpsc;
-    /// use aura::futures::sink::SinkExt;
-    /// use aura::futures::Stream;
-    /// use aura::stream;
-    /// use aura::Subscription;
+    /// use taim::futures::channel::mpsc;
+    /// use taim::futures::sink::SinkExt;
+    /// use taim::futures::Stream;
+    /// use taim::stream;
+    /// use taim::Subscription;
     ///
     /// pub enum Event {
     ///     Ready(mpsc::Sender<Input>),
@@ -179,7 +179,7 @@ impl<T> Subscription<T> {
     ///         output.send(Event::Ready(sender)).await;
     ///
     ///         loop {
-    ///             use aura_futures::futures::StreamExt;
+    ///             use taim_futures::futures::StreamExt;
     ///
     ///             // Read next input sent from `Application`
     ///             let input = receiver.select_next_some().await;
@@ -205,7 +205,7 @@ impl<T> Subscription<T> {
     /// Check out the [`websocket`] example, which showcases this pattern to maintain a `WebSocket`
     /// connection open.
     ///
-    /// [`websocket`]: https://github.com/theaimartco/vyom-aura/tree/master/examples/websocket
+    /// [`websocket`]: https://github.com/theaimartco/taim/tree/master/examples/websocket
     pub fn run<S>(builder: fn() -> S) -> Self
     where
         S: Stream<Item = T> + MaybeSend + 'static,

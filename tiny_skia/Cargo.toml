@@ -1,6 +1,6 @@
 [package]
-name = "aura_tiny_skia"
-description = "A software renderer for aura on top of tiny-skia"
+name = "taim_tiny_skia"
+description = "A software renderer for taim on top of tiny-skia"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -15,17 +15,17 @@ workspace = true
 
 [features]
 default = ["x11", "wayland"]
-image = ["aura_graphics/image"]
-svg = ["aura_graphics/svg", "resvg"]
+image = ["taim_graphics/image"]
+svg = ["taim_graphics/svg", "resvg"]
 svg-text = ["svg", "resvg/text", "resvg/system-fonts", "resvg/memmap-fonts"]
 svg-raster-images = ["svg", "resvg/raster-images"]
-geometry = ["aura_graphics/geometry"]
+geometry = ["taim_graphics/geometry"]
 x11 = ["softbuffer/x11", "softbuffer/x11-dlopen"]
 wayland = ["softbuffer/wayland", "softbuffer/wayland-dlopen"]
 
 [dependencies]
-aura_debug.workspace = true
-aura_graphics.workspace = true
+taim_debug.workspace = true
+taim_graphics.workspace = true
 
 bytemuck.workspace = true
 cosmic-text.workspace = true

@@ -246,6 +246,16 @@ pub trait Base {
     /// This name may be used to efficiently detect theme
     /// changes in some widgets.
     fn name(&self) -> &str;
+
+    /// Returns the [`SceneLight`](crate::material::SceneLight) every
+    /// material-shaded surface in the theme responds to.
+    ///
+    /// [`SceneLight::KEY`](crate::material::SceneLight::KEY) by default,
+    /// which is what the renderer already assumes when nothing overrides it
+    /// -- so a theme that never opts into materials changes nothing.
+    fn light(&self) -> crate::material::SceneLight {
+        crate::material::SceneLight::KEY
+    }
 }
 
 impl Base for Theme {
@@ -256,7 +266,7 @@ impl Base for Theme {
         static SYSTEM: OnceLock<Option<Theme>> = OnceLock::new();
 
         let system = SYSTEM.get_or_init(|| {
-            let name = env::var("AURA_THEME").ok()?;
+            let name = env::var("TAIM_THEME").ok()?;
 
             Theme::ALL
                 .iter()

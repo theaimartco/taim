@@ -1,4 +1,4 @@
-//! Retained layer cache for the Aura rendering pipeline.
+//! Retained layer cache for the Taim rendering pipeline.
 //!
 //! A retained layer captures the rendering output of a widget subtree
 //! that has not changed between frames. Instead of re-traversing the

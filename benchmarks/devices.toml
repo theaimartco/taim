@@ -1,7 +1,7 @@
 # Named reference hardware for benchmark reports.
 #
-# `aura_bench --device <name>` records the given name verbatim into the
-# report's `environment.device` field (see tools/aura_bench/src/report.rs).
+# `taim_bench --device <name>` records the given name verbatim into the
+# report's `environment.device` field (see tools/taim_bench/src/report.rs).
 # It does not read this file; the file exists so a device name in a report
 # can be looked up here for the hardware/display/OS/driver/power-mode
 # context phase.md requires ("store raw samples, median-of-runs summary,
@@ -36,7 +36,7 @@ Provenance note (2026-08-23): the baselines previously committed under
 this device name recorded `environment.os = "macos"`, which contradicts
 this entry and made every one of them unattributable (Capstone.md F-02).
 They were also captured from a dirty worktree (F-03). All 13 have been
-re-captured on this machine, from a clean tree, and `aura_bench --save`
+re-captured on this machine, from a clean tree, and `taim_bench --save`
 now refuses both failure modes.
 
 Known limitation: with the governor at `powersave`, the `text_heavy`

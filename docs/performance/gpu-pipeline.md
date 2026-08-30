@@ -35,8 +35,8 @@ themselves.
 
 Added `wgpu::metrics::Counters`: per-frame, per-frame-reset counters for
 `Primitive`, `Batch`, `Upload`, `AtlasMiss`, `PipelineSwitch`, and `Draw`,
-mirroring `aura_runtime::diagnostics::Counters`'s exact zero-cost-when-
-disabled contract (a new `profiling` feature on `aura_wgpu`, off by
+mirroring `taim_runtime::diagnostics::Counters`'s exact zero-cost-when-
+disabled contract (a new `profiling` feature on `taim_wgpu`, off by
 default). Wired into `Renderer::prepare` (per-primitive-kind
 `Primitive`/`Upload` increments) and `quad::State::render` (`Batch`/
 `PipelineSwitch`/`Draw`, once per contiguous same-kind run).

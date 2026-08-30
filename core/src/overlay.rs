@@ -45,7 +45,7 @@ where
     /// An overlay is not decoration: a dropdown, a menu, or a sheet is
     /// often the *only* thing the user can currently interact with. Before
     /// this method existed, every overlay was invisible to the semantic
-    /// tree -- `aura_runtime::semantics::build` walks widgets, and an
+    /// tree -- `taim_runtime::semantics::build` walks widgets, and an
     /// overlay is reached through [`crate::Widget::overlay`] rather than
     /// through the widget tree, so nothing ever asked it.
     ///

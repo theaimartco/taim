@@ -12,6 +12,7 @@ struct GradientVertexInput {
     @location(9) border_width: f32,
     @location(10) snap: u32,
     @location(11) material: vec4<f32>,
+    @location(15) transmission: f32,
 }
 
 struct GradientVertexOutput {
@@ -27,6 +28,7 @@ struct GradientVertexOutput {
     @location(9) border_radius: vec4<f32>,
     @location(10) border_width: f32,
     @location(11) @interpolate(flat) material: vec4<f32>,
+    @location(12) @interpolate(flat) transmission: f32,
 }
 
 @vertex
@@ -71,6 +73,7 @@ fn gradient_vs_main(input: GradientVertexInput) -> GradientVertexOutput {
     out.border_radius = border_radius * globals.scale;
     out.border_width = input.border_width * globals.scale;
     out.material = input.material;
+    out.transmission = input.transmission;
 
     return out;
 }
@@ -189,9 +192,35 @@ fn gradient_fs_main(input: GradientVertexOutput) -> @location(0) vec4<f32> {
 
     // Material shading, identical to the solid pipeline: `sdf_point` is scaled
     // by -2 relative to screen space, so its gradient is negated.
+    let sdf_gradient = -rounded_box_gradient(sdf_point, scale, input.border_radius * 2.0);
+
+    // Refraction, on the same terms as the solid pipeline. See
+    // `quad/solid.wgsl` for why the backdrop is premultiplied before mixing.
+    if input.transmission > 0.0 && has_backdrop() {
+        let behind = quad_transmission(
+            dist,
+            sdf_gradient,
+            input.material,
+            input.transmission,
+            input.position.xy
+        );
+
+        mixed_color = vec4<f32>(
+            blend_transmission(
+                mixed_color.rgb,
+                behind * mixed_color.a,
+                input.material,
+                input.transmission,
+                dist,
+                sdf_gradient
+            ),
+            mixed_color.a
+        );
+    }
+
     let highlight = quad_specular(
         dist,
-        -rounded_box_gradient(sdf_point, scale, input.border_radius * 2.0),
+        sdf_gradient,
         input.material,
         globals.light.xyz
     );

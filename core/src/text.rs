@@ -367,10 +367,10 @@ pub trait Renderer: crate::Renderer {
     /// [`ICON_FONT`]: Self::ICON_FONT
     const SCROLL_RIGHT_ICON: char;
 
-    /// The 'char' representing the aura logo in the built-in ['ICON_FONT'].
+    /// The 'char' representing the taim logo in the built-in ['ICON_FONT'].
     ///
     /// ['ICON_FONT']: Self::ICON_FONT
-    const AURA_LOGO: char;
+    const TAIM_LOGO: char;
 
     /// Returns the default [`Self::Font`].
     fn default_font(&self) -> Self::Font;

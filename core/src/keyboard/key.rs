@@ -37,7 +37,7 @@ impl Key {
     /// Returns `None` if no latin variant could be found.
     ///
     /// ```
-    /// use aura_core::keyboard::key::{Key, Named, Physical, Code};
+    /// use taim_core::keyboard::key::{Key, Named, Physical, Code};
     ///
     /// // Latin c
     /// assert_eq!(

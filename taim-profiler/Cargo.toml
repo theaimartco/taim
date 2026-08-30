@@ -1,0 +1,28 @@
+[package]
+name = "taim-profiler"
+description = "Low-overhead, privacy-preserving instrumentation for Taim"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# Turns instrumentation on. Off by default, and the whole point of the
+# split: with this off, `Collector::record` is a call that returns
+# immediately and every `Event` construction is behind a closure that is
+# never invoked, so a shipped build pays for an atomic load and nothing
+# else.
+profiling = []
+
+[dependencies]
+taim_core.workspace = true
+rustc-hash.workspace = true
+smol_str.workspace = true

@@ -1,6 +1,6 @@
 [package]
-name = "aura_widget"
-description = "The built-in widgets for aura"
+name = "taim_widget"
+description = "The built-in widgets for taim"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -18,29 +18,29 @@ rustdoc-args = ["--cfg", "docsrs"]
 all-features = true
 
 [features]
-# Makes `aura_design::Theme` a first-class aura theme: every widget with
-# an Aura counterpart resolves its style from Aura's semantic tokens
-# instead of aura's built-in palette. Off by default so an application
-# that only wants upstream aura does not pay for the design system.
-aura = ["dep:aura-design"]
+# Makes `taim_design::Theme` a first-class taim theme: every widget with
+# an Taim counterpart resolves its style from Taim's semantic tokens
+# instead of taim's built-in palette. Off by default so an application
+# that only wants upstream taim does not pay for the design system.
+taim = ["dep:taim-design"]
 lazy = ["ouroboros"]
-image = ["aura_renderer/image"]
-svg = ["aura_renderer/svg"]
-canvas = ["aura_renderer/geometry"]
+image = ["taim_renderer/image"]
+svg = ["taim_renderer/svg"]
+canvas = ["taim_renderer/geometry"]
 qr_code = ["canvas", "dep:qrcode"]
-wgpu = ["aura_renderer/wgpu-bare"]
+wgpu = ["taim_renderer/wgpu-bare"]
 markdown = ["dep:pulldown-cmark"]
 advanced = []
 # Enables syntax highlighting of fenced code blocks in the `markdown`
-# widget, and the `aura-highlighter` adapter for `text_editor`.
-highlighter = ["dep:aura-highlighter"]
+# widget, and the `taim-highlighter` adapter for `text_editor`.
+highlighter = ["dep:taim-highlighter"]
 
 [dependencies]
-aura-design = { workspace = true, optional = true }
-aura-highlighter = { workspace = true, optional = true }
-aura-motion.workspace = true
-aura_renderer.workspace = true
-aura_runtime.workspace = true
+taim-design = { workspace = true, optional = true }
+taim-highlighter = { workspace = true, optional = true }
+taim-motion.workspace = true
+taim_renderer.workspace = true
+taim_runtime.workspace = true
 
 num-traits.workspace = true
 log.workspace = true

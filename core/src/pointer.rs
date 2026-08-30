@@ -4,7 +4,7 @@
 //! Every existing input source in this crate (`mouse::Event`,
 //! `touch::Event`) already reports "something pressed/moved/released at
 //! a position," but each with its own vocabulary and no shared identity
-//! a gesture recognizer (`aura-gesture`) could track across the full
+//! a gesture recognizer (`taim-gesture`) could track across the full
 //! lifetime of one contact. [`Pointer`] gives every contact -- a mouse
 //! cursor, a finger, a stylus tip -- one stable [`Id`] for as long as it
 //! stays down, plus the metadata (pressure, tilt, contact size, button
@@ -14,7 +14,7 @@
 //! keep working exactly as before, and `core::event::Event` keeps
 //! carrying them unchanged. [`Pointer`] is a normalized *view* derived
 //! from them (see `core::touch`'s compatibility mapping), the common
-//! representation `aura-gesture`'s arena and recognizers are written
+//! representation `taim-gesture`'s arena and recognizers are written
 //! against so they do not need one code path per device kind.
 use crate::Point;
 use crate::time::Instant;
@@ -146,8 +146,8 @@ pub struct Pointer {
     pub position: Point,
 
     /// When this event occurred, for velocity estimation
-    /// (`aura-gesture::velocity`) and deadline-based recognizers (e.g.
-    /// `aura-gesture::long_press`).
+    /// (`taim-gesture::velocity`) and deadline-based recognizers (e.g.
+    /// `taim-gesture::long_press`).
     pub timestamp: Instant,
 
     /// Pressure/tilt/contact-size metadata, when available.

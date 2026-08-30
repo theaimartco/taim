@@ -6,7 +6,7 @@ use crate::pointer;
 /// present as a touch target.
 ///
 /// This constant is the single source of the policy for the whole
-/// workspace. `aura-design` re-exports it as `MIN_TOUCH_TARGET` and
+/// workspace. `taim-design` re-exports it as `MIN_TOUCH_TARGET` and
 /// widgets clamp to it directly, so there is exactly one number to
 /// change and no way for a widget to drift from the design contract.
 ///
@@ -93,7 +93,7 @@ impl Event {
     /// Converts this [`Event`] into a unified [`pointer::Pointer`]
     /// event, given the [`pointer::Instant`] it occurred at.
     ///
-    /// This is the compatibility mapping `aura-gesture` (and anything
+    /// This is the compatibility mapping `taim-gesture` (and anything
     /// else that wants one normalized pointer model instead of
     /// device-specific branches) is expected to use: a touch's
     /// [`Finger`] becomes a [`pointer::Id`] stable for that finger's

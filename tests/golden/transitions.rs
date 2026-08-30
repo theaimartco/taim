@@ -1,6 +1,6 @@
 //! Fixed-time motion oracles used in place of renderer-specific pixels.
 
-use aura_motion::{Easing, Timestamp, Transition};
+use taim_motion::{Easing, Timestamp, Transition};
 
 #[test]
 fn fixed_time_transition_has_the_same_pixels_at_every_refresh_rate() {

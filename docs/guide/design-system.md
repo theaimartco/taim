@@ -1,16 +1,16 @@
-# Vyom-Aura Design System
+# Vyom-Taim Design System
 
-The Vyom-Aura Design System is a comprehensive set of guidelines, tokens, and components that ensure visual consistency, accessibility, and exceptional user experience across all applications built with the framework.
+The Vyom-Taim Design System is a comprehensive set of guidelines, tokens, and components that ensure visual consistency, accessibility, and exceptional user experience across all applications built with the framework.
 
 ## 1. What is a Design System?
 
 A design system is more than just a UI kit; it is the single source of truth for the visual language of an application. It defines how colors, typography, spacing, and motion combine to create a cohesive and premium feel.
 
-In Vyom-Aura, the design system is codified into **Tokens**. Tokens are semantic representations of design decisions. Instead of hardcoding a hex color (e.g., `#FF0000`), you use a token (e.g., `ColorTokens::error`). This semantic abstraction allows the framework to seamlessly switch themes, adapt to user preferences, and guarantee accessibility contrast ratios.
+In Vyom-Taim, the design system is codified into **Tokens**. Tokens are semantic representations of design decisions. Instead of hardcoding a hex color (e.g., `#FF0000`), you use a token (e.g., `ColorTokens::error`). This semantic abstraction allows the framework to seamlessly switch themes, adapt to user preferences, and guarantee accessibility contrast ratios.
 
 ## 2. Color Tokens Deep Dive
 
-Vyom-Aura's color system is built on dynamic, semantic roles. The `ColorTokens` struct defines these roles.
+Vyom-Taim's color system is built on dynamic, semantic roles. The `ColorTokens` struct defines these roles.
 
 ### Roles
 - **Primary**: The main brand color, used for primary actions and prominent UI elements.
@@ -55,7 +55,7 @@ The `Typography` system defines a rigid scale of text styles, ensuring readabili
 - **Label**: For buttons, tooltips, and badges (usually medium/bold weight).
 
 ### Script-Aware Line Heights
-Vyom-Aura's typography engine is script-aware. Different languages and writing systems require different line heights to prevent clipping of ascenders/descenders (e.g., Thai, Arabic, or Devanagari).
+Vyom-Taim's typography engine is script-aware. Different languages and writing systems require different line heights to prevent clipping of ascenders/descenders (e.g., Thai, Arabic, or Devanagari).
 
 | Script Category | Base Line Height Multiplier | Adjustment |
 |-----------------|-----------------------------|------------|
@@ -98,7 +98,7 @@ Elevation conveys depth and hierarchy along the Z-axis using shadows.
 - `Modal`: Highest elevation, strong shadow + backdrop dimming (e.g., dialogs).
 
 ### ElevationRecipe and GPU Tier Adaptation
-Vyom-Aura uses an `ElevationRecipe` to define shadows. Crucially, the framework adapts to the hardware's GPU capabilities.
+Vyom-Taim uses an `ElevationRecipe` to define shadows. Crucially, the framework adapts to the hardware's GPU capabilities.
 - **High-End GPU**: Uses soft, physically-based blur shadows with ambient occlusion.
 - **Low-End GPU**: Falls back to simple drop shadows or even solid borders (in extreme cases) to maintain 60/120fps performance.
 
@@ -118,7 +118,7 @@ Motion adds life to the UI. `MotionTokens` define standard durations and easing 
 
 ## 8. Component Contracts
 
-Vyom-Aura includes over 18 core component contracts that adhere strictly to the design system. These include:
+Vyom-Taim includes over 18 core component contracts that adhere strictly to the design system. These include:
 
 1. **Button**: Primary, Secondary, Text, Outlined variants.
 2. **Card**: Surface container with elevation.
@@ -161,7 +161,7 @@ The design system enforces a minimum touch target size (usually 44x44 or 48x48 p
 Here is how you use the design tokens to build a custom component that stays perfectly in sync with the design system.
 
 ```rust
-use vyom_aura::prelude::*;
+use taim::prelude::*;
 
 pub fn custom_profile_card(name: &str, role: &str) -> impl Widget {
     // We access tokens implicitly through framework modifiers,
@@ -198,4 +198,4 @@ pub fn custom_profile_card(name: &str, role: &str) -> impl Widget {
         )
 }
 ```
-This comprehensive guide provides everything you need to understand and effectively utilize the Vyom-Aura Design System.
+This comprehensive guide provides everything you need to understand and effectively utilize the Vyom-Taim Design System.

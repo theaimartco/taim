@@ -145,7 +145,7 @@ where
     const SCROLL_DOWN_ICON: char = A::SCROLL_DOWN_ICON;
     const SCROLL_LEFT_ICON: char = A::SCROLL_LEFT_ICON;
     const SCROLL_RIGHT_ICON: char = A::SCROLL_RIGHT_ICON;
-    const AURA_LOGO: char = A::AURA_LOGO;
+    const TAIM_LOGO: char = A::TAIM_LOGO;
 
     fn default_font(&self) -> Self::Font {
         delegate!(self, renderer, renderer.default_font())
@@ -434,12 +434,12 @@ where
 }
 
 #[cfg(feature = "wgpu-bare")]
-impl<A, B> aura_wgpu::primitive::Renderer for Renderer<A, B>
+impl<A, B> taim_wgpu::primitive::Renderer for Renderer<A, B>
 where
-    A: aura_wgpu::primitive::Renderer,
+    A: taim_wgpu::primitive::Renderer,
     B: core::Renderer,
 {
-    fn draw_primitive(&mut self, bounds: Rectangle, primitive: impl aura_wgpu::Primitive) {
+    fn draw_primitive(&mut self, bounds: Rectangle, primitive: impl taim_wgpu::Primitive) {
         match self {
             Self::Primary(renderer) => {
                 renderer.draw_primitive(bounds, primitive);

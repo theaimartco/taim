@@ -84,7 +84,7 @@ pub struct Tree {
     /// That is precisely the guarantee `phase.md` Phase 13 requires --
     /// "semantic IDs remain stable across ordinary view reconstruction" --
     /// and it is why a widget can report semantics at all: an
-    /// [`aura_core::semantics::Node`] must carry an identity, and a
+    /// [`taim_core::semantics::Node`] must carry an identity, and a
     /// freshly-generated one per frame would make every node look new to
     /// an assistive technology on every repaint.
     ///
@@ -315,7 +315,7 @@ impl Tree {
     /// layout constraints the way its measured size does, so
     /// [`DirtyFlags::SEMANTICS`] alone determines reuse. A caller (or the
     /// container assembling a full semantic tree, see
-    /// `aura_runtime::semantics`) is responsible for calling
+    /// `taim_runtime::semantics`) is responsible for calling
     /// [`Tree::mark_dirty`] with [`DirtyFlags::SEMANTICS`] whenever
     /// something that would change this node's own reported semantics
     /// changes (its label, value, state, ...); [`Tree`] cannot detect
@@ -323,7 +323,7 @@ impl Tree {
     /// [`DirtyFlags::SEMANTICS`] already set.
     ///
     /// This method never recurses into children -- composing a full
-    /// subtree from per-node results is `aura_runtime::semantics`'s job,
+    /// subtree from per-node results is `taim_runtime::semantics`'s job,
     /// exactly as `hit_test`'s `Hoverable` adapter composes a path from
     /// per-node `contains` checks rather than `Tree` walking children
     /// itself.

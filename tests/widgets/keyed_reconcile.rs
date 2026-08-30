@@ -1,19 +1,19 @@
-//! Nested-identity reconciliation tests for `aura_widget::keyed::Column`.
+//! Nested-identity reconciliation tests for `taim_widget::keyed::Column`.
 //!
 //! `tests/widgets/identity.rs` (Phase 3, commit 1) already covers
 //! reorder/insert/remove/replace at the *top level* of a keyed column,
 //! using a flat `Marker` widget whose own state is a single counter.
 //! These tests instead put a **container** behind each key -- a small
 //! `row`-like wrapper holding its own nested `Marker` -- to confirm
-//! `aura_runtime::reconcile::reconcile` preserves state correctly one
+//! `taim_runtime::reconcile::reconcile` preserves state correctly one
 //! level deeper than the keyed slot itself, since a real application's
 //! keyed list rows are essentially never a single leaf widget.
 
-use aura::advanced::widget::{self, Widget};
-use aura::advanced::{Layout, mouse, renderer};
-use aura::widget::keyed::Column;
-use aura::{Element, Length, Point, Rectangle, Size, Theme};
-use aura_renderer::Renderer;
+use taim::advanced::widget::{self, Widget};
+use taim::advanced::{Layout, mouse, renderer};
+use taim::widget::keyed::Column;
+use taim::{Element, Length, Point, Rectangle, Size, Theme};
+use taim_renderer::Renderer;
 
 /// A single-child wrapper, so each keyed row has a nested `Tree` level
 /// (`tree.children[i].children[0]`) whose own state must survive
@@ -35,14 +35,14 @@ impl<Message> Widget<Message, Theme, Renderer> for Row<Message> {
         &mut self,
         tree: &mut widget::Tree,
         renderer: &Renderer,
-        limits: &aura::advanced::layout::Limits,
-    ) -> aura::advanced::layout::Node {
+        limits: &taim::advanced::layout::Limits,
+    ) -> taim::advanced::layout::Node {
         let child_node = self
             .child
             .as_widget_mut()
             .layout(&mut tree.children[0], renderer, limits);
 
-        aura::advanced::layout::Node::with_children(Size::new(20.0, 20.0), vec![child_node])
+        taim::advanced::layout::Node::with_children(Size::new(20.0, 20.0), vec![child_node])
     }
 
     fn draw(
@@ -75,9 +75,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Marker {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &aura::advanced::layout::Limits,
-    ) -> aura::advanced::layout::Node {
-        aura::advanced::layout::Node::new(Size::new(20.0, 20.0))
+        _limits: &taim::advanced::layout::Limits,
+    ) -> taim::advanced::layout::Node {
+        taim::advanced::layout::Node::new(Size::new(20.0, 20.0))
     }
 
     fn tag(&self) -> widget::tree::Tag {
@@ -192,9 +192,9 @@ fn replacing_every_key_gives_every_row_fresh_nested_state() {
 
 #[test]
 fn a_keyed_columns_layout_still_succeeds_with_nested_rows() {
-    let renderer = aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    let renderer = taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -206,7 +206,7 @@ fn a_keyed_columns_layout_still_succeeds_with_nested_rows() {
     let mut tree = widget::Tree::new(&column as &dyn Widget<(), Theme, Renderer>);
     tree.diff(&mut column as &mut dyn Widget<(), Theme, Renderer>);
 
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
     let node = Widget::<(), Theme, Renderer>::layout(&mut column, &mut tree, &renderer, &limits);
 
     assert_eq!(node.children().len(), 3);

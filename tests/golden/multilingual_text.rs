@@ -12,8 +12,8 @@
 //! visual approval; `assets/fonts/test/README.md` records that gap. What
 //! is pinned here is the identity contract those pixels would depend on.)
 
-use aura_core::text::paragraph::{Direction, ShapingKey};
-use aura_core::text::{FallbackChain, Script};
+use taim_core::text::paragraph::{Direction, ShapingKey};
+use taim_core::text::{FallbackChain, Script};
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;

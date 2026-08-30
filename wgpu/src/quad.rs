@@ -50,9 +50,18 @@ pub struct Quad {
     /// `(roughness, thickness_mm, ior, dispersion)`.
     ///
     /// Packed rather than a struct because this is an instance attribute and
-    /// a `vec4<f32>` is one vertex location; `transmission` is absent because
-    /// nothing samples a backdrop yet.
+    /// a `vec4<f32>` is one vertex location. `transmission` is a fifth
+    /// scalar rather than a member here for the same reason: a `vec4` is one
+    /// location, and a fifth component would need a second.
     pub material: [f32; 4],
+
+    /// How much light the quad transmits, `0.0..=1.0`.
+    ///
+    /// `0.0` -- every quad that has not asked for a material -- is opaque
+    /// and never samples a backdrop. Above zero the fragment stage refracts
+    /// what is behind the quad through it, which is the part a blurred
+    /// rectangle cannot do.
+    pub transmission: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -60,6 +69,16 @@ pub struct Pipeline {
     solid: solid::Pipeline,
     gradient: gradient::Pipeline,
     constant_layout: wgpu::BindGroupLayout,
+    backdrop_layout: wgpu::BindGroupLayout,
+    backdrop_sampler: wgpu::Sampler,
+    /// Bound at group 1 by every quad draw that does *not* transmit.
+    ///
+    /// A pipeline's bind-group layout set is fixed when it is created, so a
+    /// transmissive quad and an opaque one share it and something has to
+    /// occupy the slot either way. This is a 1x1 transparent texture that no
+    /// opaque fragment ever samples -- the shader's `transmission <= 0.0`
+    /// early-out returns before any texture read.
+    empty_backdrop: wgpu::BindGroup,
 }
 
 #[derive(Default)]
@@ -95,17 +114,25 @@ impl State {
         self.prepare_layer += 1;
     }
 
+    /// Draws `quads`, sampling `backdrop` for any that transmit.
+    ///
+    /// `backdrop` is `None` when nothing in this batch transmits, which is
+    /// nearly every batch; the pipeline's own empty texture fills the slot,
+    /// and no fragment ever samples it.
     pub fn render<'a>(
         &'a self,
         pipeline: &'a Pipeline,
         layer: usize,
         bounds: Rectangle<u32>,
         quads: &Batch,
+        backdrop: Option<&'a wgpu::BindGroup>,
         render_pass: &mut wgpu::RenderPass<'a>,
         metrics: &crate::metrics::Counters,
     ) {
         if let Some(layer) = self.layers.get(layer) {
             render_pass.set_scissor_rect(bounds.x, bounds.y, bounds.width, bounds.height);
+
+            let backdrop = backdrop.unwrap_or(&pipeline.empty_backdrop);
 
             let mut solid_offset = 0;
             let mut gradient_offset = 0;
@@ -125,6 +152,7 @@ impl State {
                         pipeline.solid.render(
                             render_pass,
                             &layer.constants,
+                            backdrop,
                             &layer.solid,
                             solid_offset..(solid_offset + count),
                         );
@@ -135,6 +163,7 @@ impl State {
                         pipeline.gradient.render(
                             render_pass,
                             &layer.constants,
+                            backdrop,
                             &layer.gradient,
                             gradient_offset..(gradient_offset + count),
                         );
@@ -154,7 +183,7 @@ impl State {
 impl Pipeline {
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Pipeline {
         let constant_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("aura_wgpu::quad uniforms layout"),
+            label: Some("taim_wgpu::quad uniforms layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 // The fragment stage reads the scene light from here, so this
@@ -171,11 +200,111 @@ impl Pipeline {
             }],
         });
 
+        // Group 1: what is behind a transmissive quad. This takes the last
+        // slot at the `max_bind_groups: 2` limit this crate requests of every
+        // adapter (see `Engine::new` and `window::compositor`), so a further
+        // quad-pipeline resource would mean raising that limit -- which costs
+        // portability on weaker adapters.
+        let backdrop_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("taim_wgpu::quad backdrop layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let backdrop_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("taim_wgpu::quad backdrop sampler"),
+            // Clamped, so a refraction offset that reaches past the frame
+            // edge repeats the edge pixel rather than wrapping the opposite
+            // side of the screen into the glass.
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..wgpu::SamplerDescriptor::default()
+        });
+
+        let empty_backdrop = {
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("taim_wgpu::quad empty backdrop"),
+                size: wgpu::Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            });
+
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("taim_wgpu::quad empty backdrop bind group"),
+                layout: &backdrop_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(
+                            &texture.create_view(&wgpu::TextureViewDescriptor::default()),
+                        ),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&backdrop_sampler),
+                    },
+                ],
+            })
+        };
+
         Self {
-            solid: solid::Pipeline::new(device, format, &constant_layout),
-            gradient: gradient::Pipeline::new(device, format, &constant_layout),
+            solid: solid::Pipeline::new(device, format, &constant_layout, &backdrop_layout),
+            gradient: gradient::Pipeline::new(device, format, &constant_layout, &backdrop_layout),
             constant_layout,
+            backdrop_layout,
+            backdrop_sampler,
+            empty_backdrop,
         }
+    }
+
+    /// Builds a bind group for `view`, to be bound at group 1 by quads that
+    /// transmit.
+    pub fn backdrop_bind_group(
+        &self,
+        device: &wgpu::Device,
+        view: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("taim_wgpu::quad backdrop bind group"),
+            layout: &self.backdrop_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.backdrop_sampler),
+                },
+            ],
+        })
     }
 }
 
@@ -190,14 +319,14 @@ pub struct Layer {
 impl Layer {
     pub fn new(device: &wgpu::Device, constant_layout: &wgpu::BindGroupLayout) -> Self {
         let constants_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("aura_wgpu::quad uniforms buffer"),
+            label: Some("taim_wgpu::quad uniforms buffer"),
             size: mem::size_of::<Uniforms>() as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
         let constants = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("aura_wgpu::quad uniforms bind group"),
+            label: Some("taim_wgpu::quad uniforms bind group"),
             layout: constant_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
@@ -278,10 +407,25 @@ impl Batch {
         self.solids.is_empty() && self.gradients.is_empty()
     }
 
+    /// Returns whether any quad in this batch transmits, and therefore needs
+    /// what is behind it captured before it draws.
+    ///
+    /// A backdrop capture costs a full-frame copy, so a batch of ordinary
+    /// opaque quads -- which is nearly every batch -- must never trigger one.
+    pub fn needs_backdrop(&self) -> bool {
+        self.solids
+            .iter()
+            .any(|solid| solid.quad.transmission > 0.0)
+            || self
+                .gradients
+                .iter()
+                .any(|gradient| gradient.quad.transmission > 0.0)
+    }
+
     /// Adds a [`Quad`] with the provided `Background` type to the quad [`Layer`].
     ///
     /// `luminance` scales the light the fill emits; see
-    /// [`aura_core::renderer::Quad::luminance`]. Gradients are not scaled:
+    /// [`taim_core::renderer::Quad::luminance`]. Gradients are not scaled:
     /// their stops are packed into a shared representation whose components
     /// are read by the gradient shader, and brightening one is a change to
     /// that shader rather than to this call.
@@ -439,6 +583,7 @@ mod batching_tests {
             shadow_blur_radius: 0.0,
             snap: 0,
             material: [1.0, 0.0, 1.0, 0.0],
+            transmission: 0.0,
         }
     }
 

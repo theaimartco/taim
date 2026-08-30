@@ -127,8 +127,8 @@ the only way in.
 | "cache keys include every shaping-affecting input" | **Met** | `tests/golden/multilingual_text.rs`: every input discriminates; order and re-setting do not; the whole corpus × every scale is pairwise distinct. |
 | "no reshaping for unchanged text" | **Met at the key level** | Identical inputs produce an identical key and hash. Whether the *cache* then serves the hit is `graphics::text::cache`'s own tested concern. |
 | "corpus and editing tests pass" | **Met** | The full mandatory matrix (English, Devanagari, Gurmukhi, Arabic, Bengali, Tamil, emoji ZWJ, combining marks, mixed BiDi) with deterministic fallbacks and safe break offsets. |
-| Screenshot / profiler exclusion | **Not enforced here** | `Purpose::Secure` exists and is distinct, and the widget sets it. But **no backend consumes it**: nothing in `aura_winit`/`aura_wgpu` maps it onto `FLAG_SECURE` or a compositor policy. A screenshot today would capture a password field. This is the one channel of the six that is a signal without a consumer. |
-| "text-heavy P95 improves ... with significantly fewer repeated shapes/uploads" | **Not measured** | `tools/aura_bench/src/scenes/text_edit.rs` exists, but no before/after P95 or shape/upload counts were recorded this phase. |
+| Screenshot / profiler exclusion | **Not enforced here** | `Purpose::Secure` exists and is distinct, and the widget sets it. But **no backend consumes it**: nothing in `taim_winit`/`taim_wgpu` maps it onto `FLAG_SECURE` or a compositor policy. A screenshot today would capture a password field. This is the one channel of the six that is a signal without a consumer. |
+| "text-heavy P95 improves ... with significantly fewer repeated shapes/uploads" | **Not measured** | `tools/taim_bench/src/scenes/text_edit.rs` exists, but no before/after P95 or shape/upload counts were recorded this phase. |
 | Password reveal "timed/policy-controlled" | **Partially met** | Reveal is *explicit* (masked and revealed values are observably different; there is no ambient path to the content) and testable. There is no built-in **timed** auto-remask or policy hook — an application that adds a reveal toggle must implement the timeout itself. |
 
 ## Follow-ups carried forward
@@ -142,4 +142,4 @@ the only way in.
 3. Real multilingual pixel goldens, which need the licensed reference
    font `assets/fonts/test/README.md` describes and human visual approval.
 4. Text-heavy P95 and repeated-shape/upload measurement through
-   `aura_bench`'s `text_edit` scene.
+   `taim_bench`'s `text_edit` scene.

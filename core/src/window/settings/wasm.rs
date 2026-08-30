@@ -8,14 +8,14 @@ pub struct PlatformSpecific {
     ///
     /// If set to `None`, the application will be appended to the HTML body.
     ///
-    /// By default, it is set to `"aura"`.
+    /// By default, it is set to `"taim"`.
     pub target: Option<String>,
 }
 
 impl Default for PlatformSpecific {
     fn default() -> Self {
         Self {
-            target: Some(String::from("aura")),
+            target: Some(String::from("taim")),
         }
     }
 }

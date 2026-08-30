@@ -2,9 +2,9 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-//! use aura::widget::{column, skeleton};
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+//! use taim::widget::{column, skeleton};
 //!
 //! # enum Message {}
 //! fn view() -> Element<'static, Message> {
@@ -19,7 +19,7 @@
 //!
 //! # A skeleton says "loading", not nothing
 //!
-//! The widget reports [`State::BUSY`](aura_core::semantics::State::BUSY)
+//! The widget reports [`State::BUSY`](taim_core::semantics::State::BUSY)
 //! with an accessible name, so a screen reader announces that content is
 //! on its way. A placeholder that is only a grey rectangle tells a
 //! sighted user something is happening and tells everyone else nothing.
@@ -27,7 +27,7 @@
 //! # The shimmer respects reduced motion
 //!
 //! The sweep is driven by
-//! [`MotionPolicy`](aura_motion::reduced_motion::MotionPolicy). Under a
+//! [`MotionPolicy`](taim_motion::reduced_motion::MotionPolicy). Under a
 //! reduced-motion preference the skeleton holds a steady fill instead of
 //! animating: a looping animation is exactly the kind of movement that
 //! preference exists to stop, and a skeleton can loop for a long time.
@@ -93,7 +93,7 @@ where
     height: Length,
     radius: f32,
     animated: bool,
-    motion_policy: aura_motion::MotionPolicy,
+    motion_policy: taim_motion::MotionPolicy,
     label: String,
     class: Theme::Class<'a>,
 }
@@ -109,7 +109,7 @@ where
             height: Length::Fixed(16.0),
             radius: 4.0,
             animated: true,
-            motion_policy: aura_motion::MotionPolicy::Full,
+            motion_policy: taim_motion::MotionPolicy::Full,
             label: "Loading".to_owned(),
             class: Theme::default(),
         }
@@ -162,13 +162,13 @@ where
 
     /// Sets the motion policy this placeholder honours.
     ///
-    /// Defaults to [`MotionPolicy::Full`]. `aura-motion` does not read
+    /// Defaults to [`MotionPolicy::Full`]. `taim-motion` does not read
     /// the platform preference itself -- there is no
     /// `MotionPolicy::from_environment` -- so an application that has
     /// resolved the user's setting passes it in here. Reading it in the
     /// widget would mean every widget guessing separately at something
     /// the platform layer already knows.
-    pub fn motion_policy(mut self, policy: aura_motion::MotionPolicy) -> Self {
+    pub fn motion_policy(mut self, policy: taim_motion::MotionPolicy) -> Self {
         self.motion_policy = policy;
         self
     }
@@ -181,7 +181,7 @@ where
     /// nothing meaningful to fade between. It holds a steady fill
     /// instead.
     fn is_animated(&self) -> bool {
-        use aura_motion::reduced_motion::Effect;
+        use taim_motion::reduced_motion::Effect;
 
         self.animated && self.motion_policy.effect(Effect::Transform) == Effect::Transform
     }
@@ -376,7 +376,7 @@ impl Catalog for Theme {
     }
 }
 
-/// The default styling of a [`Skeleton`] for aura's own theme.
+/// The default styling of a [`Skeleton`] for taim's own theme.
 pub fn default(theme: &Theme) -> Style {
     let palette = theme.palette();
 

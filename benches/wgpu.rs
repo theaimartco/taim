@@ -1,19 +1,19 @@
 #![allow(missing_docs)]
 use criterion::{Bencher, Criterion, criterion_group, criterion_main};
 
-use aura::alignment;
-use aura::mouse;
-use aura::widget::{canvas, scrollable, stack, text};
-use aura::{Color, Element, Font, Length, Pixels, Point, Rectangle, Size, Theme};
-use aura_wgpu::Renderer;
-use aura_wgpu::wgpu;
+use taim::alignment;
+use taim::mouse;
+use taim::widget::{canvas, scrollable, stack, text};
+use taim::{Color, Element, Font, Length, Pixels, Point, Rectangle, Size, Theme};
+use taim_wgpu::Renderer;
+use taim_wgpu::wgpu;
 
 criterion_main!(benches);
 criterion_group!(benches, wgpu_benchmark);
 
 pub fn wgpu_benchmark(c: &mut Criterion) {
-    use aura_futures::futures::executor;
-    use aura_wgpu::wgpu;
+    use taim_futures::futures::executor;
+    use taim_wgpu::wgpu;
 
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::all(),
@@ -73,16 +73,16 @@ fn benchmark<'a>(
     queue: &wgpu::Queue,
     view: impl Fn(usize) -> Element<'a, (), Theme, Renderer>,
 ) {
-    use aura_wgpu::graphics;
-    use aura_wgpu::graphics::{Antialiasing, Shell};
-    use aura_wgpu::wgpu;
-    use aura_winit::core;
-    use aura_winit::core::renderer;
-    use aura_winit::runtime;
+    use taim_wgpu::graphics;
+    use taim_wgpu::graphics::{Antialiasing, Shell};
+    use taim_wgpu::wgpu;
+    use taim_winit::core;
+    use taim_winit::core::renderer;
+    use taim_winit::runtime;
 
     let format = wgpu::TextureFormat::Bgra8UnormSrgb;
 
-    let engine = aura_wgpu::Engine::new(
+    let engine = taim_wgpu::Engine::new(
         adapter,
         device.clone(),
         queue.clone(),

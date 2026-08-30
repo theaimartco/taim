@@ -7,11 +7,11 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
 //! #
-//! use aura::widget::markdown;
-//! use aura::Theme;
+//! use taim::widget::markdown;
+//! use taim::Theme;
 //!
 //! struct State {
 //!    markdown: Vec<markdown::Item>,
@@ -383,11 +383,11 @@ impl Bullet {
 ///
 /// # Example
 /// ```no_run
-/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+/// # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
 /// #
-/// use aura::widget::markdown;
-/// use aura::Theme;
+/// use taim::widget::markdown;
+/// use taim::Theme;
 ///
 /// struct State {
 ///    markdown: Vec<markdown::Item>,
@@ -437,7 +437,7 @@ struct State {
 struct Highlighter {
     lines: Vec<(String, Vec<Span>)>,
     language: String,
-    parser: aura_highlighter::Stream,
+    parser: taim_highlighter::Stream,
     current: usize,
 }
 
@@ -446,8 +446,8 @@ impl Highlighter {
     pub fn new(language: &str) -> Self {
         Self {
             lines: Vec::new(),
-            parser: aura_highlighter::Stream::new(&aura_highlighter::Settings {
-                theme: aura_highlighter::Theme::Dark,
+            parser: taim_highlighter::Stream::new(&taim_highlighter::Settings {
+                theme: taim_highlighter::Theme::Dark,
                 token: language.to_owned(),
             }),
             language: language.to_owned(),
@@ -1117,11 +1117,11 @@ impl From<Theme> for Style {
 ///
 /// # Example
 /// ```no_run
-/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+/// # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
 /// #
-/// use aura::widget::markdown;
-/// use aura::Theme;
+/// use taim::widget::markdown;
+/// use taim::Theme;
 ///
 /// struct State {
 ///    markdown: Vec<markdown::Item>,

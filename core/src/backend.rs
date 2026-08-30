@@ -4,7 +4,7 @@ use std::fmt;
 
 /// A graphical backend.
 ///
-/// You can override the default strategy by setting the `AURA_BACKEND` environment variable.
+/// You can override the default strategy by setting the `TAIM_BACKEND` environment variable.
 /// If you are using the default renderer, the available options are:
 ///   - `wgpu` for the hardware accelerated backend.
 ///   - `tiny-skia` for the software-based backend.
@@ -99,7 +99,7 @@ pub enum Api {
 
 impl Default for Backend {
     fn default() -> Self {
-        let Ok(backend) = env::var("AURA_BACKEND") else {
+        let Ok(backend) = env::var("TAIM_BACKEND") else {
             return Self::Best;
         };
 

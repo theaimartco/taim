@@ -1,8 +1,8 @@
-//! A windowing shell for Aura, on top of [`winit`].
+//! A windowing shell for Taim, on top of [`winit`].
 //!
-//! ![The native path of the Aura ecosystem](https://github.com/theaimartco/vyom-aura/blob/main/docs/graphs/native.png?raw=true)
+//! ![The native path of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/native.png?raw=true)
 //!
-//! `aura_winit` offers some convenient abstractions on top of [`aura_runtime`]
+//! `taim_winit` offers some convenient abstractions on top of [`taim_runtime`]
 //! to quickstart development when using [`winit`].
 //!
 //! It exposes a renderer-agnostic [`Program`] trait that can be implemented
@@ -11,16 +11,16 @@
 //! Additionally, a [`conversion`] module is available for users that decide to
 //! implement a custom event loop.
 //!
-//! [`aura_runtime`]: https://github.com/theaimartco/vyom-aura/tree/master/runtime
+//! [`taim_runtime`]: https://github.com/theaimartco/taim/tree/master/runtime
 //! [`winit`]: https://github.com/rust-windowing/winit
 //! [`conversion`]: crate::conversion
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-pub use aura_debug as debug;
-pub use aura_program as program;
-pub use aura_runtime as runtime;
+pub use taim_debug as debug;
+pub use taim_program as program;
+pub use taim_runtime as runtime;
 pub use program::core;
 pub use program::graphics;
 pub use runtime::futures;
@@ -658,6 +658,13 @@ async fn run_instance<P>(
                 #[cfg(feature = "hinting")]
                 window.renderer.hint(window.state.scale_factor());
 
+                // One light for every surface in the window, owned by the
+                // theme rather than by a widget. Ungated: a material
+                // responds to it whether or not metrics are hinted.
+                window
+                    .renderer
+                    .set_light(theme::Base::light(window.state.theme()));
+
                 let mut ui = build_user_interface(
                     &program,
                     user_interface::Cache::default(),
@@ -1186,7 +1193,7 @@ async fn run_instance<P>(
                                         });
 
                                 let _ = interface.route_pointer(event, cursor, now, || {
-                                    path.map(|p| (p, aura_gesture::arena::Arena::new()))
+                                    path.map(|p| (p, taim_gesture::arena::Arena::new()))
                                 });
                             }
 
@@ -1934,6 +1941,13 @@ where
 
         #[cfg(feature = "hinting")]
         window.renderer.hint(window.state.scale_factor());
+
+        // `synchronize` above re-reads the theme, so this is where a theme
+        // change reaches the renderer. Without it a scheme switch would
+        // move every colour and leave the light where it was.
+        window
+            .renderer
+            .set_light(theme::Base::light(window.state.theme()));
     }
 
     debug::theme_changed(|| {

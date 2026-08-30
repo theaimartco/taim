@@ -1,12 +1,12 @@
-//! Stable schema and missing-metric failure tests for `aura_bench`'s
+//! Stable schema and missing-metric failure tests for `taim_bench`'s
 //! JSON report format.
 //!
-//! This test drives the actual `aura_bench` binary and parses its real
-//! JSON output (rather than unit-testing `aura_bench`'s internal `Report`
+//! This test drives the actual `taim_bench` binary and parses its real
+//! JSON output (rather than unit-testing `taim_bench`'s internal `Report`
 //! type directly), because the contract phase.md asks for here --
 //! "JSON report is schema-tested" -- is about what a consumer of the
-//! report file sees, which is exactly this stdout stream. `aura_bench`
-//! is a bin-only crate (see `tools/aura_bench/Cargo.toml`), so its types
+//! report file sees, which is exactly this stdout stream. `taim_bench`
+//! is a bin-only crate (see `tools/taim_bench/Cargo.toml`), so its types
 //! are not otherwise reachable from an integration test in this
 //! directory.
 
@@ -14,7 +14,7 @@ use std::process::Command;
 
 /// Required top-level fields the report schema must always produce.
 /// Extend this list (never shrink it without a `schema_version` bump)
-/// when `tools/aura_bench/src/report.rs` gains a new required field.
+/// when `tools/taim_bench/src/report.rs` gains a new required field.
 const REQUIRED_TOP_LEVEL_FIELDS: &[&str] = &[
     "schema_version",
     "scene",
@@ -51,27 +51,27 @@ const REQUIRED_FRAME_TIME_FIELDS: &[&str] = &[
     "present_p95",
 ];
 
-fn run_aura_bench(args: &[&str]) -> serde_json::Value {
+fn run_taim_bench(args: &[&str]) -> serde_json::Value {
     let output = Command::new(env!("CARGO"))
-        .args(["run", "--quiet", "--package", "aura_bench", "--"])
+        .args(["run", "--quiet", "--package", "taim_bench", "--"])
         .args(args)
         .output()
-        .expect("failed to run aura_bench");
+        .expect("failed to run taim_bench");
 
     assert!(
         output.status.success(),
-        "aura_bench exited with {}: {}",
+        "taim_bench exited with {}: {}",
         output.status,
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let stdout = String::from_utf8(output.stdout).expect("aura_bench stdout was not valid UTF-8");
+    let stdout = String::from_utf8(output.stdout).expect("taim_bench stdout was not valid UTF-8");
 
     let json_start = stdout
         .find('{')
-        .expect("aura_bench stdout did not contain a JSON report");
+        .expect("taim_bench stdout did not contain a JSON report");
 
-    serde_json::from_str(&stdout[json_start..]).expect("aura_bench stdout was not valid JSON")
+    serde_json::from_str(&stdout[json_start..]).expect("taim_bench stdout was not valid JSON")
 }
 
 fn assert_has_fields(value: &serde_json::Value, fields: &[&str], context: &str) {
@@ -89,7 +89,7 @@ fn assert_has_fields(value: &serde_json::Value, fields: &[&str], context: &str) 
 
 #[test]
 fn report_has_every_required_top_level_field() {
-    let report = run_aura_bench(&[
+    let report = run_taim_bench(&[
         "--scene",
         "idle_shell",
         "--warm-up-secs",
@@ -107,7 +107,7 @@ fn report_has_every_required_top_level_field() {
 
 #[test]
 fn report_environment_has_every_required_field() {
-    let report = run_aura_bench(&[
+    let report = run_taim_bench(&[
         "--scene",
         "idle_shell",
         "--warm-up-secs",
@@ -134,7 +134,7 @@ fn report_environment_has_every_required_field() {
 
 #[test]
 fn report_has_the_configured_number_of_runs_each_with_every_required_field() {
-    let report = run_aura_bench(&[
+    let report = run_taim_bench(&[
         "--scene",
         "idle_shell",
         "--warm-up-secs",
@@ -168,24 +168,24 @@ fn report_has_the_configured_number_of_runs_each_with_every_required_field() {
 #[test]
 fn refusing_fewer_than_five_runs_is_enforced_by_the_binary() {
     let output = Command::new(env!("CARGO"))
-        .args(["run", "--quiet", "--package", "aura_bench", "--"])
+        .args(["run", "--quiet", "--package", "taim_bench", "--"])
         .args(["--scene", "idle_shell", "--runs", "1"])
         .output()
-        .expect("failed to run aura_bench");
+        .expect("failed to run taim_bench");
 
     assert!(
         !output.status.success(),
-        "aura_bench should reject --runs below phase.md's 5-run minimum"
+        "taim_bench should reject --runs below phase.md's 5-run minimum"
     );
 }
 
 #[test]
 fn unknown_scene_name_fails_cleanly_rather_than_panicking() {
     let output = Command::new(env!("CARGO"))
-        .args(["run", "--quiet", "--package", "aura_bench", "--"])
+        .args(["run", "--quiet", "--package", "taim_bench", "--"])
         .args(["--scene", "does_not_exist"])
         .output()
-        .expect("failed to run aura_bench");
+        .expect("failed to run taim_bench");
 
     assert!(!output.status.success());
 
@@ -199,16 +199,16 @@ fn unknown_scene_name_fails_cleanly_rather_than_panicking() {
 #[test]
 fn every_registered_scene_produces_a_schema_valid_report() {
     let list_output = Command::new(env!("CARGO"))
-        .args(["run", "--quiet", "--package", "aura_bench", "--", "--list"])
+        .args(["run", "--quiet", "--package", "taim_bench", "--", "--list"])
         .output()
-        .expect("failed to list aura_bench scenes");
+        .expect("failed to list taim_bench scenes");
 
     assert!(list_output.status.success());
 
     let scenes = String::from_utf8(list_output.stdout).expect("scene list was not valid UTF-8");
 
     for scene in scenes.lines().filter(|line| !line.is_empty()) {
-        let report = run_aura_bench(&["--scene", scene, "--warm-up-secs", "0", "--runs", "5"]);
+        let report = run_taim_bench(&["--scene", scene, "--warm-up-secs", "0", "--runs", "5"]);
 
         assert_has_fields(
             &report,

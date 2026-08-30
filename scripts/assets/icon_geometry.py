@@ -1,4 +1,4 @@
-"""Geometry for Aura's icon set, on a 24x24 grid in SVG coordinates (y down).
+"""Geometry for Taim's icon set, on a 24x24 grid in SVG coordinates (y down).
 
 Each icon is a list of contours; each contour is a list of segments:
     ("L", x, y)                -- line to

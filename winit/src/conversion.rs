@@ -1,7 +1,7 @@
-//! Convert [`winit`] types into [`aura_runtime`] types, and viceversa.
+//! Convert [`winit`] types into [`taim_runtime`] types, and viceversa.
 //!
 //! [`winit`]: https://github.com/rust-windowing/winit
-//! [`aura_runtime`]: https://github.com/theaimartco/vyom-aura/tree/master/runtime
+//! [`taim_runtime`]: https://github.com/theaimartco/taim/tree/master/runtime
 use crate::core::input_method;
 use crate::core::keyboard;
 use crate::core::mouse;
@@ -145,7 +145,7 @@ pub fn window_attributes(
     attributes
 }
 
-/// Converts a winit window event into an aura event.
+/// Converts a winit window event into an taim event.
 pub fn window_event(
     event: winit::event::WindowEvent,
     scale_factor: f32,
@@ -479,10 +479,10 @@ pub fn mouse_interaction(interaction: mouse::Interaction) -> Option<winit::windo
     Some(icon)
 }
 
-/// Converts a `MouseButton` from [`winit`] to an [`aura`] mouse button.
+/// Converts a `MouseButton` from [`winit`] to an [`taim`] mouse button.
 ///
 /// [`winit`]: https://github.com/rust-windowing/winit
-/// [`aura`]: https://github.com/theaimartco/vyom-aura/tree/0.12
+/// [`taim`]: https://github.com/theaimartco/taim/tree/0.12
 pub fn mouse_button(mouse_button: winit::event::MouseButton) -> mouse::Button {
     match mouse_button {
         winit::event::MouseButton::Left => mouse::Button::Left,
@@ -494,11 +494,11 @@ pub fn mouse_button(mouse_button: winit::event::MouseButton) -> mouse::Button {
     }
 }
 
-/// Converts some `ModifiersState` from [`winit`] to an [`aura`] modifiers
+/// Converts some `ModifiersState` from [`winit`] to an [`taim`] modifiers
 /// state.
 ///
 /// [`winit`]: https://github.com/rust-windowing/winit
-/// [`aura`]: https://github.com/theaimartco/vyom-aura/tree/0.12
+/// [`taim`]: https://github.com/theaimartco/taim/tree/0.12
 pub fn modifiers(modifiers: winit::keyboard::ModifiersState) -> keyboard::Modifiers {
     let mut result = keyboard::Modifiers::empty();
 
@@ -517,10 +517,10 @@ pub fn cursor_position(position: winit::dpi::PhysicalPosition<f64>, scale_factor
     Point::new(logical_position.x, logical_position.y)
 }
 
-/// Converts a `Touch` from [`winit`] to an [`aura`] touch event.
+/// Converts a `Touch` from [`winit`] to an [`taim`] touch event.
 ///
 /// [`winit`]: https://github.com/rust-windowing/winit
-/// [`aura`]: https://github.com/theaimartco/vyom-aura/tree/0.12
+/// [`taim`]: https://github.com/theaimartco/taim/tree/0.12
 pub fn touch_event(touch: winit::event::Touch, scale_factor: f32) -> touch::Event {
     let id = touch::Finger(touch.id);
     let position = {
@@ -559,10 +559,10 @@ pub fn touch_event(touch: winit::event::Touch, scale_factor: f32) -> touch::Even
     }
 }
 
-/// Converts a `Key` from [`winit`] to an [`aura`] key.
+/// Converts a `Key` from [`winit`] to an [`taim`] key.
 ///
 /// [`winit`]: https://github.com/rust-windowing/winit
-/// [`aura`]: https://github.com/theaimartco/vyom-aura/tree/0.12
+/// [`taim`]: https://github.com/theaimartco/taim/tree/0.12
 pub fn key(key: winit::keyboard::Key) -> keyboard::Key {
     use keyboard::key::Named;
     use winit::keyboard::NamedKey;
@@ -882,10 +882,10 @@ pub fn key(key: winit::keyboard::Key) -> keyboard::Key {
     }
 }
 
-/// Converts a `PhysicalKey` from [`winit`] to an [`aura`] physical key.
+/// Converts a `PhysicalKey` from [`winit`] to an [`taim`] physical key.
 ///
 /// [`winit`]: https://github.com/rust-windowing/winit
-/// [`aura`]: https://github.com/theaimartco/vyom-aura/tree/0.12
+/// [`taim`]: https://github.com/theaimartco/taim/tree/0.12
 pub fn physical_key(physical_key: winit::keyboard::PhysicalKey) -> keyboard::key::Physical {
     match physical_key {
         winit::keyboard::PhysicalKey::Code(code) => {
@@ -899,10 +899,10 @@ pub fn physical_key(physical_key: winit::keyboard::PhysicalKey) -> keyboard::key
     }
 }
 
-/// Converts a `KeyCode` from [`winit`] to an [`aura`] key code.
+/// Converts a `KeyCode` from [`winit`] to an [`taim`] key code.
 ///
 /// [`winit`]: https://github.com/rust-windowing/winit
-/// [`aura`]: https://github.com/theaimartco/vyom-aura/tree/0.12
+/// [`taim`]: https://github.com/theaimartco/taim/tree/0.12
 pub fn key_code(key_code: winit::keyboard::KeyCode) -> Option<keyboard::key::Code> {
     use winit::keyboard::KeyCode;
 
@@ -1105,10 +1105,10 @@ pub fn key_code(key_code: winit::keyboard::KeyCode) -> Option<keyboard::key::Cod
     })
 }
 
-/// Converts a `NativeKeyCode` from [`winit`] to an [`aura`] native key code.
+/// Converts a `NativeKeyCode` from [`winit`] to an [`taim`] native key code.
 ///
 /// [`winit`]: https://github.com/rust-windowing/winit
-/// [`aura`]: https://github.com/theaimartco/vyom-aura/tree/0.12
+/// [`taim`]: https://github.com/theaimartco/taim/tree/0.12
 pub fn native_key_code(
     native_key_code: winit::keyboard::NativeKeyCode,
 ) -> keyboard::key::NativeCode {

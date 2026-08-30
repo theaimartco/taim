@@ -1,24 +1,25 @@
 //! Proves the design system actually reaches real widgets.
 //!
 //! `phase.md` Phase 11's whole point is a coherent visual language for
-//! *production components*. Until these tests existed, `aura-design` was
+//! *production components*. Until these tests existed, `taim-design` was
 //! an island: its tokens, state resolution, and component contracts were
-//! tested only against themselves, and no `aura_widget` rendered from
+//! tested only against themselves, and no `taim_widget` rendered from
 //! them. A design system nothing renders is a specification, not a design
 //! system.
 //!
-//! These drive the real `Catalog` impls (`aura_widget::aura`) that a
+//! These drive the real `Catalog` impls (`taim_widget::taim`) that a
 //! running application uses, and assert the resulting per-widget `Style`
-//! carries Aura's semantic tokens -- so the state matrix
+//! carries Taim's semantic tokens -- so the state matrix
 //! `components.rs` proves is demonstrably the one pixels come from.
 
-use aura_design::components::button::ButtonKind;
-use aura_design::theme::Theme;
-use aura_design::tokens::{Contrast, Scheme};
+use taim_design::components::button::ButtonKind;
+use taim_design::theme::Theme;
+use taim_design::tokens::{Contrast, MaterialTokens, Scheme};
 
-use aura_core::{Background, Color};
-use aura_widget::aura;
-use aura_widget::{
+use taim_core::material::{Material, SceneLight};
+use taim_core::{Background, Color};
+use taim_widget::taim;
+use taim_widget::{
     button, checkbox, container, icon_button, list_tile, progress_bar, radio, text_input,
 };
 
@@ -28,7 +29,7 @@ fn color_of(background: Background) -> Color {
     match background {
         Background::Color(color) => color,
         Background::Gradient(_) => {
-            panic!("Aura only ever produces solid colour backgrounds")
+            panic!("Taim only ever produces solid colour backgrounds")
         }
     }
 }
@@ -38,9 +39,9 @@ fn color_of(background: Background) -> Color {
 // ---------------------------------------------------------------------
 
 #[test]
-fn a_real_button_renders_auras_primary_token() {
-    // The end-to-end claim: an `aura_widget::button` themed with
-    // `aura_design::Theme` paints Aura's `primary`, not aura's palette.
+fn a_real_button_renders_taims_primary_token() {
+    // The end-to-end claim: an `taim_widget::button` themed with
+    // `taim_design::Theme` paints Taim's `primary`, not taim's palette.
     for scheme in EVERY_SCHEME {
         let theme = Theme::new(scheme);
         let class = <Theme as button::Catalog>::default();
@@ -59,7 +60,7 @@ fn a_real_button_renders_auras_primary_token() {
 #[test]
 fn a_real_button_is_readable_in_every_scheme() {
     // The contrast guarantee has to survive the trip through the widget's
-    // own Style, not just hold inside aura-design.
+    // own Style, not just hold inside taim-design.
     for scheme in EVERY_SCHEME {
         let theme = Theme::new(scheme);
         let class = <Theme as button::Catalog>::default();
@@ -77,7 +78,7 @@ fn a_real_button_is_readable_in_every_scheme() {
 
 #[test]
 fn a_real_buttons_state_layer_deepens_from_rest_to_hover_to_press() {
-    // Aura resolves feedback as one overlay alpha; the bridge turns it
+    // Taim resolves feedback as one overlay alpha; the bridge turns it
     // into a real colour. Each step must be visibly distinct, or the
     // control feels dead.
     let theme = Theme::new(Scheme::Dark);
@@ -126,10 +127,10 @@ fn every_button_variant_reaches_the_widget_with_its_own_tokens() {
     let theme = Theme::new(Scheme::Dark);
     let colors = theme.colors();
 
-    let filled = aura::button_style(ButtonKind::Filled)(&theme, button::Status::Active);
-    let destructive = aura::button_style(ButtonKind::Destructive)(&theme, button::Status::Active);
-    let outlined = aura::button_style(ButtonKind::Outlined)(&theme, button::Status::Active);
-    let text_only = aura::button_style(ButtonKind::Text)(&theme, button::Status::Active);
+    let filled = taim::button_style(ButtonKind::Filled)(&theme, button::Status::Active);
+    let destructive = taim::button_style(ButtonKind::Destructive)(&theme, button::Status::Active);
+    let outlined = taim::button_style(ButtonKind::Outlined)(&theme, button::Status::Active);
+    let text_only = taim::button_style(ButtonKind::Text)(&theme, button::Status::Active);
 
     assert_eq!(filled.background.map(color_of), Some(colors.primary));
     assert_eq!(destructive.background.map(color_of), Some(colors.error));
@@ -145,7 +146,7 @@ fn every_button_variant_reaches_the_widget_with_its_own_tokens() {
 }
 
 #[test]
-fn a_real_text_input_renders_aura_tokens_and_shows_focus() {
+fn a_real_text_input_renders_taim_tokens_and_shows_focus() {
     for scheme in EVERY_SCHEME {
         let theme = Theme::new(scheme);
         let colors = theme.colors();
@@ -261,7 +262,7 @@ fn a_card_container_paints_a_surface_but_a_bare_container_does_not() {
     let theme = Theme::new(Scheme::Dark);
     let colors = theme.colors();
 
-    let card = aura::card_style()(&theme);
+    let card = taim::card_style()(&theme);
     assert_eq!(card.background.map(color_of), Some(colors.surface));
     assert_eq!(card.text_color, Some(colors.on_surface));
 
@@ -273,13 +274,93 @@ fn a_card_container_paints_a_surface_but_a_bare_container_does_not() {
 }
 
 // ---------------------------------------------------------------------
+// Materials, from the token set to a widget's Style
+// ---------------------------------------------------------------------
+
+#[test]
+fn a_widget_is_opaque_until_a_theme_opts_into_materials() {
+    // `MaterialTokens::FLAT` is the default, and it must leave every
+    // widget exactly as it was before materials existed -- otherwise
+    // "opt-in" is not what this is.
+    let theme = Theme::new(Scheme::Dark);
+
+    assert_eq!(theme.materials(), MaterialTokens::FLAT);
+    assert_eq!(taim::card_style()(&theme).material, Material::OPAQUE);
+    assert_eq!(taim::glass_style()(&theme).material, Material::OPAQUE);
+
+    let class = <Theme as container::Catalog>::default();
+    let bare = container::Catalog::style(&theme, &class);
+    assert_eq!(bare.material, Material::OPAQUE);
+}
+
+#[test]
+fn a_physical_theme_reaches_a_widgets_material() {
+    // The whole chain in one assertion: token set -> Theme -> the style
+    // function a real application calls -> the `Style` a widget draws
+    // from. If any link is missing, the material never reaches a pixel.
+    let theme = Theme::new(Scheme::Dark).with_materials(MaterialTokens::PHYSICAL);
+
+    assert_eq!(
+        taim::glass_style()(&theme).material,
+        MaterialTokens::PHYSICAL.overlay,
+        "a glass surface must take the theme's overlay material"
+    );
+    assert_eq!(
+        taim::card_style()(&theme).material,
+        MaterialTokens::PHYSICAL.surface,
+        "a card must take the theme's surface material"
+    );
+
+    // And the one that makes it worth doing: an overlay transmits, so it
+    // has something behind it to bend.
+    assert!(taim::glass_style()(&theme).material.needs_backdrop());
+}
+
+#[test]
+fn swapping_materials_bumps_the_theme_revision() {
+    // Widgets cache against `revision`; a material change that did not
+    // move it would leave stale styles on screen.
+    let flat = Theme::new(Scheme::Dark);
+    let physical = flat.with_materials(MaterialTokens::PHYSICAL);
+
+    assert_ne!(physical.revision(), flat.revision());
+
+    // But an identical set must not: a revision bump invalidates caches,
+    // and doing that for a no-op change is a per-frame cost for nothing.
+    assert_eq!(flat.with_materials(MaterialTokens::FLAT).revision(), flat.revision());
+}
+
+#[test]
+fn the_scene_light_reaches_the_renderer_trait_through_the_theme() {
+    // `theme::Base::light` is what `winit` calls to drive
+    // `Renderer::set_light`. If it did not follow the token set, every
+    // surface in the interface would be lit by a constant no designer
+    // could move.
+    use taim_core::theme::Base as _;
+
+    let flat = Theme::new(Scheme::Dark);
+    assert_eq!(flat.light(), SceneLight::KEY);
+
+    let moved = SceneLight {
+        direction: [0.6, -0.5, 0.62],
+        ..SceneLight::KEY
+    };
+    let relit = flat.with_materials(MaterialTokens {
+        light: moved,
+        ..MaterialTokens::PHYSICAL
+    });
+
+    assert_eq!(relit.light(), moved);
+}
+
+// ---------------------------------------------------------------------
 // The "no effects required" promise, at the pixel level
 // ---------------------------------------------------------------------
 
 #[test]
-fn no_aura_widget_depends_on_a_shadow_to_be_seen() {
+fn no_taim_widget_depends_on_a_shadow_to_be_seen() {
     // "Effects are never load-bearing": with every shadow removed, the
-    // controls must still be fully distinguishable. Aura enforces this by
+    // controls must still be fully distinguishable. Taim enforces this by
     // simply never emitting one -- elevation is an overlay tint.
     let theme = Theme::new(Scheme::Dark);
 
@@ -287,14 +368,14 @@ fn no_aura_widget_depends_on_a_shadow_to_be_seen() {
     let button_style = button::Catalog::style(&theme, &button_class, button::Status::Active);
     assert_eq!(
         button_style.shadow,
-        aura_core::Shadow::default(),
+        taim_core::Shadow::default(),
         "a button must not need a shadow"
     );
 
-    let card = aura::card_style()(&theme);
+    let card = taim::card_style()(&theme);
     assert_eq!(
         card.shadow,
-        aura_core::Shadow::default(),
+        taim_core::Shadow::default(),
         "a card must not need a shadow"
     );
 }
@@ -324,11 +405,11 @@ fn switching_the_scheme_changes_what_a_real_widget_paints() {
 }
 
 // ---------------------------------------------------------------------
-// The Aura-native widgets
+// The Taim-native widgets
 // ---------------------------------------------------------------------
 
 #[test]
-fn a_real_icon_button_renders_aura_tokens() {
+fn a_real_icon_button_renders_taim_tokens() {
     for scheme in EVERY_SCHEME {
         let theme = Theme::new(scheme);
         let colors = theme.colors();
@@ -412,7 +493,7 @@ fn a_list_tile_stays_flush_so_a_list_reads_as_a_column() {
 }
 
 #[test]
-fn every_aura_native_widget_is_readable_on_the_surface_it_sits_on() {
+fn every_taim_native_widget_is_readable_on_the_surface_it_sits_on() {
     for scheme in EVERY_SCHEME {
         let theme = Theme::new(scheme);
         let surface = theme.colors().surface;

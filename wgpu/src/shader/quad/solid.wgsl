@@ -11,6 +11,7 @@ struct SolidVertexInput {
     @location(8) shadow_blur_radius: f32,
     @location(9) snap: u32,
     @location(10) material: vec4<f32>,
+    @location(11) transmission: f32,
 }
 
 struct SolidVertexOutput {
@@ -25,6 +26,7 @@ struct SolidVertexOutput {
     @location(7) shadow_offset: vec2<f32>,
     @location(8) shadow_blur_radius: f32,
     @location(9) @interpolate(flat) material: vec4<f32>,
+    @location(10) @interpolate(flat) transmission: f32,
 }
 
 @vertex
@@ -62,6 +64,7 @@ fn solid_vs_main(input: SolidVertexInput) -> SolidVertexOutput {
     out.shadow_offset = input.shadow_offset * globals.scale;
     out.shadow_blur_radius = input.shadow_blur_radius * globals.scale;
     out.material = input.material;
+    out.transmission = input.transmission;
 
     return out;
 }
@@ -90,13 +93,48 @@ fn solid_fs_main(
 
     var quad_alpha: f32 = clamp(0.5-dist, 0.0, 1.0);
 
-    var quad_color = mixed_color * quad_alpha;
-
     // Material shading. `sdf_point` is scaled by -2 relative to screen space,
     // so its gradient is negated to point outwards on screen.
+    let sdf_gradient = -rounded_box_gradient(sdf_point, input.scale, input.border_radius * 2.0);
+
+    // What the quad transmits is part of its own colour, not something
+    // composited over it -- the hardware's alpha blend against the
+    // destination is what shows content through a *translucent* quad, and
+    // that shows it undisplaced. This is the refracted version.
+    //
+    // Gated so an opaque quad -- nearly every quad -- costs one comparison
+    // and no texture read.
+    if input.transmission > 0.0 && has_backdrop() {
+        let behind = quad_transmission(
+            dist,
+            sdf_gradient,
+            input.material,
+            input.transmission,
+            input.position.xy
+        );
+
+        // `mixed_color` is premultiplied (see `premultiply` in the vertex
+        // stage), so the sampled backdrop is premultiplied by the same alpha
+        // before mixing. Mixing a straight colour into a premultiplied one
+        // brightens every translucent pane.
+        mixed_color = vec4<f32>(
+            blend_transmission(
+                mixed_color.rgb,
+                behind * mixed_color.a,
+                input.material,
+                input.transmission,
+                dist,
+                sdf_gradient
+            ),
+            mixed_color.a
+        );
+    }
+
+    var quad_color = mixed_color * quad_alpha;
+
     let highlight = quad_specular(
         dist,
-        -rounded_box_gradient(sdf_point, input.scale, input.border_radius * 2.0),
+        sdf_gradient,
         input.material,
         globals.light.xyz
     );

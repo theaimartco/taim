@@ -9,14 +9,14 @@
 //! `text::cache::Cache` under a byte budget never silently
 //! use-after-evicts an entry the current frame still needs.
 
-use aura_core::Size;
-use aura_core::cache::{Budget, Class};
-use aura_core::text::fallback::{FallbackChain, Script};
-use aura_core::text::paragraph::Direction;
-use aura_core::text::{Alignment, Ellipsis, Shaping, Wrapping};
-use aura_graphics::text::cache::{Cache, Key};
-use aura_graphics::text::cosmic_text;
-use aura_wgpu::resource_budget::{Pressure, Tracker};
+use taim_core::Size;
+use taim_core::cache::{Budget, Class};
+use taim_core::text::fallback::{FallbackChain, Script};
+use taim_core::text::paragraph::Direction;
+use taim_core::text::{Alignment, Ellipsis, Shaping, Wrapping};
+use taim_graphics::text::cache::{Cache, Key};
+use taim_graphics::text::cosmic_text;
+use taim_wgpu::resource_budget::{Pressure, Tracker};
 
 #[test]
 fn a_tracker_reports_normal_pressure_for_a_realistic_light_workload() {
@@ -49,7 +49,7 @@ fn key(content: &str) -> Key<'_> {
         content,
         size: 16.0,
         line_height: 20.0,
-        font: aura_core::Font::default(),
+        font: taim_core::Font::default(),
         bounds: Size::new(200.0, 200.0),
         shaping: Shaping::Basic,
         align_x: Alignment::default(),

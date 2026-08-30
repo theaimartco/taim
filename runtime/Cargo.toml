@@ -1,6 +1,6 @@
 [package]
-name = "aura_runtime"
-description = "A renderer-agnostic runtime for aura"
+name = "taim_runtime"
+description = "A renderer-agnostic runtime for taim"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -11,7 +11,7 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-image = ["aura_core/image"]
+image = ["taim_core/image"]
 # Enables phase counters in `diagnostics`. Disabled by default so
 # instrumentation compiles out entirely in production release builds
 # (phase.md Phase 2 design constraint); see docs/architecture/feature-policy.md.
@@ -21,13 +21,13 @@ profiling = []
 workspace = true
 
 [dependencies]
-aura-profiler.workspace = true
-aura-gesture.workspace = true
-aura-accessibility.workspace = true
+taim-profiler.workspace = true
+taim-gesture.workspace = true
+taim-accessibility.workspace = true
 bytes.workspace = true
-aura_core.workspace = true
-aura_futures.workspace = true
-aura_graphics.workspace = true
+taim_core.workspace = true
+taim_futures.workspace = true
+taim_graphics.workspace = true
 rustc-hash.workspace = true
 
 thiserror.workspace = true

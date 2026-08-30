@@ -1,5 +1,5 @@
 //! Deterministic, fake-clock scenario tests for
-//! `aura_runtime::frame_scheduler::Scheduler`.
+//! `taim_runtime::frame_scheduler::Scheduler`.
 //!
 //! `runtime/src/frame_scheduler.rs`'s own unit tests already cover every
 //! individual transition in isolation. These tests instead replay
@@ -12,7 +12,7 @@
 //! point of taking every timestamp as an explicit parameter rather than
 //! reading a live clock.
 
-use aura_runtime::frame_scheduler::Scheduler;
+use taim_runtime::frame_scheduler::Scheduler;
 use std::time::{Duration, Instant};
 
 fn epoch() -> Instant {

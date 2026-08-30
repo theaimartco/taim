@@ -15,12 +15,12 @@
 //! be a threat test; these format, mask, and query the real types the way
 //! a leak actually happens.
 
-use aura_core::input_method::{Purpose, SurroundingText};
-use aura_core::semantics::{Node, Role, Value as SemanticValue};
-use aura_core::widget::Id;
-use aura_core::{Rectangle, Size};
+use taim_core::input_method::{Purpose, SurroundingText};
+use taim_core::semantics::{Node, Role, Value as SemanticValue};
+use taim_core::widget::Id;
+use taim_core::{Rectangle, Size};
 
-use aura_widget::text_input::Value;
+use taim_widget::text_input::Value;
 
 /// The secret every test below tries, and fails, to extract.
 const SECRET: &str = "correct horse battery staple";

@@ -22,9 +22,9 @@ mod vector;
 #[cfg(feature = "geometry")]
 pub mod geometry;
 
-use aura_debug as debug;
-pub use aura_graphics as graphics;
-pub use aura_graphics::core;
+use taim_debug as debug;
+pub use taim_graphics as graphics;
+pub use taim_graphics::core;
 
 pub use layer::Layer;
 pub use primitive::Primitive;
@@ -63,10 +63,10 @@ struct RecordingRetainedFrame {
     start: usize,
 }
 
-/// A [`tiny-skia`] graphics renderer for [`aura`].
+/// A [`tiny-skia`] graphics renderer for [`taim`].
 ///
 /// [`tiny-skia`]: https://github.com/RazrFalcon/tiny-skia
-/// [`aura`]: https://github.com/theaimartco/vyom-aura
+/// [`taim`]: https://github.com/theaimartco/taim
 #[derive(Debug)]
 pub struct Renderer {
     settings: renderer::Settings,
@@ -360,10 +360,10 @@ impl core::text::Renderer for Renderer {
     type Paragraph = Paragraph;
     type Editor = Editor;
 
-    const ICON_FONT: Font = Font::new("Aura-Icons");
+    const ICON_FONT: Font = Font::new("Taim-Icons");
     const CHECKMARK_ICON: char = '\u{f00c}';
     const ARROW_DOWN_ICON: char = '\u{e800}';
-    const AURA_LOGO: char = '\u{e801}';
+    const TAIM_LOGO: char = '\u{e801}';
     const SCROLL_UP_ICON: char = '\u{e802}';
     const SCROLL_DOWN_ICON: char = '\u{e803}';
     const SCROLL_LEFT_ICON: char = '\u{e804}';
@@ -491,11 +491,11 @@ impl graphics::geometry::Renderer for Renderer {
 
 impl graphics::mesh::Renderer for Renderer {
     fn draw_mesh(&mut self, _mesh: graphics::Mesh) {
-        log::warn!("aura_tiny_skia does not support drawing meshes");
+        log::warn!("taim_tiny_skia does not support drawing meshes");
     }
 
-    fn draw_mesh_cache(&mut self, _cache: aura_graphics::mesh::Cache) {
-        log::warn!("aura_tiny_skia does not support drawing meshes");
+    fn draw_mesh_cache(&mut self, _cache: taim_graphics::mesh::Cache) {
+        log::warn!("taim_tiny_skia does not support drawing meshes");
     }
 }
 

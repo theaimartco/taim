@@ -1,6 +1,6 @@
-# Styling in Vyom Aura
+# Styling in Vyom Taim
 
-Vyom Aura takes a unique, highly structured approach to styling that ensures your application always looks consistent, professional, and accessible. Instead of manually specifying hex codes and pixel borders on every widget, Aura uses a comprehensive **Theme** and **Style Catalog** system.
+Vyom Taim takes a unique, highly structured approach to styling that ensures your application always looks consistent, professional, and accessible. Instead of manually specifying hex codes and pixel borders on every widget, Taim uses a comprehensive **Theme** and **Style Catalog** system.
 
 This guide will take you from applying basic built-in themes to building complex custom styling engines.
 
@@ -8,7 +8,7 @@ This guide will take you from applying basic built-in themes to building complex
 
 ## 1. The 22+ Built-in Themes
 
-Aura ships with a vast array of high-quality, pre-built themes out of the box. They are carefully designed with proper contrast ratios and aesthetic harmony.
+Taim ships with a vast array of high-quality, pre-built themes out of the box. They are carefully designed with proper contrast ratios and aesthetic harmony.
 
 You can categorize them roughly into:
 
@@ -42,7 +42,7 @@ You can categorize them roughly into:
 If your app only needs one theme, return it from your `Application::theme` method:
 
 ```rust
-use aura::Theme;
+use taim::Theme;
 
 impl Application for MyApp {
     // ... other methods ...
@@ -68,9 +68,9 @@ impl Application for MyApp {
 }
 ```
 
-### Environment Variable (`AURA_THEME`)
+### Environment Variable (`TAIM_THEME`)
 For quick testing without recompiling, users can override the default theme by setting an environment variable:
-`AURA_THEME=dracula cargo run`
+`TAIM_THEME=dracula cargo run`
 
 ---
 
@@ -82,8 +82,8 @@ If none of the 22 built-in themes match your brand, you can create a completely 
 You can define a theme by providing a `Palette`.
 
 ```rust
-use aura::theme::{Theme, Palette};
-use aura::color;
+use taim::theme::{Theme, Palette};
+use taim::color;
 
 let my_palette = Palette {
     primary: color!(0x3b82f6),
@@ -127,13 +127,13 @@ let brand_color = palette.primary;
 
 ## 5. Widget Styling: The Style + Status Pattern
 
-This is the most critical concept in Aura's styling engine.
+This is the most critical concept in Taim's styling engine.
 
-Widgets in Aura do not have methods like `.background_color()` or `.border_radius()`. Instead, they take a **Style Function**.
+Widgets in Taim do not have methods like `.background_color()` or `.border_radius()`. Instead, they take a **Style Function**.
 
 ### How `.style(fn)` works
 
-When Aura draws a widget, it needs to know what it looks like in different states (Hovered, Pressed, Disabled, Active).
+When Taim draws a widget, it needs to know what it looks like in different states (Hovered, Pressed, Disabled, Active).
 
 A Style Function has this signature (conceptually):
 `fn(theme: &Theme, status: Status) -> Appearance`
@@ -162,11 +162,11 @@ pub struct Appearance {
 ```
 
 ### Using Pre-built Style Functions
-Aura's default `Theme` implements hundreds of these style functions for you. You apply them to widgets using the `.style()` method.
+Taim's default `Theme` implements hundreds of these style functions for you. You apply them to widgets using the `.style()` method.
 
 ```rust
-use aura::widget::button;
-use aura::theme::Theme;
+use taim::widget::button;
+use taim::theme::Theme;
 
 // Uses the default 'primary' style
 button("Submit").style(button::primary)
@@ -215,9 +215,9 @@ Checkbox, ProgressBar, Slider, Toggler, PickList, etc., all have `primary`, `suc
 If you want to create a totally unique looking element (like a glassy card), you create a custom style function for a `Container`.
 
 ```rust
-use aura::widget::container;
-use aura::{Color, Border, Shadow, Theme};
-use aura::widget::container::Appearance;
+use taim::widget::container;
+use taim::{Color, Border, Shadow, Theme};
+use taim::widget::container::Appearance;
 
 fn glassmorphism_style(theme: &Theme) -> Appearance {
     Appearance {
@@ -230,7 +230,7 @@ fn glassmorphism_style(theme: &Theme) -> Appearance {
         },
         shadow: Shadow {
             color: Color::from_rgba8(0, 0, 0, 0.1),
-            offset: aura::Vector::new(0.0, 4.0),
+            offset: taim::Vector::new(0.0, 4.0),
             blur_radius: 16.0,
         },
         text_color: Some(theme.palette().text),
@@ -245,7 +245,7 @@ container(text("Glass Card")).style(glassmorphism_style)
 
 ## 8. The `.class()` Method
 
-While `.style(fn)` is powerful, passing function pointers can be tedious. Aura introduced `.class()` as a cleaner alternative.
+While `.style(fn)` is powerful, passing function pointers can be tedious. Taim introduced `.class()` as a cleaner alternative.
 
 Every theme maintains a "Catalog" of classes.
 
@@ -254,7 +254,7 @@ Every theme maintains a "Catalog" of classes.
 button("Save").style(button::success)
 
 // You can do this:
-button("Save").class(aura::theme::ButtonClass::Success)
+button("Save").class(taim::theme::ButtonClass::Success)
 ```
 
 Classes are enums, making them easier to store in state, pass around, or serialize.
@@ -263,7 +263,7 @@ Classes are enums, making them easier to store in state, pass around, or seriali
 
 ## 9. Root Application Style
 
-By default, an Aura window has a neutral background. To ensure your entire application respects the Theme's background color, apply a style to the root node of your `view()` method:
+By default, an Taim window has a neutral background. To ensure your entire application respects the Theme's background color, apply a style to the root node of your `view()` method:
 
 ```rust
 impl Application for MyApp {
@@ -287,8 +287,8 @@ impl Application for MyApp {
 Here is how you wire up a fully working Light/Dark mode toggle:
 
 ```rust
-use aura::{Application, Theme, Element, Length};
-use aura::widget::{column, button, text, container};
+use taim::{Application, Theme, Element, Length};
+use taim::widget::{column, button, text, container};
 
 struct App {
     is_dark: bool,
@@ -325,7 +325,7 @@ impl Application for App {
             .style(button::primary);
 
         let content = column![
-            text("Welcome to Aura!").size(40),
+            text("Welcome to Taim!").size(40),
             toggle_btn,
         ].spacing(20);
 

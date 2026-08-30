@@ -2,11 +2,11 @@
 //! per-widget, dirty-tracked contributions.
 //!
 //! [`build`] walks a tree of `(widget, Tree, Layout)` triples (adapted
-//! via [`aura_core::widget::visit::Widgets`], the same hook
-//! `aura_runtime::hit_test` rides on) and produces the full
+//! via [`taim_core::widget::visit::Widgets`], the same hook
+//! `taim_runtime::hit_test` rides on) and produces the full
 //! [`semantics::Node`] forest an assistive-technology adapter consumes. Each node's own,
 //! non-recursive semantics are computed through
-//! [`aura_core::widget::tree::Tree::semantics_with_cache`], so a subtree
+//! [`taim_core::widget::tree::Tree::semantics_with_cache`], so a subtree
 //! whose [`DirtyFlags::SEMANTICS`] is clear contributes its last result
 //! without calling back into the widget at all; only children are always
 //! walked, since a parent cannot know whether *they* are dirty without
@@ -17,7 +17,7 @@
 //! Commit 4 does not need to invent identity, only avoid re-deriving a
 //! node's own properties when nothing about it changed.
 //!
-//! [`DirtyFlags::SEMANTICS`]: aura_core::widget::tree::DirtyFlags::SEMANTICS
+//! [`DirtyFlags::SEMANTICS`]: taim_core::widget::tree::DirtyFlags::SEMANTICS
 
 use crate::core::semantics;
 use crate::core::widget::visit::Visit;
@@ -158,7 +158,7 @@ mod tests {
     use crate::core::widget::tree::DirtyFlags;
 
     /// A minimal synthetic tree for exercising [`build`] without any
-    /// dependency on `aura_core::Widget`.
+    /// dependency on `taim_core::Widget`.
     ///
     /// Stored as a flat arena (rather than `Vec<Node>` children owning
     /// their own subtrees directly) so [`Adapter`] can hold plain

@@ -1,11 +1,11 @@
 //! Use the built-in widgets or create your own.
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-pub use aura_renderer as renderer;
-pub use aura_renderer::core;
-pub use aura_renderer::graphics;
+pub use taim_renderer as renderer;
+pub use taim_renderer::core;
+pub use taim_renderer::graphics;
 
 pub use core::widget::{Id, Void};
 
@@ -22,9 +22,9 @@ mod themer;
 
 pub mod app_bar;
 
-#[cfg(feature = "aura")]
-#[cfg_attr(docsrs, doc(cfg(feature = "aura")))]
-pub mod aura;
+#[cfg(feature = "taim")]
+#[cfg_attr(docsrs, doc(cfg(feature = "taim")))]
+pub mod taim;
 
 pub mod button;
 pub mod checkbox;

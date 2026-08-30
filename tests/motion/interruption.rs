@@ -1,6 +1,6 @@
-use aura_core::animation::{Motion, MotionClock};
-use aura_core::time::{Duration, Instant};
-use aura_motion::{Easing, Timestamp, Transition};
+use taim_core::animation::{Motion, MotionClock};
+use taim_core::time::{Duration, Instant};
+use taim_motion::{Easing, Timestamp, Transition};
 
 #[test]
 fn rapid_reverse_preserves_the_sampled_position() {
@@ -28,7 +28,7 @@ fn immediate_transition_does_not_keep_idle_frames_alive() {
 }
 
 #[test]
-fn aura_compatibility_motion_uses_redraw_timestamps() {
+fn taim_compatibility_motion_uses_redraw_timestamps() {
     let mut motion = Motion::new(0.0_f32).duration(Duration::from_millis(200));
     let now = Instant::now();
     motion.go_mut(1.0, now);

@@ -1,6 +1,6 @@
 //! The display transform, on the GPU.
 //!
-//! Applies [`aura_core::color::DisplayTransform`] to a rendered frame: tone
+//! Applies [`taim_core::color::DisplayTransform`] to a rendered frame: tone
 //! map into the panel's luminance range, gamut map into its primaries, encode
 //! with its transfer function.
 //!
@@ -102,19 +102,19 @@ impl Pipeline {
     /// Creates a [`Pipeline`] writing to `format`.
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("aura_wgpu.display.sampler"),
+            label: Some("taim_wgpu.display.sampler"),
             ..wgpu::SamplerDescriptor::default()
         });
 
         let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("aura_wgpu.display.uniforms"),
+            label: Some("taim_wgpu.display.uniforms"),
             size: std::mem::size_of::<Uniforms>() as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
         let constant_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("aura_wgpu.display.constant_layout"),
+            label: Some("taim_wgpu.display.constant_layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -136,7 +136,7 @@ impl Pipeline {
         });
 
         let texture_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("aura_wgpu.display.texture_layout"),
+            label: Some("taim_wgpu.display.texture_layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::FRAGMENT,
@@ -153,18 +153,18 @@ impl Pipeline {
         // `max_bind_groups == 2`, and the mask pipeline already learned that
         // the hard way (`Capstone.md`, F-07).
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("aura_wgpu.display.pipeline_layout"),
+            label: Some("taim_wgpu.display.pipeline_layout"),
             bind_group_layouts: &[Some(&constant_layout), Some(&texture_layout)],
             immediate_size: 0,
         });
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("aura_wgpu.display.shader"),
+            label: Some("taim_wgpu.display.shader"),
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader/display.wgsl"))),
         });
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("aura_wgpu.display.pipeline"),
+            label: Some("taim_wgpu.display.pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -222,7 +222,7 @@ impl Pipeline {
         );
 
         let constants = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("aura_wgpu.display.constant_bind_group"),
+            label: Some("taim_wgpu.display.constant_bind_group"),
             layout: &self.constant_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -237,7 +237,7 @@ impl Pipeline {
         });
 
         let texture = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("aura_wgpu.display.texture_bind_group"),
+            label: Some("taim_wgpu.display.texture_bind_group"),
             layout: &self.texture_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
@@ -246,7 +246,7 @@ impl Pipeline {
         });
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("aura_wgpu.display.render_pass"),
+            label: Some("taim_wgpu.display.render_pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target,
                 depth_slice: None,
@@ -421,7 +421,7 @@ impl Target {
         surface_format: wgpu::TextureFormat,
     ) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("aura_wgpu.display.target"),
+            label: Some("taim_wgpu.display.target"),
             size: wgpu::Extent3d {
                 width: width.max(1),
                 height: height.max(1),

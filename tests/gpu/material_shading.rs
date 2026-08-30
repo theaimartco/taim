@@ -13,10 +13,10 @@
 //!
 //! Skipped rather than failed when no adapter exists.
 
-use aura_core::material::{
+use taim_core::material::{
     self, Material, fresnel_schlick, ggx_distribution, refraction_offset_mm,
 };
-use aura_wgpu::wgpu;
+use taim_wgpu::wgpu;
 
 /// Full precision: the point is to compare arithmetic, not measure rounding.
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
@@ -78,7 +78,7 @@ fn device() -> Option<(wgpu::Device, wgpu::Queue)> {
         ..wgpu::InstanceDescriptor::new_without_display_handle()
     });
 
-    aura_futures::futures::executor::block_on(async {
+    taim_futures::futures::executor::block_on(async {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,

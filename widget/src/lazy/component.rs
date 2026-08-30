@@ -17,9 +17,9 @@ use std::rc::Rc;
 /// A reusable, custom widget that uses The Elm Architecture.
 ///
 /// A [`Component`] allows you to implement custom widgets as if they were
-/// `aura` applications with encapsulated state.
+/// `taim` applications with encapsulated state.
 ///
-/// In other words, a [`Component`] allows you to turn `aura` applications into
+/// In other words, a [`Component`] allows you to turn `taim` applications into
 /// custom widgets and embed them without cumbersome wiring.
 ///
 /// A [`Component`] produces widgets that may fire an [`Event`](Component::Event)

@@ -8,7 +8,7 @@
 //! add a few compound, multi-window-shaped scenarios its own module
 //! tests do not.
 
-use aura_runtime::frame_scheduler::{FEEDBACK_TIMEOUT, Scheduler};
+use taim_runtime::frame_scheduler::{FEEDBACK_TIMEOUT, Scheduler};
 use std::time::{Duration, Instant};
 
 fn epoch() -> Instant {

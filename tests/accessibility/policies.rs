@@ -14,26 +14,26 @@
 //! densities. There is **no watch profile** in the system; that gap is
 //! recorded in `docs/accessibility/contract.md` rather than papered over.
 
-use aura_design::components::button::{Button, ButtonKind};
-use aura_design::components::card::Card;
-use aura_design::components::icon_button::IconButton;
-use aura_design::components::list_tile::{ListLines, ListTile};
-use aura_design::components::menu::Menu;
-use aura_design::components::navigation::{Navigation, NavigationMode};
-use aura_design::components::progress::Progress;
-use aura_design::components::selection::{Selection, SelectionKind};
-use aura_design::components::slider::Slider;
-use aura_design::components::text_field::TextField;
-use aura_design::components::{ComponentSpec, Density, MIN_TOUCH_TARGET, ViewportClass};
-use aura_design::icon::Icon;
-use aura_design::state::Interaction;
-use aura_design::theme::Theme;
-use aura_design::tokens::{Contrast, Scheme, TextStyle, Typography};
+use taim_design::components::button::{Button, ButtonKind};
+use taim_design::components::card::Card;
+use taim_design::components::icon_button::IconButton;
+use taim_design::components::list_tile::{ListLines, ListTile};
+use taim_design::components::menu::Menu;
+use taim_design::components::navigation::{Navigation, NavigationMode};
+use taim_design::components::progress::Progress;
+use taim_design::components::selection::{Selection, SelectionKind};
+use taim_design::components::slider::Slider;
+use taim_design::components::text_field::TextField;
+use taim_design::components::{ComponentSpec, Density, MIN_TOUCH_TARGET, ViewportClass};
+use taim_design::icon::Icon;
+use taim_design::state::Interaction;
+use taim_design::theme::Theme;
+use taim_design::tokens::{Contrast, Scheme, TextStyle, Typography};
 
-use aura_motion::{Effect, MotionPolicy};
+use taim_motion::{Effect, MotionPolicy};
 
-use aura_core::semantics::Actions;
-use aura_core::text::Script;
+use taim_core::semantics::Actions;
+use taim_core::text::Script;
 
 const EVERY_SCHEME: [Scheme; 3] = [Scheme::Light, Scheme::Dark, Scheme::HighContrast];
 

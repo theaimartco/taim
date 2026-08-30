@@ -7,7 +7,7 @@ use crate::keyboard::{Key, Location, Modifiers};
 /// _**Note:** This type is largely incomplete! If you need to track
 /// additional events, feel free to [open an issue] and share your use case!_
 ///
-/// [open an issue]: https://github.com/theaimartco/vyom-aura/issues
+/// [open an issue]: https://github.com/theaimartco/taim/issues
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     /// A keyboard key was pressed.

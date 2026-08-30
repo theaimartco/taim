@@ -1,7 +1,7 @@
 # Benchmark methodology
 
 > Status: Phase 1 baseline. This document is the reproducibility contract
-> `aura_bench` (`tools/aura_bench/`) and `scripts/perf/run-baseline.sh`
+> `taim_bench` (`tools/taim_bench/`) and `scripts/perf/run-baseline.sh`
 > exist to enforce. Update it whenever a phase changes what is measured
 > or how.
 
@@ -9,9 +9,9 @@
 
 Phase 1's objective (`phase.md`) is "create a benchmark laboratory before
 changing engine behavior." It does not optimize anything. Every number
-`aura_bench` produces today is the **unoptimized baseline** every later
+`taim_bench` produces today is the **unoptimized baseline** every later
 phase's "P95 improved by N%" claim must be measured against. Do not read
-Phase 1 numbers as a performance claim about VYOM Aura; read them as the
+Phase 1 numbers as a performance claim about VYOM Taim; read them as the
 starting line.
 
 ## Reproducibility rules
@@ -20,11 +20,11 @@ starting line.
 2. **Same renderer backend.** Compare reports only where
    `report.environment.renderer_backend` matches (`"wgpu"` vs
    `"tiny-skia"` are different code paths with different cost profiles;
-   see `tools/aura_bench/src/main.rs`'s backend selection, which tries
+   see `tools/taim_bench/src/main.rs`'s backend selection, which tries
    `wgpu` first and falls back to `tiny-skia` unless `--backend` forces
    one).
 3. **Same device.** Compare reports only where
-   `report.environment.device` matches. `aura_bench --compare <path>`
+   `report.environment.device` matches. `taim_bench --compare <path>`
    enforces rules 1-3 automatically and refuses to compare otherwise.
 4. **Same build profile.** Compare `release`-profile reports only against
    other `release`-profile reports. `scripts/perf/run-baseline.sh` always
@@ -32,14 +32,14 @@ starting line.
 5. **Warm-up before measurement.** At least 30 seconds of warm-up
    (`--warm-up-secs`, default 30) runs before any measured frame, so JIT/
    cache/allocator warm-up cost does not leak into the measured samples.
-6. **At least five measured runs.** `aura_bench` refuses `--runs` below
+6. **At least five measured runs.** `taim_bench` refuses `--runs` below
    5. Each run replays the scene's full deterministic frame sequence
    (`Scene::advance`/`Scene::input_events` keyed by frame index and
    `--seed`) from a fresh scene instance, so two runs with the same seed
    produce byte-identical input.
 7. **Report the median run, but keep every run.** `report.median` is the
    run whose P95 frame time is the middle value across all measured runs
-   (see `median_of` in `tools/aura_bench/src/report.rs`); `report.runs`
+   (see `median_of` in `tools/taim_bench/src/report.rs`); `report.runs`
    keeps every individual run's summary so outliers are visible, not
    hidden by the aggregate.
 8. **CPU governor.** `scripts/perf/run-baseline.sh` checks (on Linux)
@@ -57,26 +57,26 @@ starting line.
 
 | Required measurement | Status | Where |
 |---|---|---|
-| Cold start to first visible frame | **Not measured.** `aura_bench` never creates a real window; there is no "first visible frame" in a headless run. This belongs to Phase 14's platform-backend work, where a real compositor surface exists. | — |
-| CPU frame phases: diff, event, layout, semantics, paint prep, upload | **Partially measured.** `aura_runtime::UserInterface` does not yet split diff/event/layout into separately-timed phases (that split is Phase 3's job); `aura_bench` records `update` (diff+event+layout folded together) and `draw` (paint preparation) as they exist today. Semantics and upload have no timing hooks yet and are not fabricated. | `tools/aura_bench/src/metrics/frame_time.rs` |
-| GPU duration and presentation time | **Approximated.** No real presentation feedback exists headlessly (Phase 6). `present` measures `Renderer::screenshot`'s readback time as a stand-in. | `tools/aura_bench/src/metrics/frame_time.rs` |
-| Allocations/frame, RSS, GPU bytes, draw calls, batch count, uploaded bytes | **Partially measured.** Allocation counting and RSS are implemented (opt-in via `--features profiling` for allocations; RSS via `/proc/self/status` on Linux only). GPU bytes/draw calls/batch count/uploaded bytes have no instrumentation hook in `aura_wgpu` yet; that is Phase 5's `wgpu/src/engine.rs` and `wgpu/src/layer.rs` work. | `tools/aura_bench/src/metrics/{allocations,memory}.rs` |
+| Cold start to first visible frame | **Not measured.** `taim_bench` never creates a real window; there is no "first visible frame" in a headless run. This belongs to Phase 14's platform-backend work, where a real compositor surface exists. | — |
+| CPU frame phases: diff, event, layout, semantics, paint prep, upload | **Partially measured.** `taim_runtime::UserInterface` does not yet split diff/event/layout into separately-timed phases (that split is Phase 3's job); `taim_bench` records `update` (diff+event+layout folded together) and `draw` (paint preparation) as they exist today. Semantics and upload have no timing hooks yet and are not fabricated. | `tools/taim_bench/src/metrics/frame_time.rs` |
+| GPU duration and presentation time | **Approximated.** No real presentation feedback exists headlessly (Phase 6). `present` measures `Renderer::screenshot`'s readback time as a stand-in. | `tools/taim_bench/src/metrics/frame_time.rs` |
+| Allocations/frame, RSS, GPU bytes, draw calls, batch count, uploaded bytes | **Partially measured.** Allocation counting and RSS are implemented (opt-in via `--features profiling` for allocations; RSS via `/proc/self/status` on Linux only). GPU bytes/draw calls/batch count/uploaded bytes have no instrumentation hook in `taim_wgpu` yet; that is Phase 5's `wgpu/src/engine.rs` and `wgpu/src/layer.rs` work. | `tools/taim_bench/src/metrics/{allocations,memory}.rs` |
 | Damage area/full-screen area, visited/laid-out/painted/cached nodes | **Not measured.** There is no damage tracking yet (Phase 4) and no per-node visit counters (Phase 2's `runtime/src/diagnostics.rs`). | — |
-| Event timestamp to submit, and to compositor presentation feedback | **Partially measured.** `metrics::latency` times "event dispatched to `UserInterface::update`" through "readback returned", which is the headless stand-in for "event to submit." There is no compositor, so there is no presentation-feedback leg yet. | `tools/aura_bench/src/metrics/latency.rs` |
+| Event timestamp to submit, and to compositor presentation feedback | **Partially measured.** `metrics::latency` times "event dispatched to `UserInterface::update`" through "readback returned", which is the headless stand-in for "event to submit." There is no compositor, so there is no presentation-feedback leg yet. | `tools/taim_bench/src/metrics/latency.rs` |
 | Idle wake-ups and submissions | **Not measured.** There is no frame scheduler yet (Phase 6); a headless harness that calls `draw`/`screenshot` on every configured frame has no concept of "idle" to begin with. | — |
 
 Every "not measured" row above is a real gap, not an oversight to paper
 over. The phase responsible for closing it is named so a later
-`aura_bench` change can find the right point to add the missing metric
+`taim_bench` change can find the right point to add the missing metric
 rather than guessing at one.
 
 ## Renderer backend selection
 
-`aura_bench` asks `aura_renderer::Renderer::new(settings, backend)` for a
+`taim_bench` asks `taim_renderer::Renderer::new(settings, backend)` for a
 headless renderer. With `backend: None` (the default), it tries `wgpu`
 first (a real GPU adapter, headless — no window, no surface) and falls
 back to `tiny-skia` (CPU rasterization) if no GPU adapter is available,
-matching `aura_renderer`'s own fallback-dispatcher behavior. Pass
+matching `taim_renderer`'s own fallback-dispatcher behavior. Pass
 `--backend wgpu` or `--backend tiny-skia` to force one and fail loudly if
 it is unavailable, rather than silently measuring the other.
 
@@ -86,8 +86,8 @@ would otherwise produce numbers that look comparable but are not.
 
 ## Scenes
 
-See `tools/aura_bench/src/scenes/mod.rs` for the full registry
-(`aura_bench --list`). Each scene module's doc comment records which
+See `tools/taim_bench/src/scenes/mod.rs` for the full registry
+(`taim_bench --list`). Each scene module's doc comment records which
 phase.md-described workload it stands in for today and which later phase
 is expected to change its underlying mechanism (e.g. `blur_layers` uses
 styled containers as a stand-in for GPU blur effects, which do not exist
@@ -104,23 +104,23 @@ comparable at all.
 - Percentiles (P50/P95/P99) are computed by sorting all frame-total
   durations in a measured run and taking the value at
   `round((n - 1) * p)`, clamped to the last index. See `percentile` in
-  `tools/aura_bench/src/metrics/frame_time.rs`.
+  `tools/taim_bench/src/metrics/frame_time.rs`.
 - The "missed frame rate" is the fraction of frames in a run whose total
   CPU time (`update + draw + present`) exceeded the frame budget for the
   configured `--refresh-rate` (`1/60`, `1/90`, or `1/120` second).
 - The reported "median run" is chosen by comparing each run's P95 (not
   by averaging runs together), so the reported numbers are always a real
   run's real samples, never a synthetic blend.
-- `aura_bench --compare <path>` computes the relative difference between
+- `taim_bench --compare <path>` computes the relative difference between
   two P95s as `(max - min) / max`, matching the exit gate's "differ by
   <= 5%" wording (a symmetric, bounded measure -- see
-  `relative_difference` in `tools/aura_bench/src/report.rs`).
+  `relative_difference` in `tools/taim_bench/src/report.rs`).
 
 ## Report format
 
 Reports are versioned JSON (`schema_version`, currently `1`); see
 `tests/bench/report_schema.rs` for the fields every report must contain
-and `tools/aura_bench/src/report.rs` for the authoritative shape. A
+and `tools/taim_bench/src/report.rs` for the authoritative shape. A
 schema version bump is required whenever an existing field is removed,
 renamed, or changes meaning; adding a new required field is also treated
 as requiring a bump under this phase's policy, since
@@ -131,14 +131,14 @@ version rather than "at least these fields."
 
 ```bash
 # One scene, human summary + JSON to stdout:
-cargo run --release --package aura_bench -- --scene idle_shell
+cargo run --release --package taim_bench -- --scene idle_shell
 
 # Every registered scene, saved to benchmarks/baseline/<scene>.json.
 # DEVICE is required and must name a [[device]] in benchmarks/devices.toml:
 DEVICE=dev-workstation-01 scripts/perf/run-baseline.sh
 
 # Compare a fresh run against a saved baseline:
-cargo run --release --package aura_bench -- \
+cargo run --release --package taim_bench -- \
     --scene idle_shell --compare benchmarks/baseline/idle_shell.json
 ```
 
@@ -183,7 +183,7 @@ threshold. P50 was stable within 0.5% across the same runs (~2.34 ms
 every time). This is consistent with occasional OS scheduling
 interference on a shared, unpinned machine hitting one or two of the 180
 sampled frames per run: at `FRAMES_PER_RUN = 180`
-(`tools/aura_bench/src/main.rs`), P95 is the value at rank
+(`tools/taim_bench/src/main.rs`), P95 is the value at rank
 `round(179 * 0.95) = 170`, so a single delayed frame landing in the top
 ~9 of 180 can move the reported P95 substantially. The other six scenes
 (`idle_shell`, `ten_thousand_rows`, `image_grid`, `blur_layers`,

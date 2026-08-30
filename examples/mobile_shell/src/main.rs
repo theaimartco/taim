@@ -1,16 +1,16 @@
-use aura::widget::bottom_nav_bar::Item;
+use taim::widget::bottom_nav_bar::Item;
 // Aliased: this example already has its own `Tab` for the bottom bar's
 // destinations, which is a different thing from a tab in a tab bar.
-use aura::widget::tabs::Tab as TabItem;
-use aura::widget::{
+use taim::widget::tabs::Tab as TabItem;
+use taim::widget::{
     avatar, badge, bottom_nav_bar, bottom_sheet, button, chip, column, container, drawer,
     pull_to_refresh, row, scaffold, search_bar, skeleton, snackbar, stack, tabs, text,
 };
-use aura::{Center, Element, Fill, Task};
+use taim::{Center, Element, Fill, Task};
 
-pub fn main() -> aura::Result {
-    aura::application(Shell::new, Shell::update, Shell::view)
-        .title("Aura — Mobile Shell")
+pub fn main() -> taim::Result {
+    taim::application(Shell::new, Shell::update, Shell::view)
+        .title("Taim — Mobile Shell")
         .run()
 }
 
@@ -190,7 +190,7 @@ impl Shell {
         ];
 
         let navigation = column![
-            text("Aura").size(24),
+            text("Taim").size(24),
             text("Mobile shell example").size(13),
             button(text("Close")).on_press(Message::DrawerDismissed),
         ]
@@ -223,7 +223,7 @@ impl Shell {
         // placed inside the body, so it floats above the bottom bar the
         // way a real notice does.
         let shell = scaffold(body)
-            .app_bar(container(text("Aura").size(20)).padding(16))
+            .app_bar(container(text("Taim").size(20)).padding(16))
             .bottom_navigation_bar(tabs)
             .drawer(
                 drawer(navigation, self.drawer_open)

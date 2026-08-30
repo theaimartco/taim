@@ -1,8 +1,8 @@
-# Aura Readiness Audit — UI, Components, Speed
+# Taim Readiness Audit — UI, Components, Speed
 
 **Commit:** `30b5e969-dirty` · **Date:** 13 August 2026
 **Method:** `cargo check --workspace --all-targets`, `cargo test --workspace`,
-`aura_bench` (6 scenes × 5 runs), source inventory of `widget/`, `aura-design/`, `tools/aura_bench/`
+`taim_bench` (6 scenes × 5 runs), source inventory of `widget/`, `taim-design/`, `tools/taim_bench/`
 
 Published version: https://claude.ai/code/artifact/09e0e9dd-0476-49b3-9fb0-8937244599cc
 
@@ -10,7 +10,7 @@ Published version: https://claude.ai/code/artifact/09e0e9dd-0476-49b3-9fb0-89372
 
 ## Verdict (as first audited)
 
-Aura was **not** beating Flutter or React Native on UI or components, and its speed advantage —
+Taim was **not** beating Flutter or React Native on UI or components, and its speed advantage —
 which is probably real — was unproven by the data this repository produced.
 
 The foundation is strong. The component layer was the thinnest part of the codebase, the newest
@@ -44,7 +44,7 @@ entire test suite passes.
 | 2 | `BottomNavigationBar` — selection renders; per-item `Role::Tab` + `SELECTED` | **Done** |
 | 2 | `Scaffold` — real slot composition | **Done** |
 | 2 | Failing `app_bar/Compact` touch-target test | **Done** |
-| 2 | All `aura_widget` warnings cleared | **Done** |
+| 2 | All `taim_widget` warnings cleared | **Done** |
 | 3 | `Tabs` — animated sliding indicator, per-tab `Role::Tab` + `SELECTED` | **Done** |
 | 3 | `Snackbar` — timeout, action slot, `Live::Polite` announcement | **Done** |
 | 3 | `SearchBar` — wraps `text_input`, drawn glyph, conditional clear | **Done** |
@@ -56,7 +56,7 @@ entire test suite passes.
 | 3 | P1: `SegmentedControl`, `Stepper`, `Accordion`, `Carousel` | **Done** |
 | 3 | P1: `DatePicker`, `TimePicker` + proleptic Gregorian date module | **Done** |
 | 4 | `examples/mobile_shell` — runnable shell exercising every surface | **Done** |
-| 4 | `aura-showcase` — every widget, both themes, real states | **Done** |
+| 4 | `taim-showcase` — every widget, both themes, real states | **Done** |
 | 4 | Golden contract oracles for the shipped component set | **Done** |
 | 4 | README rewritten against measured data only | **Done** |
 | 5 | Competitor benchmark apps and comparison | **Cannot be done here** — no Flutter/RN toolchain |
@@ -123,7 +123,7 @@ recently accessed layer survives.
 ## 1. Lineage
 
 `git log` reaches iced's initial commit (`Decouple iced from coffee`) across 6,841 commits.
-Aura is an iced fork. Most of `widget/`'s 38k LOC is inherited, not authored.
+Taim is an iced fork. Most of `widget/`'s 38k LOC is inherited, not authored.
 
 ---
 
@@ -150,7 +150,7 @@ An idle shell costs the same as ten thousand rows. The per-phase breakdown shows
 
 ### CRITICAL — `present` is a full GPU readback
 
-`tools/aura_bench/src/metrics/frame_time.rs` documents `present` honestly as
+`tools/taim_bench/src/metrics/frame_time.rs` documents `present` honestly as
 `Renderer::screenshot`, a stand-in "until Phase 6". But `FramePhases::total()` sums it into the
 headline number, so a fixed ~2.3 ms readback accounts for 99.5% of every reported frame time.
 
@@ -158,7 +158,7 @@ The framework's real per-frame cost is `update + draw`: **5.4 µs idle vs 12.2 �
 rows** — roughly two orders of magnitude below the reported figure, and invisible in the published
 metric.
 
-Publishing `frame p95 = 2.39 ms` against Flutter understates Aura by ~200×, and any reviewer who
+Publishing `frame p95 = 2.39 ms` against Flutter understates Taim by ~200×, and any reviewer who
 profiles it finds the readback in minutes.
 
 ### MODERATE — two metrics wired but inert
@@ -169,7 +169,7 @@ should win decisively.
 
 ### ASSET — the harness design is genuinely good
 
-`aura_bench` has 13 scenes, deterministic seeds, configurable warm-up, ≥5 measured runs, cold/warm
+`taim_bench` has 13 scenes, deterministic seeds, configurable warm-up, ≥5 measured runs, cold/warm
 cache states, 60/90/120 Hz gating, device identity, git+rustc stamping, a versioned JSON schema,
 and `--compare` for median-P95 regression checks. `.github/workflows/perf.yml` explicitly refuses
 to gate on noisy hosted runners. The problem is the metric it feeds, not the machinery.
@@ -178,8 +178,8 @@ to gate on noisy hosted runners. The problem is the metric it feeds, not the mac
 
 | Artifact | State | Detail |
 |---|---|---|
-| `docs/performance/aura-1.0-report.md` | Template | Contains `(Insert benchmark data from compare-frameworks.sh vs Qt/Flutter)`. The "60fps solid, 2ms" figures have no source. |
-| `scripts/perf/compare-frameworks.sh` | Inert | Every functional line commented out, including the one that runs Aura. |
+| `docs/performance/taim-1.0-report.md` | Template | Contains `(Insert benchmark data from compare-frameworks.sh vs Qt/Flutter)`. The "60fps solid, 2ms" figures have no source. |
+| `scripts/perf/compare-frameworks.sh` | Inert | Every functional line commented out, including the one that runs Taim. |
 | `scripts/ci/check-budgets.sh` | Fake | Prints "verified" without checking. Self-labelled `(dummy check)`. Exits 0 unconditionally. |
 | `benchmarks/competitors/` | Empty | One README. No Flutter or RN comparison app. |
 
@@ -206,8 +206,8 @@ to gate on noisy hosted runners. The problem is the metric it feeds, not the mac
 No open/close state, slide animation, scrim, edge-swipe, focus trap, or dismissal.
 `bottom_sheet.rs` (47 lines) is the same — no drag handle, snap points, velocity fling, or modality.
 
-Every primitive these need already exists: `aura-gesture` ships `edge_swipe.rs`, `velocity.rs`,
-`pan.rs`, `nested_scroll.rs`; `aura-motion` ships `spring.rs`, `decay.rs`. They are simply not wired up.
+Every primitive these need already exists: `taim-gesture` ships `edge_swipe.rs`, `velocity.rs`,
+`pan.rs`, `nested_scroll.rs`; `taim-motion` ships `spring.rs`, `decay.rs`. They are simply not wired up.
 
 **BUG — bottom nav bar cannot show selection.**
 `widget/src/bottom_nav_bar.rs:84` computes `is_selected` and never reads it (compiler warns).
@@ -264,7 +264,7 @@ exactly how that happens.
 
 ### The design system is a spec layer, not a component library
 
-`aura-design` is **2,501 lines total**. Its "18+ components" are `ComponentSpec` implementations
+`taim-design` is **2,501 lines total**. Its "18+ components" are `ComponentSpec` implementations
 returning `Role`, `Actions`, and token-derived `Appearance` — metadata, not rendering widgets.
 
 The architecture is good (semantics-first, density-aware, a11y derived rather than bolted on).
@@ -278,12 +278,12 @@ comparison against ~100k lines of shipped, gesture-complete widgets.
 | Asset | State | Detail |
 |---|---|---|
 | `examples/` | Empty | iced's ~80 examples deleted, nothing replaced them |
-| `aura-showcase/` | Stub | 20 lines; `main()` prints a string, `// app.run();` commented out |
+| `taim-showcase/` | Stub | 20 lines; `main()` prints a string, `// app.run();` commented out |
 | README comparison table | Unbacked | 13 rows of ✅/❌ with no measurement. Also asserts Flutter has ❌ memory safety — Dart is memory-safe, and that error undermines the whole table |
 
 ---
 
-## 5. Where Aura can actually win
+## 5. Where Taim can actually win
 
 **Do not fight here:** component breadth (10 years, 300+ widgets, pub.dev), ecosystem and hiring,
 tooling maturity (DevTools, stateful hot reload), web reach.
@@ -326,7 +326,7 @@ allocation counts non-zero; a deliberate regression fails CI.
   `selected` exposure.
 - **Scaffold** — real slot composition using its existing imports; safe-area and keyboard insets.
 - Fix the failing `app_bar/Compact` test.
-- Clear all `aura_widget` / `aura_wgpu` warnings; deny them in CI.
+- Clear all `taim_widget` / `taim_wgpu` warnings; deny them in CI.
 
 **Exit:** a drawer + sheet + tab-bar app indistinguishable from its Flutter equivalent by feel,
 including fling velocity and mid-animation interruption.
@@ -337,7 +337,7 @@ Tabs/TabBar, Snackbar (a `toast` spec exists and needs a widget), SearchBar, Pul
 Chip, Badge, Avatar, Skeleton. Build spec-first so a11y and density come for free.
 
 **Exit:** a non-trivial reference app — list, detail, search, settings, modal flows — built
-entirely from shipped Aura components with no custom widget code.
+entirely from shipped Taim components with no custom widget code.
 
 ### Phase 4 — Make it demonstrable (1–2 weeks, parallel to 3)
 
@@ -347,15 +347,15 @@ entirely from shipped Aura components with no custom widget code.
 - Rewrite the README table: only rows linking to committed measurement data; drop the incorrect
   Flutter memory-safety row; replace or remove the placeholder performance report.
 
-**Exit:** `git clone && cargo run -p aura-showcase` sells the framework without commentary.
+**Exit:** `git clone && cargo run -p taim-showcase` sells the framework without commentary.
 
 ### Phase 5 — Win the comparison on the record (2–3 weeks, requires 1–4)
 
-- Build the same reference app in Aura, Flutter, and React Native; commit all three to
+- Build the same reference app in Taim, Flutter, and React Native; commit all three to
   `benchmarks/competitors/`.
 - Measure on identical hardware: cold start, frame p95/p99 under scripted scroll, steady-state and
   peak RSS, binary/bundle size, idle CPU%, energy over a fixed interaction script.
-- Publish methodology, raw JSON, and the harness — including axes where Aura loses.
+- Publish methodology, raw JSON, and the harness — including axes where Taim loses.
 - Make `compare-frameworks.sh` actually execute the comparison it describes.
 
 **Exit:** a performance report a hostile reviewer can reproduce and does not refute.
@@ -381,7 +381,7 @@ Frame-time target is against `update + draw` — the honest metric after Phase 1
 
 ## Summary
 
-Aura has a better foundation than its component layer suggests and a better performance story than
+Taim has a better foundation than its component layer suggests and a better performance story than
 its benchmark output shows. The gap is self-inflicted: a metric that measures a screenshot
 readback, three mobile components scaffolded but never finished, and competitive claims written
 before the data existed. None of it is a hard engineering problem — the gesture arena, motion

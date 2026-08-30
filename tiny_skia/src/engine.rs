@@ -574,11 +574,11 @@ impl Engine {
             }
             #[cfg(not(feature = "image"))]
             Image::Raster { .. } => {
-                log::warn!("Unsupported primitive in `aura_tiny_skia`: {image:?}",);
+                log::warn!("Unsupported primitive in `taim_tiny_skia`: {image:?}",);
             }
             #[cfg(not(feature = "svg"))]
             Image::Vector { .. } => {
-                log::warn!("Unsupported primitive in `aura_tiny_skia`: {image:?}",);
+                log::warn!("Unsupported primitive in `taim_tiny_skia`: {image:?}",);
             }
         }
     }
@@ -605,7 +605,7 @@ pub fn into_color(color: Color) -> tiny_skia::Color {
     let [red, green, blue, alpha] = working_components(color);
 
     tiny_skia::Color::from_rgba(blue, green, red, alpha)
-        .expect("Convert color from aura to tiny_skia")
+        .expect("Convert color from taim to tiny_skia")
 }
 
 /// Returns a colour's components in the compositing working space.

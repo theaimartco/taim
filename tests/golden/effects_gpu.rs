@@ -12,20 +12,20 @@
 //! the question, and a suite that goes red on such a machine teaches its
 //! readers to ignore it.
 
-use aura::{Color, Rectangle, Size};
-use aura_core::Renderer as _;
-use aura_wgpu::Renderer;
-use aura_wgpu::graphics::Viewport;
+use taim::{Color, Rectangle, Size};
+use taim_core::Renderer as _;
+use taim_wgpu::Renderer;
+use taim_wgpu::graphics::Viewport;
 
 const WIDTH: u32 = 128;
 const HEIGHT: u32 = 128;
 
 /// A renderer on the `wgpu` backend, or `None` when no adapter exists.
 fn wgpu_renderer() -> Option<Renderer> {
-    // The concrete `wgpu` renderer, not `aura_renderer`'s fallback enum:
+    // The concrete `wgpu` renderer, not `taim_renderer`'s fallback enum:
     // `add_effect` belongs to the backend that has an effect pipeline.
-    aura_futures::futures::executor::block_on(<Renderer as aura_core::renderer::Headless>::new(
-        aura_core::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
         None,
     ))
 }
@@ -40,13 +40,13 @@ macro_rules! needs_gpu {
 }
 
 /// Draws a hard-edged white square, optionally under `effect`.
-fn square(renderer: &mut Renderer, effect: Option<aura_wgpu::effects::Effect>) -> Vec<u8> {
+fn square(renderer: &mut Renderer, effect: Option<taim_wgpu::effects::Effect>) -> Vec<u8> {
     let logical = Size::new(WIDTH as f32, HEIGHT as f32);
 
     renderer.reset(Rectangle::with_size(logical));
 
     renderer.fill_quad(
-        aura_core::renderer::Quad {
+        taim_core::renderer::Quad {
             bounds: Rectangle {
                 x: 32.0,
                 y: 32.0,
@@ -60,7 +60,7 @@ fn square(renderer: &mut Renderer, effect: Option<aura_wgpu::effects::Effect>) -
 
     if let Some(effect) = effect {
         assert!(
-            renderer.add_effect(effect, aura_wgpu::graphics::quality::Tier::default()),
+            renderer.add_effect(effect, taim_wgpu::graphics::quality::Tier::default()),
             "the tier rejected the effect before it could be rendered"
         );
     }
@@ -103,7 +103,7 @@ fn linear_luminance(rgba: &[u8]) -> f64 {
         .map(|pixel| {
             let encoded = f64::from(pixel[0]) / 255.0;
 
-            // sRGB EOTF, matching `aura_core::color::space::Transfer::Srgb`.
+            // sRGB EOTF, matching `taim_core::color::space::Transfer::Srgb`.
             if encoded <= 0.04045 {
                 encoded / 12.92
             } else {
@@ -120,8 +120,8 @@ fn a_blur_softens_an_edge_that_was_hard() {
     let sharp = square(&mut renderer, None);
     let blurred = square(
         &mut renderer,
-        Some(aura_wgpu::effects::Effect::Blur(
-            aura_wgpu::effects::blur::Blur { radius: 8.0 },
+        Some(taim_wgpu::effects::Effect::Blur(
+            taim_wgpu::effects::blur::Blur { radius: 8.0 },
         )),
     );
 
@@ -146,8 +146,8 @@ fn a_blur_conserves_the_image_it_blurs() {
     let sharp = square(&mut renderer, None);
     let blurred = square(
         &mut renderer,
-        Some(aura_wgpu::effects::Effect::Blur(
-            aura_wgpu::effects::blur::Blur { radius: 6.0 },
+        Some(taim_wgpu::effects::Effect::Blur(
+            taim_wgpu::effects::blur::Blur { radius: 6.0 },
         )),
     );
 
@@ -182,7 +182,7 @@ fn a_zero_saturation_matrix_removes_colour() {
     renderer.reset(Rectangle::with_size(logical));
 
     renderer.fill_quad(
-        aura_core::renderer::Quad {
+        taim_core::renderer::Quad {
             bounds: Rectangle {
                 x: 16.0,
                 y: 16.0,
@@ -196,8 +196,8 @@ fn a_zero_saturation_matrix_removes_colour() {
 
     assert!(
         renderer.add_effect(
-            aura_wgpu::effects::Effect::Saturation(aura_wgpu::effects::saturation::Saturation(0.0)),
-            aura_wgpu::graphics::quality::Tier::default(),
+            taim_wgpu::effects::Effect::Saturation(taim_wgpu::effects::saturation::Saturation(0.0)),
+            taim_wgpu::graphics::quality::Tier::default(),
         ),
         "the tier rejected saturation before it could be rendered"
     );
@@ -229,8 +229,8 @@ fn noise_perturbs_a_flat_fill_without_shifting_it() {
     let flat = square(&mut renderer, None);
     let grainy = square(
         &mut renderer,
-        Some(aura_wgpu::effects::Effect::Noise(
-            aura_wgpu::effects::noise::Noise { seed: 0x5EED },
+        Some(taim_wgpu::effects::Effect::Noise(
+            taim_wgpu::effects::noise::Noise { seed: 0x5EED },
         )),
     );
 
@@ -257,8 +257,8 @@ fn noise_is_deterministic_for_a_seed() {
 
     // The same seed must give the same grain, or a static screen shimmers.
     let effect = |seed| {
-        Some(aura_wgpu::effects::Effect::Noise(
-            aura_wgpu::effects::noise::Noise { seed },
+        Some(taim_wgpu::effects::Effect::Noise(
+            taim_wgpu::effects::noise::Noise { seed },
         ))
     };
 
@@ -284,7 +284,7 @@ fn a_backdrop_blur_blurs_the_page_and_not_the_sheet() {
 
         // The page: a hard vertical edge down the middle of the surface.
         renderer.fill_quad(
-            aura_core::renderer::Quad {
+            taim_core::renderer::Quad {
                 bounds: Rectangle {
                     x: 0.0,
                     y: 0.0,
@@ -312,13 +312,13 @@ fn a_backdrop_blur_blurs_the_page_and_not_the_sheet() {
         if backdrop {
             assert!(
                 renderer.add_effect(
-                    aura_wgpu::effects::Effect::BackdropBlur(
-                        aura_wgpu::effects::backdrop_blur::BackdropBlur {
+                    taim_wgpu::effects::Effect::BackdropBlur(
+                        taim_wgpu::effects::backdrop_blur::BackdropBlur {
                             radius: 10.0,
                             area: 1.0,
                         },
                     ),
-                    aura_wgpu::graphics::quality::Tier::default(),
+                    taim_wgpu::graphics::quality::Tier::default(),
                 ),
                 "the tier rejected the backdrop blur"
             );
@@ -369,8 +369,8 @@ fn a_mask_erases_what_it_does_not_cover() {
 
     let masked = square(
         &mut renderer,
-        Some(aura_wgpu::effects::Effect::Mask(
-            aura_wgpu::effects::mask::Mask { atlas_slot: slot },
+        Some(taim_wgpu::effects::Effect::Mask(
+            taim_wgpu::effects::mask::Mask { atlas_slot: slot },
         )),
     );
 
@@ -410,11 +410,11 @@ fn a_wrongly_sized_mask_is_refused() {
 ///
 /// Not an assertion. The numeric tests above state properties -- more
 /// intermediate pixels, conserved luminance -- and a property can hold while
-/// the picture is still wrong. `AURA_DUMP_EFFECTS=<dir>` renders the pair to
+/// the picture is still wrong. `TAIM_DUMP_EFFECTS=<dir>` renders the pair to
 /// binary PPM so someone can check that a blur looks like a blur.
 #[test]
 fn dump_for_inspection() {
-    let Ok(directory) = std::env::var("AURA_DUMP_EFFECTS") else {
+    let Ok(directory) = std::env::var("TAIM_DUMP_EFFECTS") else {
         return;
     };
 
@@ -426,26 +426,26 @@ fn dump_for_inspection() {
         ("sharp", None),
         (
             "noise",
-            Some(aura_wgpu::effects::Effect::Noise(
-                aura_wgpu::effects::noise::Noise { seed: 0x5EED },
+            Some(taim_wgpu::effects::Effect::Noise(
+                taim_wgpu::effects::noise::Noise { seed: 0x5EED },
             )),
         ),
         (
             "desaturated",
-            Some(aura_wgpu::effects::Effect::Saturation(
-                aura_wgpu::effects::saturation::Saturation(0.0),
+            Some(taim_wgpu::effects::Effect::Saturation(
+                taim_wgpu::effects::saturation::Saturation(0.0),
             )),
         ),
         (
             "blur8",
-            Some(aura_wgpu::effects::Effect::Blur(
-                aura_wgpu::effects::blur::Blur { radius: 8.0 },
+            Some(taim_wgpu::effects::Effect::Blur(
+                taim_wgpu::effects::blur::Blur { radius: 8.0 },
             )),
         ),
         (
             "blur16",
-            Some(aura_wgpu::effects::Effect::Blur(
-                aura_wgpu::effects::blur::Blur { radius: 16.0 },
+            Some(taim_wgpu::effects::Effect::Blur(
+                taim_wgpu::effects::blur::Blur { radius: 16.0 },
             )),
         ),
     ] {

@@ -4,22 +4,22 @@
 //! "changing one leaf in a 10,000-node synthetic tree lays out/paints
 //! only the required path/subtree." It builds a synthetic tree of
 //! `Leaf`/`Branch` test widgets that cooperate with
-//! `aura_core::widget::tree::Tree::layout_with_cache` (added in this
+//! `taim_core::widget::tree::Tree::layout_with_cache` (added in this
 //! phase's second commit), instruments every leaf's layout call with a
 //! shared counter, and asserts that re-laying-out the tree after
 //! touching exactly one leaf only re-measures that leaf and its
 //! ancestors -- never a sibling subtree.
 //!
-//! This does **not** prove that aura's shipped, production widgets
+//! This does **not** prove that taim's shipped, production widgets
 //! (`Column`, `Row`, `Container`, ...) get this speedup today -- none of
 //! them call `layout_with_cache` yet, since retrofitting every widget is
 //! out of this phase's scope (see `docs/architecture/widget-lifecycle.md`).
 //! It proves the mechanism itself is correct and safe to adopt.
 
-use aura::advanced::widget::{self, Widget};
-use aura::advanced::{Layout, mouse, renderer};
-use aura::{Element, Length, Point, Rectangle, Size, Theme};
-use aura_renderer::Renderer;
+use taim::advanced::widget::{self, Widget};
+use taim::advanced::{Layout, mouse, renderer};
+use taim::{Element, Length, Point, Rectangle, Size, Theme};
+use taim_renderer::Renderer;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -71,15 +71,15 @@ impl<Message> Widget<Message, Theme, Renderer> for Leaf {
         &mut self,
         tree: &mut widget::Tree,
         _renderer: &Renderer,
-        limits: &aura::advanced::layout::Limits,
-    ) -> aura::advanced::layout::Node {
+        limits: &taim::advanced::layout::Limits,
+    ) -> taim::advanced::layout::Node {
         let counters = self.counters.clone();
         let index = self.index;
         let size = self.size;
 
         tree.layout_with_cache(*limits, move |_tree| {
             counters.record(index);
-            aura::advanced::layout::Node::new(Size::new(size, size))
+            taim::advanced::layout::Node::new(Size::new(size, size))
         })
     }
 
@@ -123,8 +123,8 @@ impl<Message> Widget<Message, Theme, Renderer> for Branch<Message> {
         &mut self,
         tree: &mut widget::Tree,
         renderer: &Renderer,
-        limits: &aura::advanced::layout::Limits,
-    ) -> aura::advanced::layout::Node {
+        limits: &taim::advanced::layout::Limits,
+    ) -> taim::advanced::layout::Node {
         if tree.children.len() != self.children.len() {
             tree.children = self
                 .children
@@ -161,7 +161,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Branch<Message> {
             })
             .collect();
 
-        aura::advanced::layout::Node::with_children(Size::new(width, height), positioned)
+        taim::advanced::layout::Node::with_children(Size::new(width, height), positioned)
     }
 
     fn draw(
@@ -208,9 +208,9 @@ fn build_tree(counters: &LayoutCounters) -> Element<'static, ()> {
 }
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -221,7 +221,7 @@ fn headless_renderer() -> Renderer {
 fn changing_one_leaf_only_recomputes_that_leaf() {
     let counters = LayoutCounters::new(LEAF_COUNT);
     let renderer = headless_renderer();
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(2000.0, 200_000.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(2000.0, 200_000.0));
 
     let mut root = build_tree(&counters);
     let mut tree = widget::Tree::new(root.as_widget());
@@ -295,12 +295,12 @@ fn different_limits_recompute_every_leaf_even_when_clean() {
     let mut tree = widget::Tree::new(root.as_widget());
     tree.diff(root.as_widget_mut());
 
-    let limits_a = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(2000.0, 200_000.0));
+    let limits_a = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(2000.0, 200_000.0));
     let _ = root.as_widget_mut().layout(&mut tree, &renderer, &limits_a);
 
     assert_eq!(counters.total_calls(), LEAF_COUNT as u32);
 
-    let limits_b = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(1000.0, 100_000.0));
+    let limits_b = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(1000.0, 100_000.0));
     let _ = root.as_widget_mut().layout(&mut tree, &renderer, &limits_b);
 
     assert_eq!(
@@ -316,7 +316,7 @@ fn different_limits_recompute_every_leaf_even_when_clean() {
 fn a_leaf_marked_dirty_twice_is_only_measured_once_per_layout_pass() {
     let counters = LayoutCounters::new(LEAF_COUNT);
     let renderer = headless_renderer();
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(2000.0, 200_000.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(2000.0, 200_000.0));
 
     let mut root = build_tree(&counters);
     let mut tree = widget::Tree::new(root.as_widget());
@@ -341,7 +341,7 @@ fn a_leaf_marked_dirty_twice_is_only_measured_once_per_layout_pass() {
 // without an intervening `diff` must reuse the cached result (skipping
 // every child's own `layout`), while a `diff` -- modeling "content may
 // have changed" -- must force a real recompute even under identical
-// [`aura::advanced::layout::Limits`].
+// [`taim::advanced::layout::Limits`].
 
 /// A leaf with no caching of its own -- unlike [`Leaf`] (which wraps
 /// [`widget::Tree::layout_with_cache`] and so would mask a container's
@@ -365,11 +365,11 @@ impl<Message> Widget<Message, Theme, Renderer> for SimpleLeaf {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &aura::advanced::layout::Limits,
-    ) -> aura::advanced::layout::Node {
+        _limits: &taim::advanced::layout::Limits,
+    ) -> taim::advanced::layout::Node {
         self.counters.record(self.index);
 
-        aura::advanced::layout::Node::new(Size::new(self.size, self.size))
+        taim::advanced::layout::Node::new(Size::new(self.size, self.size))
     }
 
     fn draw(
@@ -395,11 +395,11 @@ fn leaf(index: usize, size: f32, counters: &LayoutCounters) -> Element<'static, 
 
 #[test]
 fn a_real_row_reuses_its_cache_across_layout_calls_with_no_diff_in_between() {
-    use aura::widget::row;
+    use taim::widget::row;
 
     let counters = LayoutCounters::new(3);
     let renderer = headless_renderer();
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
 
     let mut element: Element<'static, ()> = row((0..3).map(|i| leaf(i, 10.0, &counters))).into();
 
@@ -428,11 +428,11 @@ fn a_real_row_reuses_its_cache_across_layout_calls_with_no_diff_in_between() {
 
 #[test]
 fn a_real_column_reuses_its_cache_across_layout_calls_with_no_diff_in_between() {
-    use aura::widget::column;
+    use taim::widget::column;
 
     let counters = LayoutCounters::new(3);
     let renderer = headless_renderer();
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
 
     let mut element: Element<'static, ()> = column((0..3).map(|i| leaf(i, 10.0, &counters))).into();
 
@@ -457,11 +457,11 @@ fn a_real_column_reuses_its_cache_across_layout_calls_with_no_diff_in_between() 
 
 #[test]
 fn a_row_recomputes_after_diff_even_under_identical_limits() {
-    use aura::widget::row;
+    use taim::widget::row;
 
     let counters = LayoutCounters::new(3);
     let renderer = headless_renderer();
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
 
     let mut element: Element<'static, ()> = row((0..3).map(|i| leaf(i, 10.0, &counters))).into();
 
@@ -494,7 +494,7 @@ fn a_row_recomputes_after_diff_even_under_identical_limits() {
 
 #[test]
 fn a_row_recomputes_when_limits_actually_change() {
-    use aura::widget::row;
+    use taim::widget::row;
 
     let counters = LayoutCounters::new(3);
     let renderer = headless_renderer();
@@ -504,13 +504,13 @@ fn a_row_recomputes_when_limits_actually_change() {
     let mut tree = widget::Tree::new(element.as_widget());
     element.as_widget_mut().diff(&mut tree);
 
-    let limits_a = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
+    let limits_a = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
     let _ = element
         .as_widget_mut()
         .layout(&mut tree, &renderer, &limits_a);
     assert_eq!(counters.total_calls(), 3);
 
-    let limits_b = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(300.0, 300.0));
+    let limits_b = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(300.0, 300.0));
     let _ = element
         .as_widget_mut()
         .layout(&mut tree, &renderer, &limits_b);
@@ -523,7 +523,7 @@ fn a_row_recomputes_when_limits_actually_change() {
 
 #[test]
 fn a_row_cache_survives_a_handful_of_recurring_limits_without_thrashing() {
-    use aura::widget::row;
+    use taim::widget::row;
 
     let counters = LayoutCounters::new(3);
     let renderer = headless_renderer();
@@ -533,8 +533,8 @@ fn a_row_cache_survives_a_handful_of_recurring_limits_without_thrashing() {
     let mut tree = widget::Tree::new(element.as_widget());
     element.as_widget_mut().diff(&mut tree);
 
-    let limits_a = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
-    let limits_b = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(300.0, 300.0));
+    let limits_a = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
+    let limits_b = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(300.0, 300.0));
 
     // Oscillate between two recurring limits (e.g. a resize settling
     // back and forth), with no diff in between -- the default capacity
@@ -559,11 +559,11 @@ fn a_row_cache_survives_a_handful_of_recurring_limits_without_thrashing() {
 
 #[test]
 fn a_real_stack_reuses_its_base_layer_cache_across_layout_calls_with_no_diff_in_between() {
-    use aura::widget::stack;
+    use taim::widget::stack;
 
     let counters = LayoutCounters::new(2);
     let renderer = headless_renderer();
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(500.0, 500.0));
 
     let mut element: Element<'static, ()> =
         stack([leaf(0, 50.0, &counters), leaf(1, 20.0, &counters)]).into();
@@ -589,11 +589,11 @@ fn a_real_stack_reuses_its_base_layer_cache_across_layout_calls_with_no_diff_in_
 
 #[test]
 fn a_real_grid_reuses_its_track_cache_across_layout_calls_with_no_diff_in_between() {
-    use aura::widget::grid;
+    use taim::widget::grid;
 
     let counters = LayoutCounters::new(6);
     let renderer = headless_renderer();
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(300.0, 300.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(300.0, 300.0));
 
     let mut element: Element<'static, ()> = grid((0..6).map(|i| leaf(i, 10.0, &counters)))
         .columns(3)

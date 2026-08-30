@@ -1,6 +1,6 @@
-# Layout & Alignment in Vyom Aura
+# Layout & Alignment in Vyom Taim
 
-Creating beautiful user interfaces requires a robust layout system. Vyom Aura provides a powerful, flexbox-inspired layout engine that gives you complete control over how widgets are sized, positioned, and aligned.
+Creating beautiful user interfaces requires a robust layout system. Vyom Taim provides a powerful, flexbox-inspired layout engine that gives you complete control over how widgets are sized, positioned, and aligned.
 
 This comprehensive guide covers everything from the basic `Length` type to advanced responsive layout patterns.
 
@@ -8,18 +8,18 @@ This comprehensive guide covers everything from the basic `Length` type to advan
 
 ## 1. The Length Type: Sizing Widgets
 
-The foundation of layout in Aura is the `Length` type, which determines how much space a widget should take up along a particular axis (width or height).
+The foundation of layout in Taim is the `Length` type, which determines how much space a widget should take up along a particular axis (width or height).
 
 ### The Variants of Length
 
-Aura provides several variants of `Length`, each serving a specific layout purpose:
+Taim provides several variants of `Length`, each serving a specific layout purpose:
 
 #### `Length::Fill`
 The most common variant. It tells the widget to expand and fill all available remaining space in its parent container. If multiple widgets in a row or column use `Fill`, the space is divided equally among them.
 
 ```rust
-use aura::widget::button;
-use aura::Length;
+use taim::widget::button;
+use taim::Length;
 
 // This button will expand to fill the entire width of its container
 button("Submit").width(Length::Fill)
@@ -29,8 +29,8 @@ button("Submit").width(Length::Fill)
 Similar to `Fill`, but allows you to specify a proportion. If you have two widgets in a row, one with `FillPortion(1)` and the other with `FillPortion(3)`, the first gets 25% of the space, and the second gets 75%.
 
 ```rust
-use aura::widget::{row, container};
-use aura::Length;
+use taim::widget::{row, container};
+use taim::Length;
 
 // A classic sidebar + content layout
 row![
@@ -43,8 +43,8 @@ row![
 Tells the widget to take up only as much space as it needs to display its contents. This is often the default behavior for widgets like `text`.
 
 ```rust
-use aura::widget::text;
-use aura::Length;
+use taim::widget::text;
+use taim::Length;
 
 // This text widget will be exactly as wide as the string "Hello"
 text("Hello").width(Length::Shrink)
@@ -54,8 +54,8 @@ text("Hello").width(Length::Shrink)
 Forces the widget to be exactly the specified number of logical pixels wide or tall, regardless of its contents or available space.
 
 ```rust
-use aura::widget::image;
-use aura::Length;
+use taim::widget::image;
+use taim::Length;
 
 // This image will be exactly 200x200 pixels
 image("logo.png")
@@ -77,8 +77,8 @@ button("Click").width(150)
 Sometimes you want a widget to fill space, but never get too small or too large. `Length` provides modifier methods for this:
 
 ```rust
-use aura::widget::text_input;
-use aura::Length;
+use taim::widget::text_input;
+use taim::Length;
 
 // Fills available space, but never gets smaller than 200px or larger than 600px
 text_input("Search...")
@@ -86,7 +86,7 @@ text_input("Search...")
 ```
 
 #### `Length::Bounded` and `Length::Fluid`
-For advanced layouts, Aura also supports fluid sizing where bounds are determined dynamically.
+For advanced layouts, Taim also supports fluid sizing where bounds are determined dynamically.
 
 ---
 
@@ -95,7 +95,7 @@ For advanced layouts, Aura also supports fluid sizing where bounds are determine
 The `column` widget stacks its children vertically. It is the primary building block for most application layouts.
 
 ```rust
-use aura::widget::{column, text, button};
+use taim::widget::{column, text, button};
 
 let my_column = column![
     text("Step 1"),
@@ -123,7 +123,7 @@ column![text("Content")].padding(15)
 #### `align_x(alignment::Horizontal)`
 Aligns children horizontally within the column. Options are `Start` (left), `Center`, and `End` (right).
 ```rust
-use aura::alignment;
+use taim::alignment;
 column![
     text("Left").width(Length::Fill),
 ].align_x(alignment::Horizontal::Center)
@@ -152,13 +152,13 @@ column![/* many children */].wrap()
 The `row` widget places its children side-by-side horizontally. It shares an almost identical API with `column`, but operates on the X-axis.
 
 ```rust
-use aura::widget::{row, text, button, Space};
+use taim::widget::{row, text, button, Space};
 
 let header = row![
     text("My App Title"),
     Space::with_width(Length::Fill), // Pushes the button to the right
     button("Settings"),
-].spacing(10).align_y(aura::alignment::Vertical::Center);
+].spacing(10).align_y(taim::alignment::Vertical::Center);
 ```
 
 ### Row Formatting
@@ -169,7 +169,7 @@ Adds fixed horizontal space between each child widget.
 #### `align_y(alignment::Vertical)`
 Aligns children vertically within the row. Options are `Top`, `Center`, and `Bottom`.
 ```rust
-use aura::alignment;
+use taim::alignment;
 row![
     text("Tall text\nMultiple lines"),
     button("Aligned to bottom"),
@@ -185,8 +185,8 @@ Using `Length::FillPortion` lets you create robust, flexible layouts that mainta
 ### Example: Dashboard Layout
 
 ```rust
-use aura::widget::{row, column, container, text};
-use aura::Length::FillPortion;
+use taim::widget::{row, column, container, text};
+use taim::Length::FillPortion;
 
 let dashboard = row![
     // Sidebar takes up 1 unit of space (20%)
@@ -215,7 +215,7 @@ By default, widgets like `text` just take up the space they need. If you want to
 
 ### Centering Methods
 
-Aura's `container` provides expressive methods for alignment. They all take a `Length` argument (usually `Length::Fill` or a fixed size) which defines the size of the container itself before aligning its child.
+Taim's `container` provides expressive methods for alignment. They all take a `Length` argument (usually `Length::Fill` or a fixed size) which defines the size of the container itself before aligning its child.
 
 #### `center(Length)`
 Centers the child both vertically and horizontally.
@@ -247,7 +247,7 @@ Aligns the child to the top or bottom edge.
 
 ## 6. Padding
 
-Padding is space inside a widget, between its borders and its content. Aura uses a `Padding` struct that provides immense flexibility.
+Padding is space inside a widget, between its borders and its content. Taim uses a `Padding` struct that provides immense flexibility.
 
 Many widgets accept padding via a `.padding()` method.
 
@@ -256,7 +256,7 @@ Many widgets accept padding via a `.padding()` method.
 **1. Single Value (Uniform)**
 Applies the same padding to all four sides.
 ```rust
-use aura::Padding;
+use taim::Padding;
 // 10px on top, bottom, left, and right
 container("Text").padding(10) 
 ```
@@ -288,7 +288,7 @@ container("Text").padding(pad)
 When content exceeds the available screen space, you need a `scrollable` widget.
 
 ```rust
-use aura::widget::{scrollable, column, text};
+use taim::widget::{scrollable, column, text};
 
 let long_content = column![
     text("Item 1"),
@@ -320,7 +320,7 @@ If you have thousands of items to display, `scrollable` will try to render all o
 `VirtualList` only renders the items currently visible on screen (plus a small buffer).
 
 ```rust
-use aura::widget::VirtualList;
+use taim::widget::VirtualList;
 // ... VirtualList API ...
 ```
 
@@ -333,8 +333,8 @@ use aura::widget::VirtualList;
 The `Stack` layout allows you to place widgets on top of each other in the Z-axis. This is essential for overlays, badges, tooltips, or floating action buttons.
 
 ```rust
-use aura::widget::{stack, image, container, text};
-use aura::alignment;
+use taim::widget::{stack, image, container, text};
+use taim::alignment;
 
 let profile_pic_with_badge = stack![
     image("avatar.png").width(100).height(100),
@@ -354,10 +354,10 @@ The first widget in the stack is at the bottom (Z-index 0). Subsequent widgets a
 
 ## 10. Grid Layout
 
-For multi-dimensional layouts, Aura provides a `Grid` layout (if enabled via features).
+For multi-dimensional layouts, Taim provides a `Grid` layout (if enabled via features).
 
 ```rust
-use aura::widget::grid;
+use taim::widget::grid;
 // ... Grid example ...
 ```
 
@@ -368,8 +368,8 @@ use aura::widget::grid;
 To make layouts change based on screen size, use the `responsive` widget. It takes a closure that receives the available `Size` and returns a widget.
 
 ```rust
-use aura::widget::{responsive, row, column, text};
-use aura::Size;
+use taim::widget::{responsive, row, column, text};
+use taim::Size;
 
 let dynamic_layout = responsive(|size: Size| {
     if size.width > 800.0 {
@@ -392,7 +392,7 @@ let dynamic_layout = responsive(|size: Size| {
 
 ## 12. Adaptive Layouts
 
-Sometimes you want to adapt based on window classification (e.g., is it a compact mobile screen or an expanded tablet screen?) rather than exact pixel sizes. Aura integrates window classes for this purpose.
+Sometimes you want to adapt based on window classification (e.g., is it a compact mobile screen or an expanded tablet screen?) rather than exact pixel sizes. Taim integrates window classes for this purpose.
 
 ---
 
@@ -409,8 +409,8 @@ Wrap your top-level layout in a `SafeArea` widget to automatically add padding w
 ### 1. Header, Body, Footer
 
 ```rust
-use aura::widget::{column, container, text};
-use aura::Length;
+use taim::widget::{column, container, text};
+use taim::Length;
 
 column![
     container(text("Header")).height(60).center(Length::Fill),
@@ -424,7 +424,7 @@ column![
 ### 2. Form Layout
 
 ```rust
-use aura::widget::{column, text_input, button, text};
+use taim::widget::{column, text_input, button, text};
 
 column![
     text("Login").size(32),

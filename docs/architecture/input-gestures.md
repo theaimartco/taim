@@ -1,16 +1,16 @@
 # Input gestures
 
 > Status: Phase 8 baseline. This document describes the unified pointer
-> model (`aura_core::pointer`), the gesture competition engine
-> (`aura_gesture::arena`), and the routing layer that connects them to a
-> real widget tree (`aura_runtime::{hit_test, pointer_router}`) --
+> model (`taim_core::pointer`), the gesture competition engine
+> (`taim_gesture::arena`), and the routing layer that connects them to a
+> real widget tree (`taim_runtime::{hit_test, pointer_router}`) --
 > together, "unified pointer input and gesture arena" (`phase.md`).
 
 ## The pointer model
 
 Every input device this codebase supports -- mouse, touch, and
 (structurally, though no backend emits it yet) pen/trackpad -- is
-normalized into one shape: `aura_core::pointer::Pointer`. A `Pointer`
+normalized into one shape: `taim_core::pointer::Pointer`. A `Pointer`
 carries a stable `Id` for its whole contact's lifetime, a `DeviceKind`,
 a `Phase` (`Down`/`Move`/`Up`/`Cancel`), a position, a timestamp, and
 optional `Metadata` (pressure, tilt, contact size) that most backends
@@ -21,20 +21,20 @@ today report as absent (`Metadata::NONE`).
 a time), while each touch finger gets an `Id::from_finger`-derived value
 tagged with bit 63, so a mouse `Id` and every possible finger `Id` can
 never collide even though they are constructed independently. This is
-what lets `aura_gesture::arena::Arena` and
-`aura_runtime::pointer_router::Router` key their internal maps on one
+what lets `taim_gesture::arena::Arena` and
+`taim_runtime::pointer_router::Router` key their internal maps on one
 `Id` type regardless of which device produced it.
 
 Two existing types feed into this model without duplicating it:
 
-- `aura_core::touch::Event` (unchanged in shape, extended with a
+- `taim_core::touch::Event` (unchanged in shape, extended with a
   `metadata` field on every variant) converts directly via
   `Event::to_pointer`, since every touch variant already carries its
   own position.
-- `aura_core::mouse::Event` has no `to_pointer` of its own --
+- `taim_core::mouse::Event` has no `to_pointer` of its own --
   `ButtonPressed`/`ButtonReleased`/`WheelScrolled` carry no coordinates
   (the platform reports the cursor position out-of-band). Instead,
-  `aura_core::event::Event::to_pointer(cursor, timestamp)` takes the
+  `taim_core::event::Event::to_pointer(cursor, timestamp)` takes the
   cursor position a caller is already tracking (e.g.
   `UserInterface::update`'s own `mouse::Cursor` parameter) and produces
   a `Pointer` for `ButtonPressed`/`ButtonReleased`/`CursorMoved`;
@@ -47,13 +47,13 @@ Two existing types feed into this model without duplicating it:
 `phase.md`'s own correctness rule -- "high-frequency moves may be
 coalesced, but down/up/cancel and semantic boundary events may not be
 dropped" -- is implemented once, as a pure classification function:
-`aura_core::event::Event::coalescing() -> Coalescing`
+`taim_core::event::Event::coalescing() -> Coalescing`
 (`Mergeable`/`Critical`). Only `CursorMoved`, `WheelScrolled`, and
 `FingerMoved` are `Mergeable`; every other event (including every
 lifecycle boundary: presses, releases, cancellations, cursor
 enter/leave) is `Critical`.
 
-`aura_runtime::pointer_router::coalesce` is the consumer: given a
+`taim_runtime::pointer_router::coalesce` is the consumer: given a
 backlog of queued `Pointer`s for the same contact, it collapses
 consecutive `Move`s to the latest one while leaving every `Down`/`Up`/
 `Cancel` untouched and in order. `Router::route` itself takes events
@@ -63,7 +63,7 @@ one at a time -- the routing decision never needs more than one -- so
 
 ## The gesture arena
 
-`aura_gesture::arena::Arena` is a single, bounded gesture competition:
+`taim_gesture::arena::Arena` is a single, bounded gesture competition:
 every `Recognizer` registered into it receives an identical event
 stream (fanned out by `Arena::dispatch`) and reports a `Disposition`
 (`Pending`/`Accepted`/`Rejected`); the arena resolves to at most one
@@ -140,7 +140,7 @@ no separate "reserved gesture" concept to keep in sync with it.
 
 ## Nested scroll handoff
 
-`aura_gesture::nested_scroll::Coordinator` gives each level of a nested
+`taim_gesture::nested_scroll::Coordinator` gives each level of a nested
 scroll hierarchy (a horizontally-scrolling carousel inside a
 vertically-scrolling page) a `dispatch(Delta, allow_overscroll) ->
 Consumption` method: it consumes as much of an offered delta as its own
@@ -172,7 +172,7 @@ level back to its valid range once such a drag ends.
 
 ### The spatial index
 
-`aura_runtime::hit_test::hit_test` is the correctness oracle from
+`taim_runtime::hit_test::hit_test` is the correctness oracle from
 Phase 3: an unmodified, linear (depth-first, `O(nodes)`) walk that
 finds the deepest descendant containing a point, returning a `Path` of
 child indices. `Index` (this phase) is the real spatial structure
@@ -208,7 +208,7 @@ same bounds.
 
 ### The pointer router
 
-`aura_runtime::pointer_router::Router` is the piece that drives an
+`taim_runtime::pointer_router::Router` is the piece that drives an
 `Arena` per contact across many frames and many concurrent pointers:
 
 - **Capture table.** Once an entrant's arena resolves
@@ -264,7 +264,7 @@ policy"):
 | "recorded streams are deterministic" | **Met** | `tests/gestures/recorded_streams.rs`: every scenario replays a fixed, hand-authored event stream through two independent `Router`s and asserts identical `Routing` sequences, across single-contact, mixed mouse/touch, five-finger multitouch, cancellation, and tick-driven long-press scenarios. |
 | "nested scroll has no stuck capture" | **Met** | `tests/gestures/nested_scroll.rs`: a three-level hierarchy, a middle level at its own limit passing the whole delta through, a simulated decaying fling proven to drain to exactly zero remainder and stay there, overscroll proven not to leak into a parent, and a mid-gesture resize proven to reclamp rather than leave a dangling offset. |
 | "system-edge gestures remain reserved by policy" | **Met** | `tests/gestures/arena.rs::a_system_priority_entrant_wins_a_same_pass_tie_over_a_normal_one`, proving `Priority::SYSTEM` wins a same-pass tie regardless of registration order -- the mechanism `EdgeSwipe` callers are documented to rely on. |
-| "gesture latency improves without missing critical events" | **Partially met** | `Event::coalescing`/`pointer_router::coalesce` implement the "never drop down/up/cancel/boundary events" half exactly, with tests proving critical events survive coalescing unmerged. The "latency improves" half is not independently measured this phase -- no `aura_bench` scene exercises the new `Router`/`Index` path yet (the existing `multitouch` scene, from Phase 3, still measures only raw dispatch cost with no gesture arena involved), so there is no recorded before/after latency number to point to. |
+| "gesture latency improves without missing critical events" | **Partially met** | `Event::coalescing`/`pointer_router::coalesce` implement the "never drop down/up/cancel/boundary events" half exactly, with tests proving critical events survive coalescing unmerged. The "latency improves" half is not independently measured this phase -- no `taim_bench` scene exercises the new `Router`/`Index` path yet (the existing `multitouch` scene, from Phase 3, still measures only raw dispatch cost with no gesture arena involved), so there is no recorded before/after latency number to point to. |
 
 ## Follow-ups carried forward
 
@@ -272,7 +272,7 @@ policy"):
    registered into an `Arena` on `Down` -- today, `UserInterface::
    route_pointer`'s `start` closure is caller-supplied plumbing, not
    something driven automatically from the widget tree itself.
-2. An `aura_bench` scene exercising `Router`/`Index`/`Arena` together
+2. An `taim_bench` scene exercising `Router`/`Index`/`Arena` together
    (rather than only raw dispatch), to get a real, measured before/
    after latency number for the "gesture latency improves" exit-gate
    clause.

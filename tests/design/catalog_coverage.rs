@@ -1,12 +1,12 @@
-//! Every widget `Catalog` must have an `aura_design::Theme` implementation.
+//! Every widget `Catalog` must have an `taim_design::Theme` implementation.
 //!
 //! This gap is not hypothetical. 17 of 41 catalogues had no implementation
 //! for months -- and they were exactly the mobile set (`bottom_sheet`,
 //! `drawer`, `tabs`, `chip`, `badge`, `avatar`, `date_picker`, and the rest),
-//! the part of the widget set built to differentiate Aura. They compiled and
-//! ran the whole time because each falls back to its own `aura_core::Theme`
+//! the part of the widget set built to differentiate Taim. They compiled and
+//! ran the whole time because each falls back to its own `taim_core::Theme`
 //! catalogue, so nothing failed; the design system simply did not reach them.
-//! Meanwhile `widget/src/aura.rs` documented itself as covering everything.
+//! Meanwhile `widget/src/taim.rs` documented itself as covering everything.
 //!
 //! Two mechanisms, because they catch different failures:
 //!
@@ -21,13 +21,13 @@
 /// Each line is a type-check, not a runtime call: if `Theme` stops
 /// implementing one of these, this module stops compiling.
 mod static_assertions {
-    use aura_design::theme::Theme;
+    use taim_design::theme::Theme;
 
     macro_rules! assert_catalog {
         ($($module:ident),* $(,)?) => {
             $(
                 const _: fn() = || {
-                    fn assert_impl<T: aura_widget::$module::Catalog>() {}
+                    fn assert_impl<T: taim_widget::$module::Catalog>() {}
                     assert_impl::<Theme>();
                 };
             )*
@@ -76,7 +76,7 @@ mod static_assertions {
     // `combo_box` blanket-implements through `pick_list` rather than
     // declaring its own bound shape.
     const _: fn() = || {
-        fn assert_impl<T: aura_widget::combo_box::Catalog>() {}
+        fn assert_impl<T: taim_widget::combo_box::Catalog>() {}
         assert_impl::<Theme>();
     };
 
@@ -85,19 +85,19 @@ mod static_assertions {
     // coverage rather than reporting one.
     #[cfg(feature = "markdown")]
     const _: fn() = || {
-        fn assert_impl<T: aura_widget::markdown::Catalog>() {}
+        fn assert_impl<T: taim_widget::markdown::Catalog>() {}
         assert_impl::<Theme>();
     };
 
     #[cfg(feature = "svg")]
     const _: fn() = || {
-        fn assert_impl<T: aura_widget::svg::Catalog>() {}
+        fn assert_impl<T: taim_widget::svg::Catalog>() {}
         assert_impl::<Theme>();
     };
 
     #[cfg(feature = "qr_code")]
     const _: fn() = || {
-        fn assert_impl<T: aura_widget::qr_code::Catalog>() {}
+        fn assert_impl<T: taim_widget::qr_code::Catalog>() {}
         assert_impl::<Theme>();
     };
 }
@@ -141,8 +141,8 @@ fn every_catalog_has_a_theme_implementation() {
         declared.len()
     );
 
-    let bridge = std::fs::read_to_string(widget_src.join("aura.rs"))
-        .expect("widget/src/aura.rs should be readable");
+    let bridge = std::fs::read_to_string(widget_src.join("taim.rs"))
+        .expect("widget/src/taim.rs should be readable");
 
     let missing: Vec<&String> = declared
         .iter()
@@ -156,10 +156,10 @@ fn every_catalog_has_a_theme_implementation() {
 
     assert!(
         missing.is_empty(),
-        "these widgets declare a `Catalog` with no `aura_design::Theme` \
-         implementation in widget/src/aura.rs: {missing:?}\n\
+        "these widgets declare a `Catalog` with no `taim_design::Theme` \
+         implementation in widget/src/taim.rs: {missing:?}\n\
          They will still compile and run -- each falls back to its own \
-         `aura_core::Theme` catalogue -- but the design system does not reach \
+         `taim_core::Theme` catalogue -- but the design system does not reach \
          them, which is the drift this test exists to prevent."
     );
 }

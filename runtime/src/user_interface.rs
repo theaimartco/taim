@@ -17,21 +17,21 @@ use crate::hit_test;
 use crate::invalidation::Aggregator;
 use crate::pointer_router::{self, Routing};
 
-use aura_gesture::arena::Arena;
+use taim_gesture::arena::Arena;
 use std::hash::{Hash, Hasher};
 
 /// A set of interactive graphical elements with a specific [`Layout`].
 ///
 /// It can be updated and drawn.
 ///
-/// Aura tries to avoid dictating how to write your event loop. You are in
+/// Taim tries to avoid dictating how to write your event loop. You are in
 /// charge of using this type in your system in any way you want.
 ///
 /// # Example
-/// The [`integration`] example uses a [`UserInterface`] to integrate Aura in an
+/// The [`integration`] example uses a [`UserInterface`] to integrate Taim in an
 /// existing graphical application.
 ///
-/// [`integration`]: https://github.com/theaimartco/vyom-aura/tree/master/examples/integration
+/// [`integration`]: https://github.com/theaimartco/taim/tree/master/examples/integration
 pub struct UserInterface<'a, Message, Theme, Renderer> {
     root: Element<'a, Message, Theme, Renderer>,
     base: layout::Node,
@@ -40,7 +40,7 @@ pub struct UserInterface<'a, Message, Theme, Renderer> {
     bounds: Size,
     pointer_router: pointer_router::Router,
     automatic_pointer_routing: bool,
-    semantic_tree: aura_accessibility::Tree,
+    semantic_tree: taim_accessibility::Tree,
     trace: diagnostics::Trace,
 }
 
@@ -64,7 +64,7 @@ where
     /// is naive way to set up our application loop:
     ///
     /// ```no_run
-    /// # mod aura_wgpu {
+    /// # mod taim_wgpu {
     /// #     pub type Renderer = ();
     /// # }
     /// #
@@ -72,14 +72,14 @@ where
     /// #
     /// # impl Counter {
     /// #     pub fn new() -> Self { Counter }
-    /// #     pub fn view(&self) -> aura_core::Element<(), (), Renderer> { unimplemented!() }
+    /// #     pub fn view(&self) -> taim_core::Element<(), (), Renderer> { unimplemented!() }
     /// #     pub fn update(&mut self, _: ()) {}
     /// # }
-    /// use aura_runtime::core::shell;
-    /// use aura_runtime::core::window;
-    /// use aura_runtime::core::Size;
-    /// use aura_runtime::user_interface::{self, UserInterface};
-    /// use aura_wgpu::Renderer;
+    /// use taim_runtime::core::shell;
+    /// use taim_runtime::core::window;
+    /// use taim_runtime::core::Size;
+    /// use taim_runtime::user_interface::{self, UserInterface};
+    /// use taim_wgpu::Renderer;
     ///
     /// // Initialization
     /// let mut counter = Counter::new();
@@ -190,7 +190,7 @@ where
     /// completing [the previous example](#example):
     ///
     /// ```no_run
-    /// # mod aura_wgpu {
+    /// # mod taim_wgpu {
     /// #     pub type Renderer = ();
     /// # }
     /// #
@@ -198,15 +198,15 @@ where
     /// #
     /// # impl Counter {
     /// #     pub fn new() -> Self { Counter }
-    /// #     pub fn view(&self) -> aura_core::Element<(), (), Renderer> { unimplemented!() }
+    /// #     pub fn view(&self) -> taim_core::Element<(), (), Renderer> { unimplemented!() }
     /// #     pub fn update(&mut self, _: ()) {}
     /// # }
-    /// use aura_runtime::core::mouse;
-    /// use aura_runtime::core::shell;
-    /// use aura_runtime::core::window;
-    /// use aura_runtime::core::Size;
-    /// use aura_runtime::user_interface::{self, UserInterface};
-    /// use aura_wgpu::Renderer;
+    /// use taim_runtime::core::mouse;
+    /// use taim_runtime::core::shell;
+    /// use taim_runtime::core::window;
+    /// use taim_runtime::core::Size;
+    /// use taim_runtime::user_interface::{self, UserInterface};
+    /// use taim_wgpu::Renderer;
     ///
     /// let mut counter = Counter::new();
     /// let mut cache = user_interface::Cache::new();
@@ -545,7 +545,7 @@ where
     /// [completing the last example](#example-1):
     ///
     /// ```no_run
-    /// # mod aura_wgpu {
+    /// # mod taim_wgpu {
     /// #     pub type Renderer = ();
     /// #     pub type Theme = ();
     /// # }
@@ -557,13 +557,13 @@ where
     /// #     pub fn view(&self) -> Element<(), (), Renderer> { unimplemented!() }
     /// #     pub fn update(&mut self, _: ()) {}
     /// # }
-    /// use aura_runtime::core::mouse;
-    /// use aura_runtime::core::renderer;
-    /// use aura_runtime::core::shell;
-    /// use aura_runtime::core::window;
-    /// use aura_runtime::core::{Element, Size};
-    /// use aura_runtime::user_interface::{self, UserInterface};
-    /// use aura_wgpu::{Renderer, Theme};
+    /// use taim_runtime::core::mouse;
+    /// use taim_runtime::core::renderer;
+    /// use taim_runtime::core::shell;
+    /// use taim_runtime::core::window;
+    /// use taim_runtime::core::{Element, Size};
+    /// use taim_runtime::user_interface::{self, UserInterface};
+    /// use taim_wgpu::{Renderer, Theme};
     ///
     /// let mut counter = Counter::new();
     /// let mut cache = user_interface::Cache::new();
@@ -736,7 +736,7 @@ where
     /// frame costs a walk, not a rebuild.
     ///
     /// This is the entry point an accessibility adapter drives: feed the
-    /// result to `aura_accessibility::Tree`, diff it against the
+    /// result to `taim_accessibility::Tree`, diff it against the
     /// previous frame's, and hand the changes to the platform.
     ///
     /// [`semantics::Node`]: crate::core::semantics::Node
@@ -786,16 +786,16 @@ where
     pub fn semantics_changes(
         &mut self,
         renderer: &Renderer,
-    ) -> Vec<aura_accessibility::tree::Change> {
+    ) -> Vec<taim_accessibility::tree::Change> {
         let forest = self.semantics(renderer);
-        let next = aura_accessibility::Tree::from_forest(&forest);
+        let next = taim_accessibility::Tree::from_forest(&forest);
         let changes = self.semantic_tree.diff(&next);
         self.semantic_tree = next;
         changes
     }
 
     /// Returns the latest retained semantic tree.
-    pub fn semantic_tree(&self) -> &aura_accessibility::Tree {
+    pub fn semantic_tree(&self) -> &taim_accessibility::Tree {
         &self.semantic_tree
     }
 
@@ -881,7 +881,7 @@ where
     /// register into an [`Arena`] (a larger, separate `Widget` API
     /// question outside this method's scope).
     ///
-    /// [`Arena`]: aura_gesture::arena::Arena
+    /// [`Arena`]: taim_gesture::arena::Arena
     /// [`hit_test::Path`]: crate::hit_test::Path
     /// [`hit_test::Index::hit_test`]: crate::hit_test::Index::hit_test
     /// [`Widget`]: crate::core::Widget
@@ -891,7 +891,7 @@ where
         event: &Event,
         cursor: mouse::Cursor,
         timestamp: crate::core::time::Instant,
-        start: impl FnOnce() -> Option<(crate::hit_test::Path, aura_gesture::arena::Arena)>,
+        start: impl FnOnce() -> Option<(crate::hit_test::Path, taim_gesture::arena::Arena)>,
     ) -> Routing {
         let Some(pointer) = event.to_pointer(cursor.position(), timestamp) else {
             return Routing::None;
@@ -993,7 +993,7 @@ pub struct Cache {
     state: widget::Tree,
     pointer_router: pointer_router::Router,
     automatic_pointer_routing: bool,
-    semantic_tree: aura_accessibility::Tree,
+    semantic_tree: taim_accessibility::Tree,
     /// Carried through the rebuild so a trace survives it.
     ///
     /// `build` runs `Diff` and `Layout` before a [`UserInterface`] exists
@@ -1014,8 +1014,8 @@ impl Cache {
             state: widget::Tree::empty(),
             pointer_router: pointer_router::Router::new(),
             automatic_pointer_routing: true,
-            semantic_tree: aura_accessibility::Tree::new(),
-            trace: diagnostics::Trace::new(aura_profiler::Collector::disabled()),
+            semantic_tree: taim_accessibility::Tree::new(),
+            trace: diagnostics::Trace::new(taim_profiler::Collector::disabled()),
         }
     }
 
