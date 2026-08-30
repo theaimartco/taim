@@ -15,9 +15,9 @@ To use the Canvas, you implement the `canvas::Program` trait. This trait has thr
 - **`mouse_interaction()`** — Return a cursor style based on the current state and cursor position.
 
 ```rust
-use aura::widget::canvas::{self, Canvas};
-use aura::mouse;
-use aura::{Color, Element, Point, Rectangle, Renderer, Theme};
+use taim::widget::canvas::{self, Canvas};
+use taim::mouse;
+use taim::{Color, Element, Point, Rectangle, Renderer, Theme};
 
 struct MyDrawing;
 
@@ -60,8 +60,8 @@ impl<Message> canvas::Program<Message> for MyDrawing {
 ```rust
 fn view(state: &State) -> Element<'_, Message> {
     canvas(MyDrawing)
-        .width(aura::Fill)
-        .height(aura::Fill)
+        .width(taim::Fill)
+        .height(taim::Fill)
         .into()
 }
 ```
@@ -80,10 +80,10 @@ Paths define shapes. You can create them from built-in helpers or build custom o
 // Built-in path constructors
 let line = canvas::Path::line(Point::new(0.0, 0.0), Point::new(200.0, 100.0));
 let circle = canvas::Path::circle(Point::new(100.0, 100.0), 50.0);
-let rect = canvas::Path::rectangle(Point::new(10.0, 10.0), aura::Size::new(80.0, 40.0));
+let rect = canvas::Path::rectangle(Point::new(10.0, 10.0), taim::Size::new(80.0, 40.0));
 let rounded = canvas::Path::rounded_rectangle(
     Point::new(10.0, 10.0),
-    aura::Size::new(80.0, 40.0),
+    taim::Size::new(80.0, 40.0),
     12.0, // border radius
 );
 
@@ -134,11 +134,11 @@ frame.stroke(
 frame.fill_text(canvas::Text {
     content: String::from("Hello, Canvas!"),
     position: Point::new(50.0, 50.0),
-    size: aura::Pixels(24.0),
+    size: taim::Pixels(24.0),
     color: Color::WHITE,
-    font: aura::Font::MONOSPACE,
-    horizontal_alignment: aura::alignment::Horizontal::Left,
-    vertical_alignment: aura::alignment::Vertical::Top,
+    font: taim::Font::MONOSPACE,
+    horizontal_alignment: taim::alignment::Horizontal::Left,
+    vertical_alignment: taim::alignment::Vertical::Top,
     ..Default::default()
 });
 ```
@@ -149,7 +149,7 @@ Apply transformations to everything drawn after the call:
 
 ```rust
 // Translate (move the origin)
-frame.translate(aura::Vector::new(100.0, 50.0));
+frame.translate(taim::Vector::new(100.0, 50.0));
 
 // Rotate around the current origin
 frame.rotate(std::f32::consts::PI / 4.0); // 45 degrees
@@ -165,7 +165,7 @@ frame.scale_nonuniform(2.0, 0.5); // 2x horizontal, 0.5x vertical
 
 ```rust
 frame.with_save(|frame| {
-    frame.translate(aura::Vector::new(100.0, 100.0));
+    frame.translate(taim::Vector::new(100.0, 100.0));
     frame.rotate(angle);
     frame.fill(&shape, Color::RED); // drawn rotated at (100, 100)
 });
@@ -307,7 +307,7 @@ impl<Message> canvas::Program<Message> for ChartWidget {
                 let height = value * bounds.height;
                 let bar = canvas::Path::rectangle(
                     Point::new(x, bounds.height - height),
-                    aura::Size::new(bounds.width / self.data.len() as f32 - 2.0, height),
+                    taim::Size::new(bounds.width / self.data.len() as f32 - 2.0, height),
                 );
                 frame.fill(&bar, Color::from_rgb(0.3, 0.6, 1.0));
             }

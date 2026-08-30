@@ -1,4 +1,4 @@
-//! Baseline headless `aura_wgpu` renderer smoke test.
+//! Baseline headless `taim_wgpu` renderer smoke test.
 //!
 //! `Compositor::is_device_lost` (the device-loss detection this file
 //! was originally meant to test) lives on `window::Compositor`, which
@@ -7,7 +7,7 @@
 //! `device_lost_tests` module covers the actual flag/callback mechanism
 //! directly instead.
 //!
-//! What *is* reachable headlessly is `aura_wgpu::Renderer` via
+//! What *is* reachable headlessly is `taim_wgpu::Renderer` via
 //! `renderer::Headless`, which does construct a real `wgpu::Device`
 //! (skipping only the windowed `Compositor`/surface layer). This test
 //! is deliberately scoped as partial coverage: a baseline "the real
@@ -15,12 +15,12 @@
 //! panicking" smoke test, not a device-loss test per se -- there is no
 //! way to force a real device loss from safe, portable Rust without
 //! hardware/driver cooperation this environment cannot provide.
-use aura_core::Size;
-use aura_wgpu::Renderer;
+use taim_core::Size;
+use taim_wgpu::Renderer;
 
 fn headless_wgpu_renderer() -> Option<Renderer> {
-    aura_futures::futures::executor::block_on(<Renderer as aura_core::renderer::Headless>::new(
-        aura_core::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
         Some("wgpu"),
     ))
 }
@@ -39,13 +39,13 @@ fn a_headless_wgpu_renderer_can_be_constructed_and_screenshotted() {
         return;
     };
 
-    let viewport = aura_core::Rectangle::new(aura_core::Point::ORIGIN, Size::new(64.0, 64.0));
-    let viewport = aura_wgpu::graphics::Viewport::with_physical_size(
+    let viewport = taim_core::Rectangle::new(taim_core::Point::ORIGIN, Size::new(64.0, 64.0));
+    let viewport = taim_wgpu::graphics::Viewport::with_physical_size(
         Size::new(viewport.width as u32, viewport.height as u32),
         1.0,
     );
 
-    let screenshot = renderer.screenshot(&viewport, aura_core::Color::BLACK);
+    let screenshot = renderer.screenshot(&viewport, taim_core::Color::BLACK);
 
     assert_eq!(
         screenshot.len(),

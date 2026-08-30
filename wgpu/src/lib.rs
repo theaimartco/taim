@@ -1,24 +1,24 @@
-//! A [`wgpu`] renderer for [Aura].
+//! A [`wgpu`] renderer for [Taim].
 //!
-//! ![The native path of the Aura ecosystem](https://github.com/theaimartco/vyom-aura/blob/main/docs/graphs/native.png?raw=true)
+//! ![The native path of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/native.png?raw=true)
 //!
 //! [`wgpu`] supports most modern graphics backends: Vulkan, Metal, DX11, and
 //! DX12 (OpenGL and WebGL are still WIP). Additionally, it will support the
 //! incoming [WebGPU API].
 //!
-//! Currently, `aura_wgpu` supports the following primitives:
+//! Currently, `taim_wgpu` supports the following primitives:
 //! - Text, which is rendered using [`glyphon`].
 //! - Quads or rectangles, with rounded borders and a solid background color.
 //! - Clip areas, useful to implement scrollables or hide overflowing content.
 //! - Images and SVG, loaded from memory or the file system.
 //! - Meshes of triangles, useful to draw geometry freely.
 //!
-//! [Aura]: https://github.com/theaimartco/vyom-aura
+//! [Taim]: https://github.com/theaimartco/taim
 //! [`wgpu`]: https://github.com/gfx-rs/wgpu-rs
 //! [WebGPU API]: https://gpuweb.github.io/gpuweb/
 //! [`glyphon`]: https://github.com/grovesNL/glyphon
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(missing_docs)]
@@ -52,9 +52,9 @@ mod image;
 
 use buffer::Buffer;
 
-use aura_debug as debug;
-pub use aura_graphics as graphics;
-pub use aura_graphics::core;
+use taim_debug as debug;
+pub use taim_graphics as graphics;
+pub use taim_graphics::core;
 
 pub use wgpu;
 
@@ -98,10 +98,34 @@ struct RecordingRetainedFrame {
     start: usize,
 }
 
-/// A [`wgpu`] graphics renderer for [`aura`].
+/// What is behind a transmissive quad, captured from the frame.
+///
+/// The whole frame at frame resolution rather than a scissored region: a
+/// refraction offset reaches outside the quad's own bounds by design, and a
+/// region-sized capture would clip exactly the displacement that makes the
+/// effect visible.
+struct QuadBackdrop {
+    texture: wgpu::Texture,
+    bind_group: wgpu::BindGroup,
+    size: wgpu::Extent3d,
+    format: wgpu::TextureFormat,
+}
+
+impl QuadBackdrop {
+    /// Whether this capture can still receive a copy of `texture`.
+    ///
+    /// `copy_texture_to_texture` requires both sides agree on format and
+    /// size, so a resize or a format change has to rebuild rather than
+    /// silently sample a stale frame.
+    fn matches(&self, texture: &wgpu::Texture) -> bool {
+        self.format == texture.format() && self.size == texture.size()
+    }
+}
+
+/// A [`wgpu`] graphics renderer for [`taim`].
 ///
 /// [`wgpu`]: https://github.com/gfx-rs/wgpu-rs
-/// [`aura`]: https://github.com/theaimartco/vyom-aura
+/// [`taim`]: https://github.com/theaimartco/taim
 pub struct Renderer {
     engine: Engine,
     settings: renderer::Settings,
@@ -133,7 +157,7 @@ pub struct Renderer {
     /// Frame-level rather than per-widget: a per-application light produces
     /// surfaces that disagree about where the window is, which reads as
     /// inconsistency rather than as lighting. Set it from
-    /// `aura_design::tokens::MaterialTokens::light`.
+    /// `taim_design::tokens::MaterialTokens::light`.
     light: core::material::SceneLight,
 
     /// Pipelines compatible with the format currently being drawn into.
@@ -147,6 +171,15 @@ pub struct Renderer {
     /// that resolves it onto the surface. `None` on the standard-range path,
     /// which draws straight to the surface exactly as it always has.
     hdr: Option<(display::Target, core::color::DisplayTransform)>,
+
+    /// A copy of the frame as it stood before a transmissive layer drew,
+    /// and the bind group that reads it.
+    ///
+    /// Allocated the first time a quad actually transmits and reused after,
+    /// so an interface with no glass in it never pays for this. Kept keyed
+    /// by size and format so a resize or a format change rebuilds it rather
+    /// than sampling a stale one.
+    quad_backdrop: Option<QuadBackdrop>,
 
     quad: quad::State,
     triangle: triangle::State,
@@ -183,6 +216,7 @@ impl Renderer {
             frame_damage: None,
             light: core::material::SceneLight::KEY,
             hdr: None,
+            quad_backdrop: None,
 
             quad: quad::State::new(),
             triangle: triangle::State::new(&engine.device, &pipelines.triangle),
@@ -248,7 +282,7 @@ impl Renderer {
             self.engine
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("aura_wgpu encoder"),
+                    label: Some("taim_wgpu encoder"),
                 });
 
         self.prepare(&mut encoder, viewport);
@@ -352,19 +386,6 @@ impl Renderer {
         // error at the next draw.
         self.triangle = triangle::State::new(&self.engine.device, &self.pipelines.triangle);
         self.text_viewport = self.pipelines.text.create_viewport(&self.engine.device);
-    }
-
-    /// Sets the light every material responds to.
-    ///
-    /// Takes effect on the next frame. There is deliberately one per renderer
-    /// rather than one per widget.
-    pub fn set_light(&mut self, light: core::material::SceneLight) {
-        self.light = light;
-    }
-
-    /// Returns the light every material responds to.
-    pub fn light(&self) -> core::material::SceneLight {
-        self.light
     }
 
     /// Returns the format this renderer's pipelines currently target.
@@ -501,7 +522,7 @@ impl Renderer {
         };
 
         let texture = self.engine.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("aura_wgpu.offscreen.source_texture"),
+            label: Some("taim_wgpu.offscreen.source_texture"),
             size: texture_extent,
             mip_level_count: 1,
             sample_count: 1,
@@ -529,7 +550,7 @@ impl Renderer {
         );
 
         let output_buffer = self.engine.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("aura_wgpu.offscreen.output_texture_buffer"),
+            label: Some("taim_wgpu.offscreen.output_texture_buffer"),
             size: (dimensions.padded_bytes_per_row * dimensions.height as usize) as u64,
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -720,6 +741,53 @@ impl Renderer {
         }
     }
 
+    /// Allocates the quad backdrop if any layer will transmit this frame.
+    ///
+    /// Hoisted out of the draw loop, which holds `self.layers` borrowed, and
+    /// done once per frame rather than once per transmissive layer -- every
+    /// layer captures the same frame texture at the same size, so they share
+    /// one allocation and differ only in what has been drawn into it by the
+    /// time each copy runs.
+    ///
+    /// Leaves `quad_backdrop` untouched when nothing transmits, so an
+    /// interface with no glass in it never allocates a frame-sized texture.
+    fn prepare_quad_backdrop(&mut self, frame_texture: &wgpu::Texture) {
+        let stale = self
+            .quad_backdrop
+            .as_ref()
+            .is_none_or(|backdrop| !backdrop.matches(frame_texture));
+
+        if !stale {
+            return;
+        }
+
+        let size = frame_texture.size();
+        let format = frame_texture.format();
+
+        let texture = self.engine.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("taim_wgpu::quad backdrop"),
+            size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+
+        let bind_group = self.pipelines.quad.backdrop_bind_group(
+            &self.engine.device,
+            &texture.create_view(&wgpu::TextureViewDescriptor::default()),
+        );
+
+        self.quad_backdrop = Some(QuadBackdrop {
+            texture,
+            bind_group,
+            size,
+            format,
+        });
+    }
+
     fn render(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -730,9 +798,19 @@ impl Renderer {
     ) {
         use std::mem::ManuallyDrop;
 
+        // Before the draw loop, which borrows `self.layers`.
+        eprintln!("DBG layers={} any_needs={}", self.layers.iter().count(), self.layers.iter().any(|layer| layer.quads.needs_backdrop()));
+        for (i, l) in self.layers.iter().enumerate() {
+            eprintln!("DBG   layer {i}: quads_empty={} needs_backdrop={}", l.quads.is_empty(), l.quads.needs_backdrop());
+        }
+        if self.layers.iter().any(|layer| layer.quads.needs_backdrop()) {
+            self.prepare_quad_backdrop(frame_texture);
+            eprintln!("DBG prepared backdrop: {}", self.quad_backdrop.is_some());
+        }
+
         let mut render_pass =
             ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("aura_wgpu render pass"),
+                label: Some("taim_wgpu render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: frame,
                     depth_slice: None,
@@ -815,7 +893,44 @@ impl Renderer {
 
                 render_pass =
                     ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("aura_wgpu render pass"),
+                        label: Some("taim_wgpu render pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: frame,
+                            depth_slice: None,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                        multiview_mask: None,
+                    }));
+            }
+
+            // A transmissive quad refracts what is behind it, so what is
+            // behind it has to be captured before it draws over it. Unlike a
+            // backdrop *effect*, which replaces its region in its own pass,
+            // this is a plain copy: the bending happens per-fragment inside
+            // the quad's own draw.
+            let backdrop = (!layer.quads.is_empty() && layer.quads.needs_backdrop())
+                .then(|| self.quad_backdrop.as_ref())
+                .flatten();
+
+            if let Some(backdrop) = backdrop {
+                let _ = ManuallyDrop::into_inner(render_pass);
+
+                encoder.copy_texture_to_texture(
+                    frame_texture.as_image_copy(),
+                    backdrop.texture.as_image_copy(),
+                    backdrop.size,
+                );
+
+                render_pass =
+                    ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("taim_wgpu render pass"),
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                             view: frame,
                             depth_slice: None,
@@ -839,6 +954,7 @@ impl Renderer {
                     quad_layer,
                     scissor_rect,
                     &layer.quads,
+                    backdrop.map(|backdrop| &backdrop.bind_group),
                     &mut render_pass,
                     &self.metrics,
                 );
@@ -864,7 +980,7 @@ impl Renderer {
 
                 render_pass =
                     ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("aura_wgpu render pass"),
+                        label: Some("taim_wgpu render pass"),
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                             view: frame,
                             depth_slice: None,
@@ -952,7 +1068,7 @@ impl Renderer {
 
                     render_pass =
                         ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                            label: Some("aura_wgpu render pass"),
+                            label: Some("taim_wgpu render pass"),
                             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                                 view: frame,
                                 depth_slice: None,
@@ -1012,7 +1128,7 @@ impl Renderer {
                 );
                 render_pass =
                     ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("aura_wgpu render pass"),
+                        label: Some("taim_wgpu render pass"),
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                             view: frame,
                             depth_slice: None,
@@ -1310,6 +1426,14 @@ impl core::Renderer for Renderer {
         Some(self.scale_factor? * self.layers.transformation().scale_factor())
     }
 
+    fn set_light(&mut self, light: core::material::SceneLight) {
+        self.light = light;
+    }
+
+    fn light(&self) -> core::material::SceneLight {
+        self.light
+    }
+
     fn tick(&mut self) {
         #[cfg(feature = "image")]
         self.image_cache.get_mut().receive();
@@ -1336,10 +1460,10 @@ impl core::text::Renderer for Renderer {
     type Paragraph = Paragraph;
     type Editor = Editor;
 
-    const ICON_FONT: Font = Font::new("Aura-Icons");
+    const ICON_FONT: Font = Font::new("Taim-Icons");
     const CHECKMARK_ICON: char = '\u{f00c}';
     const ARROW_DOWN_ICON: char = '\u{e800}';
-    const AURA_LOGO: char = '\u{e801}';
+    const TAIM_LOGO: char = '\u{e801}';
     const SCROLL_UP_ICON: char = '\u{e802}';
     const SCROLL_DOWN_ICON: char = '\u{e803}';
     const SCROLL_LEFT_ICON: char = '\u{e804}';
@@ -1558,7 +1682,7 @@ impl renderer::Headless for Renderer {
 
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                label: Some("aura_wgpu [headless]"),
+                label: Some("taim_wgpu [headless]"),
                 required_features: wgpu::Features::empty(),
                 required_limits: wgpu::Limits {
                     max_bind_groups: 2,

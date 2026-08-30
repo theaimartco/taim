@@ -15,10 +15,10 @@
 //!
 //! These tests call the public methods an application calls.
 
-use aura::widget::{column, container, row, space, stack};
-use aura::{Element, Point, Size, Theme};
-use aura_renderer::Renderer;
-use aura_runtime::user_interface::{Cache, UserInterface};
+use taim::widget::{column, container, row, space, stack};
+use taim::{Element, Point, Size, Theme};
+use taim_renderer::Renderer;
+use taim_runtime::user_interface::{Cache, UserInterface};
 
 type Message = &'static str;
 
@@ -28,9 +28,9 @@ const WINDOW: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )

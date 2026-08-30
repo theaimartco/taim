@@ -1,10 +1,10 @@
-# Aura Documentation
+# Taim Documentation
 
-Welcome to the official documentation for the **Aura UI Framework** — the GPU-first, zero-compromise GUI framework built in Rust.
+Welcome to the official documentation for the **Taim UI Framework** — the GPU-first, zero-compromise GUI framework built in Rust.
 
 ## 📚 User Guide
 
-Step-by-step guides to learn Aura from scratch:
+Step-by-step guides to learn Taim from scratch:
 
 | Guide | Description |
 |---|---|
@@ -22,7 +22,7 @@ Step-by-step guides to learn Aura from scratch:
 
 ## 🏗️ Architecture
 
-Deep dives into how Aura works internally:
+Deep dives into how Taim works internally:
 
 | Document | Description |
 |---|---|
@@ -38,23 +38,23 @@ Deep dives into how Aura works internally:
 
 ## 🎨 Design
 
-The visual language behind Aura:
+The visual language behind Taim:
 
 | Document | Description |
 |---|---|
-| [Aura Design Language](design/aura-language.md) | Visual principles and component philosophy |
+| [Taim Design Language](design/taim-language.md) | Visual principles and component philosophy |
 | [Motion Language](design/motion-language.md) | Animation principles and timing semantics |
 
 ## ⚡ Performance
 
-Engineering Aura for speed:
+Engineering Taim for speed:
 
 | Document | Description |
 |---|---|
 | [GPU Pipeline](performance/gpu-pipeline.md) | Batching, pipeline cache, atlas management |
 | [Effect Budgets](performance/effect-budgets.md) | Blur, shadow, and mask cost accounting |
 | [Methodology](performance/methodology.md) | How we measure and compare performance |
-| [1.0 Report](performance/aura-1.0-report.md) | Benchmark results and analysis |
+| [1.0 Report](performance/taim-1.0-report.md) | Benchmark results and analysis |
 
 ## 🧪 Testing
 
@@ -75,7 +75,7 @@ Quality assurance infrastructure:
 
 | Document | Description |
 |---|---|
-| [Aura Lab](tools/aura-lab.md) | Widget inspector, layout overlay, frame profiler |
+| [Taim Lab](tools/taim-lab.md) | Widget inspector, layout overlay, frame profiler |
 
 ## 🔧 Operations
 

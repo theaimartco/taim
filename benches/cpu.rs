@@ -1,16 +1,16 @@
 #![allow(missing_docs)]
 use criterion::{Bencher, Criterion, criterion_group, criterion_main};
 
-use aura::border;
-use aura::mouse;
-use aura::widget::{canvas, center_y, column, container, row, scrollable, space, text};
-use aura::{Center, Color, Element, Fill, Length, Never, Point, Rectangle, Size, Theme};
-use aura_renderer::Renderer;
-use aura_renderer::core::renderer::{self, Headless as _};
-use aura_runtime::UserInterface;
-use aura_runtime::user_interface;
+use taim::border;
+use taim::mouse;
+use taim::widget::{canvas, center_y, column, container, row, scrollable, space, text};
+use taim::{Center, Color, Element, Fill, Length, Never, Point, Rectangle, Size, Theme};
+use taim_renderer::Renderer;
+use taim_renderer::core::renderer::{self, Headless as _};
+use taim_runtime::UserInterface;
+use taim_runtime::user_interface;
 
-use aura_futures::futures::executor;
+use taim_futures::futures::executor;
 
 criterion_main!(benches);
 criterion_group!(benches, benchmark);

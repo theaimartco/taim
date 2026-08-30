@@ -1,6 +1,6 @@
 //! Propagation, clearing, and revision wrap-policy tests for
-//! [`aura_core::widget::tree::DirtyFlags`] and
-//! [`aura_core::widget::tree::Revision`].
+//! [`taim_core::widget::tree::DirtyFlags`] and
+//! [`taim_core::widget::tree::Revision`].
 //!
 //! Unit tests colocated in `core/src/widget/tree.rs` already cover each
 //! primitive in isolation; this file instead exercises them the way a
@@ -11,7 +11,7 @@
 //! propagation manually to prove the primitives compose the way that
 //! future caller will need.
 
-use aura::advanced::widget::tree::{self, DirtyFlags, Revision, Tree};
+use taim::advanced::widget::tree::{self, DirtyFlags, Revision, Tree};
 
 /// A minimal stand-in for "a container noticed one of its children is
 /// dirty and marked itself dirty too," which is the propagation rule

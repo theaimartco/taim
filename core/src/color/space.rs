@@ -3,7 +3,7 @@
 //!
 //! # The scene-referred scale
 //!
-//! Aura composites in a *scene-referred* linear signal. Throughout the
+//! Taim composites in a *scene-referred* linear signal. Throughout the
 //! framework, and unless a function says otherwise in its own
 //! documentation, a linear value of
 //!
@@ -41,7 +41,7 @@ pub const DIFFUSE_WHITE_NITS: f32 = 203.0;
 /// The peak luminance the PQ transfer function is defined against, in nits.
 pub const PQ_PEAK_NITS: f32 = 10_000.0;
 
-/// Converts an absolute luminance into Aura's scene-referred scale.
+/// Converts an absolute luminance into Taim's scene-referred scale.
 #[must_use]
 pub fn nits_to_scene(nits: f32) -> f32 {
     nits / DIFFUSE_WHITE_NITS
@@ -360,7 +360,7 @@ impl ColorSpace {
         peak_nits: 1_000.0,
     };
 
-    /// Aura's compositing space: Rec. 2020 primaries, linear light, on the
+    /// Taim's compositing space: Rec. 2020 primaries, linear light, on the
     /// scene-referred scale described in this module's documentation.
     pub const COMPOSITING: Self = Self {
         primaries: Primaries::Rec2020,

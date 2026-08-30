@@ -9,7 +9,7 @@
 //! allocation"). A change to any tier's contract must update this oracle
 //! deliberately, exactly as re-approving a golden image would.
 
-use aura_graphics::quality::Tier;
+use taim_graphics::quality::Tier;
 
 const ALL_TIERS: [Tier; 4] = [Tier::Ultra, Tier::Balanced, Tier::Efficient, Tier::Recovery];
 

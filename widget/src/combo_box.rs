@@ -2,10 +2,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
 //! #
-//! use aura::widget::combo_box;
+//! use taim::widget::combo_box;
 //!
 //! struct State {
 //!    fruits: combo_box::State<Fruit>,
@@ -75,10 +75,10 @@ use std::fmt::Display;
 ///
 /// # Example
 /// ```no_run
-/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+/// # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
 /// #
-/// use aura::widget::combo_box;
+/// use taim::widget::combo_box;
 ///
 /// struct State {
 ///    fruits: combo_box::State<Fruit>,

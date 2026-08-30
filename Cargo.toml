@@ -1,5 +1,5 @@
 [package]
-name = "aura"
+name = "taim"
 description = "A cross-platform GUI library inspired by Elm"
 version.workspace = true
 edition.workspace = true
@@ -22,7 +22,7 @@ all-features = true
 maintenance = { status = "actively-developed" }
 
 [features]
-# `fira-sans` is default so an Aura application renders identically on every
+# `fira-sans` is default so an Taim application renders identically on every
 # machine. Without it text falls back to whatever the host happens to have
 # installed, which is not a look a framework can claim to control. Costs
 # ~430 KiB in the binary; see scripts/ci/check-budgets.sh.
@@ -34,40 +34,40 @@ maintenance = { status = "actively-developed" }
 # `docs/architecture/color-pipeline.md` and `tests/color/contract.rs`.
 default = ["wgpu", "tiny-skia", "crisp", "hinting", "thread-pool", "linux-theme-detection", "x11", "wayland", "fira-sans"]
 # Enables the `wgpu` GPU-accelerated renderer with all its default features (Vulkan, Metal, DX12, OpenGL, and WebGPU)
-wgpu = ["wgpu-bare", "aura_renderer/wgpu"]
+wgpu = ["wgpu-bare", "taim_renderer/wgpu"]
 # Enables the `wgpu` GPU-accelerated renderer with the minimum required features (no backends!)
-wgpu-bare = ["aura_renderer/wgpu-bare", "aura_widget/wgpu"]
+wgpu-bare = ["taim_renderer/wgpu-bare", "taim_widget/wgpu"]
 # Enables the `tiny-skia` software renderer
-tiny-skia = ["aura_renderer/tiny-skia"]
+tiny-skia = ["taim_renderer/tiny-skia"]
 # Enables the `image` widget and image clipboard support
-image = ["image-without-codecs", "image/default", "aura_winit/image"]
+image = ["image-without-codecs", "image/default", "taim_winit/image"]
 # Enables the `image` widget, without any built-in codecs of the `image` crate
-image-without-codecs = ["aura_widget/image", "dep:image"]
+image-without-codecs = ["taim_widget/image", "dep:image"]
 # Enables the `svg` widget
-svg = ["aura_widget/svg"]
+svg = ["taim_widget/svg"]
 # Enables the `canvas` widget
-canvas = ["aura_widget/canvas"]
+canvas = ["taim_widget/canvas"]
 # Enables the `qr_code` widget
-qr_code = ["aura_widget/qr_code"]
+qr_code = ["taim_widget/qr_code"]
 # Enables the `markdown` widget
-markdown = ["aura_widget/markdown"]
-# Makes `aura_design::Theme` usable as the theme for every widget with an
-# Aura counterpart, so real controls render from Aura's semantic tokens
-# (see docs/design/aura-language.md). Depend on `aura-design` directly to
+markdown = ["taim_widget/markdown"]
+# Makes `taim_design::Theme` usable as the theme for every widget with an
+# Taim counterpart, so real controls render from Taim's semantic tokens
+# (see docs/design/taim-language.md). Depend on `taim-design` directly to
 # name the theme type.
-aura = ["aura_widget/aura"]
+taim = ["taim_widget/taim"]
 # Enables lazy widgets
-lazy = ["aura_widget/lazy"]
+lazy = ["taim_widget/lazy"]
 # Enables hot reloading (very experimental!)
-hot = ["aura_debug/hot"]
+hot = ["taim_debug/hot"]
 # Enables the `thread-pool` futures executor as the `executor::Default` on native platforms
-thread-pool = ["aura_futures/thread-pool"]
+thread-pool = ["taim_futures/thread-pool"]
 # Enables `tokio` as the `executor::Default` on native platforms
-tokio = ["aura_futures/tokio"]
+tokio = ["taim_futures/tokio"]
 # Enables `smol` as the `executor::Default` on native platforms
-smol = ["aura_futures/smol"]
+smol = ["taim_futures/smol"]
 # Enables querying system information
-sysinfo = ["aura_winit/sysinfo"]
+sysinfo = ["taim_winit/sysinfo"]
 # Legacy compatibility: blends in gamma space, reproducing the Web's colour
 # management. Opt-in only.
 #
@@ -75,63 +75,63 @@ sysinfo = ["aura_winit/sysinfo"]
 # wrong operation, and it changes every translucent surface, antialiased glyph
 # edge, and soft shadow in the framework. It exists for callers who must match
 # a browser's output exactly. Enabling it disables
-# `aura_graphics::color::GAMMA_CORRECTION` and makes
-# `aura_core::renderer::Quad::luminance` inert, because there is no linear
+# `taim_graphics::color::GAMMA_CORRECTION` and makes
+# `taim_core::renderer::Quad::luminance` inert, because there is no linear
 # light in the pipeline for a luminance multiplier to scale.
-web-colors = ["aura_renderer/web-colors"]
+web-colors = ["taim_renderer/web-colors"]
 # Enables pixel snapping for crisp edges by default (can cause jitter!)
-crisp = ["aura_core/crisp"]
+crisp = ["taim_core/crisp"]
 # Enables the WebGL backend
-webgl = ["aura_renderer/webgl"]
+webgl = ["taim_renderer/webgl"]
 # Enables syntax highlighting for the `markdown` widget and the
-# `text_editor` widget, via the dependency-free `aura-highlighter` crate
-highlighter = ["dep:aura-highlighter", "aura_widget/highlighter"]
+# `text_editor` widget, via the dependency-free `taim-highlighter` crate
+highlighter = ["dep:taim-highlighter", "taim_widget/highlighter"]
 # Enables the advanced module
-advanced = ["aura_core/advanced", "aura_widget/advanced"]
+advanced = ["taim_core/advanced", "taim_widget/advanced"]
 # Embeds Fira Sans into the final application; useful for testing and Wasm builds
-fira-sans = ["aura_renderer/fira-sans"]
+fira-sans = ["taim_renderer/fira-sans"]
 # Enables basic text shaping by default
-basic-shaping = ["aura_core/basic-shaping"]
+basic-shaping = ["taim_core/basic-shaping"]
 # Enables advanced text shaping by default
-advanced-shaping = ["aura_core/advanced-shaping"]
+advanced-shaping = ["taim_core/advanced-shaping"]
 # Enables rendering hints (e.g. metrics hinting)
-hinting = ["aura_winit/hinting"]
+hinting = ["taim_winit/hinting"]
 # Enables strict assertions for debugging purposes at the expense of performance
-strict-assertions = ["aura_renderer/strict-assertions"]
+strict-assertions = ["taim_renderer/strict-assertions"]
 # Redraws on every runtime event, and not only when a widget requests it
-unconditional-rendering = ["aura_winit/unconditional-rendering"]
+unconditional-rendering = ["taim_winit/unconditional-rendering"]
 # Enables support for the `sipper` library
-sipper = ["aura_runtime/sipper"]
+sipper = ["taim_runtime/sipper"]
 # Enables Linux system theme detection
-linux-theme-detection = ["aura_winit/linux-theme-detection"]
+linux-theme-detection = ["taim_winit/linux-theme-detection"]
 # Enables the Unix X11 backend
-x11 = ["aura_renderer/x11", "aura_winit/x11"]
+x11 = ["taim_renderer/x11", "taim_winit/x11"]
 # Enables the Unix Wayland backend
-wayland = ["aura_renderer/wayland", "aura_winit/wayland"]
+wayland = ["taim_renderer/wayland", "taim_winit/wayland"]
 # Enables the VYOM platform backend
-vyom = ["dep:aura-platform-vyom"]
+vyom = ["dep:taim-platform-vyom"]
 # Delivers the semantic tree to assistive technology over AT-SPI.
 #
-# Aura builds a retained semantic tree every frame regardless; this is what
+# Taim builds a retained semantic tree every frame regardless; this is what
 # carries it to a screen reader. Without it the tree is diffed, translated,
 # and pushed into an in-memory queue nothing drains -- which is what the
 # framework did for its whole existence (Capstone.md F-15).
-accessibility = ["aura_winit/accessibility"]
+accessibility = ["taim_winit/accessibility"]
 
 [dependencies]
-aura_debug.workspace = true
-aura_core.workspace = true
-aura_futures.workspace = true
-aura_renderer.workspace = true
-aura_runtime.workspace = true
-aura_widget.workspace = true
-aura_winit.workspace = true
+taim_debug.workspace = true
+taim_core.workspace = true
+taim_futures.workspace = true
+taim_renderer.workspace = true
+taim_runtime.workspace = true
+taim_widget.workspace = true
+taim_winit.workspace = true
 
-aura-highlighter.workspace = true
-aura-highlighter.optional = true
+taim-highlighter.workspace = true
+taim-highlighter.optional = true
 
-aura-platform-vyom.workspace = true
-aura-platform-vyom.optional = true
+taim-platform-vyom.workspace = true
+taim-platform-vyom.optional = true
 
 thiserror.workspace = true
 
@@ -139,22 +139,22 @@ image.workspace = true
 image.optional = true
 
 [dev-dependencies]
-aura-accessibility.workspace = true
-aura-design.workspace = true
-aura-gesture.workspace = true
-aura-profiler.workspace = true
-aura-motion.workspace = true
-aura-platform-vyom.workspace = true
+taim-accessibility.workspace = true
+taim-design.workspace = true
+taim-gesture.workspace = true
+taim-profiler.workspace = true
+taim-motion.workspace = true
+taim-platform-vyom.workspace = true
 criterion = "0.5"
-aura_wgpu.workspace = true
-aura_renderer.workspace = true
-aura_graphics.workspace = true
+taim_wgpu.workspace = true
+taim_renderer.workspace = true
+taim_graphics.workspace = true
 # The CPU backend, so `tests/color/output.rs` can assert what reaches a
 # presentation target on a machine with no GPU.
-aura_tiny_skia.workspace = true
+taim_tiny_skia.workspace = true
 
 # `default-features = false` is load-bearing, not tidiness. Without it this
-# edge re-enabled the `aura` crate's whole default set inside every
+# edge re-enabled the `taim` crate's whole default set inside every
 # integration test, so `cargo test --no-default-features` was a no-op and
 # `web-colors` was silently on in every configuration -- which is why the
 # framework blended in gamma space for its entire history with 1,800 tests
@@ -162,10 +162,10 @@ aura_tiny_skia.workspace = true
 #
 # Features are listed explicitly. Adding one here changes what every
 # integration test exercises, so it should be a deliberate act.
-aura.workspace = true
-aura.features = [
+taim.workspace = true
+taim.features = [
     "advanced",
-    "aura",
+    "taim",
     "wgpu",
     "tiny-skia",
     "crisp",
@@ -177,8 +177,8 @@ aura.features = [
     "wayland",
 ]
 
-# Used by tests/bench/report_schema.rs to parse aura_bench's JSON report
-# output as a black box (aura_bench is a bin-only crate, so its own
+# Used by tests/bench/report_schema.rs to parse taim_bench's JSON report
+# output as a black box (taim_bench is a bin-only crate, so its own
 # `Report` type is not otherwise reachable from this directory).
 serde_json = "1.0"
 
@@ -204,14 +204,14 @@ strip = "symbols"
 
 [workspace]
 members = [
-    "aura-accessibility",
-    "aura-design",
-    "aura-gesture",
-    "aura-highlighter",
-    "aura-motion",
-    "aura-platform-vyom",
-    "aura-profiler",
-    "aura-showcase",
+    "taim-accessibility",
+    "taim-design",
+    "taim-gesture",
+    "taim-highlighter",
+    "taim-motion",
+    "taim-platform-vyom",
+    "taim-profiler",
+    "taim-showcase",
     "core",
     "debug",
     "examples/mobile_shell",
@@ -221,8 +221,8 @@ members = [
     "renderer",
     "runtime",
     "tiny_skia",
-    "tools/aura_bench",
-    "tools/aura_lab",
+    "tools/taim_bench",
+    "tools/taim_lab",
     "wgpu",
     "widget",
     "winit",
@@ -231,43 +231,43 @@ members = [
 [workspace.package]
 version = "0.15.0-dev"
 authors = [
-    "VYOM Aura contributors",
-    # Aura is a fork of `iced`; the upstream architecture and a large part
+    "VYOM Taim contributors",
+    # Taim is a fork of `iced`; the upstream architecture and a large part
     # of the widget/renderer code originate there. See CREDITS.md.
     "Héctor Ramón Jiménez <hector@hecrj.dev>",
 ]
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/theaimartco/vyom-aura"
-homepage = "https://github.com/theaimartco/vyom-aura"
+repository = "https://github.com/theaimartco/taim"
+homepage = "https://github.com/theaimartco/taim"
 categories = ["gui"]
 keywords = ["gui", "ui", "graphics", "vyom", "wayland"]
 rust-version = "1.92"
 
 [workspace.dependencies]
 zbus = "5.17"
-aura-accessibility = { version = "0.15.0-dev", path = "aura-accessibility" }
-aura-design = { version = "0.15.0-dev", path = "aura-design" }
-aura-gesture = { version = "0.15.0-dev", path = "aura-gesture" }
-aura-highlighter = { version = "0.15.0-dev", path = "aura-highlighter" }
-aura-motion = { version = "0.15.0-dev", path = "aura-motion", default-features = false }
-aura-platform-vyom = { version = "0.15.0-dev", path = "aura-platform-vyom" }
-aura-profiler = { version = "0.15.0-dev", path = "aura-profiler" }
+taim-accessibility = { version = "0.15.0-dev", path = "taim-accessibility" }
+taim-design = { version = "0.15.0-dev", path = "taim-design" }
+taim-gesture = { version = "0.15.0-dev", path = "taim-gesture" }
+taim-highlighter = { version = "0.15.0-dev", path = "taim-highlighter" }
+taim-motion = { version = "0.15.0-dev", path = "taim-motion", default-features = false }
+taim-platform-vyom = { version = "0.15.0-dev", path = "taim-platform-vyom" }
+taim-profiler = { version = "0.15.0-dev", path = "taim-profiler" }
 # `default-features = false` here rather than at the dev-dependency, because
 # Cargo forbids an inherited dependency from overriding it. See the
 # dev-dependencies section for why it matters.
-aura = { version = "0.15.0-dev", path = ".", default-features = false }
-aura_core = { version = "0.15.0-dev", path = "core" }
-aura_debug = { version = "0.15.0-dev", path = "debug" }
-aura_futures = { version = "0.15.0-dev", path = "futures" }
-aura_graphics = { version = "0.15.0-dev", path = "graphics" }
-aura_program = { version = "0.15.0-dev", path = "program" }
-aura_renderer = { version = "0.15.0-dev", path = "renderer" }
-aura_runtime = { version = "0.15.0-dev", path = "runtime" }
-aura_tiny_skia = { version = "0.15.0-dev", path = "tiny_skia", default-features = false }
-aura_wgpu = { version = "0.15.0-dev", path = "wgpu", default-features = false }
-aura_widget = { version = "0.15.0-dev", path = "widget" }
-aura_winit = { version = "0.15.0-dev", path = "winit", default-features = false }
+taim = { version = "0.15.0-dev", path = ".", default-features = false }
+taim_core = { version = "0.15.0-dev", path = "core" }
+taim_debug = { version = "0.15.0-dev", path = "debug" }
+taim_futures = { version = "0.15.0-dev", path = "futures" }
+taim_graphics = { version = "0.15.0-dev", path = "graphics" }
+taim_program = { version = "0.15.0-dev", path = "program" }
+taim_renderer = { version = "0.15.0-dev", path = "renderer" }
+taim_runtime = { version = "0.15.0-dev", path = "runtime" }
+taim_tiny_skia = { version = "0.15.0-dev", path = "tiny_skia", default-features = false }
+taim_wgpu = { version = "0.15.0-dev", path = "wgpu", default-features = false }
+taim_widget = { version = "0.15.0-dev", path = "widget" }
+taim_winit = { version = "0.15.0-dev", path = "winit", default-features = false }
 
 arboard = { version = "3.6", default-features = false }
 bincode = "1.3"

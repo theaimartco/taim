@@ -1,4 +1,4 @@
-# The Aura accessibility contract
+# The Taim accessibility contract
 
 > Status: Phase 13 baseline. This document describes how a semantic tree
 > is produced, retained, diffed, focused, and delivered; the authoring
@@ -21,7 +21,7 @@ runtime::semantics::build  ◄───────────┘
         │                   forest assembly, skips clean subtrees
         ▼                   (runtime/src/semantics.rs)
 accessibility::Tree         retained, indexed by stable Id, diffable
-        │                   (aura-accessibility)
+        │                   (taim-accessibility)
         ├──► Tree::diff ──► Change[] ──► adapter ──► platform
         ├──► Focus          traversal, scopes, restoration
         ├──► Router         action routing back to identity
@@ -81,7 +81,7 @@ fixed. `tests/accessibility/user_interface.rs` pins it.
 
 ## Identity
 
-`aura_core::semantics::Node::id` is **required**, not optional, because
+`taim_core::semantics::Node::id` is **required**, not optional, because
 every consumer downstream — diffing, focus, action routing, focus
 restoration — needs a key that survives a rebuild.
 
@@ -317,8 +317,8 @@ an adapter cannot recover what assembly threw away.
 | "incremental semantic output matches full rebuild oracle" | **Met** | `Tree::diff`/`apply` against `Tree::from_forest`, proven over hand-built cases and a generated mutation matrix. |
 | "focus never becomes lost or trapped unintentionally" | **Met** | Node removal, becoming disabled, abandoned traps, nested restore, empty scopes — each with a test that creates the failure and asserts recovery. |
 | "live regions do not leak secure/private text" | **Met** | Enforced at the only entry point, checked against the node's role rather than the caller's honesty. |
-| "all Aura components have semantic snapshots/actions" | **Partially met** | Ten widgets plus `pick_list`'s dropdown report semantics, each proven into the real engine *by a test*. Four of the formerly contract-only `aura-design` components now have real widgets (`icon_button`, `list_tile`, `app_bar`, `dialog`); **six still have none** (`bottom_sheet`, `menu`, `toast`, `notification`, `navigation`, `window_chrome`) — they declare `role()`/`actions()` as contracts, and nothing renders or reports them. Most catalogued widgets (`scrollable`, `combo_box`, `text_editor`, `table`, `pane_grid`, …) still report nothing. |
-| "large text and high contrast remain usable on all device profiles" | **Partially met** | High contrast is enforced and tested (`aura-design` pins the AAA bar and sweeps every component × state × scheme). **Large text is not tested**, and "usable on all device profiles" is partly a visual judgement — the same class of clause left explicitly unmet in Phase 11. There is no watch profile. |
+| "all Taim components have semantic snapshots/actions" | **Partially met** | Ten widgets plus `pick_list`'s dropdown report semantics, each proven into the real engine *by a test*. Four of the formerly contract-only `taim-design` components now have real widgets (`icon_button`, `list_tile`, `app_bar`, `dialog`); **six still have none** (`bottom_sheet`, `menu`, `toast`, `notification`, `navigation`, `window_chrome`) — they declare `role()`/`actions()` as contracts, and nothing renders or reports them. Most catalogued widgets (`scrollable`, `combo_box`, `text_editor`, `table`, `pane_grid`, …) still report nothing. |
+| "large text and high contrast remain usable on all device profiles" | **Partially met** | High contrast is enforced and tested (`taim-design` pins the AAA bar and sweeps every component × state × scheme). **Large text is not tested**, and "usable on all device profiles" is partly a visual judgement — the same class of clause left explicitly unmet in Phase 11. There is no watch profile. |
 | Platform delivery | **Not met** | `adapter.rs` defines the trait and capability negotiation. **No platform adapter exists**: nothing bridges to AT-SPI, UIA, or AX. An application can now assemble its semantic forest via `UserInterface::semantics`, and there is nothing at the far end to deliver it to. |
 
 ## Follow-ups carried forward
@@ -327,7 +327,7 @@ an adapter cannot recover what assembly threw away.
    exists, every guarantee here is inspectable but not *usable* by an
    actual screen reader — the largest remaining gap in this phase.
 2. **Semantics for the remaining widgets**, and real widgets for the
-   `aura-design` components that are contracts only (`bottom_sheet`,
+   `taim-design` components that are contracts only (`bottom_sheet`,
    `menu`, `toast`, `notification`, `navigation`, `window_chrome`).
 3. **`Role::Image` is reported by nothing**, so an `image` has no
    alternative text and no way to declare one. A decorative image should

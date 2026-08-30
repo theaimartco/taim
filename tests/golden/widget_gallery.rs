@@ -8,8 +8,8 @@
 //! not exist. A change that rendered every button as a black rectangle
 //! passed the entire suite.
 //!
-//! That was not hypothetical. `graphics/fonts/Aura-Icons.ttf` declared the
-//! family `Iced-Icons` while both renderers asked for `Aura-Icons`, so every
+//! That was not hypothetical. `graphics/fonts/Taim-Icons.ttf` declared the
+//! family `Iced-Icons` while both renderers asked for `Taim-Icons`, so every
 //! checkmark, dropdown arrow, and scrollbar arrow in the framework resolved
 //! to a missing glyph -- for as long as the fork has existed, through 1,705
 //! passing tests, because not one of them looked at a pixel.
@@ -25,21 +25,21 @@
 //! # Adopting a golden
 //!
 //! ```bash
-//! AURA_UPDATE_GOLDEN=1 cargo test --test golden
+//! TAIM_UPDATE_GOLDEN=1 cargo test --test golden
 //! ```
 //!
 //! Deliberately awkward. Read `harness`'s module docs before doing it.
 
 use super::harness::{Harness, Image, Tolerance};
 
-use aura::widget::icon::{self, Icon};
-use aura::widget::segmented_control::Segment;
-use aura::widget::tabs::Tab;
-use aura::widget::{
+use taim::widget::icon::{self, Icon};
+use taim::widget::segmented_control::Segment;
+use taim::widget::tabs::Tab;
+use taim::widget::{
     accordion, avatar, badge, button, checkbox, chip, column, container, progress_bar, radio, row,
     search_bar, segmented_control, skeleton, slider, stepper, tabs, text, text_input, toggler,
 };
-use aura::{Center, Element, Size, Theme};
+use taim::{Center, Element, Size, Theme};
 
 /// No message is ever produced: these are pictures, not interactions.
 type Case<'a> = Element<'a, ()>;
@@ -344,16 +344,16 @@ fn icon_sizes() {
 #[test]
 fn app_bar_with_title() {
     check("app_bar", (300, 72), Tolerance::TEXT, || {
-        aura::widget::app_bar(text("Inbox").size(18)).into()
+        taim::widget::app_bar(text("Inbox").size(18)).into()
     });
 }
 
 #[test]
 fn bottom_nav_bar_selected() {
-    use aura::widget::bottom_nav_bar::Item;
+    use taim::widget::bottom_nav_bar::Item;
 
     check("bottom_nav_bar", (300, 80), Tolerance::TEXT, || {
-        aura::widget::bottom_nav_bar(
+        taim::widget::bottom_nav_bar(
             [
                 (Icon::HOME, "Home"),
                 (Icon::SEARCH, "Search"),
@@ -378,7 +378,7 @@ fn bottom_nav_bar_selected() {
 #[test]
 fn list_tile_row() {
     check("list_tile", (300, 72), Tolerance::TEXT, || {
-        aura::widget::list_tile(text("Ada Lovelace").size(15))
+        taim::widget::list_tile(text("Ada Lovelace").size(15))
             .on_press(())
             .into()
     });
@@ -387,14 +387,14 @@ fn list_tile_row() {
 #[test]
 fn snackbar_visible() {
     check("snackbar", (300, 96), Tolerance::TEXT, || {
-        aura::widget::snackbar(text("Message sent").size(14), true).into()
+        taim::widget::snackbar(text("Message sent").size(14), true).into()
     });
 }
 
 #[test]
 fn carousel_dots() {
     check("carousel", (280, 120), Tolerance::TEXT, || {
-        aura::widget::carousel((0..3).map(|page| {
+        taim::widget::carousel((0..3).map(|page| {
             container(text(format!("Page {page}")).size(15))
                 .padding(20)
                 .into()
@@ -406,7 +406,7 @@ fn carousel_dots() {
 #[test]
 fn icon_button_glyph() {
     check("icon_button", (72, 72), Tolerance::TEXT, || {
-        aura::widget::icon_button(Icon::SETTINGS.codepoint(), "Settings")
+        taim::widget::icon_button(Icon::SETTINGS.codepoint(), "Settings")
             .font(icon::FONT)
             .on_press(())
             .into()
@@ -415,10 +415,10 @@ fn icon_button_glyph() {
 
 #[test]
 fn date_picker_month() {
-    use aura::widget::date::Date;
+    use taim::widget::date::Date;
 
     check("date_picker", (320, 300), Tolerance::TEXT, || {
-        aura::widget::date_picker(Date::new(2026, 8, 1))
+        taim::widget::date_picker(Date::new(2026, 8, 1))
             .selected(Date::new(2026, 8, 20))
             .today(Date::new(2026, 8, 13))
             .on_select(|_| ())
@@ -428,10 +428,10 @@ fn date_picker_month() {
 
 #[test]
 fn time_picker_columns() {
-    use aura::widget::time_picker::Time;
+    use taim::widget::time_picker::Time;
 
     check("time_picker", (240, 200), Tolerance::TEXT, || {
-        aura::widget::time_picker(Time::new(9, 30))
+        taim::widget::time_picker(Time::new(9, 30))
             .minute_step(15)
             .on_change(|_| ())
             .into()
@@ -457,7 +457,7 @@ fn badge_dot_and_count() {
 #[test]
 fn pull_to_refresh_idle() {
     check("pull_to_refresh", (280, 120), Tolerance::TEXT, || {
-        aura::widget::pull_to_refresh(container(text("Pull me").size(14)).padding(20), false)
+        taim::widget::pull_to_refresh(container(text("Pull me").size(14)).padding(20), false)
             .on_refresh(())
             .into()
     });

@@ -13,11 +13,11 @@
 //! the property on each, so the guarantee does not rest on whichever
 //! cases happened to occur to whoever wrote the test.
 
-use aura_accessibility::tree::{Change, Tree};
+use taim_accessibility::tree::{Change, Tree};
 
-use aura_core::semantics::{Actions, Live, Node, Role, State, Value};
-use aura_core::widget::Id;
-use aura_core::{Point, Rectangle, Size};
+use taim_core::semantics::{Actions, Live, Node, Role, State, Value};
+use taim_core::widget::Id;
+use taim_core::{Point, Rectangle, Size};
 
 /// A fixed cast of identities, so a mutation can refer to the same node
 /// across two independently-built forests.

@@ -23,11 +23,11 @@
 //! nothing after the first time, and that device-global state survives the
 //! switch — because the cheap wrong fix is to rebuild the engine.
 
-use aura_core::Renderer as _;
-use aura_core::{Color, Rectangle, Size};
-use aura_wgpu::graphics::{Shell, Viewport};
-use aura_wgpu::wgpu;
-use aura_wgpu::{Engine, Renderer};
+use taim_core::Renderer as _;
+use taim_core::{Color, Rectangle, Size};
+use taim_wgpu::graphics::{Shell, Viewport};
+use taim_wgpu::wgpu;
+use taim_wgpu::{Engine, Renderer};
 
 const SIDE: u32 = 32;
 
@@ -50,7 +50,7 @@ fn renderer_preferring(format: wgpu::TextureFormat) -> Option<Renderer> {
         ..wgpu::InstanceDescriptor::new_without_display_handle()
     });
 
-    aura_futures::futures::executor::block_on(async {
+    taim_futures::futures::executor::block_on(async {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -79,7 +79,7 @@ fn renderer_preferring(format: wgpu::TextureFormat) -> Option<Renderer> {
 
         Some(Renderer::new(
             engine,
-            aura_core::renderer::Settings::default(),
+            taim_core::renderer::Settings::default(),
         ))
     })
 }
@@ -104,7 +104,7 @@ fn render_into(renderer: &mut Renderer, format: wgpu::TextureFormat) {
     renderer.reset(Rectangle::with_size(Size::new(SIDE as f32, SIDE as f32)));
 
     renderer.fill_quad(
-        aura_core::renderer::Quad {
+        taim_core::renderer::Quad {
             bounds: Rectangle {
                 x: 4.0,
                 y: 4.0,
@@ -215,7 +215,7 @@ fn an_hdr_frame_does_not_require_an_hdr_engine() {
 
     renderer.reset(Rectangle::with_size(Size::new(SIDE as f32, SIDE as f32)));
     renderer.fill_quad(
-        aura_core::renderer::Quad {
+        taim_core::renderer::Quad {
             bounds: Rectangle {
                 x: 0.0,
                 y: 0.0,
@@ -252,6 +252,6 @@ fn an_hdr_frame_does_not_require_an_hdr_engine() {
         &view,
         format,
         &viewport,
-        aura_core::color::Display::P3_EXTENDED,
+        taim_core::color::Display::P3_EXTENDED,
     );
 }

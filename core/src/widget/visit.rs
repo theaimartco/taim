@@ -26,8 +26,8 @@
 //!
 //! Both of the framework's whole-tree traversals ride on this:
 //!
-//! - `aura_runtime::semantics::build` — accessibility forest assembly.
-//! - `aura_runtime::hit_test` — the linear oracle and the spatial
+//! - `taim_runtime::semantics::build` — accessibility forest assembly.
+//! - `taim_runtime::hit_test` — the linear oracle and the spatial
 //!   `Index`, and through them pointer/gesture routing.
 //!
 //! They share one hook deliberately. A second, parallel children hook

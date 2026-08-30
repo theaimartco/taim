@@ -2,9 +2,9 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-//! use aura::widget::{button, snackbar, stack, text};
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+//! use taim::widget::{button, snackbar, stack, text};
 //!
 //! #[derive(Clone)]
 //! enum Message {
@@ -29,7 +29,7 @@
 //!
 //! # It announces itself
 //!
-//! A snackbar reports [`Live::Polite`](aura_core::semantics::Live::Polite),
+//! A snackbar reports [`Live::Polite`](taim_core::semantics::Live::Polite),
 //! so a screen reader speaks it when it appears without interrupting
 //! whatever the user was already hearing. A transient message that is
 //! only visible is not a message a blind user ever receives, and a
@@ -710,7 +710,7 @@ impl Catalog for Theme {
     }
 }
 
-/// The default styling of a [`Snackbar`] for aura's own theme.
+/// The default styling of a [`Snackbar`] for taim's own theme.
 ///
 /// A snackbar deliberately inverts the page: it is a notice layered over
 /// content, and matching the surface it floats above would make it read

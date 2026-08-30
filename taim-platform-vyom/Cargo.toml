@@ -1,0 +1,27 @@
+[package]
+name = "taim-platform-vyom"
+description = "Native Wayland platform backend for the VYOM compositor"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[features]
+default = []
+atspi = ["taim-accessibility/atspi"]
+
+[dependencies]
+taim-accessibility.workspace = true
+taim_core.workspace = true
+taim-gesture.workspace = true
+rustc-hash.workspace = true
+thiserror.workspace = true
+wayland-client = "0.31.14"
+wayland-protocols = { version = "0.32.13", features = ["client", "staging"] }
+
+[lints]
+workspace = true

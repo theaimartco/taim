@@ -65,7 +65,7 @@ impl FrameContext {
 
 /// A graphics compositor that can draw to windows.
 pub trait Compositor: Sized {
-    /// The aura renderer of the backend.
+    /// The taim renderer of the backend.
     type Renderer;
 
     /// The surface of the backend.

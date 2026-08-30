@@ -4,10 +4,10 @@
 //! hits, misses, revision invalidation, resource generation staleness,
 //! LRU eviction under budget pressure, and telemetry reporting.
 
-use aura_graphics::core::widget::tree::Revision;
-use aura_graphics::core::{Point, Rectangle, Size, Transformation};
-use aura_graphics::display_list::{Command, DisplayListBuilder, Generation};
-use aura_graphics::retained_layer::{
+use taim_graphics::core::widget::tree::Revision;
+use taim_graphics::core::{Point, Rectangle, Size, Transformation};
+use taim_graphics::display_list::{Command, DisplayListBuilder, Generation};
+use taim_graphics::retained_layer::{
     CacheTelemetry, RetainedLayer, RetainedLayerCache, RetainedLayerKey,
 };
 
@@ -28,7 +28,7 @@ fn make_layer_with_resource(revision: Revision, resource_gen: Generation) -> Ret
     let mut builder = DisplayListBuilder::new();
     builder.push(Command::Text {
         position: Point::ORIGIN,
-        color: aura_graphics::core::Color::WHITE,
+        color: taim_graphics::core::Color::WHITE,
         bounds: rect(0.0, 0.0, 100.0, 20.0),
         cache_generation: resource_gen,
     });

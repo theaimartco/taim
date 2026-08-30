@@ -1,6 +1,6 @@
 # Scaling Applications
 
-When you first start building an application with Vyom-Aura, a single `update` function, one `Message` enum, and one `view` function might be all you need. However, as your application grows in complexity, features, and lines of code, managing everything in a single file becomes unwieldy.
+When you first start building an application with Vyom-Taim, a single `update` function, one `Message` enum, and one `view` function might be all you need. However, as your application grows in complexity, features, and lines of code, managing everything in a single file becomes unwieldy.
 
 This guide explains how to scale your application architecture by breaking it down into manageable, reusable components.
 
@@ -15,12 +15,12 @@ You should consider scaling and refactoring your application when:
 
 ## 2. The Component Pattern
 
-The primary way to scale an Aura application is by applying the Component pattern. A Component is essentially a mini-application. It has its own `State`, `Message`, `update`, and `view`.
+The primary way to scale an Taim application is by applying the Component pattern. A Component is essentially a mini-application. It has its own `State`, `Message`, `update`, and `view`.
 
 ```rust
 // A basic Counter Component
 pub mod counter {
-    use aura::{Element, Task, widget::{row, button, text}};
+    use taim::{Element, Task, widget::{row, button, text}};
 
     pub struct State {
         value: i32,
@@ -187,7 +187,7 @@ By doing this, you avoid syncing issues. The source of truth remains in the pare
 For truly complex applications, you may want to spawn entirely new OS windows. This is done via `window::open()`.
 
 ```rust
-use aura::window;
+use taim::window;
 
 pub fn update(&mut self, message: Message) -> Task<Message> {
     match message {
@@ -203,7 +203,7 @@ When managing multiple windows, your application `Message` enum will often need 
 
 ## 9. Project Structure
 
-As your application grows, organize your files logically. A recommended structure for a medium-to-large Aura app:
+As your application grows, organize your files logically. A recommended structure for a medium-to-large Taim app:
 
 ```
 src/
@@ -230,7 +230,7 @@ src/
 Here is a simplified but complete example showing a Parent app managing two screens: Home and Settings, sharing a global user state.
 
 ```rust
-use aura::{Element, Task, widget::{column, button, text}};
+use taim::{Element, Task, widget::{column, button, text}};
 
 // --- GLOBAL SHARED STATE ---
 #[derive(Clone)]

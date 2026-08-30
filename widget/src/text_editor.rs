@@ -2,10 +2,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
 //! #
-//! use aura::widget::text_editor;
+//! use taim::widget::text_editor;
 //!
 //! struct State {
 //!    content: text_editor::Content,
@@ -65,10 +65,10 @@ pub use text::editor::{Action, Cursor, Edit, Line, LineEnding, Motion, Position,
 ///
 /// # Example
 /// ```no_run
-/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+/// # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
 /// #
-/// use aura::widget::text_editor;
+/// use taim::widget::text_editor;
 ///
 /// struct State {
 ///    content: text_editor::Content,
@@ -223,13 +223,13 @@ where
     pub fn highlight(
         self,
         syntax: &str,
-        theme: aura_highlighter::Theme,
-    ) -> TextEditor<'a, aura_highlighter::Highlighter, Message, Theme, Renderer>
+        theme: taim_highlighter::Theme,
+    ) -> TextEditor<'a, taim_highlighter::Highlighter, Message, Theme, Renderer>
     where
         Renderer: text::Renderer<Font = crate::core::Font>,
     {
-        self.highlight_with::<aura_highlighter::Highlighter>(
-            aura_highlighter::Settings {
+        self.highlight_with::<taim_highlighter::Highlighter>(
+            taim_highlighter::Settings {
                 theme,
                 token: syntax.to_owned(),
             },
@@ -570,7 +570,7 @@ where
         tree: &mut widget::Tree,
         renderer: &Renderer,
         limits: &layout::Limits,
-    ) -> aura_renderer::core::layout::Node {
+    ) -> taim_renderer::core::layout::Node {
         let mut internal = self.content.0.borrow_mut();
         let state = tree.state.downcast_mut::<State<Highlighter>>();
 

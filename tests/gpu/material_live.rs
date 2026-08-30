@@ -12,17 +12,17 @@
 //!
 //! Skipped rather than failed when no adapter is available.
 
-use aura_core::material::Material;
-use aura_core::renderer::Quad;
-use aura_core::{Color, Rectangle, Renderer as _, Size};
-use aura_wgpu::Renderer;
-use aura_wgpu::graphics::Viewport;
+use taim_core::material::Material;
+use taim_core::renderer::Quad;
+use taim_core::{Color, Rectangle, Renderer as _, Size};
+use taim_wgpu::Renderer;
+use taim_wgpu::graphics::Viewport;
 
 const SIZE: u32 = 64;
 
 fn renderer() -> Option<Renderer> {
-    aura_futures::futures::executor::block_on(<Renderer as aura_core::renderer::Headless>::new(
-        aura_core::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
         None,
     ))
 }
@@ -49,7 +49,7 @@ fn card(renderer: &mut Renderer, material: Material) -> Vec<u8> {
                 width: 48.0,
                 height: 48.0,
             },
-            border: aura_core::Border {
+            border: taim_core::Border {
                 radius: 12.0.into(),
                 ..Default::default()
             },
@@ -133,12 +133,25 @@ fn the_highlight_is_on_the_edge_and_not_the_middle() {
     // A bevel highlight belongs to the edge. If the interior brightened too,
     // the SDF normal is wrong — most likely facing the viewer everywhere,
     // which is what a constant normal produces.
+    //
+    // `POLISHED` rather than `GLASS` deliberately: this pins the *specular*
+    // half of a material, and a transmissive material legitimately changes
+    // its own interior because that is where it shows what is behind it
+    // undisplaced (refraction is zero head-on). Mixing the two axes into one
+    // assertion would make this fail for a correct reason.
+    // `tests/gpu/material_backdrop.rs` pins the transmissive half.
     needs_gpu!(renderer);
 
-    let flat = card(&mut renderer, Material::OPAQUE);
-    let glass = card(&mut renderer, Material::GLASS);
+    assert_eq!(
+        Material::POLISHED.transmission,
+        0.0,
+        "this test needs a material that does not transmit"
+    );
 
-    let centre_change = i16::from(at(&glass, 32, 32)) - i16::from(at(&flat, 32, 32));
+    let flat = card(&mut renderer, Material::OPAQUE);
+    let polished = card(&mut renderer, Material::POLISHED);
+
+    let centre_change = i16::from(at(&polished, 32, 32)) - i16::from(at(&flat, 32, 32));
 
     assert!(
         centre_change.abs() <= 3,
@@ -146,8 +159,9 @@ fn the_highlight_is_on_the_edge_and_not_the_middle() {
     );
 
     // Somewhere on the card, the edge did change.
-    let edge_changed = (0..SIZE)
-        .any(|x| (0..SIZE).any(|y| i16::from(at(&glass, x, y)) - i16::from(at(&flat, x, y)) > 3));
+    let edge_changed = (0..SIZE).any(|x| {
+        (0..SIZE).any(|y| i16::from(at(&polished, x, y)) - i16::from(at(&flat, x, y)) > 3)
+    });
 
     assert!(edge_changed, "no pixel anywhere caught a highlight");
 }
@@ -215,8 +229,8 @@ fn the_scene_light_is_configurable_and_moves_the_highlight() {
 
     // Mirror the light across the vertical axis: the highlight must move to
     // the other edge.
-    let key = aura_core::material::SceneLight::KEY;
-    renderer.set_light(aura_core::material::SceneLight {
+    let key = taim_core::material::SceneLight::KEY;
+    renderer.set_light(taim_core::material::SceneLight {
         direction: [-key.direction[0], key.direction[1], key.direction[2]],
         ..key
     });

@@ -2,7 +2,7 @@
 
 ## Supported baseline
 
-Aura connects directly to the compositor through Wayland. The production
+Taim connects directly to the compositor through Wayland. The production
 baseline requires `wl_compositor` v4+, `xdg_wm_base` v1+, and `wl_seat`
 v5+. Optional functionality is enabled only when its advertised protocol
 and minimum version are present:
@@ -23,7 +23,7 @@ connection loss, never as permission to continue with stale proxies.
 
 ## VYOM privilege boundary
 
-Standard session-lock support alone does not authorize an Aura process to
+Standard session-lock support alone does not authorize an Taim process to
 become the system lock screen. The compositor must additionally advertise
 the authenticated `vyom_secure_shell_v1` global. Only then can the backend
 issue an unforgeable `SecureAuthorization`. Lock surfaces are always marked

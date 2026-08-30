@@ -1,6 +1,6 @@
 [package]
-name = "aura_graphics"
-description = "A bunch of backend-agnostic types that can be leveraged to build a renderer for aura"
+name = "taim_graphics"
+description = "A bunch of backend-agnostic types that can be leveraged to build a renderer for taim"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -25,8 +25,8 @@ web-colors = []
 fira-sans = []
 
 [dependencies]
-aura_core.workspace = true
-aura_futures.workspace = true
+taim_core.workspace = true
+taim_futures.workspace = true
 
 bitflags.workspace = true
 bytemuck.workspace = true

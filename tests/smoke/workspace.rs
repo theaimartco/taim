@@ -17,10 +17,10 @@
 #[test]
 fn default_profile_public_api_compiles() {
     #[allow(unused_imports)]
-    use aura::{Alignment, Center, Fill, Length, Task};
+    use taim::{Alignment, Center, Fill, Length, Task};
 
     #[allow(unused_imports)]
-    use aura::widget;
+    use taim::widget;
 
     #[allow(dead_code)]
     fn assert_application_builder_exists() {
@@ -33,19 +33,19 @@ fn default_profile_public_api_compiles() {
     }
 }
 
-/// `aura_core`, `aura_runtime`, and `aura_widget` must each compile and
+/// `taim_core`, `taim_runtime`, and `taim_widget` must each compile and
 /// link with no default features -- i.e. with no GPU backend, no
 /// windowing backend, and no software rasterizer pulled in. This is the
 /// "minimal-headless" combination from `docs/architecture/feature-policy.md`;
 /// it is verified at the workspace level in CI via
-/// `cargo check -p aura_core -p aura_runtime -p aura_widget --no-default-features`
-/// rather than here, since this crate (`aura`) always depends on both
+/// `cargo check -p taim_core -p taim_runtime -p taim_widget --no-default-features`
+/// rather than here, since this crate (`taim`) always depends on both
 /// renderers. This test instead asserts that the renderer-neutral core
 /// types used across every phase are reachable without any backend
 /// feature enabled.
 #[test]
 fn core_types_are_backend_independent() {
-    use aura::{Point, Rectangle, Size};
+    use taim::{Point, Rectangle, Size};
 
     let size = Size::new(1.0_f32, 1.0_f32);
     let origin = Point::ORIGIN;
@@ -57,10 +57,10 @@ fn core_types_are_backend_independent() {
 
 /// The `advanced` feature must additively expose the advanced module
 /// without breaking the base public API. `Cargo.toml`'s `[dev-dependencies]`
-/// enables `advanced` for the whole `aura` dev-dependency graph, so this
+/// enables `advanced` for the whole `taim` dev-dependency graph, so this
 /// checks the feature is real rather than a manifest-only stub.
 #[test]
 fn advanced_feature_exposes_advanced_module() {
     #[allow(unused_imports)]
-    use aura::advanced;
+    use taim::advanced;
 }

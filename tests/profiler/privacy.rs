@@ -25,9 +25,9 @@
 //!   trace containing none of the secrets — the end-to-end claim, checked
 //!   against the export rather than the type.
 
-use aura_profiler::collector::Collector;
-use aura_profiler::events::{Event, Label, Redacted, Sensitivity};
-use aura_profiler::export;
+use taim_profiler::collector::Collector;
+use taim_profiler::events::{Event, Label, Redacted, Sensitivity};
+use taim_profiler::export;
 
 const PASSWORD: &str = "hunter2-correct-horse-battery-staple";
 const NOTIFICATION: &str = "Your test results are ready";
@@ -46,7 +46,7 @@ fn a_password_never_reaches_a_trace() {
         content: Redacted::new(PASSWORD.len(), Sensitivity::Secret),
     });
 
-    let trace = export::aura(&collector);
+    let trace = export::taim(&collector);
 
     assert!(
         !trace.contains(PASSWORD),
@@ -74,7 +74,7 @@ fn a_passwords_length_never_reaches_a_trace_either() {
         content: Redacted::new(PASSWORD.len(), Sensitivity::Secret),
     });
 
-    let trace = export::aura(&collector);
+    let trace = export::taim(&collector);
 
     assert!(
         !trace.contains(&PASSWORD.len().to_string()),
@@ -93,7 +93,7 @@ fn a_private_notifications_body_never_reaches_a_trace() {
         content: Redacted::new(NOTIFICATION.len(), Sensitivity::Private),
     });
 
-    let trace = export::aura(&collector);
+    let trace = export::taim(&collector);
 
     assert!(!trace.contains(NOTIFICATION), "{trace}");
     assert!(!trace.contains("test results"), "{trace}");
@@ -109,7 +109,7 @@ fn clipboard_contents_never_reach_a_trace() {
         content: Redacted::new(CLIPBOARD.len(), Sensitivity::Private),
     });
 
-    let trace = export::aura(&collector);
+    let trace = export::taim(&collector);
 
     assert!(!trace.contains(CLIPBOARD), "{trace}");
     assert!(!trace.contains("4111"), "{trace}");
@@ -127,7 +127,7 @@ fn a_protected_surfaces_pixels_never_reach_a_trace() {
         content: Redacted::new(1920 * 1080 * 4, Sensitivity::Protected),
     });
 
-    let trace = export::aura(&collector);
+    let trace = export::taim(&collector);
 
     assert!(trace.contains("\"sensitivity\":\"protected\""), "{trace}");
     assert!(
@@ -150,7 +150,7 @@ fn withholding_is_recorded_rather_than_omitted() {
 
     assert_eq!(collector.len(), 1, "the marker itself must survive");
 
-    let trace = export::aura(&collector);
+    let trace = export::taim(&collector);
 
     assert!(trace.contains("\"name\":\"withheld\""), "{trace}");
 }
@@ -209,7 +209,7 @@ fn typing_a_password_produces_a_trace_with_no_keystrokes_in_it() {
         content: Redacted::new(PASSWORD.len(), Sensitivity::Secret),
     });
 
-    let trace = export::aura(&collector);
+    let trace = export::taim(&collector);
 
     // Every distinctive run of the password, rather than every character.
     // A first draft checked each character in quotes and failed on `"s"`

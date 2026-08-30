@@ -5,7 +5,7 @@
 
 ## 1. The contract
 
-Aura composites in **linear light**. One sentence, and everything else in this
+Taim composites in **linear light**. One sentence, and everything else in this
 document follows from it.
 
 ```text
@@ -39,7 +39,7 @@ otherwise.
 
 | Stage | `1.0` means | Type |
 |---|---|---|
-| Authored `Color` | full-scale sRGB white | `aura_core::Color` |
+| Authored `Color` | full-scale sRGB white | `taim_core::Color` |
 | Packed / working space | SDR diffuse white, **203 nits** | `graphics::color::Packed` |
 | `Radiance` | SDR diffuse white; a 1,000-nit highlight is `4.93` | `core::color::Radiance` |
 | Quad luminance multiplier | ordinary surface; `4.93` emits 1,000 nits | `renderer::Quad::luminance` |
@@ -156,7 +156,7 @@ previous hard-coded `bytes_per_pixel = 4` under-priced every HDR frame by half.
 | `cargo test --all-features` | gamma | `web-colors` is included |
 
 `web-colors` is opt-in. It was a *default* feature, which made gamma-space
-blending the shipping behaviour, and the `aura` crate listing itself as a
+blending the shipping behaviour, and the `taim` crate listing itself as a
 dev-dependency with default features meant no test configuration could observe
 it. Both halves are fixed: the feature is out of `default`, and the workspace
 dependency sets `default-features = false`.

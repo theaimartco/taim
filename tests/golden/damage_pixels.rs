@@ -27,12 +27,12 @@
 //! event needs work this suite does not have yet, and a test that pretended
 //! otherwise would be worse than an honest gap. Recorded in `Capstone.md`.
 
-use aura::widget::{column, container, text};
-use aura::{Element, Rectangle, Size, Theme};
-use aura_core::Renderer as _;
-use aura_core::renderer::Headless as _;
-use aura_core::theme::Base as _;
-use aura_renderer::Renderer;
+use taim::widget::{column, container, text};
+use taim::{Element, Rectangle, Size, Theme};
+use taim_core::Renderer as _;
+use taim_core::renderer::Headless as _;
+use taim_core::theme::Base as _;
+use taim_renderer::Renderer;
 
 const WIDTH: u32 = 240;
 const HEIGHT: u32 = 120;
@@ -43,9 +43,9 @@ fn render(build: impl FnOnce() -> Element<'static, ()>) -> Vec<u8> {
     let base = theme.base();
     let logical = Size::new(WIDTH as f32, HEIGHT as f32);
 
-    let mut renderer = aura_futures::futures::executor::block_on(
-        <Renderer as aura_core::renderer::Headless>::new(
-            aura_core::renderer::Settings::default(),
+    let mut renderer = taim_futures::futures::executor::block_on(
+        <Renderer as taim_core::renderer::Headless>::new(
+            taim_core::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -53,20 +53,20 @@ fn render(build: impl FnOnce() -> Element<'static, ()>) -> Vec<u8> {
 
     renderer.reset(Rectangle::with_size(logical));
 
-    let mut interface = aura_runtime::UserInterface::build(
+    let mut interface = taim_runtime::UserInterface::build(
         build(),
         logical,
-        aura_runtime::user_interface::Cache::new(),
+        taim_runtime::user_interface::Cache::new(),
         &mut renderer,
     );
 
     interface.draw(
         &mut renderer,
         &theme,
-        &aura_core::renderer::Style {
+        &taim_core::renderer::Style {
             text_color: base.text_color,
         },
-        aura_core::mouse::Cursor::Unavailable,
+        taim_core::mouse::Cursor::Unavailable,
     );
 
     // The tree must outlive the screenshot; see `harness::render_element`.
@@ -180,9 +180,9 @@ fn a_tree_rebuilt_with_different_content_reports_no_damage() {
     // changed", or it will present a stale frame.
     let logical = Size::new(WIDTH as f32, HEIGHT as f32);
 
-    let mut renderer = aura_futures::futures::executor::block_on(
-        <Renderer as aura_core::renderer::Headless>::new(
-            aura_core::renderer::Settings::default(),
+    let mut renderer = taim_futures::futures::executor::block_on(
+        <Renderer as taim_core::renderer::Headless>::new(
+            taim_core::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -192,25 +192,25 @@ fn a_tree_rebuilt_with_different_content_reports_no_damage() {
 
     let first: Element<'static, ()> = text("Alpha").size(16).into();
 
-    let cache = aura_runtime::UserInterface::build(
+    let cache = taim_runtime::UserInterface::build(
         first,
         logical,
-        aura_runtime::user_interface::Cache::new(),
+        taim_runtime::user_interface::Cache::new(),
         &mut renderer,
     )
     .into_cache();
 
     let second: Element<'static, ()> = text("Omega").size(16).into();
 
-    let mut interface = aura_runtime::UserInterface::build(second, logical, cache, &mut renderer);
+    let mut interface = taim_runtime::UserInterface::build(second, logical, cache, &mut renderer);
 
     let mut messages = Vec::new();
 
     let (state, _statuses) = interface.update(
-        &aura_core::window::Headless,
-        &aura_core::shell::Waker::noop(),
+        &taim_core::window::Headless,
+        &taim_core::shell::Waker::noop(),
         &[],
-        aura_core::mouse::Cursor::Unavailable,
+        taim_core::mouse::Cursor::Unavailable,
         &mut renderer,
         &mut messages,
     );
@@ -229,10 +229,10 @@ fn a_tree_rebuilt_with_different_content_reports_no_damage() {
 // while too small a region leaves stale pixels on screen that never repaint.
 
 /// A `wgpu` renderer, or `None` when no adapter is available.
-fn gpu() -> Option<aura_wgpu::Renderer> {
-    aura_futures::futures::executor::block_on(
-        <aura_wgpu::Renderer as aura_core::renderer::Headless>::new(
-            aura_core::renderer::Settings::default(),
+fn gpu() -> Option<taim_wgpu::Renderer> {
+    taim_futures::futures::executor::block_on(
+        <taim_wgpu::Renderer as taim_core::renderer::Headless>::new(
+            taim_core::renderer::Settings::default(),
             None,
         ),
     )
@@ -247,8 +247,8 @@ macro_rules! needs_gpu {
     };
 }
 
-fn area(x: f32, y: f32, w: f32, h: f32) -> aura_wgpu::graphics::damage::DamageRegion {
-    aura_wgpu::graphics::damage::DamageRegion::from_rect(aura::Rectangle {
+fn area(x: f32, y: f32, w: f32, h: f32) -> taim_wgpu::graphics::damage::DamageRegion {
+    taim_wgpu::graphics::damage::DamageRegion::from_rect(taim::Rectangle {
         x,
         y,
         width: w,
@@ -257,7 +257,7 @@ fn area(x: f32, y: f32, w: f32, h: f32) -> aura_wgpu::graphics::damage::DamageRe
     .expect("a non-empty rectangle is a valid damage region")
 }
 
-const SURFACE: aura::Size<u32> = aura::Size {
+const SURFACE: taim::Size<u32> = taim::Size {
     width: 400,
     height: 300,
 };
@@ -278,7 +278,7 @@ fn unknown_damage_forces_a_full_redraw() {
 fn full_damage_forces_a_full_redraw() {
     needs_gpu!(renderer);
 
-    let full = aura_wgpu::graphics::damage::DamageRegion::full();
+    let full = taim_wgpu::graphics::damage::DamageRegion::full();
 
     assert_eq!(renderer.accumulate_damage(Some(&full), SURFACE, 3), None);
 }

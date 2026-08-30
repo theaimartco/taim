@@ -1,5 +1,5 @@
-use aura_platform_vyom::capabilities::{Capabilities, Global};
-use aura_platform_vyom::window_protocol::{
+use taim_platform_vyom::capabilities::{Capabilities, Global};
+use taim_platform_vyom::window_protocol::{
     CapturePolicy, Error, Role, authorize, secure_authorization,
 };
 

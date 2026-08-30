@@ -15,16 +15,16 @@
 //! testing easier would open a fresh disclosure channel for exactly the
 //! content Phase 10's security requirements protect.
 
-use aura::advanced::widget::{self, Widget};
-use aura::advanced::{Layout, Shell, layout, mouse};
-use aura::widget::text_input;
-use aura::{Event, Point, Rectangle, Size};
-use aura_core::input_method::{self, CandidateRect, InputMethod, Preedit, Purpose};
-use aura_core::{shell::Waker, window};
-use aura_renderer::Renderer;
+use taim::advanced::widget::{self, Widget};
+use taim::advanced::{Layout, Shell, layout, mouse};
+use taim::widget::text_input;
+use taim::{Event, Point, Rectangle, Size};
+use taim_core::input_method::{self, CandidateRect, InputMethod, Preedit, Purpose};
+use taim_core::{shell::Waker, window};
+use taim_renderer::Renderer;
 
 type Message = String;
-type Paragraph = <Renderer as aura_core::text::Renderer>::Paragraph;
+type Paragraph = <Renderer as taim_core::text::Renderer>::Paragraph;
 
 const BOUNDS: Size = Size {
     width: 200.0,
@@ -32,9 +32,9 @@ const BOUNDS: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -43,7 +43,7 @@ fn headless_renderer() -> Renderer {
 
 /// A focused text input, ready to receive composition events.
 struct Field<'a> {
-    input: text_input::TextInput<'a, Message, aura::Theme, Renderer>,
+    input: text_input::TextInput<'a, Message, taim::Theme, Renderer>,
     tree: widget::Tree,
     node: layout::Node,
     renderer: Renderer,
@@ -56,13 +56,13 @@ impl<'a> Field<'a> {
             .secure(secure);
 
         let renderer = headless_renderer();
-        let mut tree = widget::Tree::new(&input as &dyn Widget<Message, aura::Theme, Renderer>);
-        tree.diff(&mut input as &mut dyn Widget<Message, aura::Theme, Renderer>);
+        let mut tree = widget::Tree::new(&input as &dyn Widget<Message, taim::Theme, Renderer>);
+        tree.diff(&mut input as &mut dyn Widget<Message, taim::Theme, Renderer>);
 
         // Use the widget's own layout rather than a hand-rolled node: a
         // text input's internals index into the child node its `layout`
         // produces, so a synthetic node would not model the real thing.
-        let node = Widget::<Message, aura::Theme, Renderer>::layout(
+        let node = Widget::<Message, taim::Theme, Renderer>::layout(
             &mut input,
             &mut tree,
             &renderer,
@@ -98,7 +98,7 @@ impl<'a> Field<'a> {
         let mut shell = Shell::new(&window::Headless, Waker::noop(), &mut messages);
         let viewport = Rectangle::new(Point::ORIGIN, BOUNDS);
 
-        Widget::<Message, aura::Theme, Renderer>::update(
+        Widget::<Message, taim::Theme, Renderer>::update(
             &mut self.input,
             &mut self.tree,
             &event,
@@ -122,7 +122,7 @@ impl<'a> Field<'a> {
     /// redraw, which is when a real runtime asks.
     fn input_method(&mut self) -> InputMethod {
         self.dispatch(Event::Window(window::Event::RedrawRequested(
-            aura_core::time::Instant::now(),
+            taim_core::time::Instant::now(),
         )))
         .1
     }

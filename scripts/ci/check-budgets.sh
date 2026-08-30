@@ -30,7 +30,7 @@ cd "$(dirname "$0")/../.."
 #   - The wgpu/naga/ash GPU stack alone accounts for ~12 crates and is
 #     irreducible for a GPU-backed renderer.
 #   - The rest arrived with the component set in bf065be7 and with
-#     aura-highlighter in b753d3e0.
+#     taim-highlighter in b753d3e0.
 #
 # 260 leaves room for the GPU effect work (Capstone.md F-07) without hiding
 # another step change. Reducing the graph is real work, not a threshold edit:
@@ -66,7 +66,7 @@ readonly ALLOWED_UNSAFE_FILES=(
   "tiny_skia/src/lib.rs"
   "tiny_skia/src/raster.rs"
   "tiny_skia/src/window/compositor.rs"
-  "tools/aura_bench/src/metrics/allocations.rs"
+  "tools/taim_bench/src/metrics/allocations.rs"
   "wgpu/src/image/cache.rs"
   "wgpu/src/quad/gradient.rs"
   "wgpu/src/window/compositor.rs"
@@ -157,12 +157,12 @@ fi
 # The harness readback must stay out of the reported frame time. This is
 # cheap to check and catches the single most damaging regression the
 # benchmark can suffer: a metric that measures the harness instead of the
-# framework. See tools/aura_bench/src/metrics/frame_time.rs.
+# framework. See tools/taim_bench/src/metrics/frame_time.rs.
 
 echo "Benchmark budget"
 
-if cargo test -p aura_bench --lib frame_time >/dev/null 2>&1 ||
-  cargo test -p aura_bench frame_time >/dev/null 2>&1; then
+if cargo test -p taim_bench --lib frame_time >/dev/null 2>&1 ||
+  cargo test -p taim_bench frame_time >/dev/null 2>&1; then
   pass "frame-time metric guards hold"
 else
   fail "frame-time metric guards do not hold; the reported frame time may include harness overhead"

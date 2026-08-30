@@ -1,4 +1,4 @@
-//! Ordering-correctness oracle for `aura_wgpu::batch::group`.
+//! Ordering-correctness oracle for `taim_wgpu::batch::group`.
 //!
 //! `wgpu/src/batch.rs`'s own unit tests already cover `group`'s
 //! index-range bookkeeping in isolation. These tests instead prove the
@@ -10,7 +10,7 @@
 //! items together is only sound if it never lets an item's paint happen
 //! at the wrong time relative to a different-key item it overlaps.
 
-use aura_wgpu::batch::{self, Batchable};
+use taim_wgpu::batch::{self, Batchable};
 
 /// A synthetic paintable item: a "pixel" position it claims (so overlap
 /// is easy to construct) and a key controlling what it batches with.

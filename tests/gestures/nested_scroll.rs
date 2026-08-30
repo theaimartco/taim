@@ -1,7 +1,7 @@
 //! Handoff, fling, and boundary cases for
-//! `aura_gesture::nested_scroll::{Coordinator, dispatch_chain}`, beyond
+//! `taim_gesture::nested_scroll::{Coordinator, dispatch_chain}`, beyond
 //! the two/three-level unit tests already covered in
-//! `aura-gesture/src/nested_scroll.rs` itself.
+//! `taim-gesture/src/nested_scroll.rs` itself.
 //!
 //! This suite's focus is the scenarios `phase.md`'s exit gate calls out
 //! by name: "nested scroll has no stuck capture." A stuck capture here
@@ -10,8 +10,8 @@
 //! phase's own `widget::Scrollable` fix addressed for the single-level
 //! case), or a fling that never actually drains to zero.
 
-use aura_core::Vector;
-use aura_gesture::nested_scroll::{Coordinator, Delta, Extent, dispatch_chain};
+use taim_core::Vector;
+use taim_gesture::nested_scroll::{Coordinator, Delta, Extent, dispatch_chain};
 
 fn extent(max_y: f32) -> Extent {
     Extent {

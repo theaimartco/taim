@@ -1,28 +1,28 @@
 //! Deterministic multi-device event replays through
-//! `aura_runtime::pointer_router::Router` combined with
-//! `aura_gesture::arena::Arena`, `Tap`, `Pan`, and `LongPress`.
+//! `taim_runtime::pointer_router::Router` combined with
+//! `taim_gesture::arena::Arena`, `Tap`, `Pan`, and `LongPress`.
 //!
 //! Each scenario here is a fixed, hand-authored sequence of
-//! [`aura_core::pointer::Pointer`] events (a recorded "stream") replayed
+//! [`taim_core::pointer::Pointer`] events (a recorded "stream") replayed
 //! through a fresh [`Router`] twice, asserting the exact same sequence
 //! of [`Routing`] decisions comes out both times -- the concrete
 //! meaning of `phase.md`'s exit-gate requirement "recorded streams are
 //! deterministic." A stream also mixes device kinds (mouse and touch
-//! sharing one [`Router`], each with independent [`aura_core::pointer::Id`]s)
+//! sharing one [`Router`], each with independent [`taim_core::pointer::Id`]s)
 //! to prove routing for one contact never depends on another
 //! unrelated contact happening to share the same tick.
 
-use aura_gesture::arena::{Arena, Priority, Resolution, Team};
-use aura_gesture::pan::Pan;
-use aura_gesture::tap::Tap;
+use taim_gesture::arena::{Arena, Priority, Resolution, Team};
+use taim_gesture::pan::Pan;
+use taim_gesture::tap::Tap;
 
-use aura_core::pointer::{DeviceKind, Id as PointerId, Metadata, Phase, Pointer};
-use aura_core::time::{Duration, Instant};
-use aura_core::widget::visit::Visit;
-use aura_core::{Point, Rectangle, Size};
+use taim_core::pointer::{DeviceKind, Id as PointerId, Metadata, Phase, Pointer};
+use taim_core::time::{Duration, Instant};
+use taim_core::widget::visit::Visit;
+use taim_core::{Point, Rectangle, Size};
 
-use aura_runtime::hit_test::{self, Path};
-use aura_runtime::pointer_router::{Router, Routing};
+use taim_runtime::hit_test::{self, Path};
+use taim_runtime::pointer_router::{Router, Routing};
 
 fn epoch() -> Instant {
     static EPOCH: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
@@ -54,7 +54,7 @@ fn pointer(id: u64, device: DeviceKind, phase: Phase, x: f32, y: f32, millis: u6
 struct Anywhere;
 
 impl Visit for Anywhere {
-    fn semantics(&mut self) -> Option<aura_core::semantics::Node> {
+    fn semantics(&mut self) -> Option<taim_core::semantics::Node> {
         None
     }
 
@@ -374,7 +374,7 @@ fn a_five_finger_multitouch_stream_resolves_every_contact_deterministically() {
 
 #[test]
 fn tick_driven_long_press_resolution_is_deterministic_across_replays() {
-    use aura_gesture::long_press::LongPress;
+    use taim_gesture::long_press::LongPress;
 
     fn long_press_and_tap_arena() -> Arena {
         let mut arena = Arena::new();

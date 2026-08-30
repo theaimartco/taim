@@ -2,9 +2,9 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-//! use aura::widget::{drawer, stack, text};
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+//! use taim::widget::{drawer, stack, text};
 //!
 //! #[derive(Clone)]
 //! enum Message {
@@ -26,7 +26,7 @@
 //!
 //! # The drawer does not own `is_open`
 //!
-//! Like every other aura widget, [`Drawer`] is controlled: the
+//! Like every other taim widget, [`Drawer`] is controlled: the
 //! application owns whether the panel is open and passes it in, and the
 //! widget reports intent through [`Drawer::on_open`] and
 //! [`Drawer::on_dismiss`]. Only the *animation* between those two states
@@ -44,7 +44,7 @@
 //! # Focus trapping is the caller's to complete
 //!
 //! While open, a modal drawer owns focus: Tab must not wander into the
-//! inert page behind it. That is `aura_accessibility::focus::Scope`'s
+//! inert page behind it. That is `taim_accessibility::focus::Scope`'s
 //! job and it lives in application state, because focus outlives any
 //! single view. This widget reports the drawer's open state and offers
 //! `DISMISS`, which is what a caller pushes a `Scope` *for*; see
@@ -837,7 +837,7 @@ impl Catalog for Theme {
     }
 }
 
-/// The default styling of a [`Drawer`] for aura's own theme.
+/// The default styling of a [`Drawer`] for taim's own theme.
 pub fn default(theme: &Theme) -> Style {
     let palette = theme.palette();
 

@@ -1,12 +1,12 @@
 //! Integration tests for the damage region tracking system.
 //!
 //! These tests verify the damage region behavior from a consumer's
-//! perspective, exercising the public API of [`aura_graphics::damage`]
+//! perspective, exercising the public API of [`taim_graphics::damage`]
 //! including merge, clip, transform, threshold, and filter expansion
 //! operations.
 
-use aura_graphics::core::{Point, Rectangle, Size, Transformation};
-use aura_graphics::damage::DamageRegion;
+use taim_graphics::core::{Point, Rectangle, Size, Transformation};
+use taim_graphics::damage::DamageRegion;
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle::new(Point::new(x, y), Size::new(w, h))
@@ -374,14 +374,14 @@ fn total_area_of_empty_is_zero() {
 
 #[test]
 fn from_core_region_full_produces_full() {
-    let region = DamageRegion::from_core_region(aura_graphics::core::damage::Region::Full);
+    let region = DamageRegion::from_core_region(taim_graphics::core::damage::Region::Full);
     assert!(region.is_full());
 }
 
 #[test]
 fn from_core_region_area_produces_rect_region() {
     let core_region =
-        aura_graphics::core::damage::Region::area(rect(10.0, 10.0, 50.0, 50.0)).unwrap();
+        taim_graphics::core::damage::Region::area(rect(10.0, 10.0, 50.0, 50.0)).unwrap();
     let region = DamageRegion::from_core_region(core_region);
     assert_eq!(region.rect_count(), 1);
 }
@@ -392,7 +392,7 @@ fn from_core_region_area_produces_rect_region() {
 fn legacy_group_merges_close_rects() {
     let damage = vec![rect(0.0, 0.0, 10.0, 10.0), rect(10.0, 0.0, 10.0, 10.0)];
 
-    let grouped = aura_graphics::damage::group(damage, rect(0.0, 0.0, 1000.0, 1000.0));
+    let grouped = taim_graphics::damage::group(damage, rect(0.0, 0.0, 1000.0, 1000.0));
     assert_eq!(grouped.len(), 1);
 }
 
@@ -400,7 +400,7 @@ fn legacy_group_merges_close_rects() {
 fn legacy_group_keeps_distant_rects_separate() {
     let damage = vec![rect(0.0, 0.0, 10.0, 10.0), rect(900.0, 900.0, 10.0, 10.0)];
 
-    let grouped = aura_graphics::damage::group(damage, rect(0.0, 0.0, 1000.0, 1000.0));
+    let grouped = taim_graphics::damage::group(damage, rect(0.0, 0.0, 1000.0, 1000.0));
     assert_eq!(grouped.len(), 2);
 }
 
@@ -409,7 +409,7 @@ fn legacy_diff_detects_changed_primitives() {
     let previous = vec![rect(0.0, 0.0, 10.0, 10.0)];
     let current = vec![rect(5.0, 5.0, 10.0, 10.0)];
 
-    let damage = aura_graphics::damage::list(&previous, &current, |r| vec![*r], |a, b| a == b);
+    let damage = taim_graphics::damage::list(&previous, &current, |r| vec![*r], |a, b| a == b);
     assert_eq!(damage.len(), 2); // old + new bounds
 }
 

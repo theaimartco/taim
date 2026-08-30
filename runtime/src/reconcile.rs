@@ -8,7 +8,7 @@
 //! reordered.
 //!
 //! This is deliberately more capable than
-//! [`aura_core::widget::tree::diff_children_custom_with_search`], the
+//! [`taim_core::widget::tree::diff_children_custom_with_search`], the
 //! existing helper `widget::keyed::Column` uses: that helper only
 //! detects growth/shrink at the list's boundaries and is purely
 //! positional otherwise (see `tests/widgets/identity.rs`'s Phase 2
@@ -17,7 +17,7 @@
 //! allocating a lookup table sized to the list -- appropriate for a
 //! container that is built once and reused, not for a hot per-frame
 //! path with no stable keys at all (which is what
-//! [`aura_core::widget::tree::diff_children`]'s positional zip remains
+//! [`taim_core::widget::tree::diff_children`]'s positional zip remains
 //! the right tool for).
 
 use crate::core::widget::Tree;
@@ -86,7 +86,7 @@ mod tests {
     #[allow(clippy::trivially_copy_pass_by_ref)]
     fn new_state(item: &Item) -> Tree {
         let mut tree = Tree::empty();
-        tree.state = aura_core::widget::tree::State::new(item.0);
+        tree.state = taim_core::widget::tree::State::new(item.0);
         tree
     }
 

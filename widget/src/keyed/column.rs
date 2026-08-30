@@ -15,10 +15,10 @@ use crate::core::{
 ///
 /// # Example
 /// ```no_run
-/// # mod aura { pub mod widget { pub use aura_widget::*; } }
+/// # mod taim { pub mod widget { pub use taim_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-/// use aura::widget::{keyed_column, text};
+/// # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+/// use taim::widget::{keyed_column, text};
 ///
 /// enum Message {
 ///     // ...
@@ -88,7 +88,7 @@ where
 
     /// Sets the vertical spacing _between_ elements.
     ///
-    /// Custom margins per element do not exist in aura. You should use this
+    /// Custom margins per element do not exist in taim. You should use this
     /// method instead! While less flexible, it helps you keep spacing between
     /// elements consistent.
     pub fn spacing(mut self, amount: impl Into<Pixels>) -> Self {
@@ -203,7 +203,7 @@ where
         // Pair each existing `Tree` with the key it was built from (the
         // two are parallel vectors on `Tree`/`State`, since `Tree` itself
         // has no notion of a key), reconcile by key -- see
-        // `aura_runtime::reconcile` for why this finds every surviving
+        // `taim_runtime::reconcile` for why this finds every surviving
         // item regardless of reordering, unlike the previous
         // boundary-only heuristic -- then split the result back into the
         // parallel shape `Tree`/`State` require.
@@ -220,7 +220,7 @@ where
             .zip(self.children.iter_mut())
             .collect::<Vec<_>>();
 
-        let reconciled = aura_runtime::reconcile::reconcile(
+        let reconciled = taim_runtime::reconcile::reconcile(
             current,
             &mut new_items,
             |tree, child| child.as_widget_mut().diff(tree),

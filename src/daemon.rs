@@ -7,11 +7,11 @@ use crate::theme;
 use crate::window;
 use crate::{Element, Executor, Font, Preset, Result, Settings, Subscription, Task, Theme};
 
-use aura_debug as debug;
+use taim_debug as debug;
 
 use std::borrow::Cow;
 
-/// Creates an aura [`Daemon`] given its boot, update, and view logic.
+/// Creates an taim [`Daemon`] given its boot, update, and view logic.
 ///
 /// A [`Daemon`] will not open a window by default, but will run silently
 /// instead until a [`Task`] from [`window::open`] is returned by its update logic.
@@ -58,7 +58,7 @@ where
         type Message = Message;
         type Theme = Theme;
         type Renderer = Renderer;
-        type Executor = aura_futures::backend::default::Executor;
+        type Executor = taim_futures::backend::default::Executor;
 
         fn name() -> &'static str {
             let name = std::any::type_name::<State>();
@@ -70,7 +70,7 @@ where
             Settings::default()
         }
 
-        fn window(&self) -> Option<aura_core::window::Settings> {
+        fn window(&self) -> Option<taim_core::window::Settings> {
             None
         }
 
@@ -106,9 +106,9 @@ where
     }
 }
 
-/// The underlying definition and configuration of an aura daemon.
+/// The underlying definition and configuration of an taim daemon.
 ///
-/// You can use this API to create and run aura applications
+/// You can use this API to create and run taim applications
 /// step by step—without coupling your logic to a trait
 /// or a specific type.
 ///
@@ -293,7 +293,7 @@ impl<P: Program> Program for Daemon<P> {
         debug::hot(|| self.raw.subscription(state))
     }
 
-    fn theme(&self, state: &Self::State, window: aura_core::window::Id) -> Option<Self::Theme> {
+    fn theme(&self, state: &Self::State, window: taim_core::window::Id) -> Option<Self::Theme> {
         debug::hot(|| self.raw.theme(state, window))
     }
 
@@ -362,13 +362,13 @@ where
 /// Any implementors of this trait can be provided as an argument to
 /// [`Daemon::theme`].
 ///
-/// `aura` provides two implementors:
+/// `taim` provides two implementors:
 /// - the built-in [`Theme`] itself
 /// - and any `Fn(&State, window::Id) -> impl Into<Option<Theme>>`.
 pub trait ThemeFn<State, Theme> {
     /// Returns the theme of the [`Daemon`] for the current state and window.
     ///
-    /// If `None` is returned, `aura` will try to use a theme that
+    /// If `None` is returned, `taim` will try to use a theme that
     /// matches the system color scheme.
     fn theme(&self, state: &State, window: window::Id) -> Option<Theme>;
 }

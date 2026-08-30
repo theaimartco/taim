@@ -1,6 +1,6 @@
-# Aura Capstone — Competitive Audit and the Path Past Flutter and React Native
+# Taim Capstone — Competitive Audit and the Path Past Flutter and React Native
 
-**Repository:** `vyom-aura` · **Audited at:** `bf065be7` ("ui components added") · **Date:** 2026-08-23
+**Repository:** `taim` · **Audited at:** `bf065be7` ("ui components added") · **Date:** 2026-08-23
 **Toolchain:** rustc 1.95.0 (59807616e 2026-04-14), cargo 1.95.0 · **Host:** Linux 7.0.0-30-generic, 20 cores, 14 GiB
 
 ---
@@ -71,16 +71,16 @@ audit had already called done:**
    treat `None` as "no information", never as "nothing changed".
 
 **Closed by M1** — F-13 (all 41 widget catalogues now have an
-`aura_design::Theme` implementation, enforced by
+`taim_design::Theme` implementation, enforced by
 `tests/design/catalog_coverage.rs`), F-14 (36 original icons, a typed
 `widget::icon` module, and Fira Sans bundled by default under its OFL
 notice), and the `date_picker` half of F-16 (one semantic node per day).
 
 **M1 found a framework-wide rendering bug this audit missed.**
-`graphics/fonts/Aura-Icons.ttf` declared the family `Iced-Icons` — renamed on
+`graphics/fonts/Taim-Icons.ttf` declared the family `Iced-Icons` — renamed on
 disk when the fork happened, but not inside the file — while
 `wgpu/src/lib.rs` and `tiny_skia/src/lib.rs` both looked it up as
-`Font::new("Aura-Icons")`. Font lookup is by declared family, so it matched
+`Font::new("Taim-Icons")`. Font lookup is by declared family, so it matched
 nothing: **every checkmark, dropdown arrow, and scrollbar arrow in the
 framework resolved to a missing glyph.** Nothing caught it, because F-10 is
 still open — 1,705 tests passed while the framework drew blanks. This is the
@@ -94,10 +94,10 @@ is still M3 work.
 **Two things M0 found that this audit had wrong:**
 
 1. **The clippy error count was higher than 15.** `cargo clippy` aborted at
-   `aura_wgpu`, so six further lints in `aura_widget` and `tests/design` were
+   `taim_wgpu`, so six further lints in `taim_widget` and `tests/design` were
    never reported. F-21's count reflected what the tool printed, not what was
    there.
-2. **`aura_bench` recorded stale commits.** `build.rs` watched `.git/HEAD`,
+2. **`taim_bench` recorded stale commits.** `build.rs` watched `.git/HEAD`,
    whose contents do not change when you commit on a branch, so the commit
    baked into the binary went stale until a branch switch. The new
    dirty-tree guard surfaced this on its first run: a clean tree still
@@ -126,8 +126,8 @@ feature-shaped, and corrected one finding this audit had wrong.
 
 | Finding | Status |
 |---|---|
-| **F-19** Web/WASM inherited and unexercised | **Closed.** `wasm32-unknown-unknown` was never built by any workflow, so whether it worked was unknown rather than true. It compiles: `cargo check -p aura --target wasm32-unknown-unknown --no-default-features --features "wgpu,webgl,web-colors"`. CI's `wasm32 build` job now holds it there. |
-| **M4 task 4** No AT-SPI test against a real bus | **Closed.** `aura-accessibility/tests/atspi_bus.rs` already served a tree over a live bus and queried it as a reader would, but `needs_bus!()` skipped whenever no accessibility bus was reachable — which is every CI box, so it had never once run there. It now stands up its own `org.a11y.Bus`, answering with the session bus's address, so `dbus-run-session` is enough; `AURA_ATSPI_REQUIRE_BUS=1` turns the skip into a failure. A fourth case covers retirement. CI's `AT-SPI over a real bus` job runs all four. |
+| **F-19** Web/WASM inherited and unexercised | **Closed.** `wasm32-unknown-unknown` was never built by any workflow, so whether it worked was unknown rather than true. It compiles: `cargo check -p taim --target wasm32-unknown-unknown --no-default-features --features "wgpu,webgl,web-colors"`. CI's `wasm32 build` job now holds it there. |
+| **M4 task 4** No AT-SPI test against a real bus | **Closed.** `taim-accessibility/tests/atspi_bus.rs` already served a tree over a live bus and queried it as a reader would, but `needs_bus!()` skipped whenever no accessibility bus was reachable — which is every CI box, so it had never once run there. It now stands up its own `org.a11y.Bus`, answering with the session bus's address, so `dbus-run-session` is enough; `TAIM_ATSPI_REQUIRE_BUS=1` turns the skip into a failure. A fourth case covers retirement. CI's `AT-SPI over a real bus` job runs all four. |
 | **F-11** Image decode synchronous on the UI thread | **Wrong as written.** See below. |
 
 **F-11 was a false finding, and the fix it asked for would have been a
@@ -275,26 +275,26 @@ that first, because every other advantage is worthless if the numbers can't be t
 
 ### 1.2 The one-sentence verdict
 
-Aura is a **well-architected desktop-Linux GUI engine with a mobile-shaped widget set**, roughly
+Taim is a **well-architected desktop-Linux GUI engine with a mobile-shaped widget set**, roughly
 20% of the way to being a framework that can be *compared* to Flutter or React Native — and 0%
 of the way to being one that can be *deployed* against them, because it does not run on a phone.
 
-### 1.3 Can Aura beat Flutter and React Native?
+### 1.3 Can Taim beat Flutter and React Native?
 
 **Not on their terms, and not in this decade.** Flutter has ~10 years, several hundred widgets,
 2,000+ bundled icons, six platform targets, and a DevTools suite. React Native has the npm
 ecosystem and renders real `UIView`/`android.view.View` instances so it inherits every platform
-behaviour for free. Aura has 75 constructors, zero icons, and one platform.
+behaviour for free. Taim has 75 constructors, zero icons, and one platform.
 
-**Yes, on a battlefield Aura chooses.** There is a real, defensible thesis here, and Section 8
-develops it: Aura should not be "Flutter, but in Rust." It should be **the system UI layer for
+**Yes, on a battlefield Taim chooses.** There is a real, defensible thesis here, and Section 8
+develops it: Taim should not be "Flutter, but in Rust." It should be **the system UI layer for
 VYOM OS and for memory- and power-constrained Linux devices** — a domain where a no-GC,
 zero-idle-work, damage-driven, software-fallback-capable framework has structural advantages
 that Flutter and React Native cannot copy without abandoning their own runtime models.
 
 The three things that make that thesis winnable are:
-1. **No GC.** Flutter's UI thread and RN's JS thread both have collector pauses in the frame path. Aura has none. This is not a tuning difference; it is a runtime-model difference.
-2. **Zero idle work.** Aura produces no frames when nothing changes. Both competitors have paths that keep the pipeline warm.
+1. **No GC.** Flutter's UI thread and RN's JS thread both have collector pauses in the frame path. Taim has none. This is not a tuning difference; it is a runtime-model difference.
+2. **Zero idle work.** Taim produces no frames when nothing changes. Both competitors have paths that keep the pipeline warm.
 3. **A software renderer that renders the same tree.** `tiny_skia` is a real fallback. Flutter's Impeller requires Vulkan/Metal; RN requires the platform view system.
 
 None of those three advantages is *measured against a competitor* today. That is the work.
@@ -318,11 +318,11 @@ the rest of the document.
 
 | Command | Result | Time |
 |---|---|---|
-| `cargo check --workspace --all-targets` | **PASS** (exit 0), 11 dead-code warnings in `aura_wgpu` | 19.6 s |
+| `cargo check --workspace --all-targets` | **PASS** (exit 0), 11 dead-code warnings in `taim_wgpu` | 19.6 s |
 | `cargo test --workspace` | **PASS** (exit 0) — **1,705 passed, 0 failed, 3 ignored**, 63 binaries | ~7 min |
 | `cargo build -p mobile_shell --release` | **PASS** (exit 0) | 44.9 s |
 | `cargo fmt --all -- --check` | **FAIL** — 68 diff sites across ~30 files | 3 s |
-| `cargo clippy --workspace --all-targets -- -D warnings` | **FAIL** — 15 errors, all in `aura_wgpu` | ~2 min |
+| `cargo clippy --workspace --all-targets -- -D warnings` | **FAIL** — 15 errors, all in `taim_wgpu` | ~2 min |
 | `bash scripts/ci/check-budgets.sh` | **FAIL** — 2 of 4 budgets breached | 6 s |
 | `bash scripts/ci/check-workspace.sh` | **PASS** — 23 members resolved, workspace consistent | <1 s |
 | `ls -l target/release/mobile_shell` | **21,536,248 bytes (20.54 MiB)** unstripped | — |
@@ -340,7 +340,7 @@ the rest of the document.
 - **No GPU work was executed.** No Vulkan device was opened; the `wgpu` paths were compiled and
   their tests run, not exercised against real hardware.
 - **No mobile device, emulator, or ARM target was involved.**
-- **`aura-showcase` and `mobile_shell` were compiled, not run.** They build; whether they look
+- **`taim-showcase` and `mobile_shell` were compiled, not run.** They build; whether they look
   good is unknown and unknowable from this repository.
 
 ---
@@ -358,19 +358,19 @@ the rest of the document.
 | `wgpu` | GPU renderer: batching, pipeline cache, effects, atlas | 10,434 | 10,434 | ✓ |
 | `runtime` | Reconciliation, scheduling, hit testing, routing | 8,012 | 8,012 | ✓ |
 | `graphics` | Renderer-neutral primitives, damage, caches | 7,881 | 7,881 | ✓ |
-| `aura-accessibility` | Retained semantic tree, focus, AT-SPI, live regions | 4,904 | 4,904 | ✓ |
+| `taim-accessibility` | Retained semantic tree, focus, AT-SPI, live regions | 4,904 | 4,904 | ✓ |
 | `winit` | Desktop shell integration | 4,287 | — | — |
-| `aura-gesture` | Arena, tap, pan, pinch, rotate, swipe, nested scroll | 3,844 | 3,844 | ✓ |
+| `taim-gesture` | Arena, tap, pan, pinch, rotate, swipe, nested scroll | 3,844 | 3,844 | ✓ |
 | `tiny_skia` | Software renderer fallback | 3,326 | "—" | now measurable |
-| `aura-design` | Token and component specs | 2,501 | 2,501 | ✓ |
-| `src` (facade) | The `aura` crate itself | 2,086 | — | — |
-| `aura-highlighter` | Dependency-free syntax highlighting | 1,868 | — | — |
-| `aura-profiler` | Telemetry, Chrome trace export | 1,640 | 1,640 | ✓ |
-| `aura-platform-vyom` | Native Wayland/Smithay backend | 1,608 | — | — |
+| `taim-design` | Token and component specs | 2,501 | 2,501 | ✓ |
+| `src` (facade) | The `taim` crate itself | 2,086 | — | — |
+| `taim-highlighter` | Dependency-free syntax highlighting | 1,868 | — | — |
+| `taim-profiler` | Telemetry, Chrome trace export | 1,640 | 1,640 | ✓ |
+| `taim-platform-vyom` | Native Wayland/Smithay backend | 1,608 | — | — |
 | `futures` | Executors and subscriptions | 1,344 | — | — |
-| `aura-motion` | Springs, tweens, decay, keyframes, transitions | 1,081 | 1,081 | ✓ |
+| `taim-motion` | Springs, tweens, decay, keyframes, transitions | 1,081 | 1,081 | ✓ |
 | `renderer` / `program` / `debug` | Glue | 1,705 | — | — |
-| `tools` (`aura_bench`, `aura_lab`) | Harnesses | 8,410 | — | — |
+| `tools` (`taim_bench`, `taim_lab`) | Harnesses | 8,410 | — | — |
 | `tests` | Integration suites | 17,238 | — | — |
 
 **Finding:** the README's crate table understates `widget` by 12,431 lines and omits six crates
@@ -401,7 +401,7 @@ explicit allow list that `scripts/ci/check-budgets.sh` enforces, and the check p
 core/src/image.rs                          wgpu/src/image/cache.rs
 core/src/renderer/null.rs                  wgpu/src/quad/gradient.rs
 tiny_skia/src/lib.rs                       wgpu/src/window/compositor.rs
-tiny_skia/src/raster.rs                    tools/aura_bench/src/metrics/allocations.rs
+tiny_skia/src/raster.rs                    tools/taim_bench/src/metrics/allocations.rs
 tiny_skia/src/window/compositor.rs
 ```
 
@@ -416,7 +416,7 @@ a real, defensible, marketable advantage and it is currently not marketed at all
 `canvas-drawing`, `design-system`, `scaling`, `tasks-and-subscriptions`). The architecture notes
 (`docs/architecture/*.md`) are unusually good — they explain *why*, not just *what*.
 
-Two documents undercut the rest and are dealt with in §6.1: `docs/performance/aura-1.0-report.md`
+Two documents undercut the rest and are dealt with in §6.1: `docs/performance/taim-1.0-report.md`
 and the stale unit scale in `docs/performance/methodology.md`.
 
 ---
@@ -484,7 +484,7 @@ numbers cannot be reconstructed by anyone, including its author.
 **P-4 — Allocation counting was off in every run.** `allocation_counting_active: false` in all
 13 files, which is why every `allocations` field reads zero. The README's "197,846 alloc /
 197,843 free, net delta 3" therefore comes from a run that is **not committed anywhere in this
-repository**. The harness is honest about this — `tools/aura_bench/src/report.rs:70-76`
+repository**. The harness is honest about this — `tools/taim_bench/src/report.rs:70-76`
 documents precisely this trap — but the README quotes the number without the caveat.
 
 **P-5 — Two metric families are wired but inert.** Across all 13 scenes, `pacing.jitter`,
@@ -514,25 +514,25 @@ anyone says the word "memory" in public.
 
 At **33.79 µs p95 with 21.21 µs of that in `update` alone**, `virtual_list` is 5.3× the
 headline scene and its cost is dominated by the update half, not paint. Every other scene is
-draw-dominated. This is the one scene driving the real `aura_widget::VirtualList` over 100,000
+draw-dominated. This is the one scene driving the real `taim_widget::VirtualList` over 100,000
 rows, and it is the closest thing in the suite to "what a real list-heavy app costs."
 
 In absolute terms it is still 493× inside budget and it misses zero frames — this is not a
-crisis. But it is the profile that matters most for the mobile workloads Aura is aiming at
+crisis. But it is the profile that matters most for the mobile workloads Taim is aiming at
 (feeds, settings lists, launchers), it is the least flattering number in the suite, and it is
 the one the README omits. Publishing the other twelve and hiding this one is the single fastest
 way to lose credibility with the exact audience being courted.
 
 ---
 
-## 5. Architectural comparison: Aura vs Flutter vs React Native
+## 5. Architectural comparison: Taim vs Flutter vs React Native
 
 > Everything in this section is **architectural**, derived from each framework's design. No
 > head-to-head measurement exists (§2). Nothing here should be quoted as a benchmark result.
 
 ### 5.1 Rendering model
 
-| | **Aura** | **Flutter** | **React Native** |
+| | **Taim** | **Flutter** | **React Native** |
 |---|---|---|---|
 | Draws with | Own `wgpu` renderer + `tiny_skia` software fallback | Impeller (default: iOS 3.10+, Android 3.27+); Skia elsewhere | Nothing — delegates to platform views |
 | Pixel identity across platforms | Yes (own rasteriser) | Yes (own rasteriser) | **No** — inherits platform look |
@@ -542,14 +542,14 @@ way to lose credibility with the exact audience being courted.
 | Retained layers | Implemented, but **granularity is the whole frame** | `RepaintBoundary`, per-subtree, developer-placed | Platform view tree is inherently retained |
 | Visual effects (blur, backdrop, colour matrix) | **Cost model only — pipeline is an empty stub** | Full: `BackdropFilter`, `ImageFilter`, `ShaderMask`, `ColorFiltered` | Platform-native (`UIVisualEffectView`, `RenderEffect`) + community libs |
 
-**Read:** Aura's rendering *architecture* is closer to Flutter's than to React Native's — own
+**Read:** Taim's rendering *architecture* is closer to Flutter's than to React Native's — own
 renderer, own widget tree, pixel-identical output. Its rendering *implementation* is behind
-both. The software fallback is the one axis where Aura is architecturally ahead of Flutter, and
+both. The software fallback is the one axis where Taim is architecturally ahead of Flutter, and
 it is a decisive advantage on low-end and headless devices where Flutter simply will not run.
 
 ### 5.2 Threading and the frame pipeline
 
-| | **Aura** | **Flutter** | **React Native (New Arch)** |
+| | **Taim** | **Flutter** | **React Native (New Arch)** |
 |---|---|---|---|
 | Threads in the frame path | UI thread; `thread-pool`/`tokio`/`smol` executors for tasks | Platform, **UI (Dart)**, **Raster**, IO | **JS**, native/UI, background (Yoga/shadow) |
 | Raster decoupled from build/layout | **No — single-threaded frame** | **Yes** — layer tree handed to raster thread | Platform compositor handles raster |
@@ -557,35 +557,35 @@ it is a decisive advantage on low-end and headless devices where Flutter simply 
 | Idle behaviour | **Zero frames produced when nothing changes** | Vsync-driven; frames scheduled when dirty | JS event loop + platform vsync |
 | GC pauses in the frame path | **None — no GC exists** | Generational; scavenger is fast but pauses | Hermes (Hades, concurrent generational) |
 
-**Read:** This is Aura's strongest and weakest comparison in one table.
+**Read:** This is Taim's strongest and weakest comparison in one table.
 
 *Strongest:* no GC, and zero idle work. Both competitors have a managed runtime somewhere in
 the frame path. That is not a tuning gap they can close; it is what they are.
 
-*Weakest:* Aura's frame is single-threaded. Flutter's raster thread means a slow paint does not
-block the next build. Aura has no such separation, so any expensive paint directly costs the
+*Weakest:* Taim's frame is single-threaded. Flutter's raster thread means a slow paint does not
+block the next build. Taim has no such separation, so any expensive paint directly costs the
 next frame's budget. With 493× of headroom today this is invisible — and it will stop being
 invisible the moment real effects, real image decode, and real blur land, because those are
-exactly the costs the raster thread exists to absorb. **Aura's future perf ceiling is set here,
+exactly the costs the raster thread exists to absorb. **Taim's future perf ceiling is set here,
 not in micro-optimisation.**
 
 ### 5.3 Layout
 
-| | **Aura** | **Flutter** | **React Native** |
+| | **Taim** | **Flutter** | **React Native** |
 |---|---|---|---|
 | Algorithm | Constraint-based, iced-derived; `Tree::layout_with_cache` for revision-based reuse | Single-pass: constraints down, sizes up, parent positions | Yoga (Flexbox) in C++ |
 | Complexity | Linear in visited nodes; cached subtrees skipped | O(n), one pass; intrinsics cost extra passes | O(n) Flexbox |
 | Incremental / cached | **Yes — constraint+revision keyed cache** | No general cache; relayout boundaries limit propagation | Shadow-tree diffing |
 | Virtualisation | `virtual_list`, `sliver`, `scrollable` | `ListView.builder`, slivers, `CustomScrollView` | `FlatList`, `SectionList` (+ `FlashList` in the ecosystem) |
 
-**Read:** Roughly at parity conceptually; Aura's `layout_with_cache` is arguably ahead of
+**Read:** Roughly at parity conceptually; Taim's `layout_with_cache` is arguably ahead of
 Flutter's model, which relies on relayout boundaries rather than memoisation. But §4.5 shows
 `virtual_list` update cost at 21.21 µs, which suggests the cache is not yet paying off on the
 one path where it matters most. That is a profiling task, not a redesign.
 
 ### 5.4 State, reconciliation, and the programming model
 
-| | **Aura** | **Flutter** | **React Native** |
+| | **Taim** | **Flutter** | **React Native** |
 |---|---|---|---|
 | Model | Elm: `boot` / `update` / `view`, messages | `StatefulWidget` + `setState`; Provider/Riverpod/Bloc externally | React function components + hooks |
 | Identity/keying | **Keyed structural reconciliation** (`runtime/src/reconcile.rs`, `09d0c9c2`) | `Key`, `GlobalKey` | React `key` |
@@ -593,61 +593,61 @@ one path where it matters most. That is a profiling task, not a redesign.
 | Learning curve | Steep — Rust ownership + Elm | Moderate | Low for React developers |
 | Hiring pool | **Very small** | Large | **Very large** |
 
-**Read:** Aura's model is the most correct and the least hireable. That is an acceptable trade
+**Read:** Taim's model is the most correct and the least hireable. That is an acceptable trade
 for a systems-UI framework owned by one organisation (VYOM OS) and a fatal one for a framework
 seeking third-party app developers. This directly constrains the strategy in §8.1.
 
 ### 5.5 Text
 
-| | **Aura** | **Flutter** | **React Native** |
+| | **Taim** | **Flutter** | **React Native** |
 |---|---|---|---|
 | Shaping | `cosmic-text` 0.19 (rustybuzz/swash lineage) | HarfBuzz | Platform (CoreText / Android `Paragraph`) |
 | Line breaking | `core/src/text/line_break.rs` + `unicode-segmentation` | ICU | Platform |
 | Editing | `text_editor`, selection, `core/src/text/editor.rs` | `EditableText`, full | Platform `TextInput` |
 | IME / preedit | **Yes** — real preedit overlay with selection spans (`winit/src/window.rs:363-390`) | Full | Platform-native |
 | Bundled font | **None — `assets/fonts/` contains one README** | Roboto bundled | Platform system fonts |
-| Rich text | `rich_text`, `markdown`, `aura-highlighter` (1,868 LOC, dependency-free) | `TextSpan`, `RichText` | Nested `<Text>` |
+| Rich text | `rich_text`, `markdown`, `taim-highlighter` (1,868 LOC, dependency-free) | `TextSpan`, `RichText` | Nested `<Text>` |
 
 **Read:** The text stack is a genuine strength — `cosmic-text` is the right choice, IME works,
-and `aura-highlighter` being dependency-free is a nice piece of engineering. The missing bundled
-font is a real shipping problem: an app built with Aura today renders with whatever the system
+and `taim-highlighter` being dependency-free is a nice piece of engineering. The missing bundled
+font is a real shipping problem: an app built with Taim today renders with whatever the system
 provides, which means it looks different on every machine. Flutter bundles Roboto precisely to
 avoid that.
 
 ### 5.6 Input and gestures
 
-| | **Aura** | **Flutter** | **React Native** |
+| | **Taim** | **Flutter** | **React Native** |
 |---|---|---|---|
-| Disambiguation | **Gesture arena** — `aura-gesture` (3,844 LOC), wired into `runtime/src/pointer_router.rs` and `winit/src/lib.rs:1182` | Gesture arena (the model Aura's is named after) | `PanResponder` / `react-native-gesture-handler` |
+| Disambiguation | **Gesture arena** — `taim-gesture` (3,844 LOC), wired into `runtime/src/pointer_router.rs` and `winit/src/lib.rs:1182` | Gesture arena (the model Taim's is named after) | `PanResponder` / `react-native-gesture-handler` |
 | Recognisers | tap, pan, pinch, rotate, swipe, long-press, nested scroll | Full set | Full set (via RNGH) |
 | Nested scroll | Yes | Yes (slivers, `NestedScrollView`) | Yes |
 | Pointer model | Unified `core/src/pointer.rs` across mouse/touch/stylus | Unified `PointerEvent` | Platform events, normalised |
 
-**Read:** **At parity, and this is the most complete of Aura's differentiating subsystems.**
+**Read:** **At parity, and this is the most complete of Taim's differentiating subsystems.**
 `audit.md`'s P0-6 ("gesture arena is not the default widget interaction path") is **now closed** —
 the arena is constructed per-pointer-down in the winit event loop and routed through
 `Router`'s capture table. Verified at `winit/src/lib.rs:1176-1184`.
 
 ### 5.7 Accessibility
 
-| | **Aura** | **Flutter** | **React Native** |
+| | **Taim** | **Flutter** | **React Native** |
 |---|---|---|---|
-| Model | **Retained semantic tree, incrementally diffed** (`aura-accessibility`, 4,904 LOC) | `SemanticsNode` tree, also diffed | **Free** — real platform views carry native a11y |
+| Model | **Retained semantic tree, incrementally diffed** (`taim-accessibility`, 4,904 LOC) | `SemanticsNode` tree, also diffed | **Free** — real platform views carry native a11y |
 | Declared where | **In the component spec** — a widget cannot ship without a role | `Semantics` widget, opt-in per widget | Platform + `accessibilityLabel` props |
 | Reaches a screen reader | **No on the default path** — see F-15 | Yes: TalkBack, VoiceOver, and desktop ATs | Yes, natively |
 | Focus management | `focus.rs` (744 LOC), scopes, traps | `FocusNode`, `FocusScope` | Platform |
 | Live regions | `live_region.rs` (394 LOC) with a privacy policy | `liveRegion` | `accessibilityLiveRegion` |
 
-**Read:** Aura's a11y *design* is the best of the three — roles come from the component
+**Read:** Taim's a11y *design* is the best of the three — roles come from the component
 specification, so omission is a compile-time impossibility rather than a code-review miss. React
-Native's a11y is the best in *practice*, because it gets the platform's for free. Aura's design
+Native's a11y is the best in *practice*, because it gets the platform's for free. Taim's design
 advantage is currently worth nothing on the default path, because the D-Bus transport that would
 carry it to Orca is behind a non-default feature flag (F-15). This is a small fix with a large
 payoff — it converts a design claim into a demonstrable one.
 
 ### 5.8 Platform reach — the decisive table
 
-| Target | **Aura** | **Flutter** | **React Native** |
+| Target | **Taim** | **Flutter** | **React Native** |
 |---|---|---|---|
 | Android | ❌ **none** | ✅ first-class | ✅ first-class |
 | iOS | ❌ **none** | ✅ first-class | ✅ first-class |
@@ -661,10 +661,10 @@ payoff — it converts a design claim into a demonstrable one.
 
 **This is the table that decides the strategy.** A grep of the entire tree for `android`,
 `target_os = "ios"`, `ndk`, or `UIKit` returns **exactly one hit** —
-`aura-design/src/platform.rs:33`, a `cfg!` used to pick a visual style. There is no mobile
+`taim-design/src/platform.rs:33`, a `cfg!` used to pick a visual style. There is no mobile
 platform code anywhere in this repository.
 
-Aura ships `scaffold`, `drawer`, `bottom_sheet`, `bottom_nav_bar`, `app_bar`, `safe_area`,
+Taim ships `scaffold`, `drawer`, `bottom_sheet`, `bottom_nav_bar`, `app_bar`, `safe_area`,
 `pull_to_refresh`, and a `mobile_shell` example — **a mobile component vocabulary with no mobile
 platform underneath it.** Every one of those widgets is currently exercised only by a mouse on
 a desktop. `safe_area` in particular cannot be correct, because nothing in the tree reads a real
@@ -672,7 +672,7 @@ device's display cutout or home indicator inset.
 
 ### 5.9 Memory and binary
 
-| | **Aura (measured)** | **Flutter** | **React Native** |
+| | **Taim (measured)** | **Flutter** | **React Native** |
 |---|---|---|---|
 | Runtime | **None — native, no VM** | Dart VM + AOT snapshot | Hermes VM + bytecode |
 | GC | **None** | Generational | Hades (concurrent generational) |
@@ -680,18 +680,18 @@ device's display cutout or home indicator inset.
 | Idle RSS in benchmark harness | **283.8 MiB** (`idle_shell`; harness included) | UNVERIFIED here | UNVERIFIED here |
 | Dependency count (normal graph) | **244** | — | npm graph typically far larger |
 
-**Read:** The runtime model is Aura's structural advantage and it is **completely unproven**.
+**Read:** The runtime model is Taim's structural advantage and it is **completely unproven**.
 20.54 MiB for a trivial Linux desktop binary is not obviously better than a Flutter APK, and the
 comparison has never been made. Until §11 is executed, "no GC, therefore smaller and faster" is
 a hypothesis with a plausible mechanism and zero evidence.
 
 ### 5.10 Developer experience
 
-| | **Aura** | **Flutter** | **React Native** |
+| | **Taim** | **Flutter** | **React Native** |
 |---|---|---|---|
 | Hot reload | `hot` feature via `cargo-hot`, "very experimental" per `Cargo.toml:56` | **Stateful hot reload, sub-second, the category benchmark** | Fast Refresh, near-instant |
-| Inspector | ❌ `aura_lab` has 11 modules of overlays but **no application** — `docs/tools/aura-lab.md` says so outright | DevTools: widget inspector, layout explorer, timeline, memory, CPU | React DevTools + Hermes debugger |
-| Profiler | ✅ **Real** — `aura-profiler`, closure-based zero-cost-when-off, Chrome trace export | DevTools timeline | Systrace / Hermes profiler |
+| Inspector | ❌ `taim_lab` has 11 modules of overlays but **no application** — `docs/tools/taim-lab.md` says so outright | DevTools: widget inspector, layout explorer, timeline, memory, CPU | React DevTools + Hermes debugger |
+| Profiler | ✅ **Real** — `taim-profiler`, closure-based zero-cost-when-off, Chrome trace export | DevTools timeline | Systrace / Hermes profiler |
 | Examples | **1** (`mobile_shell`) + 1 showcase | Hundreds, plus samples repo, plus codelabs | Thousands |
 | Package published | ❌ not on crates.io | ✅ pub.dev | ✅ npm |
 | Project scaffolding | ❌ none | `flutter create` | `npx react-native init` / Expo |
@@ -699,7 +699,7 @@ a hypothesis with a plausible mechanism and zero evidence.
 
 **Read:** **This is the widest gap of any row in this document, and it is the one least
 discussed in the repository.** Iteration speed is why Flutter won mindshare. A Rust GUI
-framework starts with a structural disadvantage here — compile times — and Aura currently adds
+framework starts with a structural disadvantage here — compile times — and Taim currently adds
 to it by having no inspector, no template, and one example. The profiler is genuinely good and
 is the seed of the answer.
 
@@ -708,7 +708,7 @@ is the seed of the answer.
 Scored 1–5 on architecture and current implementation. "Arch" is the ceiling the design allows;
 "Impl" is what the tree does today.
 
-| Dimension | Aura arch | Aura impl | Flutter | React Native |
+| Dimension | Taim arch | Taim impl | Flutter | React Native |
 |---|:--:|:--:|:--:|:--:|
 | Rendering correctness & breadth | 4 | **2** | 5 | 4 |
 | Frame-path performance | 5 | **4** | 4 | 3 |
@@ -727,7 +727,7 @@ Scored 1–5 on architecture and current implementation. "Arch" is the ceiling t
 | Test discipline | **5** | **5** | 4 | 3 |
 | **Mean** | 4.1 | **2.5** | 4.4 | 3.9 |
 
-The gap between *Aura arch 4.1* and *Aura impl 2.5* is the entire content of this document. The
+The gap between *Taim arch 4.1* and *Taim impl 2.5* is the entire content of this document. The
 design is competitive. The build is 60% of the way to the design.
 
 ---
@@ -755,7 +755,7 @@ tree is marked as such.
 `benchmarks/baseline/idle_shell.json` → `6,376 ns`. Worst scene (`virtual_list`) → 33,792 ns,
 a 493× margin, not 1,800×.
 
-*Impact:* The README states "Every number below comes from `tools/aura_bench` and can be
+*Impact:* The README states "Every number below comes from `tools/taim_bench` and can be
 reproduced with the command beneath it. Nothing here is estimated." The commands beneath it do
 not produce those numbers. This is the single most damaging fact in this repository.
 
@@ -782,7 +782,7 @@ point until re-captured.
 *Evidence:* `git_commit = "30b5e969…-dirty"` in all 13 files; HEAD is `bf065be7`.
 
 *Fix:* Teach `--save` to refuse a `-dirty` commit outright. The harness already refuses reports
-with unattributable identity fields (`tools/aura_bench/src/report.rs:119-124`); extend that
+with unattributable identity fields (`tools/taim_bench/src/report.rs:119-124`); extend that
 guard to cover tree cleanliness.
 
 ---
@@ -792,23 +792,23 @@ guard to cover tree cleanliness.
 *Evidence:* `README.md:29` claims "197,846 alloc / 197,843 free, net delta 3". All 13 baselines
 record `allocation_counting_active: false` and every allocation field reads zero.
 
-*Note:* the harness documents this exact trap in `tools/aura_bench/src/report.rs:70-76`. The
+*Note:* the harness documents this exact trap in `tools/taim_bench/src/report.rs:70-76`. The
 tool is more honest than the README.
 
 *Fix:* Commit a `--features profiling` run, or drop the claim.
 
 ---
 
-**F-05 · P1 · `docs/performance/aura-1.0-report.md` presents numbers with no provenance**
+**F-05 · P1 · `docs/performance/taim-1.0-report.md` presents numbers with no provenance**
 
 *Evidence:* the file states "Launcher Scroll: 60fps solid, 2ms frame time", "Settings
 Navigation: 60fps solid, 1.5ms", "Complex Grid: 60fps, 3ms", on "VYOM Reference Hardware,
 8-core ARM64, 8GB". No such device exists in `benchmarks/devices.toml`, no ARM64 run exists in
-`benchmarks/baseline/`, and no scene by those names exists in `tools/aura_bench/src/scenes/`.
+`benchmarks/baseline/`, and no scene by those names exists in `tools/taim_bench/src/scenes/`.
 The file also contains the literal line `(Insert benchmark data from compare-frameworks.sh vs
 Qt/Flutter)`.
 
-*Impact:* A document titled "Aura 1.0 Performance Report" containing invented device names and
+*Impact:* A document titled "Taim 1.0 Performance Report" containing invented device names and
 unsourced frame times is the most quotable thing in the repository and the least defensible.
 
 *Fix:* Delete it, or replace its body with a single line: *"Not yet measured. See
@@ -849,7 +849,7 @@ None of it draws.
 *Impact:* Blur, backdrop blur, colour matrix, saturation, and noise **do not render**. The
 `blur_layers` and `effect_ladder` benchmark scenes measure a cost model, not pixels — which is
 why `effect_ladder` is the *cheapest* scene in the suite at 7.62 µs. Against Flutter's
-`BackdropFilter` / `ImageFilter` / `ShaderMask` and React Native's platform blur views, Aura
+`BackdropFilter` / `ImageFilter` / `ShaderMask` and React Native's platform blur views, Taim
 today renders no effects at all. Modern mobile UI is built out of exactly these.
 
 *Fix:* Author the WGSL. Two-pass separable Gaussian for blur; backdrop capture → downsample →
@@ -878,7 +878,7 @@ saves no GPU bandwidth and no power.
 *Fix:* Two routes, both real. (a) Wayland: `wl_surface.damage_buffer` via the VYOM backend and
 `raw-window-handle`, which is where the power win actually lives on the target platform.
 (b) `VK_KHR_incremental_present` / `EGL_KHR_swap_buffers_with_damage` beneath wgpu, or a
-scissored render pass that skips undamaged tiles. **Route (a) first** — it is the platform Aura
+scissored render pass that skips undamaged tiles. **Route (a) first** — it is the platform Taim
 actually ships on. Until one of them lands, remove the claim from the README.
 
 ---
@@ -893,7 +893,7 @@ factor differ. No widget anywhere calls `start_retained_layer`.
 
 *Impact:* Retention is all-or-nothing. Change one pixel of state anywhere in the tree and the
 entire display list re-records. Flutter's `RepaintBoundary` is per-subtree and developer-placed;
-Aura's is per-application. The cache's hit rate in any interactive application is approximately
+Taim's is per-application. The cache's hit rate in any interactive application is approximately
 zero, and `RetainedLayerCache`'s budget, LRU, generation-purge, and telemetry machinery
 (`graphics/src/retained_layer.rs:208-380`) is unreachable — the wgpu backend stores a single
 `Option`, not the cache.
@@ -909,7 +909,7 @@ place of the single-slot `Option`.
 
 *Evidence:* `tests/golden/harness.rs` is 600+ lines of genuinely excellent design: it refuses to
 auto-adopt a missing golden, treats `Outcome::Missing` as a failure, separates `Exact` from
-`Approximate` tolerance, and requires `AURA_UPDATE_GOLDEN` as a deliberate act. And:
+`Approximate` tolerance, and requires `TAIM_UPDATE_GOLDEN` as a deliberate act. And:
 
 - `tests/golden/images/` **does not exist**. Zero reference images are committed.
 - `grep -c 'compare(' tests/golden/*.rs` excluding the harness → **0**. Nothing calls it.
@@ -921,7 +921,7 @@ The property oracles are good — leap years, month lengths, touch-target floors
 thresholds, badge growth bounds. They are not a visual regression suite.
 
 *Impact:* **Nothing in this repository can detect a visual regression.** A change that renders
-every button as a black rectangle passes all 1,705 tests. There is no evidence that Aura's UI
+every button as a black rectangle passes all 1,705 tests. There is no evidence that Taim's UI
 looks like anything at all. For a project whose stated goal is beating Flutter *on UI*, this is
 the most consequential gap after the missing mobile platform.
 
@@ -961,7 +961,7 @@ to build the quad/text/triangle/image pipelines, stores it, and never reads it a
 *"field `pipeline_cache` is never read"*, *"methods `invalidate_all`, `telemetry`, and
 `resource_generation` are never used"*.
 
-*Impact:* Minor today — Aura has four static pipelines. It becomes load-bearing the moment F-07
+*Impact:* Minor today — Taim has four static pipelines. It becomes load-bearing the moment F-07
 lands and effects need pipeline variants per format/tier.
 
 *Fix:* Either consult it from the effect pipeline (after F-07) or reduce it to a builder and
@@ -975,8 +975,8 @@ delete the dead surface. Do not leave it as decoration.
 
 **F-13 · P0 · 17 of 41 widget catalogs have no design-system theme — and they are exactly the mobile set**
 
-*Evidence:* 41 `pub trait Catalog` declarations across `widget/src/`. `widget/src/aura.rs`
-implements **24** of them for `aura_design::Theme`. The 17 with no implementation:
+*Evidence:* 41 `pub trait Catalog` declarations across `widget/src/`. `widget/src/taim.rs`
+implements **24** of them for `taim_design::Theme`. The 17 with no implementation:
 
 ```
 accordion   avatar        badge      bottom_nav_bar   bottom_sheet
@@ -985,15 +985,15 @@ search_bar  segmented_control  skeleton  snackbar     stepper
 tabs        time_picker
 ```
 
-*Impact:* These are **precisely the components built to differentiate Aura** — the mobile set
-the README leads with. Under the `aura` feature they fall back to `aura_core::Theme` catalogs
-declared in their own modules, so `mobile_shell` and `aura-showcase` compile and run; but the
+*Impact:* These are **precisely the components built to differentiate Taim** — the mobile set
+the README leads with. Under the `taim` feature they fall back to `taim_core::Theme` catalogs
+declared in their own modules, so `mobile_shell` and `taim-showcase` compile and run; but the
 design system does not reach them. The README's claim that *"there is no second styling path to
 drift out of sync"* describes the intent, not the tree: there are two paths today, and the new
 components are all on the wrong one.
 
-*Fix:* 17 `impl Catalog for Theme` blocks in `widget/src/aura.rs` against the tokens in
-`aura-design/src/components/`. Mechanical, high-value, roughly one week. Then add a compile-time
+*Fix:* 17 `impl Catalog for Theme` blocks in `widget/src/taim.rs` against the tokens in
+`taim-design/src/components/`. Mechanical, high-value, roughly one week. Then add a compile-time
 test that fails when a `Catalog` exists without a `Theme` impl, so this cannot recur.
 
 ---
@@ -1008,9 +1008,9 @@ test that fails when a `Catalog` exists without a `Theme` impl, so this cannot r
 for Home, `\u{2315}` (⌕) for Search, `\u{263A}` (☺) for Profile.
 
 *Impact:* Flutter bundles 2,000+ Material icons and Roboto. React Native has
-`react-native-vector-icons` with a dozen icon families. Aura has three approximate Unicode
+`react-native-vector-icons` with a dozen icon families. Taim has three approximate Unicode
 glyphs whose appearance depends entirely on which fonts the host happens to have installed. **No
-application built on Aura today can look finished**, and no two machines will render it alike.
+application built on Taim today can look finished**, and no two machines will render it alike.
 
 *Fix:* Adopt an MIT/Apache-licensed icon set (Lucide, Feather, or Material Symbols under Apache
 2.0), commit the SVGs with their licence records, generate a typed `icon::` module, and bundle
@@ -1021,10 +1021,10 @@ more for perceived UI quality per hour than anything else in this document.
 
 **F-15 · P0 · Accessibility never reaches assistive technology on the default path**
 
-*Evidence:* `aura-accessibility/src/atspi.rs:23` gates the entire D-Bus transport behind
-`#[cfg(feature = "atspi")]`. `aura-accessibility/Cargo.toml:16-21` declares that feature
+*Evidence:* `taim-accessibility/src/atspi.rs:23` gates the entire D-Bus transport behind
+`#[cfg(feature = "atspi")]`. `taim-accessibility/Cargo.toml:16-21` declares that feature
 **off by default** (`default = []`). The only manifest in the tree that enables it is
-`aura-platform-vyom/Cargo.toml:15` — itself an optional, non-default backend.
+`taim-platform-vyom/Cargo.toml:15` — itself an optional, non-default backend.
 
 The default `winit` path *does* construct a session:
 `winit/src/window.rs:93-95` → `Session::new(atspi::adapter::Adapter::new())`, and
@@ -1033,14 +1033,14 @@ without the `atspi` feature there is no `server` module, no zbus connection, and
 draining the queue. The semantic tree is diffed, translated, and pushed into an in-memory
 `VecDeque` that nothing reads.
 
-*Impact:* Aura's most distinctive design claim — *"accessibility by construction"* — is
-currently a claim about an in-memory data structure. **Orca will not read an Aura application.**
+*Impact:* Taim's most distinctive design claim — *"accessibility by construction"* — is
+currently a claim about an in-memory data structure. **Orca will not read an Taim application.**
 The tree, the diffing, the focus engine, the live-region privacy policy, the AT-SPI vocabulary
 (451 LOC), and the D-Bus server (804 LOC) are all written and tested; they are simply not
 connected on the path any user takes.
 
-*Fix:* Add an `accessibility` feature to the `aura` facade that turns on
-`aura-accessibility/atspi`, spawn the bus task from `winit`'s event loop, and **verify against a
+*Fix:* Add an `accessibility` feature to the `taim` facade that turns on
+`taim-accessibility/atspi`, spawn the bus task from `winit`'s event loop, and **verify against a
 real Orca session** — the only test that counts. Small change, very large credibility payoff.
 
 ---
@@ -1066,33 +1066,33 @@ Full gap table in §7.
 **F-17 · P0 · No mobile platform exists**
 
 *Evidence:* a tree-wide grep for `android`, `target_os = "ios"`, `ndk`, `UIKit` returns exactly
-one hit, `aura-design/src/platform.rs:33`, a `cfg!` used to choose a visual style. No NDK glue,
+one hit, `taim-design/src/platform.rs:33`, a `cfg!` used to choose a visual style. No NDK glue,
 no `NativeActivity`, no JNI, no `UIViewController`, no touch-from-platform path, no display
 cutout or safe-area inset source, no `Cross.toml` mobile targets (it lists only
 `aarch64-unknown-linux-gnu` and `armv7-unknown-linux-gnueabihf`).
 
-*Impact:* **Aura cannot run on a phone.** Flutter and React Native are mobile-first frameworks;
-mobile is the ground they are defended on. Aura ships a mobile *vocabulary* — `scaffold`,
+*Impact:* **Taim cannot run on a phone.** Flutter and React Native are mobile-first frameworks;
+mobile is the ground they are defended on. Taim ships a mobile *vocabulary* — `scaffold`,
 `drawer`, `bottom_sheet`, `bottom_nav_bar`, `safe_area`, `pull_to_refresh` — validated only by a
 mouse on a desktop. `safe_area` cannot be correct, because nothing in this tree can tell it
 where a notch is.
 
 *Fix:* This is a strategic fork, not a bug. See §8.1 — the recommendation is **not** to chase
-Android/iOS, but to own VYOM/Linux and *stop describing Aura in mobile terms* until a mobile
+Android/iOS, but to own VYOM/Linux and *stop describing Taim in mobile terms* until a mobile
 backend exists.
 
 ---
 
 **F-18 · P1 · The VYOM backend is a side crate, not the application path**
 
-*Evidence:* `aura-platform-vyom` is 1,608 LOC across 13 modules — `event_loop`, `surface`,
+*Evidence:* `taim-platform-vyom` is 1,608 LOC across 13 modules — `event_loop`, `surface`,
 `input`, `ime`, `clipboard`, `drag_drop`, `frame_clock`, `power`, `gesture_bridge`,
 `accessibility`, `capabilities`, `window_protocol`. It is an **optional dependency** of the
-`aura` facade behind a non-default `vyom` feature (`Cargo.toml:93`), and the `application()`
-entry point runs on `aura_winit`.
+`taim` facade behind a non-default `vyom` feature (`Cargo.toml:93`), and the `application()`
+entry point runs on `taim_winit`.
 
-*Impact:* The one platform where Aura has a structural advantage — direct Smithay/Wayland with
-capability-gated privileged protocols — is not the platform `aura::application()` targets. It
+*Impact:* The one platform where Taim has a structural advantage — direct Smithay/Wayland with
+capability-gated privileged protocols — is not the platform `taim::application()` targets. It
 is also the only path where `atspi` is enabled (F-15) and the only realistic route to real
 damage-based partial present (F-08). **Three separate P0s converge on this one crate.**
 
@@ -1123,7 +1123,7 @@ builds for wasm32, no example targets it, no test exercises it.
 **F-20 · P0 · `cargo fmt --check` fails — CI on `main` is red**
 
 *Evidence:* 68 diff sites across ~30 files, including `wgpu/src/effects/pipeline.rs`,
-`wgpu/src/image/decode.rs`, `winit/src/lib.rs`, `aura-showcase/src/main.rs`,
+`wgpu/src/image/decode.rs`, `winit/src/lib.rs`, `taim-showcase/src/main.rs`,
 `examples/mobile_shell/src/main.rs`, and 20 widget modules.
 
 *Impact:* `.github/workflows/ci.yml` gates `test` and `release-build` on `needs: [fmt, check,
@@ -1136,7 +1136,7 @@ well written, and is currently reporting nothing.
 
 **F-21 · P0 · `cargo clippy -- -D warnings` fails with 15 errors**
 
-*Evidence:* all 15 in `aura_wgpu` — 3 × `manual_let_else` (`wgpu/src/engine.rs:44, 57, 70`,
+*Evidence:* all 15 in `taim_wgpu` — 3 × `manual_let_else` (`wgpu/src/engine.rs:44, 57, 70`,
 denied by workspace lints) and 12 dead-code warnings promoted to errors by `-D warnings`. The
 dead code is F-11's image decoder (8) and F-12's pipeline cache (4).
 
@@ -1203,7 +1203,7 @@ The crate is not published (version `0.15.0-dev`). There is no `cargo generate` 
 scaffolding command. `CHANGELOG.md`'s `[1.0.0] - Unreleased` section is prose about features
 ("Advanced flexbox-based layout system"), not a changelog.
 
-*Impact:* Nobody outside this repository can start an Aura project. `aura = { version =
+*Impact:* Nobody outside this repository can start an Taim project. `taim = { version =
 "0.15.0-dev" }` in the README's quick start does not resolve from crates.io.
 
 ---
@@ -1228,7 +1228,7 @@ Credit where it is due — these were open in `audit.md` and are **now closed**,
 `widget/src/helpers.rs` exposes **75 `pub fn` constructors**, verified. Read honestly, that
 number is **61 actual widgets plus 14 alignment and utility helpers** (`center`, `center_x`,
 `center_y`, `bottom`, `bottom_center`, `bottom_right`, `right`, `right_center`, `hover`,
-`opaque`, `void`, `value`, `span`, `aura`). A handful more live in their own modules —
+`opaque`, `void`, `value`, `span`, `taim`). A handful more live in their own modules —
 `table::table`, `rule::horizontal`/`vertical`, `markdown::view` — and `sliver` and `navigator`
 are type-based rather than constructor-based.
 
@@ -1241,8 +1241,8 @@ are type-based rather than constructor-based.
 | **Gestures & platform** | `pull_to_refresh`, `mouse_area`, `sensor`, `transition`, `themer`, `shader` | ⚠️ only `float` |
 
 **Verified quality signals:** every widget carries unit tests; every interactive control is
-pinned against the 48 px `aura_core::touch::MIN_TARGET` floor by
-`tests/golden/components.rs:140`; and roles/actions come from `aura-design`'s component specs
+pinned against the 48 px `taim_core::touch::MIN_TARGET` floor by
+`tests/golden/components.rs:140`; and roles/actions come from `taim-design`'s component specs
 rather than from each widget's own opinion.
 
 **Verified quality gaps:** 17 of 41 catalogs unthemed (F-13); no icons (F-14); no pixel test
@@ -1251,9 +1251,9 @@ anywhere (F-10); `date_picker` exposes one semantic node instead of one per day.
 ### 7.2 Gap against Flutter (Material 3 + Cupertino)
 
 Flutter ships several hundred documented widgets. This table lists what an ordinary application
-reaches for and Aura does not have.
+reaches for and Taim does not have.
 
-| Category | Missing in Aura | Priority |
+| Category | Missing in Taim | Priority |
 |---|---|---|
 | **Iconography** | Any icon set at all; any bundled font | **P0** |
 | **Effects** | Blur, backdrop blur, colour matrix, saturation, shader mask — *stubbed, F-07* | **P0** |
@@ -1272,23 +1272,23 @@ reaches for and Aura does not have.
 
 ### 7.3 Gap against React Native core + first-tier ecosystem
 
-RN's own core component set is *smaller* than Aura's — `View`, `Text`, `Image`, `ScrollView`,
+RN's own core component set is *smaller* than Taim's — `View`, `Text`, `Image`, `ScrollView`,
 `TextInput`, `Pressable`, `FlatList`, `SectionList`, `Modal`, `Switch`, and a handful more. Its
 advantage is not core breadth; it is that everything else is one `npm install` away, and that
 its components *are* platform views.
 
-| What RN gets from the platform / ecosystem | Aura's position |
+| What RN gets from the platform / ecosystem | Taim's position |
 |---|---|
 | Native accessibility, free, everywhere | Designed better; **not connected** (F-15) |
 | Native text selection, magnifier, autofill, spell check | Not built |
 | Native keyboard avoidance & inset handling | Not built (no mobile platform, F-17) |
 | Native share sheet, permissions, camera roll, biometrics | Not built |
 | Native scroll physics matching the OS exactly | Own physics; unvalidated against any OS |
-| `react-native-reanimated` (UI-thread animation) | **`aura-motion` is arguably better** — springs/decay/keyframes, no JS bridge to cross |
-| `react-native-gesture-handler` | **`aura-gesture` is at parity** |
-| ~2M npm packages | ~0 Aura-specific crates |
+| `react-native-reanimated` (UI-thread animation) | **`taim-motion` is arguably better** — springs/decay/keyframes, no JS bridge to cross |
+| `react-native-gesture-handler` | **`taim-gesture` is at parity** |
+| ~2M npm packages | ~0 Taim-specific crates |
 
-**The honest read:** Aura's *core component set is already competitive with React Native's core
+**The honest read:** Taim's *core component set is already competitive with React Native's core
 component set*. It is not competitive with the ecosystem, and it never will be by building
 components — that is a distribution problem, not an engineering one, and it argues directly for
 the strategy in §8.1.
@@ -1308,7 +1308,7 @@ for a framework judged on looks.
 | 6 | **Declarative router** with deep links and guards | `navigator` is a transition, not a routing model | 3 wks |
 | 7 | **Menu / popover / context menu** constructors | Catalogs exist (`menu::Catalog` is themed); constructors do not | 1 wk |
 | 8 | **`date_picker` per-day semantics** | An accessibility framework shipping an inaccessible calendar is a self-inflicted headline | 3 days |
-| 9 | **Data grid** | Unlocks desktop/tooling use cases where Aura's perf actually shows | 4 wks |
+| 9 | **Data grid** | Unlocks desktop/tooling use cases where Taim's perf actually shows | 4 wks |
 | 10 | Rating, breadcrumb, pagination, tree view | Long tail | 3 wks |
 
 ---
@@ -1317,16 +1317,16 @@ for a framework judged on looks.
 
 ### 8.1 First: choose the battlefield
 
-**Do not position Aura as "Flutter, but in Rust."** That framing invites exactly the comparison
-Aura loses — breadth, ecosystem, tooling, hiring — and hides the three places it wins. §5.4
+**Do not position Taim as "Flutter, but in Rust."** That framing invites exactly the comparison
+Taim loses — breadth, ecosystem, tooling, hiring — and hides the three places it wins. §5.4
 makes the hiring constraint concrete: an Elm-in-Rust programming model is a poor fit for
 recruiting third-party app developers and an excellent fit for a systems team that owns its
 whole stack.
 
-**Position Aura as the system UI layer for VYOM OS and constrained Linux devices.** On that
+**Position Taim as the system UI layer for VYOM OS and constrained Linux devices.** On that
 battlefield the scorecard inverts:
 
-| Requirement of that domain | Aura | Flutter | React Native |
+| Requirement of that domain | Taim | Flutter | React Native |
 |---|---|---|---|
 | No GC pauses in the frame path | ✅ | ❌ | ❌ |
 | Runs with no GPU | ✅ `tiny_skia` | ❌ | ❌ |
@@ -1344,12 +1344,12 @@ proven strength instead of arriving as the 4th-best option in someone else's mar
 "Better UI" is not an opinion if it is defined as measurable properties. Four, in order:
 
 **1. Ship the visual primitives that make modern UI look modern.** Blur, backdrop blur,
-elevation with correct penumbra, colour matrix, saturation, gradient meshes. Today Aura renders
+elevation with correct penumbra, colour matrix, saturation, gradient meshes. Today Taim renders
 **none** of these (F-07). This is the whole gap and it is bounded shader work against a
 finished, tested interface.
 
 **2. Ship a coherent visual identity.** An icon set, a bundled variable font, motion curves,
-and elevation tokens that agree with each other. `aura-design` already specifies the tokens;
+and elevation tokens that agree with each other. `taim-design` already specifies the tokens;
 `assets/` is empty (F-14). A framework whose demo app draws its navigation with `⌂ ⌕ ☺` cannot
 credibly claim a UI advantage.
 
@@ -1360,15 +1360,15 @@ switchable panel: turn on reduced motion, turn on a large text scale, turn on hi
 watch every widget respond. That demo is more persuasive than any frame-time chart.
 
 **4. Prove it never regresses.** F-10. Golden images per widget × theme × state, run in CI
-against a pinned software adapter. Flutter has this. Aura has the harness and none of the cases.
+against a pinned software adapter. Flutter has this. Taim has the harness and none of the cases.
 
-**Target:** the `aura-showcase` gallery, rendered side by side against the Flutter Gallery and an
-RN Paper demo, where a designer cannot tell which is which — except that Aura's runs on a device
+**Target:** the `taim-showcase` gallery, rendered side by side against the Flutter Gallery and an
+RN Paper demo, where a designer cannot tell which is which — except that Taim's runs on a device
 with no GPU.
 
 ### 8.3 Beating them on **speed**
 
-Aura's frame cost is already excellent and is **already 493× inside the 60 Hz budget on its
+Taim's frame cost is already excellent and is **already 493× inside the 60 Hz budget on its
 worst scene**. More micro-optimisation is not the win; the win is (a) making the numbers
 defensible and (b) removing the ceilings that will bite when the renderer becomes complete.
 
@@ -1383,28 +1383,28 @@ defensible and (b) removing the ceilings that will bite when the renderer become
 | **7** | **Make pacing metrics real** (P-5) | Uniform zeros across 13 scenes is not a measurement |
 
 **The claim to aim for, once F-01…F-06 and §11 are done:** *"Same application, same device,
-same scenes: Aura's p99 frame time is lower than Flutter's and React Native's, and Aura's p99
+same scenes: Taim's p99 frame time is lower than Flutter's and React Native's, and Taim's p99
 minus p50 is dramatically lower — because there is no collector in the frame path."*
 
-That second half is the interesting one. **Aura's real speed story is not the mean, it is the
+That second half is the interesting one. **Taim's real speed story is not the mean, it is the
 tail.** A GC-free frame path should show a much tighter p99/p50 ratio than either competitor.
 That is a claim about a mechanism, it is falsifiable, and it is the kind of result nobody can
 dismiss as benchmark-rigging. Measure the tail, not the average.
 
 ### 8.4 Beating them on **performance** (memory, startup, power, size)
 
-These are the axes where a no-GC framework *should* structurally win, and **Aura currently
+These are the axes where a no-GC framework *should* structurally win, and **Taim currently
 measures its own side of exactly one of them.**
 
-| Axis | Aura today | Required to claim a win |
+| Axis | Taim today | Required to claim a win |
 |---|---|---|
 | **Memory** | 283.8 MiB idle RSS in the harness (§4.4) — harness-inflated, never isolated | Measure the *app*, not the harness. Steady-state RSS of `mobile_shell` vs equivalents. Report peak, not just steady. |
 | **Startup** | **Never measured** | Cold-start to first frame, 20 runs, median + p95, killed between runs |
-| **Power** | **Never measured** | Joules over a fixed 60 s interaction script; the zero-idle-work claim lives or dies here and it is Aura's best structural advantage |
+| **Power** | **Never measured** | Joules over a fixed 60 s interaction script; the zero-idle-work claim lives or dies here and it is Taim's best structural advantage |
 | **Binary size** | **20.54 MiB / 15.77 MiB stripped**, 2× the README claim, over budget (F-23) | Get under 10 MiB stripped, then compare like for like |
 | **Allocation churn** | Claimed net-delta-3 from an uncommitted run (F-04) | Commit a `--features profiling` run; contrast against a GC framework's allocation rate |
 
-**Do the power measurement first among these.** "Zero idle work" is Aura's most differentiated
+**Do the power measurement first among these.** "Zero idle work" is Taim's most differentiated
 claim, it is architecturally true, it is trivially demonstrable (idle an app for 60 s, measure
 joules), and neither competitor can match it without changing their runtime. It is also the
 claim that matters most to the actual customer — a device OS.
@@ -1412,15 +1412,15 @@ claim that matters most to the actual customer — a device OS.
 ### 8.5 What "winning" concretely looks like, in one paragraph
 
 Twelve months from now, the persuasive artifact is not a benchmark table. It is: **a VYOM
-reference device running an Aura system shell, side by side with the same shell in Flutter and
+reference device running an Taim system shell, side by side with the same shell in Flutter and
 in React Native, on identical hardware, with a power meter attached and a screen reader turned
-on.** Aura's is the one that idles at near-zero draw, has the flattest p99, keeps working when
+on.** Taim's is the one that idles at near-zero draw, has the flattest p99, keeps working when
 the GPU is disabled, and speaks every control aloud. That demo is winnable. It requires
 F-07, F-08, F-10, F-14, F-15, F-18, and §11 — and nothing about Android or iOS.
 
 ---
 
-## 9. What is pending to make Aura a full-fledged framework
+## 9. What is pending to make Taim a full-fledged framework
 
 A framework is not a rendering engine. It is an engine, a component library, a platform layer, a
 toolchain, a distribution channel, and a support surface. Below is every domain, with what
@@ -1455,7 +1455,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing
 | Icon set | ❌ | Manifest with 2 TBD-licensed entries, 0 SVGs (F-14) |
 | Bundled font | ❌ | `assets/fonts/` is one README (F-14) |
 | Dark/light themes | ✅ | Both, throughout |
-| Reduced motion | ✅ | `aura-motion/src/reduced_motion.rs`, honoured by `skeleton` and others |
+| Reduced motion | ✅ | `taim-motion/src/reduced_motion.rs`, honoured by `skeleton` and others |
 | Text scaling / large fonts | 🟡 | `docs/guide/scaling.md` exists; no end-to-end test |
 | RTL / bidi | 🟡 | `mirror_rtl` in the icon manifest; no RTL layout test found |
 | List family (reorder, dismiss, sticky, sections) | ❌ | §7.4 rank 5 |
@@ -1476,7 +1476,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing
 | Embedded / framebuffer | 🟡 | `tiny_skia` makes it possible; no backend written |
 | IME | ✅ | Real preedit with selection spans |
 | Clipboard | ✅ | Both backends |
-| Drag & drop | 🟡 | `aura-platform-vyom/src/drag_drop.rs` only |
+| Drag & drop | 🟡 | `taim-platform-vyom/src/drag_drop.rs` only |
 | Display cutouts / safe-area insets | ❌ | `safe_area` widget has no inset source |
 | Multi-window | ✅ | `runtime/src/window.rs`, per-window state |
 | Power / thermal policy | 🟡 | `runtime/src/power_policy.rs` exists; unmeasured |
@@ -1500,9 +1500,9 @@ Legend: ✅ done · 🟡 partial · ❌ missing
 | Item | Status | Note |
 |---|:--:|---|
 | Profiler | ✅ | Zero-cost when off, Chrome trace export |
-| **Inspector application (`aura_lab`)** | ❌ | 11 overlay modules, **no app** — `docs/tools/aura-lab.md` says so |
+| **Inspector application (`taim_lab`)** | ❌ | 11 overlay modules, **no app** — `docs/tools/taim-lab.md` says so |
 | Hot reload | 🟡 | `hot` feature, `Cargo.toml:56` calls it "very experimental" |
-| Project scaffolding (`aura new`) | ❌ | None |
+| Project scaffolding (`taim new`) | ❌ | None |
 | Published on crates.io | ❌ | `0.15.0-dev`, unpublished |
 | Examples | ❌ | **1** (upstream iced ships ~80) |
 | Guides | ✅ | 10 guides, ~45,900 words, genuinely good |
@@ -1567,8 +1567,8 @@ someone else can run.
 | 3 | Add a `budgets` job to `ci.yml`; reconcile the 244-dep and 20.54 MiB overruns deliberately | F-22, F-23 |
 | 4 | Re-capture all 13 baselines: clean tree, one machine, truthfully registered, `--features profiling` on | F-02, F-03, F-04 |
 | 5 | Rewrite README perf numbers from those baselines; publish worst-case alongside best; fix the crate LOC table | F-01 |
-| 6 | Delete or empty `docs/performance/aura-1.0-report.md`; fix units in `methodology.md` | F-05, F-06 |
-| 7 | Teach `aura_bench --save` to refuse a `-dirty` tree | F-03 |
+| 6 | Delete or empty `docs/performance/taim-1.0-report.md`; fix units in `methodology.md` | F-05, F-06 |
+| 7 | Teach `taim_bench --save` to refuse a `-dirty` tree | F-03 |
 | 8 | Write the missing `CREDITS.md` | §9.7 |
 
 **Exit gate:** `cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings &&
@@ -1584,9 +1584,9 @@ cargo test --workspace && bash scripts/ci/check-budgets.sh` all pass, and every 
 | 3 | Implement the 17 missing `Catalog for Theme` impls | F-13 |
 | 4 | Add a compile-time test: a `Catalog` without a `Theme` impl is a build failure | F-13 |
 | 5 | Add per-day `date_picker` semantics | F-16 |
-| 6 | Add an accessibility panel to `aura-showcase`: reduced motion, text scale, high contrast, live toggle | §8.2 |
+| 6 | Add an accessibility panel to `taim-showcase`: reduced motion, text scale, high contrast, live toggle | §8.2 |
 
-**Exit gate:** `cargo run -p aura-showcase` renders every widget with real icons and a bundled
+**Exit gate:** `cargo run -p taim-showcase` renders every widget with real icons and a bundled
 font, in both themes, with the a11y panel switching live.
 
 ### M2 — Visual truth (3 weeks, parallel with M1)
@@ -1618,12 +1618,12 @@ not re-presented; `effect_ladder`'s cost rises and is re-budgeted.
 
 | # | Task | Finding |
 |---|---|---|
-| 1 | Add an `accessibility` feature to the `aura` facade enabling `aura-accessibility/atspi` | F-15 |
+| 1 | Add an `accessibility` feature to the `taim` facade enabling `taim-accessibility/atspi` | F-15 |
 | 2 | Spawn the D-Bus bus task from the winit event loop; drain the queue | F-15 |
 | 3 | **Verify against a live Orca session** — record the transcript | F-15 |
 | 4 | Add an AT-SPI integration test against a real session bus in CI | F-15 |
 
-**Exit gate:** a video of Orca reading `aura-showcase` end to end.
+**Exit gate:** a video of Orca reading `taim-showcase` end to end.
 
 ### M5 — Own the platform (8 weeks)
 
@@ -1644,7 +1644,7 @@ Execute §11 in full. **No public comparison before this milestone completes.**
 
 ### M7 — Adoption (ongoing, parallel from M1)
 
-Publish to crates.io · `aura new` scaffolding · build `aura_lab` into an actual application ·
+Publish to crates.io · `taim new` scaffolding · build `taim_lab` into an actual application ·
 grow examples from 1 to 20 · migration guide from iced · API stability policy · security
 disclosure policy.
 
@@ -1670,7 +1670,7 @@ in a README, in a deck, or in a commit message.**
 
 ### 11.1 The application
 
-Build **the same application three times** — Aura, Flutter, React Native (New Architecture,
+Build **the same application three times** — Taim, Flutter, React Native (New Architecture,
 Hermes, Fabric enabled). Not three benchmark harnesses: one real application, with the same
 screens, the same asset set, the same fonts, the same interaction script.
 
@@ -1689,11 +1689,11 @@ Airplane mode. Nothing else running. Record kernel, driver, and compositor versi
 | Metric | Method | Why it matters |
 |---|---|---|
 | **p50 / p95 / p99 frame time** | Input→pixels, not update+draw. ≥1,800 frames, ≥5 runs, median-of-runs | The headline |
-| **p99 − p50 spread** | Same samples | **Aura's real story — the GC-free tail** (§8.3) |
+| **p99 − p50 spread** | Same samples | **Taim's real story — the GC-free tail** (§8.3) |
 | **Missed frame rate** | Against the device's actual refresh | A dropped frame is visible; a slow mean is not |
 | **Cold start to first frame** | Process killed between runs, 20 runs | Where Hermes/Dart VM startup shows |
 | **Steady-state and peak RSS** | Sampled over the interaction script | Where no-GC should win — currently unproven (§4.4) |
-| **Energy over 60 s idle** | Hardware power meter, not software estimate | **The zero-idle-work claim** — Aura's best structural advantage |
+| **Energy over 60 s idle** | Hardware power meter, not software estimate | **The zero-idle-work claim** — Taim's best structural advantage |
 | **Energy over 60 s of the scripted interaction** | Same meter | The claim that matters for a device OS |
 | **Install size and RSS-at-launch** | Stripped release artifact | F-23; currently 2× the claimed number |
 
@@ -1705,7 +1705,7 @@ Airplane mode. Nothing else running. Record kernel, driver, and compositor versi
 4. **Publish raw samples**, not summaries alone.
 5. **Publish the source of all three applications.**
 6. **Have someone outside the team reproduce it before publishing.**
-7. **Report every metric where Aura loses.** A comparison that reports only wins is read as one that hides losses — and Aura will lose on binary size and possibly on memory. Say so.
+7. **Report every metric where Taim loses.** A comparison that reports only wins is read as one that hides losses — and Taim will lose on binary size and possibly on memory. Say so.
 
 ---
 
@@ -1764,11 +1764,11 @@ lead with the supportable ones.
 ### A.1 Commands run, 2026-08-23, at `bf065be7`
 
 ```
-cargo check --workspace --all-targets       → exit 0, 19.61s, 11 warnings (aura_wgpu dead code)
+cargo check --workspace --all-targets       → exit 0, 19.61s, 11 warnings (taim_wgpu dead code)
 cargo test --workspace                      → exit 0, 1705 passed / 0 failed / 3 ignored, 63 binaries
 cargo build -p mobile_shell --release       → exit 0, 44.86s
 cargo fmt --all -- --check                  → FAIL, 68 diff sites
-cargo clippy --workspace --all-targets -D warnings → FAIL, 15 errors (aura_wgpu)
+cargo clippy --workspace --all-targets -D warnings → FAIL, 15 errors (taim_wgpu)
 bash scripts/ci/check-budgets.sh            → FAIL 2/4
 bash scripts/ci/check-workspace.sh          → PASS, 23 members
 ```
@@ -1806,9 +1806,9 @@ Benchmark budget
 | Tests ignored | 3 (none via `#[ignore]`) |
 | Public constructors in `widget/src/helpers.rs` | 75 (61 widgets + 14 helpers) |
 | `pub trait Catalog` declarations | 41 |
-| `Catalog for Theme` impls in `widget/src/aura.rs` | **24** |
+| `Catalog for Theme` impls in `widget/src/taim.rs` | **24** |
 | Unthemed catalogs | **17** |
-| `aura-design` component specs | 18 |
+| `taim-design` component specs | 18 |
 | WGSL shaders | 11 (0 for effects) |
 | Golden reference images | **0** |
 | `compare()` calls outside the golden harness | **0** |
@@ -1858,7 +1858,7 @@ ls -l target/release/mobile_shell
 # Component coverage — should print 17 unthemed catalogs
 comm -23 \
   <(grep -rln 'pub trait Catalog' widget/src/*.rs | xargs -n1 basename | sed 's/.rs//' | sort) \
-  <(grep -o '^impl \(crate::\)\?[a-z_]*::Catalog for Theme' widget/src/aura.rs \
+  <(grep -o '^impl \(crate::\)\?[a-z_]*::Catalog for Theme' widget/src/taim.rs \
       | sed 's/impl \(crate::\)\?//;s/::Catalog for Theme//' | sort)
 
 # Visual truth — should print 0: every compare() call lives in the harness's own self-tests
@@ -1874,7 +1874,7 @@ sed -n '1,24p' wgpu/src/effects/pipeline.rs
 sed -n '396,436p' wgpu/src/window/compositor.rs
 
 # Accessibility reachability — the feature is off by default
-sed -n '16,22p' aura-accessibility/Cargo.toml
+sed -n '16,22p' taim-accessibility/Cargo.toml
 grep -rn 'atspi' --include='*.toml' . | grep -v Cargo.lock
 
 # Mobile platform — should return one styling cfg!
@@ -1910,7 +1910,7 @@ Both of those paragraphs are true. **The second one is fixable in a week for the
 months for the substance.** The order matters: fix the claims first, because every genuine
 advantage in the first paragraph depends on being believed.
 
-Aura will not beat Flutter and React Native at being Flutter and React Native. On VYOM OS and
+Taim will not beat Flutter and React Native at being Flutter and React Native. On VYOM OS and
 constrained Linux devices — no GC, no idle work, no GPU required, no second runtime to ship —
 it can beat both, decisively, and neither can follow without becoming something else.
 

@@ -1,13 +1,13 @@
-//! The core library of [Aura].
+//! The core library of [Taim].
 //!
 //! This library holds basic types that can be reused and re-exported in
 //! different runtime implementations.
 //!
-//! ![The foundations of the Aura ecosystem](https://github.com/theaimartco/vyom-aura/blob/main/docs/graphs/foundations.png?raw=true)
+//! ![The foundations of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/foundations.png?raw=true)
 //!
-//! [Aura]: https://github.com/theaimartco/vyom-aura
+//! [Taim]: https://github.com/theaimartco/taim
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
 )]
 pub mod alignment;
 pub mod animation;
@@ -109,7 +109,7 @@ pub fn never<T>(never: Never) -> T {
 /// A trait extension for binary functions (`Fn(A, B) -> O`).
 ///
 /// It enables you to use a bunch of nifty functional programming paradigms
-/// that work well with aura.
+/// that work well with taim.
 pub trait Function<A, B, O> {
     /// Applies the given first argument to a binary function and returns
     /// a new function that takes the other argument.
@@ -137,7 +137,7 @@ pub trait Function<A, B, O> {
     /// That's quite a mouthful. [`with`](Self::with) lets you write:
     ///
     /// ```rust
-    /// # use aura_core::Function;
+    /// # use taim_core::Function;
     /// # let element: Option<()> = Some(());
     /// # enum Message { ButtonPressed(u32, ()) }
     /// let id = 123;

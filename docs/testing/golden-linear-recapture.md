@@ -1,7 +1,7 @@
 # Golden re-capture: linear-light compositing
 
 Record of every golden changed by making linear-light compositing the
-production default — removing `web-colors` from the `aura` crate's `default`
+production default — removing `web-colors` from the `taim` crate's `default`
 feature list, and giving the `tiny_skia` backend the same working space as the
 `wgpu` backend.
 

@@ -1,9 +1,9 @@
-use aura_core::input_method::{Purpose, SurroundingText};
-use aura_core::pointer::{DeviceKind, Id, Metadata, Phase, Pointer};
-use aura_core::time::Instant;
-use aura_core::{Point, Rectangle};
-use aura_platform_vyom::ime::Session;
-use aura_platform_vyom::input::{Device, DeviceId, Input, SeatId};
+use taim_core::input_method::{Purpose, SurroundingText};
+use taim_core::pointer::{DeviceKind, Id, Metadata, Phase, Pointer};
+use taim_core::time::Instant;
+use taim_core::{Point, Rectangle};
+use taim_platform_vyom::ime::Session;
+use taim_platform_vyom::input::{Device, DeviceId, Input, SeatId};
 
 #[test]
 fn hot_unplug_cancels_each_contact_exactly_once() {

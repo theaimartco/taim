@@ -1,12 +1,12 @@
-//! The Phase 13 exit-gate clause: **all Aura components have semantic
+//! The Phase 13 exit-gate clause: **all Taim components have semantic
 //! snapshots/actions**.
 //!
-//! `aura-design`'s `ComponentSpec` already declares each component's
+//! `taim-design`'s `ComponentSpec` already declares each component's
 //! `role()` and `actions()`, and `tests/design/components.rs` proves that
 //! declaration is self-consistent. This suite proves the next step: that
 //! the declaration survives being turned into a real
-//! `aura_core::semantics::Node`, retained in an
-//! `aura_accessibility::Tree`, and queried the way a platform adapter
+//! `taim_core::semantics::Node`, retained in an
+//! `taim_accessibility::Tree`, and queried the way a platform adapter
 //! would.
 //!
 //! The gap that would otherwise hide here: a component can declare a
@@ -14,33 +14,33 @@
 //! nothing ever builds a node from it. So every assertion below goes
 //! through the retained tree, not the spec.
 
-use aura_accessibility::actions::{Dispatch, Rejection, Router};
-use aura_accessibility::live_region::{LiveRegions, Refusal};
-use aura_accessibility::tree::Tree;
+use taim_accessibility::actions::{Dispatch, Rejection, Router};
+use taim_accessibility::live_region::{LiveRegions, Refusal};
+use taim_accessibility::tree::Tree;
 
-use aura_design::components::app_bar::{AppBar, AppBarKind};
-use aura_design::components::bottom_sheet::BottomSheet;
-use aura_design::components::button::{Button, ButtonKind};
-use aura_design::components::card::Card;
-use aura_design::components::dialog::Dialog;
-use aura_design::components::icon_button::IconButton;
-use aura_design::components::list_tile::{ListLines, ListTile};
-use aura_design::components::menu::Menu;
-use aura_design::components::navigation::{Navigation, NavigationMode};
-use aura_design::components::notification::{Notification, Privacy};
-use aura_design::components::progress::Progress;
-use aura_design::components::selection::{Selection, SelectionKind};
-use aura_design::components::slider::Slider;
-use aura_design::components::text_field::TextField;
-use aura_design::components::toast::Toast;
-use aura_design::components::tooltip::Tooltip;
-use aura_design::components::window_chrome::WindowChrome;
-use aura_design::components::{ComponentSpec, Density};
-use aura_design::icon::Icon;
+use taim_design::components::app_bar::{AppBar, AppBarKind};
+use taim_design::components::bottom_sheet::BottomSheet;
+use taim_design::components::button::{Button, ButtonKind};
+use taim_design::components::card::Card;
+use taim_design::components::dialog::Dialog;
+use taim_design::components::icon_button::IconButton;
+use taim_design::components::list_tile::{ListLines, ListTile};
+use taim_design::components::menu::Menu;
+use taim_design::components::navigation::{Navigation, NavigationMode};
+use taim_design::components::notification::{Notification, Privacy};
+use taim_design::components::progress::Progress;
+use taim_design::components::selection::{Selection, SelectionKind};
+use taim_design::components::slider::Slider;
+use taim_design::components::text_field::TextField;
+use taim_design::components::toast::Toast;
+use taim_design::components::tooltip::Tooltip;
+use taim_design::components::window_chrome::WindowChrome;
+use taim_design::components::{ComponentSpec, Density};
+use taim_design::icon::Icon;
 
-use aura_core::semantics::{Actions, Live, Node, Role};
-use aura_core::widget::Id;
-use aura_core::{Point, Rectangle};
+use taim_core::semantics::{Actions, Live, Node, Role};
+use taim_core::widget::Id;
+use taim_core::{Point, Rectangle};
 
 /// Builds the semantic node a component would contribute, exactly the way
 /// a widget is expected to: role and actions come straight from the
@@ -313,7 +313,7 @@ fn a_secure_field_snapshot_never_carries_a_value() {
 
     let id = Id::unique();
     let node = snapshot(&id, &spec, "Password")
-        .with_value(aura_core::semantics::Value::Text("hunter2".into()));
+        .with_value(taim_core::semantics::Value::Text("hunter2".into()));
 
     let tree = Tree::from_forest(&[node]);
     let entry = tree.get(&id).unwrap();

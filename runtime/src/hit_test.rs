@@ -21,7 +21,7 @@
 //! A hit-test cache is only sound if it is invalidated whenever the
 //! layout it was computed against changes. Nothing in this codebase
 //! marks a subtree "layout changed" reliably yet outside of the opt-in
-//! [`aura_core::widget::tree::Tree::layout_with_cache`] mechanism
+//! [`taim_core::widget::tree::Tree::layout_with_cache`] mechanism
 //! (Phase 3), which no production widget has adopted for that purpose.
 //! [`Index`] sidesteps this by being rebuilt wholesale every layout pass
 //! rather than incrementally patched -- there is no staleness window to
@@ -345,7 +345,7 @@ mod tests {
     use crate::core::{Rectangle, Size};
 
     /// A minimal synthetic tree for exercising [`hit_test`] without any
-    /// dependency on `aura_core::Widget`.
+    /// dependency on `taim_core::Widget`.
     #[derive(Debug, Clone)]
     struct Node {
         bounds: Rectangle,

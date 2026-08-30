@@ -128,6 +128,22 @@ pub trait Renderer {
     /// Resets the [`Renderer`] to start drawing in the `new_bounds` from scratch.
     fn reset(&mut self, new_bounds: Rectangle);
 
+    /// Sets the [`crate::material::SceneLight`] every [`Quad::material`]
+    /// responds to.
+    ///
+    /// A no-op by default: a renderer that never shades materials has
+    /// nothing to set.
+    fn set_light(&mut self, light: crate::material::SceneLight) {
+        let _ = light;
+    }
+
+    /// Returns the [`crate::material::SceneLight`] set by
+    /// [`Renderer::set_light`], or
+    /// [`SceneLight::KEY`](crate::material::SceneLight::KEY) if nothing has.
+    fn light(&self) -> crate::material::SceneLight {
+        crate::material::SceneLight::KEY
+    }
+
     /// Polls any concurrent computations that may be pending in the [`Renderer`].
     ///
     /// By default, it does nothing.
@@ -156,7 +172,7 @@ pub struct Quad {
     /// half-float surface a `4.93` white is a 1,000-nit highlight, brighter
     /// than the page it sits on rather than merely lighter.
     ///
-    /// Use [`aura_core::color::space::nits_to_scene`] to convert an absolute
+    /// Use [`taim_core::color::space::nits_to_scene`] to convert an absolute
     /// luminance into this scale.
     ///
     /// Applies to the fill and the border, which are the quad's own surfaces.
@@ -190,7 +206,7 @@ pub struct Quad {
     ///   packs sRGB-encoded components and blends those directly, and
     ///   scaling a gamma-encoded component changes hue rather than
     ///   luminance -- so this is ignored under it rather than applied
-    ///   wrongly. `web-colors` is a default feature of the `aura` crate
+    ///   wrongly. `web-colors` is a default feature of the `taim` crate
     ///   today, which means the default build ignores this field.
     pub luminance: f32,
 }

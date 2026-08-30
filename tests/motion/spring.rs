@@ -1,4 +1,4 @@
-use aura_motion::{Bounds, Decay, Spring, SpringConfig};
+use taim_motion::{Bounds, Decay, Spring, SpringConfig};
 
 #[test]
 fn spring_matches_across_60_90_and_120_hz() {

@@ -1,8 +1,8 @@
-//! The definition of an aura program.
-pub use aura_graphics as graphics;
-pub use aura_runtime as runtime;
-pub use aura_runtime::core;
-pub use aura_runtime::futures;
+//! The definition of an taim program.
+pub use taim_graphics as graphics;
+pub use taim_runtime as runtime;
+pub use taim_runtime::core;
+pub use taim_runtime::futures;
 
 pub mod message;
 
@@ -83,7 +83,7 @@ pub trait Program: Sized {
             title.push_str(&part);
         }
 
-        format!("{title} - Aura")
+        format!("{title} - Taim")
     }
 
     fn subscription(&self, _state: &Self::State) -> Subscription<Self::Message> {

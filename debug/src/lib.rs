@@ -1,5 +1,5 @@
-pub use aura_core as core;
-pub use aura_futures as futures;
+pub use taim_core as core;
+pub use taim_futures as futures;
 
 use crate::core::theme::palette;
 use crate::core::window;

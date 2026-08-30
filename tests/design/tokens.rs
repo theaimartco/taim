@@ -1,6 +1,6 @@
-use aura_core::text::Script;
-use aura_design::Theme;
-use aura_design::tokens::{ColorTokens, Contrast, Scheme, Spacing, TextStyle, Typography};
+use taim_core::text::Script;
+use taim_design::Theme;
+use taim_design::tokens::{ColorTokens, Contrast, Scheme, Spacing, TextStyle, Typography};
 
 #[test]
 fn all_schemes_have_readable_primary_and_surface_text() {

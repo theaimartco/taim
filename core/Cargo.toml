@@ -1,6 +1,6 @@
 [package]
-name = "aura_core"
-description = "The essential ideas of aura"
+name = "taim_core"
+description = "The essential ideas of taim"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -21,7 +21,7 @@ basic-shaping = []
 advanced-shaping = []
 
 [dependencies]
-aura-motion = { workspace = true, features = ["std"] }
+taim-motion = { workspace = true, features = ["std"] }
 bitflags.workspace = true
 bytes.workspace = true
 glam.workspace = true

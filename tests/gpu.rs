@@ -34,3 +34,6 @@ mod material_shading;
 
 #[path = "gpu/material_live.rs"]
 mod material_live;
+
+#[path = "gpu/material_backdrop.rs"]
+mod material_backdrop;

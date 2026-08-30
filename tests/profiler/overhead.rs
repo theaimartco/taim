@@ -22,12 +22,12 @@
 //! - The timing test takes the median of many trials and uses a bound
 //!   loose enough never to fail on noise. It catches a *category* error —
 //!   someone making `record` take a lock, or allocate, when disabled — not
-//!   a 1% drift. The 1% number is a budget for `aura_bench` on a quiet
+//!   a 1% drift. The 1% number is a budget for `taim_bench` on a quiet
 //!   reference machine; it is not something a unit test can honestly
 //!   assert, and this file does not pretend otherwise.
 
-use aura_profiler::collector::{Collector, Sampling};
-use aura_profiler::events::{Cause, Event, Label, Phase, Resource};
+use taim_profiler::collector::{Collector, Sampling};
+use taim_profiler::events::{Cause, Event, Label, Phase, Resource};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
@@ -292,7 +292,7 @@ fn every_frames_time_can_be_traced_to_a_phase() {
     });
 
     let events = collector.events();
-    let totals = aura_profiler::export::phase_totals(&events);
+    let totals = taim_profiler::export::phase_totals(&events);
     let attributed: u64 = totals.iter().map(|(_, total)| total).sum();
 
     assert_eq!(

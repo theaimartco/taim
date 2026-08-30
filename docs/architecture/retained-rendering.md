@@ -180,5 +180,5 @@ This is enforced by:
   a consumer's perspective.
 - **Golden tests**: `tests/golden/damage_motion.rs` verifies damage
   correctness properties (no uncovered changed pixel).
-- **Benchmark scene**: `tools/aura_bench/src/scenes/damage_churn.rs`
+- **Benchmark scene**: `tools/taim_bench/src/scenes/damage_churn.rs`
   measures performance under tiny, scattered, and full damage loads.

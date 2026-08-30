@@ -6,21 +6,21 @@
 //! accessibility engine with nothing in it is a specification, not
 //! accessibility.
 //!
-//! These drive real `aura_widget` controls through the real
+//! These drive real `taim_widget` controls through the real
 //! `Widget::semantics`, feed the result into the real
-//! `aura_accessibility::Tree`, and assert the tree an assistive
+//! `taim_accessibility::Tree`, and assert the tree an assistive
 //! technology would actually receive.
 
-use aura_accessibility::focus::Focus;
-use aura_accessibility::tree::Tree as SemanticTree;
-use aura_accessibility::{Dispatch, Router};
+use taim_accessibility::focus::Focus;
+use taim_accessibility::tree::Tree as SemanticTree;
+use taim_accessibility::{Dispatch, Router};
 
-use aura::advanced::widget;
-use aura::advanced::{Layout, layout};
-use aura::widget::{button, checkbox, radio, slider, text, text_input, toggler};
-use aura::{Element, Size, Theme};
-use aura_core::semantics::{Actions, Role, State, Value};
-use aura_renderer::Renderer;
+use taim::advanced::widget;
+use taim::advanced::{Layout, layout};
+use taim::widget::{button, checkbox, radio, slider, text, text_input, toggler};
+use taim::{Element, Size, Theme};
+use taim_core::semantics::{Actions, Role, State, Value};
+use taim_renderer::Renderer;
 
 type Message = ();
 
@@ -30,9 +30,9 @@ const BOUNDS: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -42,7 +42,7 @@ fn headless_renderer() -> Renderer {
 /// Lays out one widget and returns the semantic node it reports.
 fn semantics_of(
     element: Element<'_, Message, Theme, Renderer>,
-) -> Option<aura_core::semantics::Node> {
+) -> Option<taim_core::semantics::Node> {
     let mut element = element;
     let renderer = headless_renderer();
 

@@ -52,7 +52,7 @@ pub struct Context {
     ///
     /// This is a target, not a guarantee: a real presentation loop
     /// (Phase 6) may miss it under load, and a headless context (e.g.
-    /// `aura_bench`, Phase 1) may never populate it at all.
+    /// `taim_bench`, Phase 1) may never populate it at all.
     pub target_present_at: Option<Instant>,
     /// The device scale factor (pixels per logical point) this frame is
     /// being produced for.

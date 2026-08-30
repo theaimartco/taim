@@ -7,7 +7,7 @@
 ## The bounded cost model
 
 Effects are layer-local, never surface-global. Every effect declares
-sampling bounds (`aura_wgpu::effects::Effect::bounds`) computed as its
+sampling bounds (`taim_wgpu::effects::Effect::bounds`) computed as its
 source region expanded by whatever it samples outside itself, then
 clipped to the surface. Concretely:
 
@@ -71,7 +71,7 @@ Invariants enforced by tests, not convention:
 
 ## Texture pool
 
-Intermediate textures are byte-budgeted (`aura_wgpu::effects::pool`).
+Intermediate textures are byte-budgeted (`taim_wgpu::effects::pool`).
 The pool tracks two quantities:
 
 - `used` -- bytes of textures currently live (acquired, not released).
@@ -127,7 +127,7 @@ portable sensor to invent -- so a real event loop supplies those fields.
 
 ## The cost curve
 
-`tools/aura_bench/src/scenes/effect_ladder.rs` walks a fixed ladder that
+`tools/taim_bench/src/scenes/effect_ladder.rs` walks a fixed ladder that
 scales one axis at a time (radius, then source area, then layer count,
 then tier) and reports, per rung, the separable sample count and the
 intermediate bytes the pool must commit. Its tests pin the curve's shape:
@@ -157,7 +157,7 @@ intermediate bytes the pool must commit. Its tests pin the curve's shape:
 2. Wire real thermal and GPU-loss signals from the platform
    (`winit`/`wgpu`) into `Pressure`; only `missed_frame_ratio` is
    measured by the runtime today.
-3. **Connect `effects::Graph` to the actual `aura_wgpu` render path.**
+3. **Connect `effects::Graph` to the actual `taim_wgpu` render path.**
    The cost model, bounds, budgets, and tier gating are complete and
    tested, but no live draw call consumes them yet -- the shaders and
    pass scheduling are the remaining renderer-side work.

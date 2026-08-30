@@ -1,24 +1,24 @@
-# VYOM Aura — Production Execution Roadmap
+# VYOM Taim — Production Execution Roadmap
 
-> Status: implementation contract for the Aura-derived Aura fork  
+> Status: implementation contract for the Taim-derived Taim fork  
 > Goal: a Rust-first, Wayland-native, Vulkan-first UI framework for VYOM OS with measurable leadership in latency, frame consistency, efficiency, visual quality, accessibility, and developer experience.
 
 ## 1. Non-negotiable execution rules
 
 1. **Measure first.** “Fastest” is not a claim until the same public scene, hardware, build flags, warm-up, and sampling method reproduce the result.
 2. **Correctness before optimization.** No performance change merges without functional, visual, memory, and accessibility checks.
-3. **No permanent idle rendering.** With no animation, input, damage, or external surface update, Aura must submit no GPU frame.
+3. **No permanent idle rendering.** With no animation, input, damage, or external surface update, Taim must submit no GPU frame.
 4. **Bound every cache and queue.** Glyphs, images, layers, display lists, effects, pipelines, events, and telemetry must all have budgets and eviction/backpressure behavior.
 5. **One architectural risk per commit.** Each central-engine change must be independently benchmarked and revertible.
 6. **Keep fallback paths until replacement parity.** Keep `winit` during the VYOM backend migration and keep `tiny-skia` behind a recovery/debug feature until GPU-loss recovery is proven.
-7. **Do not mass-rename the Aura internals yet.** Stabilize behavior and crate boundaries first; cosmetic renaming is not a performance phase.
+7. **Do not mass-rename the Taim internals yet.** Stabilize behavior and crate boundaries first; cosmetic renaming is not a performance phase.
 8. **No unsafe code without an RFC.** Any new `unsafe` block requires a safety invariant, Miri/sanitizer coverage where applicable, and review.
 9. **No LOC padding.** The ceilings below are maximum review limits, not targets. Prefer deletion, reuse, and small APIs.
 10. **A phase is complete only when its exit gate passes.** “Code compiles” is never the sole completion condition.
 
 ## 2. Repository and path assumptions
 
-This roadmap uses the paths in the supplied Aura/Aura fork plan. Phase 0 must verify them against the actual checkout before feature work. If the fork uses a semantically equivalent renamed file, record it in `docs/architecture/path-map.md`; do not create duplicate modules just to match this document.
+This roadmap uses the paths in the supplied Taim/Taim fork plan. Phase 0 must verify them against the actual checkout before feature work. If the fork uses a semantically equivalent renamed file, record it in `docs/architecture/path-map.md`; do not create duplicate modules just to match this document.
 
 Expected top-level modules:
 
@@ -81,14 +81,14 @@ Phases are dependency ordered. Parallel work is allowed only when file ownership
 | 8 | Unified pointer input and gesture arena | 3, 7 | 6,890 | 9,810 |
 | 9 | Motion engine and transitions | 6, 8 | 5,320 | 7,560 |
 | 10 | Typography, editing, and IME | 3, 5 | 8,020 | 11,240 |
-| 11 | Aura visual language and components | 7, 9, 10 | 11,980 | 16,760 |
+| 11 | Taim visual language and components | 7, 9, 10 | 11,980 | 16,760 |
 | 12 | GPU effects and adaptive quality | 5, 6, 11 | 4,790 | 6,840 |
 | 13 | Accessibility and semantics | 3, 10, 11 | 5,550 | 7,810 |
 | 14 | Native VYOM platform backend | 6, 8, 10, 13 | 8,300 | 11,610 |
-| 15 | Profiler, inspector, and Aura Lab | 1–14 | 5,750 | 8,180 |
+| 15 | Profiler, inspector, and Taim Lab | 1–14 | 5,750 | 8,180 |
 | 16 | Golden, stress, and regression gates | 11–15 | 5,520 | 7,810 |
 | 17 | Power, recovery, security, and hardening | 12, 14, 16 | 5,000 | 7,170 |
-| 18 | Reference shell, comparative proof, Aura 1.0 | all | 5,820 | 8,120 |
+| 18 | Reference shell, comparative proof, Taim 1.0 | all | 5,820 | 8,120 |
 | **Total** | **Complete production program** | | **107,440** | **152,460** |
 
 The total includes production code, tests, benchmarks, developer tools, CI, and architecture documentation. Expected runtime/library code is approximately 60–70k of the estimate; the remainder is verification and tooling required for production quality.
@@ -121,7 +121,7 @@ The total includes production code, tests, benchmarks, developer tools, CI, and 
 
 1. Run `cargo metadata --format-version 1` and inventory all workspace members and path dependencies.
 2. Use `rg` to find references to removed crates: `beacon`, `devtools`, `highlighter`, `selector`, `test`, `tester`, and deleted examples.
-3. Remove only stale references. Restore a deleted capability only when a later phase explicitly needs an Aura-owned replacement.
+3. Remove only stale references. Restore a deleted capability only when a later phase explicitly needs an Taim-owned replacement.
 4. Keep `wgpu`, Wayland, advanced shaping, hinting, and the thread pool in the VYOM profile. Keep X11, web, QR, markdown, syntax highlighting, and software rendering out of default features.
 5. Verify default, minimal-headless, profiling, and recovery feature combinations.
 
@@ -151,22 +151,22 @@ cargo deny check
 
 | File | Action | Exact work | Est. +LOC | Max +LOC |
 |---|---|---|---:|---:|
-| `tools/aura_bench/Cargo.toml` | Create | isolated benchmark app and optional profiling features | 80 | 130 |
-| `tools/aura_bench/src/main.rs` | Create | scene selection, warm-up, fixed-duration run, report output | 180 | 260 |
-| `tools/aura_bench/src/config.rs` | Create | device, refresh-rate, scene, seed, and cache-state configuration | 140 | 210 |
-| `tools/aura_bench/src/scenes/mod.rs` | Create | deterministic scene registry | 90 | 140 |
-| `tools/aura_bench/src/scenes/idle_shell.rs` | Create | static shell/no-redraw case | 110 | 170 |
-| `tools/aura_bench/src/scenes/ten_thousand_rows.rs` | Create | list churn, scroll, update and jump cases | 170 | 240 |
-| `tools/aura_bench/src/scenes/text_heavy.rs` | Create | multilingual paragraphs, edits, emoji, fallback | 160 | 230 |
-| `tools/aura_bench/src/scenes/image_grid.rs` | Create | decode, upload, resize, eviction workload | 150 | 220 |
-| `tools/aura_bench/src/scenes/blur_layers.rs` | Create | controlled effect radii/areas/layer counts | 130 | 190 |
-| `tools/aura_bench/src/scenes/animated_cards.rs` | Create | transforms, opacity, layout animation stress | 140 | 210 |
-| `tools/aura_bench/src/scenes/multitouch.rs` | Create | recorded deterministic pointer streams | 140 | 210 |
-| `tools/aura_bench/src/metrics/frame_time.rs` | Create | P50/P95/P99 CPU/GPU phase timings and missed frames | 180 | 260 |
-| `tools/aura_bench/src/metrics/allocations.rs` | Create | opt-in counting allocator; disabled outside profiling | 170 | 250 |
-| `tools/aura_bench/src/metrics/memory.rs` | Create | RSS and renderer resource snapshots | 130 | 200 |
-| `tools/aura_bench/src/metrics/latency.rs` | Create | event-to-submit and present-feedback correlation | 210 | 310 |
-| `tools/aura_bench/src/report.rs` | Create | versioned JSON schema plus human-readable summary | 220 | 320 |
+| `tools/taim_bench/Cargo.toml` | Create | isolated benchmark app and optional profiling features | 80 | 130 |
+| `tools/taim_bench/src/main.rs` | Create | scene selection, warm-up, fixed-duration run, report output | 180 | 260 |
+| `tools/taim_bench/src/config.rs` | Create | device, refresh-rate, scene, seed, and cache-state configuration | 140 | 210 |
+| `tools/taim_bench/src/scenes/mod.rs` | Create | deterministic scene registry | 90 | 140 |
+| `tools/taim_bench/src/scenes/idle_shell.rs` | Create | static shell/no-redraw case | 110 | 170 |
+| `tools/taim_bench/src/scenes/ten_thousand_rows.rs` | Create | list churn, scroll, update and jump cases | 170 | 240 |
+| `tools/taim_bench/src/scenes/text_heavy.rs` | Create | multilingual paragraphs, edits, emoji, fallback | 160 | 230 |
+| `tools/taim_bench/src/scenes/image_grid.rs` | Create | decode, upload, resize, eviction workload | 150 | 220 |
+| `tools/taim_bench/src/scenes/blur_layers.rs` | Create | controlled effect radii/areas/layer counts | 130 | 190 |
+| `tools/taim_bench/src/scenes/animated_cards.rs` | Create | transforms, opacity, layout animation stress | 140 | 210 |
+| `tools/taim_bench/src/scenes/multitouch.rs` | Create | recorded deterministic pointer streams | 140 | 210 |
+| `tools/taim_bench/src/metrics/frame_time.rs` | Create | P50/P95/P99 CPU/GPU phase timings and missed frames | 180 | 260 |
+| `tools/taim_bench/src/metrics/allocations.rs` | Create | opt-in counting allocator; disabled outside profiling | 170 | 250 |
+| `tools/taim_bench/src/metrics/memory.rs` | Create | RSS and renderer resource snapshots | 130 | 200 |
+| `tools/taim_bench/src/metrics/latency.rs` | Create | event-to-submit and present-feedback correlation | 210 | 310 |
+| `tools/taim_bench/src/report.rs` | Create | versioned JSON schema plus human-readable summary | 220 | 320 |
 | `benchmarks/devices.toml` | Create | named reference hardware, display, OS, driver and power mode | 100 | 160 |
 | `benchmarks/baseline/.gitkeep` | Create | report destination; actual machine reports handled by policy | 0 | 0 |
 | `scripts/perf/run-baseline.sh` | Create | release flags, governor checks, warm-up, repeated samples | 160 | 230 |
@@ -285,7 +285,7 @@ Each commit gets an independent before/after benchmark record. Never land all fi
 | `tests/graphics/damage_region.rs` | Create | merge/clip/transform/property tests and threshold cases | 450 | 620 |
 | `tests/graphics/retained_layers.rs` | Create | cache hit, revision invalidation, resource generation and eviction | 420 | 590 |
 | `tests/golden/damage_motion.rs` | Create | moving/translucent/blurred old-new bounds oracle | 300 | 440 |
-| `tools/aura_bench/src/scenes/damage_churn.rs` | Create | tiny, scattered and full-screen damage patterns | 170 | 250 |
+| `tools/taim_bench/src/scenes/damage_churn.rs` | Create | tiny, scattered and full-screen damage patterns | 170 | 250 |
 | `docs/architecture/retained-rendering.md` | Create | ownership, invalidation, eviction, fallback and correctness model | 240 | 340 |
 
 ### Critical invariants
@@ -365,7 +365,7 @@ Each commit gets an independent before/after benchmark record. Never land all fi
 | `tests/runtime/frame_scheduler.rs` | Create | deterministic fake-clock state-machine tests | 460 | 640 |
 | `tests/runtime/idle.rs` | Create | no submit/layout/paint after quiescence | 280 | 400 |
 | `tests/runtime/occlusion.rs` | Create | suspend/resume/deadline and missed-feedback cases | 300 | 430 |
-| `tools/aura_bench/src/metrics/pacing.rs` | Create | cadence, jitter, queue depth, missed-frame classification | 270 | 390 |
+| `tools/taim_bench/src/metrics/pacing.rs` | Create | cadence, jitter, queue depth, missed-frame classification | 270 | 390 |
 | `docs/architecture/frame-scheduling.md` | Create | clock ownership and backend fallback semantics | 210 | 300 |
 
 ### Scheduler rules
@@ -407,7 +407,7 @@ Each commit gets an independent before/after benchmark record. Never land all fi
 | `tests/layout/property.rs` | Create | finite/non-negative/constraint property tests | 420 | 580 |
 | `tests/layout/incremental.rs` | Extend | cache correctness under mutation/scale/text changes | 300 | 440 |
 | `tests/widgets/virtual_list.rs` | Create | 100k rows, variable height, jump, insert/remove, focus | 520 | 720 |
-| `tools/aura_bench/src/scenes/virtual_list.rs` | Create | fixed/variable-height and churn workloads | 180 | 260 |
+| `tools/taim_bench/src/scenes/virtual_list.rs` | Create | fixed/variable-height and churn workloads | 180 | 260 |
 | `docs/architecture/layout.md` | Create | measure/place contracts, invalidation and virtualization | 230 | 330 |
 
 ### Required results
@@ -435,18 +435,18 @@ Each commit gets an independent before/after benchmark record. Never land all fi
 | `core/src/pointer.rs` | Create | unified mouse/touch/pen/trackpad events and metadata | 380 | 540 |
 | `core/src/touch.rs` | Modify | compatibility mapping and full pointer metadata | 220 | 330 |
 | `core/src/event.rs` | Modify | pointer phase, cancel, capture and coalesced-event contract | 230 | 340 |
-| `aura-gesture/Cargo.toml` | Create | minimal dependencies and feature policy | 70 | 110 |
-| `aura-gesture/src/arena.rs` | Create | competition, resolution, teams, cancellation and capture | 650 | 880 |
-| `aura-gesture/src/recognizer.rs` | Create | recognizer contract and state invariants | 280 | 410 |
-| `aura-gesture/src/tap.rs` | Create | tap and multi-tap | 210 | 310 |
-| `aura-gesture/src/long_press.rs` | Create | deadline/movement policy | 180 | 270 |
-| `aura-gesture/src/pan.rs` | Create | axis lock, slop and capture | 300 | 430 |
-| `aura-gesture/src/swipe.rs` | Create | direction/distance/velocity rules | 180 | 270 |
-| `aura-gesture/src/edge_swipe.rs` | Create | reserved edges and system priority | 220 | 320 |
-| `aura-gesture/src/pinch.rs` | Create | scale focal-point tracking | 240 | 350 |
-| `aura-gesture/src/rotate.rs` | Create | stable multi-pointer angle handling | 210 | 310 |
-| `aura-gesture/src/velocity.rs` | Create | timestamped bounded estimator | 220 | 320 |
-| `aura-gesture/src/nested_scroll.rs` | Create | pre/post consumption, child-parent handoff and overscroll | 420 | 580 |
+| `taim-gesture/Cargo.toml` | Create | minimal dependencies and feature policy | 70 | 110 |
+| `taim-gesture/src/arena.rs` | Create | competition, resolution, teams, cancellation and capture | 650 | 880 |
+| `taim-gesture/src/recognizer.rs` | Create | recognizer contract and state invariants | 280 | 410 |
+| `taim-gesture/src/tap.rs` | Create | tap and multi-tap | 210 | 310 |
+| `taim-gesture/src/long_press.rs` | Create | deadline/movement policy | 180 | 270 |
+| `taim-gesture/src/pan.rs` | Create | axis lock, slop and capture | 300 | 430 |
+| `taim-gesture/src/swipe.rs` | Create | direction/distance/velocity rules | 180 | 270 |
+| `taim-gesture/src/edge_swipe.rs` | Create | reserved edges and system priority | 220 | 320 |
+| `taim-gesture/src/pinch.rs` | Create | scale focal-point tracking | 240 | 350 |
+| `taim-gesture/src/rotate.rs` | Create | stable multi-pointer angle handling | 210 | 310 |
+| `taim-gesture/src/velocity.rs` | Create | timestamped bounded estimator | 220 | 320 |
+| `taim-gesture/src/nested_scroll.rs` | Create | pre/post consumption, child-parent handoff and overscroll | 420 | 580 |
 | `runtime/src/hit_test.rs` | Modify | spatial index with transformed/clipped bounds and linear oracle | 430 | 600 |
 | `runtime/src/pointer_router.rs` | Create | capture table, arena routing, move coalescing | 480 | 660 |
 | `runtime/src/user_interface.rs` | Modify | integrate route without full-tree traversal | 210 | 310 |
@@ -478,24 +478,24 @@ Each commit gets an independent before/after benchmark record. Never land all fi
 
 | File | Action | Exact work | Est. +LOC | Max +LOC |
 |---|---|---|---:|---:|
-| `aura-motion/Cargo.toml` | Create | minimal no-std-friendly math core where practical | 70 | 110 |
-| `aura-motion/src/clock.rs` | Create | scheduler time adapter; no independent timers | 160 | 240 |
-| `aura-motion/src/tween.rs` | Create | typed interpolation and easing | 280 | 400 |
-| `aura-motion/src/spring.rs` | Create | stable analytic/semi-implicit spring with velocity continuity | 360 | 500 |
-| `aura-motion/src/decay.rs` | Create | fling/decay with bounds and handoff | 260 | 380 |
-| `aura-motion/src/keyframes.rs` | Create | validated normalized keyframes | 300 | 430 |
-| `aura-motion/src/timeline.rs` | Create | sequencing, stagger, pause/reverse/seek | 350 | 490 |
-| `aura-motion/src/transition.rs` | Create | interruptible state transition orchestration | 360 | 510 |
-| `aura-motion/src/shared_element.rs` | Create | registration, snapshot/layer and lifecycle protocol | 430 | 590 |
-| `aura-motion/src/reduced_motion.rs` | Create | policy mapping, duration/effect substitution | 160 | 240 |
-| `core/src/animation.rs` | Modify | compatibility adapters into Aura Motion | 180 | 270 |
+| `taim-motion/Cargo.toml` | Create | minimal no-std-friendly math core where practical | 70 | 110 |
+| `taim-motion/src/clock.rs` | Create | scheduler time adapter; no independent timers | 160 | 240 |
+| `taim-motion/src/tween.rs` | Create | typed interpolation and easing | 280 | 400 |
+| `taim-motion/src/spring.rs` | Create | stable analytic/semi-implicit spring with velocity continuity | 360 | 500 |
+| `taim-motion/src/decay.rs` | Create | fling/decay with bounds and handoff | 260 | 380 |
+| `taim-motion/src/keyframes.rs` | Create | validated normalized keyframes | 300 | 430 |
+| `taim-motion/src/timeline.rs` | Create | sequencing, stagger, pause/reverse/seek | 350 | 490 |
+| `taim-motion/src/transition.rs` | Create | interruptible state transition orchestration | 360 | 510 |
+| `taim-motion/src/shared_element.rs` | Create | registration, snapshot/layer and lifecycle protocol | 430 | 590 |
+| `taim-motion/src/reduced_motion.rs` | Create | policy mapping, duration/effect substitution | 160 | 240 |
+| `core/src/animation.rs` | Modify | compatibility adapters into Taim Motion | 180 | 270 |
 | `widget/src/transition.rs` | Modify | enter/exit/replace/layout/shared-element state machine | 520 | 720 |
 | `runtime/src/frame_scheduler.rs` | Modify | active-motion registration and precise deadlines | 220 | 320 |
 | `runtime/src/user_interface.rs` | Modify | layout transition and retained-layer coordination | 230 | 340 |
 | `tests/motion/spring.rs` | Create | reference solutions, stability and refresh-rate equivalence | 320 | 450 |
 | `tests/motion/interruption.rs` | Create | rapid reverse/replace/gesture takeover | 350 | 480 |
 | `tests/golden/transitions.rs` | Create | fixed-time frames at 60/90/120 Hz | 340 | 470 |
-| `tools/aura_bench/src/scenes/motion_stress.rs` | Create | 1/10/100/1000 simultaneous animations | 170 | 250 |
+| `tools/taim_bench/src/scenes/motion_stress.rs` | Create | 1/10/100/1000 simultaneous animations | 170 | 250 |
 | `docs/design/motion-language.md` | Create | durations, springs, hierarchy and reduced-motion substitutions | 260 | 370 |
 
 ### Required behavior
@@ -535,7 +535,7 @@ Each commit gets an independent before/after benchmark record. Never land all fi
 | `tests/text/ime.rs` | Create | composition lifecycle, candidate geometry and cancellation | 500 | 700 |
 | `tests/text/security.rs` | Create | secure-field clipboard/surrounding-text/snapshot policy | 350 | 500 |
 | `tests/golden/multilingual_text.rs` | Create | deterministic reference font rendering at scale factors | 440 | 600 |
-| `tools/aura_bench/src/scenes/text_edit.rs` | Create | long document, IME, selection and cache churn | 190 | 280 |
+| `tools/taim_bench/src/scenes/text_edit.rs` | Create | long document, IME, selection and cache churn | 190 | 280 |
 | `assets/fonts/test/README.md` | Create | licensed deterministic test-font manifest; no untracked fonts | 80 | 130 |
 | `docs/architecture/text-ime.md` | Create | shaping/cache/editor/IME/security contracts | 300 | 420 |
 
@@ -555,7 +555,7 @@ English, Hindi/Devanagari, Punjabi/Gurmukhi, Arabic/RTL, Bengali, Tamil, emoji Z
 
 ---
 
-## Phase 11 — Aura design system and production components
+## Phase 11 — Taim design system and production components
 
 **Objective:** create a coherent visual language whose beauty comes from typography, hierarchy, spacing, color, material, and motion consistency.
 
@@ -563,38 +563,38 @@ English, Hindi/Devanagari, Punjabi/Gurmukhi, Arabic/RTL, Bengali, Tamil, emoji Z
 
 | File/group | Action | Exact work | Est. +LOC | Max +LOC |
 |---|---|---|---:|---:|
-| `aura-design/Cargo.toml`, `aura-design/src/lib.rs` | Create | crate boundary, public prelude and feature policy | 160 | 240 |
-| `aura-design/src/tokens/color.rs` | Create | semantic roles, light/dark/high-contrast, contrast validation | 380 | 520 |
-| `aura-design/src/tokens/typography.rs` | Create | type ramp, language-aware line metrics | 300 | 430 |
-| `aura-design/src/tokens/spacing.rs` | Create | compact canonical scale | 120 | 190 |
-| `aura-design/src/tokens/radius.rs` | Create | shape scale and component mappings | 110 | 170 |
-| `aura-design/src/tokens/elevation.rs` | Create | elevation/material hierarchy independent of blur | 180 | 260 |
-| `aura-design/src/tokens/motion.rs` | Create | semantic durations/springs tied to Aura Motion | 170 | 250 |
-| `aura-design/src/icon.rs`, `assets/icons/manifest.toml`, `scripts/design/check-icons.sh` | Create | optical-grid icon API, licensed asset manifest, SVG geometry/naming validation | 400 | 600 |
-| `aura-design/src/theme.rs` | Create | immutable theme, inheritance, dynamic color and change revision | 430 | 600 |
-| `aura-design/src/surface.rs` | Create | material/surface/elevation/interaction layer | 320 | 450 |
-| `aura-design/src/state.rs` | Create | default/hover/focus/press/select/disable/load/error state resolver | 260 | 380 |
-| `aura-design/src/components/button.rs` | Create | button variants, icon/loading/focus/touch states | 400 | 560 |
-| `aura-design/src/components/icon_button.rs` | Create | icon control and tooltip/accessibility policy | 250 | 360 |
-| `aura-design/src/components/card.rs` | Create | interactive/static cards and elevation | 280 | 400 |
-| `aura-design/src/components/text_field.rs` | Create | text/password variants, validation and IME | 650 | 880 |
-| `aura-design/src/components/selection.rs` | Create | switch, checkbox, radio | 570 | 780 |
-| `aura-design/src/components/slider.rs` | Create | single/range, keyboard/touch/RTL | 430 | 600 |
-| `aura-design/src/components/dialog.rs` | Create | modal semantics, focus trap, adaptive layout | 430 | 600 |
-| `aura-design/src/components/bottom_sheet.rs` | Create | drag anchors, nested scroll and dismiss | 500 | 690 |
-| `aura-design/src/components/menu.rs` | Create | menu/submenu, keyboard, placement, typeahead | 460 | 640 |
-| `aura-design/src/components/toast.rs` | Create | timed/live-region action behavior | 230 | 340 |
-| `aura-design/src/components/notification.rs` | Create | grouped content/actions/privacy levels | 320 | 460 |
-| `aura-design/src/components/navigation.rs` | Create | nav bar, rail/sidebar and adaptive destinations | 620 | 850 |
-| `aura-design/src/components/app_bar.rs` | Create | standard/large/collapsing title | 320 | 450 |
-| `aura-design/src/components/list_tile.rs` | Create | one/two/three-line and leading/trailing slots | 280 | 400 |
-| `aura-design/src/components/window_chrome.rs` | Create | desktop/tablet chrome and system gestures | 360 | 500 |
-| `aura-design/src/components/progress.rs` | Create | linear/circular determinate and indeterminate | 300 | 430 |
-| `aura-design/src/components/tooltip.rs` | Create | pointer/focus/long-press activation | 230 | 330 |
+| `taim-design/Cargo.toml`, `taim-design/src/lib.rs` | Create | crate boundary, public prelude and feature policy | 160 | 240 |
+| `taim-design/src/tokens/color.rs` | Create | semantic roles, light/dark/high-contrast, contrast validation | 380 | 520 |
+| `taim-design/src/tokens/typography.rs` | Create | type ramp, language-aware line metrics | 300 | 430 |
+| `taim-design/src/tokens/spacing.rs` | Create | compact canonical scale | 120 | 190 |
+| `taim-design/src/tokens/radius.rs` | Create | shape scale and component mappings | 110 | 170 |
+| `taim-design/src/tokens/elevation.rs` | Create | elevation/material hierarchy independent of blur | 180 | 260 |
+| `taim-design/src/tokens/motion.rs` | Create | semantic durations/springs tied to Taim Motion | 170 | 250 |
+| `taim-design/src/icon.rs`, `assets/icons/manifest.toml`, `scripts/design/check-icons.sh` | Create | optical-grid icon API, licensed asset manifest, SVG geometry/naming validation | 400 | 600 |
+| `taim-design/src/theme.rs` | Create | immutable theme, inheritance, dynamic color and change revision | 430 | 600 |
+| `taim-design/src/surface.rs` | Create | material/surface/elevation/interaction layer | 320 | 450 |
+| `taim-design/src/state.rs` | Create | default/hover/focus/press/select/disable/load/error state resolver | 260 | 380 |
+| `taim-design/src/components/button.rs` | Create | button variants, icon/loading/focus/touch states | 400 | 560 |
+| `taim-design/src/components/icon_button.rs` | Create | icon control and tooltip/accessibility policy | 250 | 360 |
+| `taim-design/src/components/card.rs` | Create | interactive/static cards and elevation | 280 | 400 |
+| `taim-design/src/components/text_field.rs` | Create | text/password variants, validation and IME | 650 | 880 |
+| `taim-design/src/components/selection.rs` | Create | switch, checkbox, radio | 570 | 780 |
+| `taim-design/src/components/slider.rs` | Create | single/range, keyboard/touch/RTL | 430 | 600 |
+| `taim-design/src/components/dialog.rs` | Create | modal semantics, focus trap, adaptive layout | 430 | 600 |
+| `taim-design/src/components/bottom_sheet.rs` | Create | drag anchors, nested scroll and dismiss | 500 | 690 |
+| `taim-design/src/components/menu.rs` | Create | menu/submenu, keyboard, placement, typeahead | 460 | 640 |
+| `taim-design/src/components/toast.rs` | Create | timed/live-region action behavior | 230 | 340 |
+| `taim-design/src/components/notification.rs` | Create | grouped content/actions/privacy levels | 320 | 460 |
+| `taim-design/src/components/navigation.rs` | Create | nav bar, rail/sidebar and adaptive destinations | 620 | 850 |
+| `taim-design/src/components/app_bar.rs` | Create | standard/large/collapsing title | 320 | 450 |
+| `taim-design/src/components/list_tile.rs` | Create | one/two/three-line and leading/trailing slots | 280 | 400 |
+| `taim-design/src/components/window_chrome.rs` | Create | desktop/tablet chrome and system gestures | 360 | 500 |
+| `taim-design/src/components/progress.rs` | Create | linear/circular determinate and indeterminate | 300 | 430 |
+| `taim-design/src/components/tooltip.rs` | Create | pointer/focus/long-press activation | 230 | 330 |
 | `tests/design/tokens.rs` | Create | invariants, contrast, scale and theme revision | 420 | 570 |
 | `tests/design/components.rs` | Create | state/input/semantics matrix | 900 | 1,200 |
 | `tests/golden/design_system.rs` | Create | all components/states/themes/scales/languages | 700 | 950 |
-| `docs/design/aura-language.md` | Create | visual principles, tokens, usage and anti-patterns | 500 | 680 |
+| `docs/design/taim-language.md` | Create | visual principles, tokens, usage and anti-patterns | 500 | 680 |
 
 ### Component completion contract
 
@@ -632,11 +632,11 @@ Every component defines and tests default, hover, focus-visible, pressed, select
 | `wgpu/src/effects/pool.rs` | Create | reusable intermediate texture pool with byte budget | 350 | 500 |
 | `graphics/src/quality.rs` | Create | Ultra/Balanced/Efficient/Recovery policy | 230 | 330 |
 | `runtime/src/quality_controller.rs` | Create | hysteresis-based thermal/power/frame-pressure adaptation | 360 | 510 |
-| `aura-design/src/tokens/elevation.rs` | Modify | per-tier effect recipes and no-blur fallback | 130 | 210 |
+| `taim-design/src/tokens/elevation.rs` | Modify | per-tier effect recipes and no-blur fallback | 130 | 210 |
 | `tests/gpu/effect_bounds.rs` | Create | damage expansion, clipping and sampling correctness | 330 | 470 |
 | `tests/gpu/effect_budget.rs` | Create | texture-pool/area/radius limits and tier switching | 320 | 450 |
 | `tests/golden/effects.rs` | Create | tier-by-tier approved output | 360 | 500 |
-| `tools/aura_bench/src/scenes/effect_ladder.rs` | Create | radius/area/layer scaling curve | 180 | 260 |
+| `tools/taim_bench/src/scenes/effect_ladder.rs` | Create | radius/area/layer scaling curve | 180 | 260 |
 | `docs/performance/effect-budgets.md` | Create | limits per tier/device and fallback rules | 220 | 320 |
 
 ### Effect policy
@@ -661,13 +661,13 @@ Every component defines and tests default, hover, focus-visible, pressed, select
 
 | File | Action | Exact work | Est. +LOC | Max +LOC |
 |---|---|---|---:|---:|
-| `aura-accessibility/Cargo.toml`, `src/lib.rs` | Create | semantic engine crate and adapters | 150 | 230 |
-| `aura-accessibility/src/tree.rs` | Create | stable semantic tree, dirty subtree update and diff | 520 | 720 |
-| `aura-accessibility/src/node.rs` | Create | role/name/description/value/state/action/bounds/order/live region | 350 | 500 |
-| `aura-accessibility/src/focus.rs` | Create | traversal groups, spatial/directional focus and restoration | 500 | 690 |
-| `aura-accessibility/src/actions.rs` | Create | action routing to stable widget identity | 260 | 380 |
-| `aura-accessibility/src/live_region.rs` | Create | polite/assertive queue, coalescing and privacy | 220 | 330 |
-| `aura-accessibility/src/adapter.rs` | Create | platform adapter trait and capability negotiation | 230 | 340 |
+| `taim-accessibility/Cargo.toml`, `src/lib.rs` | Create | semantic engine crate and adapters | 150 | 230 |
+| `taim-accessibility/src/tree.rs` | Create | stable semantic tree, dirty subtree update and diff | 520 | 720 |
+| `taim-accessibility/src/node.rs` | Create | role/name/description/value/state/action/bounds/order/live region | 350 | 500 |
+| `taim-accessibility/src/focus.rs` | Create | traversal groups, spatial/directional focus and restoration | 500 | 690 |
+| `taim-accessibility/src/actions.rs` | Create | action routing to stable widget identity | 260 | 380 |
+| `taim-accessibility/src/live_region.rs` | Create | polite/assertive queue, coalescing and privacy | 220 | 330 |
+| `taim-accessibility/src/adapter.rs` | Create | platform adapter trait and capability negotiation | 230 | 340 |
 | `core/src/semantics.rs` | Modify | complete roles/states/actions and virtualized child protocol | 320 | 450 |
 | `runtime/src/semantics.rs` | Modify | incremental diff, bounds updates, action routing | 420 | 580 |
 | `runtime/src/user_interface.rs` | Modify | focus/semantics lifecycle coordination | 170 | 260 |
@@ -686,7 +686,7 @@ Every component defines and tests default, hover, focus-visible, pressed, select
 - Live regions do not leak secure/private text.
 - Components expose equivalent action paths across touch, keyboard, screen reader, and switch-style navigation where supported.
 
-**Exit gate:** incremental semantic output matches full rebuild oracle; all Aura components have semantic snapshots/actions; focus never becomes lost or trapped unintentionally; large text and high contrast remain usable on all device profiles.
+**Exit gate:** incremental semantic output matches full rebuild oracle; all Taim components have semantic snapshots/actions; focus never becomes lost or trapped unintentionally; large text and high contrast remain usable on all device profiles.
 
 **Phase budget:** estimated 5,550 +LOC; hard maximum 7,810 +LOC.
 
@@ -694,30 +694,30 @@ Every component defines and tests default, hover, focus-visible, pressed, select
 
 ## Phase 14 — Native VYOM platform backend
 
-**Objective:** connect Aura directly to the Smithay-based VYOM compositor while preserving `winit` as a known-good comparison/fallback until parity.
+**Objective:** connect Taim directly to the Smithay-based VYOM compositor while preserving `winit` as a known-good comparison/fallback until parity.
 
 ### File plan
 
 | File | Action | Exact work | Est. +LOC | Max +LOC |
 |---|---|---|---:|---:|
-| `aura-platform-vyom/Cargo.toml`, `src/lib.rs` | Create | platform crate, negotiated capabilities and safe exports | 180 | 280 |
-| `aura-platform-vyom/src/event_loop.rs` | Create | poll integration, tasks, timers, shutdown and no-spin idle | 650 | 900 |
-| `aura-platform-vyom/src/surface.rs` | Create | surface lifecycle, configure/ack, scale, damage and roles | 620 | 850 |
-| `aura-platform-vyom/src/frame_clock.rs` | Create | presentation feedback to Aura scheduler | 320 | 470 |
-| `aura-platform-vyom/src/input.rs` | Create | seats, pointer/touch/keyboard, device lifecycle | 600 | 820 |
-| `aura-platform-vyom/src/gesture_bridge.rs` | Create | compositor-reserved edges and gesture handoff | 300 | 450 |
-| `aura-platform-vyom/src/ime.rs` | Create | input-method/text-input protocol and virtual keyboard insets | 500 | 700 |
-| `aura-platform-vyom/src/clipboard.rs` | Create | typed offers, cancellation, size limits and secure policy | 300 | 450 |
-| `aura-platform-vyom/src/drag_drop.rs` | Create | offer lifecycle, actions, bounds and cancellation | 360 | 500 |
-| `aura-platform-vyom/src/accessibility.rs` | Create | semantic adapter transport and action return path | 400 | 560 |
-| `aura-platform-vyom/src/power.rs` | Create | visibility, suspend, thermal and battery signals | 300 | 440 |
-| `aura-platform-vyom/src/window_protocol.rs` | Create | layer/lock/overlay/overview/security roles | 620 | 850 |
-| `aura-platform-vyom/src/capabilities.rs` | Create | protocol/version negotiation and fallbacks | 250 | 380 |
+| `taim-platform-vyom/Cargo.toml`, `src/lib.rs` | Create | platform crate, negotiated capabilities and safe exports | 180 | 280 |
+| `taim-platform-vyom/src/event_loop.rs` | Create | poll integration, tasks, timers, shutdown and no-spin idle | 650 | 900 |
+| `taim-platform-vyom/src/surface.rs` | Create | surface lifecycle, configure/ack, scale, damage and roles | 620 | 850 |
+| `taim-platform-vyom/src/frame_clock.rs` | Create | presentation feedback to Taim scheduler | 320 | 470 |
+| `taim-platform-vyom/src/input.rs` | Create | seats, pointer/touch/keyboard, device lifecycle | 600 | 820 |
+| `taim-platform-vyom/src/gesture_bridge.rs` | Create | compositor-reserved edges and gesture handoff | 300 | 450 |
+| `taim-platform-vyom/src/ime.rs` | Create | input-method/text-input protocol and virtual keyboard insets | 500 | 700 |
+| `taim-platform-vyom/src/clipboard.rs` | Create | typed offers, cancellation, size limits and secure policy | 300 | 450 |
+| `taim-platform-vyom/src/drag_drop.rs` | Create | offer lifecycle, actions, bounds and cancellation | 360 | 500 |
+| `taim-platform-vyom/src/accessibility.rs` | Create | semantic adapter transport and action return path | 400 | 560 |
+| `taim-platform-vyom/src/power.rs` | Create | visibility, suspend, thermal and battery signals | 300 | 440 |
+| `taim-platform-vyom/src/window_protocol.rs` | Create | layer/lock/overlay/overview/security roles | 620 | 850 |
+| `taim-platform-vyom/src/capabilities.rs` | Create | protocol/version negotiation and fallbacks | 250 | 380 |
 | `tests/platform/fake_compositor.rs` | Create | deterministic compositor protocol harness | 800 | 1,050 |
 | `tests/platform/lifecycle.rs` | Create | create/configure/scale/suspend/destroy/reconnect | 500 | 680 |
 | `tests/platform/input_ime.rs` | Create | multi-seat, cancel, hot-unplug and IME lifecycle | 550 | 750 |
 | `tests/platform/security.rs` | Create | lock surface, screenshot restriction, clipboard privacy | 430 | 600 |
-| `tools/aura_bench/src/platform_latency.rs` | Create | protocol timestamps and present correlation | 240 | 350 |
+| `tools/taim_bench/src/platform_latency.rs` | Create | protocol timestamps and present correlation | 240 | 350 |
 | `docs/platform/vyom-protocol.md` | Create | supported versions, ownership, fallbacks and threat boundaries | 380 | 530 |
 
 ### Required integrations
@@ -739,7 +739,7 @@ Every component defines and tests default, hover, focus-visible, pressed, select
 
 ---
 
-## Phase 15 — Aura Lab, profiler, and diagnostics
+## Phase 15 — Taim Lab, profiler, and diagnostics
 
 **Objective:** make performance and correctness observable without attaching a general-purpose debugger.
 
@@ -747,24 +747,24 @@ Every component defines and tests default, hover, focus-visible, pressed, select
 
 | File | Action | Exact work | Est. +LOC | Max +LOC |
 |---|---|---|---:|---:|
-| `aura-profiler/Cargo.toml`, `src/lib.rs` | Create | low-overhead event schema, ring buffer and export | 250 | 370 |
-| `aura-profiler/src/events.rs` | Create | versioned CPU/GPU/layout/cache/input/semantics events | 300 | 430 |
-| `aura-profiler/src/collector.rs` | Create | bounded nonblocking collection and sampling | 420 | 580 |
-| `aura-profiler/src/export.rs` | Create | Chrome trace and Aura JSON export with redaction | 300 | 440 |
-| `tools/aura_lab/Cargo.toml`, `src/main.rs` | Create | standalone inspector app and connection lifecycle | 350 | 500 |
-| `tools/aura_lab/src/widget_inspector.rs` | Create | tree, state, revisions and identity | 430 | 590 |
-| `tools/aura_lab/src/layout_overlay.rs` | Create | constraints, bounds, baselines and cache hits | 300 | 430 |
-| `tools/aura_lab/src/damage_overlay.rs` | Create | damage rectangles/full-redraw cause | 260 | 380 |
-| `tools/aura_lab/src/overdraw_overlay.rs` | Create | overdraw heat map and layer breakdown | 280 | 400 |
-| `tools/aura_lab/src/frame_graph.rs` | Create | CPU/GPU/present timeline and missed-frame cause | 450 | 620 |
-| `tools/aura_lab/src/gpu_resources.rs` | Create | buffers/textures/atlases/pipelines/budgets/evictions | 360 | 500 |
-| `tools/aura_lab/src/semantics_inspector.rs` | Create | semantic tree, focus order and actions | 330 | 470 |
-| `tools/aura_lab/src/animation_inspector.rs` | Create | timelines, velocity, spring and reduced motion | 320 | 450 |
-| `tools/aura_lab/src/device_profiles.rs` | Create | phone/tablet/desktop/watch viewport and capability simulation | 300 | 430 |
+| `taim-profiler/Cargo.toml`, `src/lib.rs` | Create | low-overhead event schema, ring buffer and export | 250 | 370 |
+| `taim-profiler/src/events.rs` | Create | versioned CPU/GPU/layout/cache/input/semantics events | 300 | 430 |
+| `taim-profiler/src/collector.rs` | Create | bounded nonblocking collection and sampling | 420 | 580 |
+| `taim-profiler/src/export.rs` | Create | Chrome trace and Taim JSON export with redaction | 300 | 440 |
+| `tools/taim_lab/Cargo.toml`, `src/main.rs` | Create | standalone inspector app and connection lifecycle | 350 | 500 |
+| `tools/taim_lab/src/widget_inspector.rs` | Create | tree, state, revisions and identity | 430 | 590 |
+| `tools/taim_lab/src/layout_overlay.rs` | Create | constraints, bounds, baselines and cache hits | 300 | 430 |
+| `tools/taim_lab/src/damage_overlay.rs` | Create | damage rectangles/full-redraw cause | 260 | 380 |
+| `tools/taim_lab/src/overdraw_overlay.rs` | Create | overdraw heat map and layer breakdown | 280 | 400 |
+| `tools/taim_lab/src/frame_graph.rs` | Create | CPU/GPU/present timeline and missed-frame cause | 450 | 620 |
+| `tools/taim_lab/src/gpu_resources.rs` | Create | buffers/textures/atlases/pipelines/budgets/evictions | 360 | 500 |
+| `tools/taim_lab/src/semantics_inspector.rs` | Create | semantic tree, focus order and actions | 330 | 470 |
+| `tools/taim_lab/src/animation_inspector.rs` | Create | timelines, velocity, spring and reduced motion | 320 | 450 |
+| `tools/taim_lab/src/device_profiles.rs` | Create | phone/tablet/desktop/watch viewport and capability simulation | 300 | 430 |
 | `runtime/src/diagnostics.rs` | Modify | instrumentation hooks behind profiling feature | 220 | 330 |
 | `tests/profiler/overhead.rs` | Create | disabled/enabled overhead and buffer overflow policy | 320 | 460 |
 | `tests/profiler/privacy.rs` | Create | secure text/image/title redaction | 260 | 380 |
-| `docs/tools/aura-lab.md` | Create | workflows, interpretation and privacy restrictions | 300 | 420 |
+| `docs/tools/taim-lab.md` | Create | workflows, interpretation and privacy restrictions | 300 | 420 |
 
 ### Tooling rules
 
@@ -774,7 +774,7 @@ Every component defines and tests default, hover, focus-visible, pressed, select
 - Secure text, private notifications, protected surfaces, clipboard contents, and raw images are redacted by default.
 - Hot reload may cover tokens/component declarations; it must not weaken type or resource safety.
 
-**Exit gate:** every global metric can be traced to a phase/cause; overlays agree with benchmark counters; overflow cannot crash or grow memory; privacy tests pass; Aura Lab works on all device profiles.
+**Exit gate:** every global metric can be traced to a phase/cause; overlays agree with benchmark counters; overflow cannot crash or grow memory; privacy tests pass; Taim Lab works on all device profiles.
 
 **Phase budget:** estimated 5,750 +LOC; hard maximum 8,180 +LOC.
 
@@ -788,9 +788,9 @@ Every component defines and tests default, hover, focus-visible, pressed, select
 
 | File/group | Action | Exact work | Est. +LOC | Max +LOC |
 |---|---|---|---:|---:|
-| `aura-showcase/Cargo.toml`, `src/main.rs` | Create | deterministic component/state showcase | 300 | 440 |
-| `aura-showcase/src/catalog.rs` | Create | all components, variants and state controls | 650 | 880 |
-| `aura-showcase/src/profiles.rs` | Create | theme/scale/language/width/motion/contrast matrix | 300 | 430 |
+| `taim-showcase/Cargo.toml`, `src/main.rs` | Create | deterministic component/state showcase | 300 | 440 |
+| `taim-showcase/src/catalog.rs` | Create | all components, variants and state controls | 650 | 880 |
+| `taim-showcase/src/profiles.rs` | Create | theme/scale/language/width/motion/contrast matrix | 300 | 430 |
 | `tests/golden/harness.rs` | Create | deterministic render/capture/diff/tolerance/report | 650 | 880 |
 | `tests/golden/manifest.toml` | Create | explicit approved cases and tolerance classes | 180 | 270 |
 | `tests/stress/navigation.rs` | Create | 100/1,000-loop state/resource stability | 380 | 530 |
@@ -834,15 +834,15 @@ Every component defines and tests default, hover, focus-visible, pressed, select
 | `runtime/src/recovery.rs` | Create | renderer restart/safe-shell escalation and crash-loop limit | 360 | 510 |
 | `wgpu/src/engine.rs` | Modify | robust device-loss, timeout/OOM classification and recreation | 320 | 470 |
 | `wgpu/src/resource_budget.rs` | Modify | tier/device budgets and critical reserve | 220 | 330 |
-| `aura-platform-vyom/src/power.rs` | Modify | real suspend/thermal/battery/visibility integration | 250 | 370 |
-| `aura-platform-vyom/src/window_protocol.rs` | Modify | protected-content and lock-role enforcement | 220 | 330 |
+| `taim-platform-vyom/src/power.rs` | Modify | real suspend/thermal/battery/visibility integration | 250 | 370 |
+| `taim-platform-vyom/src/window_protocol.rs` | Modify | protected-content and lock-role enforcement | 220 | 330 |
 | `core/src/security.rs` | Create | privacy classification propagated to render/tool/platform paths | 300 | 430 |
 | `tests/recovery/gpu_loss.rs` | Create | fault injection during text/image/effect/navigation workloads | 420 | 580 |
 | `tests/recovery/oom.rs` | Create | deterministic allocation/resource pressure and graceful purge | 360 | 510 |
 | `tests/recovery/suspend_resume.rs` | Create | repeated suspend, display removal and stale resources | 360 | 510 |
 | `tests/security/protected_content.rs` | Create | screenshots, overview, profiler, semantics and notifications | 420 | 580 |
 | `tests/security/malformed_inputs.rs` | Create | extreme images/fonts/text/protocol/event bounds | 350 | 500 |
-| `tools/aura_bench/src/scenes/power_idle.rs` | Create | idle/animation/scroll energy sampling protocol | 180 | 270 |
+| `tools/taim_bench/src/scenes/power_idle.rs` | Create | idle/animation/scroll energy sampling protocol | 180 | 270 |
 | `docs/security/threat-model.md` | Create | trust boundaries, assets, attacks, mitigations and residual risks | 330 | 470 |
 | `docs/operations/recovery.md` | Create | purge/restart/safe-shell/crash reporting runbook | 260 | 380 |
 
@@ -863,7 +863,7 @@ Never continue with potentially stale GPU handles or expose protected pixels thr
 
 ---
 
-## Phase 18 — Reference shell, competitive proof, and Aura 1.0
+## Phase 18 — Reference shell, competitive proof, and Taim 1.0
 
 **Objective:** prove the complete system in a real VYOM flow and publish only reproducible performance claims.
 
@@ -883,8 +883,8 @@ Never continue with potentially stale GPU handles or expose protected pixels thr
 | `tests/e2e/recovery_flow.rs` | Create | GPU loss/suspend/pressure inside end-to-end flow | 350 | 490 |
 | `benchmarks/competitors/README.md` | Create | public-version, scene-parity and configuration rules | 260 | 370 |
 | `scripts/perf/compare-frameworks.sh` | Create | pinned build/run/report orchestration; no selective metrics | 300 | 430 |
-| `docs/performance/aura-1.0-report.md` | Create | hardware, raw reports, statistics, wins, losses, limitations | 480 | 650 |
-| `docs/release/aura-1.0-checklist.md` | Create | API, platform, design, a11y, perf, security and recovery sign-off | 260 | 370 |
+| `docs/performance/taim-1.0-report.md` | Create | hardware, raw reports, statistics, wins, losses, limitations | 480 | 650 |
+| `docs/release/taim-1.0-checklist.md` | Create | API, platform, design, a11y, perf, security and recovery sign-off | 260 | 370 |
 | `CHANGELOG.md`, `README.md` | Modify | accurate capabilities, migration and non-marketing limitations | 280 | 400 |
 
 ### End-to-end acceptance flow
@@ -909,7 +909,7 @@ Boot animation
 - Use public, production builds of selected frameworks and disclose versions/commits.
 - Match pixels, content count, fonts, images, refresh rate, window size, animation, warm-up, and input trace as closely as possible.
 - Run on the same machine, power mode, compositor/session, driver and sampling order; randomize order when thermal drift matters.
-- Publish raw samples, methodology, confidence intervals, failures, and metrics where Aura loses.
+- Publish raw samples, methodology, confidence intervals, failures, and metrics where Taim loses.
 - Claim only the exact tested domain, for example “lowest P95 frame preparation in these scenes on device X,” never the universal phrase “fastest ever.”
 
 **Exit gate:** full flow passes 1,000 automated loops and a 24-hour soak; all global budgets pass on the locked device matrix; API/security/accessibility reviews are signed off; comparative report is reproducible; no P0/P1 defects and no unexplained P2 defect remain.
@@ -951,11 +951,11 @@ Required branch/commit sequence:
 10-pointer-and-gesture-arena
 11-motion-engine
 12-text-ime
-13-aura-design-system
+13-taim-design-system
 14-adaptive-effects
 15-accessibility
 16-vyom-backend
-17-aura-lab
+17-taim-lab
 18-regression-hardening
 19-reference-shell-release
 ```
@@ -969,12 +969,12 @@ Required branch/commit sequence:
 | `graphics/` | renderer-neutral display/damage/cache model | window event loop, product component styles |
 | `wgpu/` | GPU resources, passes, shaders, present integration | widget business state, compositor policy |
 | `widget/` | generic controls/layout widgets | VYOM visual identity or platform protocol |
-| `aura-design/` | tokens and production components | GPU backend internals |
-| `aura-motion/` | math/timelines/transitions | independent frame loop |
-| `aura-gesture/` | recognition/competition/nesting | platform event collection |
-| `aura-accessibility/` | semantics/focus/adapters | visual painting |
-| `aura-platform-vyom/` | VYOM/Wayland integration | renderer algorithms or component styling |
-| `aura-profiler/`, `tools/` | observability and development UX | production decisions required for correctness |
+| `taim-design/` | tokens and production components | GPU backend internals |
+| `taim-motion/` | math/timelines/transitions | independent frame loop |
+| `taim-gesture/` | recognition/competition/nesting | platform event collection |
+| `taim-accessibility/` | semantics/focus/adapters | visual painting |
+| `taim-platform-vyom/` | VYOM/Wayland integration | renderer algorithms or component styling |
+| `taim-profiler/`, `tools/` | observability and development UX | production decisions required for correctness |
 
 ## 7. Change-stop conditions
 
@@ -991,9 +991,9 @@ Stop and repair the active phase before continuing if any occurs:
 - a golden changes without a reviewed diff and reason;
 - unsafe code lacks written invariants and targeted verification.
 
-## 8. Definition of Aura 1.0
+## 8. Definition of Taim 1.0
 
-Aura 1.0 is production-ready only when all of the following are true:
+Taim 1.0 is production-ready only when all of the following are true:
 
 - Reference shell completes the full Phase 18 flow reliably.
 - Selected phone, tablet, desktop and watch profiles meet their locked 60/90/120 Hz budgets.
@@ -1008,4 +1008,4 @@ Aura 1.0 is production-ready only when all of the following are true:
 - Competitive claims name the exact device, scene and metric and publish both strengths and limitations.
 - All phase exit gates, LOC ceilings, CI checks and release reviews pass.
 
-The result is not “best” because the roadmap says so. It earns that position only when Aura repeatedly produces better measured latency and efficiency while preserving visual quality, accessibility, safety, and developer usability on VYOM’s real hardware.
+The result is not “best” because the roadmap says so. It earns that position only when Taim repeatedly produces better measured latency and efficiency while preserving visual quality, accessibility, safety, and developer usability on VYOM’s real hardware.

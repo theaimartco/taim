@@ -1,0 +1,38 @@
+[package]
+name = "taim-gesture"
+description = "A unified pointer gesture arena for taim: competition, capture, cancellation, and recognizers"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# Motion prediction for recognizers that can benefit from it (e.g.
+# smoothing a pan's reported position ahead of the next real event).
+# Kept behind a feature and disabled by default per phase.md's own
+# correctness rule: "prediction stays behind an experimental feature
+# until wrong-prediction correction is visually proven."
+prediction = []
+
+[dependencies]
+# `taim-gesture` only needs the pointer/event vocabulary and geometry
+# primitives from `taim_core` -- never rendering, windowing, or async
+# runtime dependencies. A gesture arena is pure state-machine logic over
+# timestamped positions; keeping this dependency list minimal is a
+# deliberate policy (see this file's own file-plan entry: "minimal
+# dependencies and feature policy"), not an oversight, so that embedding
+# `taim-gesture` never drags in a renderer or event loop transitively.
+taim_core.workspace = true
+
+rustc-hash.workspace = true
+smallvec.workspace = true
+
+[dev-dependencies]

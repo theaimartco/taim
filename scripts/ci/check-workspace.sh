@@ -65,9 +65,9 @@ echo "== Checking no manifest still depends on known-removed crates =="
 # still declaring the dependency, since that is what makes
 # `cargo metadata` fail outright. See docs/architecture/path-map.md.
 #
-# `aura_highlighter` is deliberately absent from this list: it is now a
-# real workspace member (`aura-highlighter`), not a removed crate.
-removed_crates=(aura_beacon aura_devtools aura_selector aura_tester aura_test)
+# `taim_highlighter` is deliberately absent from this list: it is now a
+# real workspace member (`taim-highlighter`), not a removed crate.
+removed_crates=(taim_beacon taim_devtools taim_selector taim_tester taim_test)
 
 for crate in "${removed_crates[@]}"; do
     hits=$(grep -rn "^\s*${crate}\s*\.\?\s*\(=\|workspace\)" --include='Cargo.toml' \

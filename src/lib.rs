@@ -1,10 +1,10 @@
-//! aura is a cross-platform GUI library focused on simplicity and type-safety.
+//! taim is a cross-platform GUI library focused on simplicity and type-safety.
 //! Inspired by [Elm].
 //!
 //! [Elm]: https://elm-lang.org/
 //!
 //! # Disclaimer
-//! aura is __experimental__ software. If you expect the documentation to hold your hand
+//! taim is __experimental__ software. If you expect the documentation to hold your hand
 //! as you learn the ropes, you are in for a frustrating experience.
 //!
 //! The library leverages Rust to its full extent: ownership, borrowing, lifetimes, futures,
@@ -12,11 +12,11 @@
 //! is not meant to teach you any of these. Far from it, it will assume you have __mastered__
 //! all of them.
 //!
-//! Furthermore—just like Rust—aura is very unforgiving. It will not let you easily cut corners.
+//! Furthermore—just like Rust—taim is very unforgiving. It will not let you easily cut corners.
 //! The type signatures alone can be used to learn how to use most of the library.
 //! Everything is connected.
 //!
-//! Therefore, aura is easy to learn for __advanced__ Rust programmers; but plenty of patient
+//! Therefore, taim is easy to learn for __advanced__ Rust programmers; but plenty of patient
 //! beginners have learned it and had a good time with it. Since it leverages a lot of what
 //! Rust has to offer in a type-safe way, it can be a great way to discover Rust itself.
 //!
@@ -25,18 +25,18 @@
 //! relying on any subsystem: it records, per subsystem, whether it is implemented, tested
 //! in isolation, or actually reached by a running application.
 //!
-//! [`examples/`]: https://github.com/theaimartco/vyom-aura/tree/main/examples
-//! [the capability matrix]: https://github.com/theaimartco/vyom-aura/blob/main/docs/status.md
+//! [`examples/`]: https://github.com/theaimartco/taim/tree/main/examples
+//! [the capability matrix]: https://github.com/theaimartco/taim/blob/main/docs/status.md
 //!
 //! # The Pocket Guide
 //! Start by calling [`run`]:
 //!
 //! ```no_run,standalone_crate
-//! pub fn main() -> aura::Result {
-//!     aura::run(update, view)
+//! pub fn main() -> taim::Result {
+//!     taim::run(update, view)
 //! }
 //! # fn update(state: &mut (), message: ()) {}
-//! # fn view(state: &()) -> aura::Element<'_, ()> { aura::widget::text("").into() }
+//! # fn view(state: &()) -> taim::Element<'_, ()> { taim::widget::text("").into() }
 //! ```
 //!
 //! Define an `update` function to __change__ your state:
@@ -54,8 +54,8 @@
 //! Define a `view` function to __display__ your state:
 //!
 //! ```standalone_crate
-//! use aura::widget::{button, text};
-//! use aura::Element;
+//! use taim::widget::{button, text};
+//! use taim::Element;
 //!
 //! fn view(counter: &u64) -> Element<'_, Message> {
 //!     button(text(counter)).on_press(Message::Increment).into()
@@ -89,8 +89,8 @@
 //! # struct Counter { value: u64 }
 //! # #[derive(Clone)]
 //! # enum Message { Increment }
-//! # use aura::widget::{button, text};
-//! # use aura::Element;
+//! # use taim::widget::{button, text};
+//! # use taim::Element;
 //! fn update(counter: &mut Counter, message: Message) {
 //!     match message {
 //!         Message::Increment => counter.value += 1,
@@ -114,8 +114,8 @@
 //! # struct Counter { value: u64 }
 //! # #[derive(Clone)]
 //! # enum Message { Increment }
-//! use aura::widget::{button, column, text};
-//! use aura::Element;
+//! use taim::widget::{button, column, text};
+//! use taim::Element;
 //!
 //! fn view(counter: &Counter) -> Element<'_, Message> {
 //!     column![
@@ -134,7 +134,7 @@
 //! your `update`.
 //!
 //! ## Layout
-//! There is no unified layout system in aura. Instead, each widget implements
+//! There is no unified layout system in taim. Instead, each widget implements
 //! its own layout strategy.
 //!
 //! Building your layout will often consist in using a combination of
@@ -143,8 +143,8 @@
 //! ```standalone_crate
 //! # struct State;
 //! # enum Message {}
-//! use aura::widget::{column, container, row};
-//! use aura::{Fill, Element};
+//! use taim::widget::{column, container, row};
+//! use taim::{Fill, Element};
 //!
 //! fn view(state: &State) -> Element<'_, Message> {
 //!     container(
@@ -186,8 +186,8 @@
 //! ```standalone_crate
 //! # struct State;
 //! # enum Message {}
-//! use aura::widget::container;
-//! use aura::Element;
+//! use taim::widget::container;
+//! use taim::Element;
 //!
 //! fn view(state: &State) -> Element<'_, Message> {
 //!     container("I am 300px tall!").height(300).into()
@@ -201,10 +201,10 @@
 //!
 //! ```no_run,standalone_crate
 //! # struct State;
-//! use aura::Theme;
+//! use taim::Theme;
 //!
-//! pub fn main() -> aura::Result {
-//!     aura::application(new, update, view)
+//! pub fn main() -> taim::Result {
+//!     taim::application(new, update, view)
 //!         .theme(theme)
 //!         .run()
 //! }
@@ -218,7 +218,7 @@
 //!     Theme::TokyoNight
 //! }
 //! # fn update(state: &mut State, message: ()) {}
-//! # fn view(state: &State) -> aura::Element<'_, ()> { aura::widget::text("").into() }
+//! # fn view(state: &State) -> taim::Element<'_, ()> { taim::widget::text("").into() }
 //! ```
 //!
 //! The `theme` function takes the current state of the application, allowing the
@@ -228,7 +228,7 @@
 //! also [create your own](Theme::custom).
 //!
 //! ## Styling
-//! As with layout, aura does not have a unified styling system. However, all
+//! As with layout, taim does not have a unified styling system. However, all
 //! of the built-in widgets follow the same styling approach.
 //!
 //! The appearance of a widget can be changed by calling its `style` method:
@@ -236,8 +236,8 @@
 //! ```standalone_crate
 //! # struct State;
 //! # enum Message {}
-//! use aura::widget::container;
-//! use aura::Element;
+//! use taim::widget::container;
+//! use taim::Element;
 //!
 //! fn view(state: &State) -> Element<'_, Message> {
 //!     container("I am a rounded box!").style(container::rounded_box).into()
@@ -251,8 +251,8 @@
 //! # struct State;
 //! # #[derive(Clone)]
 //! # enum Message {}
-//! use aura::widget::button;
-//! use aura::{Element, Theme};
+//! use taim::widget::button;
+//! use taim::{Element, Theme};
 //!
 //! fn view(state: &State) -> Element<'_, Message> {
 //!     button("I am a styled button!").style(|theme: &Theme, status| {
@@ -293,7 +293,7 @@
 //! ```standalone_crate
 //! # #[derive(Clone)]
 //! # struct Weather;
-//! use aura::Task;
+//! use taim::Task;
 //!
 //! struct State {
 //!     weather: Option<Weather>,
@@ -324,7 +324,7 @@
 //! }
 //! ```
 //!
-//! Tasks can also be used to interact with the aura runtime. Some modules
+//! Tasks can also be used to interact with the taim runtime. Some modules
 //! expose functions that create tasks for different purposes—like [changing
 //! window settings](window#functions) or [focusing a widget](widget::operation::focus_next).
 //!
@@ -339,16 +339,16 @@
 //!
 //! ```no_run,standalone_crate
 //! # struct State;
-//! use aura::window;
-//! use aura::{Size, Subscription};
+//! use taim::window;
+//! use taim::{Size, Subscription};
 //!
 //! #[derive(Debug, Clone)]
 //! enum Message {
 //!     WindowResized(Size),
 //! }
 //!
-//! pub fn main() -> aura::Result {
-//!     aura::application(new, update, view)
+//! pub fn main() -> taim::Result {
+//!     taim::application(new, update, view)
 //!         .subscription(subscription)
 //!         .run()
 //! }
@@ -358,7 +358,7 @@
 //! }
 //! # fn new() -> State { State }
 //! # fn update(state: &mut State, message: Message) {}
-//! # fn view(state: &State) -> aura::Element<'_, Message> { aura::widget::text("").into() }
+//! # fn view(state: &State) -> taim::Element<'_, Message> { taim::widget::text("").into() }
 //! ```
 //!
 //! A [`Subscription`] is [a _declarative_ builder of streams](Subscription#the-lifetime-of-a-subscription)
@@ -380,7 +380,7 @@
 //!
 //! ```standalone_crate
 //! # mod contacts {
-//! #     use aura::{Element, Task};
+//! #     use taim::{Element, Task};
 //! #     pub struct Contacts;
 //! #     impl Contacts {
 //! #         pub fn update(&mut self, message: Message) -> Action { unimplemented!() }
@@ -391,7 +391,7 @@
 //! #     pub enum Action { None, Run(Task<Message>), Chat(()) }
 //! # }
 //! # mod conversation {
-//! #     use aura::{Element, Task};
+//! #     use taim::{Element, Task};
 //! #     pub struct Conversation;
 //! #     impl Conversation {
 //! #         pub fn new(contact: ()) -> (Self, Task<Message>) { unimplemented!() }
@@ -404,7 +404,7 @@
 //! use contacts::Contacts;
 //! use conversation::Conversation;
 //!
-//! use aura::{Element, Task};
+//! use taim::{Element, Task};
 //!
 //! struct State {
 //!     screen: Screen,
@@ -470,17 +470,17 @@
 //! Furthermore, functor methods like [`Task::map`], [`Element::map`], and [`Subscription::map`] make composition
 //! seamless.
 #![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/vyom-aura/main/docs/logo.svg"
+    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-use aura_widget::renderer;
-use aura_winit as shell;
-use aura_winit::core;
-use aura_winit::program;
-use aura_winit::runtime;
+use taim_widget::renderer;
+use taim_winit as shell;
+use taim_winit::core;
+use taim_winit::program;
+use taim_winit::runtime;
 
-pub use aura_futures::futures;
-pub use aura_futures::stream;
+pub use taim_futures::futures;
+pub use taim_futures::stream;
 
 #[cfg(not(any(
     target_arch = "wasm32",
@@ -507,10 +507,10 @@ compile_error!(
 );
 
 #[cfg(feature = "highlighter")]
-pub use aura_highlighter as highlighter;
+pub use taim_highlighter as highlighter;
 
 #[cfg(feature = "wgpu-bare")]
-pub use aura_renderer::wgpu::wgpu;
+pub use taim_renderer::wgpu::wgpu;
 
 mod error;
 
@@ -519,10 +519,10 @@ pub mod daemon;
 pub mod time;
 pub mod window;
 
-/// The VYOM backend for aura applications.
+/// The VYOM backend for taim applications.
 #[cfg(feature = "vyom")]
 pub mod platform_vyom {
-    pub use aura_platform_vyom::*;
+    pub use taim_platform_vyom::*;
 }
 
 #[cfg(feature = "advanced")]
@@ -543,7 +543,7 @@ pub use crate::core::{
 pub use crate::program::Preset;
 pub use crate::program::message;
 pub use crate::runtime::exit;
-pub use aura_futures::Subscription;
+pub use taim_futures::Subscription;
 
 pub use Alignment::Center;
 pub use Length::{Fill, FillPortion, Fit, Shrink};
@@ -552,7 +552,7 @@ pub use alignment::Vertical::{Bottom, Top};
 
 pub mod debug {
     //! Debug your applications.
-    pub use aura_debug::{Span, time, time_with};
+    pub use taim_debug::{Span, time, time_with};
 }
 
 pub mod task {
@@ -577,8 +577,8 @@ pub mod clipboard {
 
 pub mod executor {
     //! Choose your preferred executor to power your application.
-    pub use aura_futures::Executor;
-    pub use aura_futures::backend::default::Executor as Default;
+    pub use taim_futures::Executor;
+    pub use taim_futures::backend::default::Executor as Default;
 }
 
 pub mod font {
@@ -590,14 +590,14 @@ pub mod font {
 pub mod event {
     //! Handle events of a user interface.
     pub use crate::core::event::{Event, Status};
-    pub use aura_futures::event::{listen, listen_raw, listen_url, listen_with};
+    pub use taim_futures::event::{listen, listen_raw, listen_url, listen_with};
 }
 
 pub mod keyboard {
     //! Listen and react to keyboard events.
     pub use crate::core::keyboard::key;
     pub use crate::core::keyboard::{Event, Key, Location, Modifiers};
-    pub use aura_futures::keyboard::listen;
+    pub use taim_futures::keyboard::listen;
 }
 
 pub mod mouse {
@@ -624,7 +624,7 @@ pub mod overlay {
     pub type Element<'a, Message, Theme = crate::Theme, Renderer = crate::Renderer> =
         crate::core::overlay::Element<'a, Message, Theme, Renderer>;
 
-    pub use aura_widget::overlay::*;
+    pub use taim_widget::overlay::*;
 }
 
 pub mod touch {
@@ -635,17 +635,17 @@ pub mod touch {
 #[allow(hidden_glob_reexports)]
 pub mod widget {
     //! Use the built-in widgets or create your own.
-    pub use aura_runtime::widget::*;
-    pub use aura_widget::*;
+    pub use taim_runtime::widget::*;
+    pub use taim_widget::*;
 
     #[cfg(feature = "image-without-codecs")]
     pub mod image {
         //! Images display raster graphics in different formats (PNG, JPG, etc.).
-        pub use aura_runtime::image::{Allocation, Error, allocate};
-        pub use aura_widget::image::*;
+        pub use taim_runtime::image::{Allocation, Error, allocate};
+        pub use taim_widget::image::*;
     }
 
-    // We hide the re-exported modules by `aura_widget`
+    // We hide the re-exported modules by `taim_widget`
     mod core {}
     mod graphics {}
     mod renderer {}
@@ -653,8 +653,8 @@ pub mod widget {
 
 pub mod backend {
     //! Graphical backends are designed to aid in rendering computer graphics to a monitor.
-    pub use aura_core::backend::*;
-    pub use aura_runtime::backend::*;
+    pub use taim_core::backend::*;
+    pub use taim_runtime::backend::*;
 }
 
 pub use application::Application;
@@ -677,24 +677,24 @@ pub use daemon::daemon;
 
 /// A generic widget.
 ///
-/// This is an alias of an `aura_native` element with a default `Renderer`.
+/// This is an alias of an `taim_native` element with a default `Renderer`.
 pub type Element<'a, Message, Theme = crate::Theme, Renderer = crate::Renderer> =
     crate::core::Element<'a, Message, Theme, Renderer>;
 
-/// The result of running an aura program.
+/// The result of running an taim program.
 pub type Result = std::result::Result<(), Error>;
 
-/// Runs a basic aura application with default [`Settings`] given its update
+/// Runs a basic taim application with default [`Settings`] given its update
 /// and view logic.
 ///
 /// This is equivalent to chaining [`application()`] with [`Application::run`].
 ///
 /// # Example
 /// ```no_run,standalone_crate
-/// use aura::widget::{button, column, text, Column};
+/// use taim::widget::{button, column, text, Column};
 ///
-/// pub fn main() -> aura::Result {
-///     aura::run(update, view)
+/// pub fn main() -> taim::Result {
+///     taim::run(update, view)
 /// }
 ///
 /// #[derive(Debug, Clone)]

@@ -2,9 +2,9 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-//! use aura::widget::{app_bar, icon_button, text};
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+//! use taim::widget::{app_bar, icon_button, text};
 //!
 //! #[derive(Clone)]
 //! enum Message {
@@ -26,7 +26,7 @@
 //! carry their own roles, names, focus, and touch targets.
 //!
 //! Modelling the bar itself as activatable, as
-//! `aura_design::components::app_bar::AppBar` originally did, claims an
+//! `taim_design::components::app_bar::AppBar` originally did, claims an
 //! action with no focusable, touch-sized target behind it. That defect
 //! was found and fixed in the contract; this widget is built the right
 //! way round from the start.
@@ -534,7 +534,7 @@ impl Catalog for Theme {
     }
 }
 
-/// The default styling of an [`AppBar`] for aura's own theme.
+/// The default styling of an [`AppBar`] for taim's own theme.
 pub fn default(theme: &Theme) -> Style {
     let palette = theme.palette();
 

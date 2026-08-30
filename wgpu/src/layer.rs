@@ -47,6 +47,20 @@ impl Layer {
         let bounds = quad.bounds * transformation;
         let luminance = quad.luminance;
 
+        // Sanitised here rather than in the shader: an authored material
+        // reaches the GPU once per instance, and doing it on the CPU keeps
+        // the fragment stage free of the guards.
+        //
+        // Neutralised entirely without linear light. A specular highlight
+        // added to gamma-encoded components is not a highlight, and an index
+        // of refraction of 1.0 is the shader's own early-out for "no
+        // material".
+        let material = if color::GAMMA_CORRECTION {
+            quad.material.sanitised()
+        } else {
+            core::material::Material::OPAQUE
+        };
+
         let quad = Quad {
             position: [bounds.x, bounds.y],
             size: [bounds.width, bounds.height],
@@ -61,28 +75,13 @@ impl Layer {
             shadow_offset: (quad.shadow.offset * transformation.scale_factor()).into(),
             shadow_blur_radius: quad.shadow.blur_radius * transformation.scale_factor(),
             snap: quad.snap as u32,
-            material: {
-                // Sanitised here rather than in the shader: an authored
-                // material reaches the GPU once per instance, and doing it on
-                // the CPU keeps the fragment stage free of the guards.
-                //
-                // Neutralised entirely without linear light. A specular
-                // highlight added to gamma-encoded components is not a
-                // highlight, and an index of refraction of 1.0 is the
-                // shader's own early-out for "no material".
-                let material = if color::GAMMA_CORRECTION {
-                    quad.material.sanitised()
-                } else {
-                    core::material::Material::OPAQUE
-                };
-
-                [
-                    material.roughness,
-                    material.thickness_mm,
-                    material.ior,
-                    material.dispersion,
-                ]
-            },
+            material: [
+                material.roughness,
+                material.thickness_mm,
+                material.ior,
+                material.dispersion,
+            ],
+            transmission: material.transmission,
         };
 
         self.quads.add(quad, &background, luminance);

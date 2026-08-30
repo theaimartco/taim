@@ -25,16 +25,16 @@
 //! step difference out of 255, on the single most common operation in any
 //! user interface.
 
-use aura_core::Renderer as _;
-use aura_core::{Color, Rectangle, Size};
-use aura_wgpu::Renderer;
-use aura_wgpu::graphics::Viewport;
+use taim_core::Renderer as _;
+use taim_core::{Color, Rectangle, Size};
+use taim_wgpu::Renderer;
+use taim_wgpu::graphics::Viewport;
 
 const SIDE: u32 = 64;
 
 fn renderer() -> Option<Renderer> {
-    aura_futures::futures::executor::block_on(<Renderer as aura_core::renderer::Headless>::new(
-        aura_core::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
         None,
     ))
 }
@@ -65,7 +65,7 @@ fn surface_of(
 /// Fills the whole surface with `color`.
 fn fill(renderer: &mut Renderer, color: Color) {
     renderer.fill_quad(
-        aura_core::renderer::Quad {
+        taim_core::renderer::Quad {
             bounds: Rectangle {
                 x: 0.0,
                 y: 0.0,

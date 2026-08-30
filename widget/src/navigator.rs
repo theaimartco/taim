@@ -17,10 +17,10 @@ use crate::core::widget::tree::{self, Tree};
 use crate::core::window;
 use crate::core::{self, Element, Event, Length, Rectangle, Shell, Size, Widget};
 
-// Navigation and the rest of Aura use the same transition contract. Keeping
+// Navigation and the rest of Taim use the same transition contract. Keeping
 // this re-export preserves the widget-facing API without maintaining a
 // second, incompatible implementation here.
-pub use aura_motion::{PageTransition, TransformState};
+pub use taim_motion::{PageTransition, TransformState};
 
 // -----------------------------------------------------------------------
 // Animation state
@@ -53,7 +53,7 @@ impl TransitionAnim {
         }
         let elapsed = now.duration_since(self.started_at).as_secs_f64();
         if let PageTransition::SpringSlide { spring } = self.transition {
-            let mut motion = aura_motion::Spring::with_config(0.0, spring);
+            let mut motion = taim_motion::Spring::with_config(0.0, spring);
             motion.set_target(1.0);
             motion.advance(elapsed.min(10.0) as f32).clamp(0.0, 1.0)
         } else if self.duration > 0.0 {
@@ -69,7 +69,7 @@ impl TransitionAnim {
         }
         let elapsed = now.duration_since(self.started_at).as_secs_f64();
         self.settled = if let PageTransition::SpringSlide { spring } = self.transition {
-            let mut motion = aura_motion::Spring::with_config(0.0, spring);
+            let mut motion = taim_motion::Spring::with_config(0.0, spring);
             motion.set_target(1.0);
             let _ = motion.advance(elapsed.min(10.0) as f32);
 
@@ -125,7 +125,7 @@ struct Page<'a, Message, Theme, Renderer> {
 /// # Example
 ///
 /// ```ignore
-/// use aura_widget::navigator::{Navigator, PageTransition};
+/// use taim_widget::navigator::{Navigator, PageTransition};
 ///
 /// Navigator::new(page_a)
 ///     .push(page_b, PageTransition::FORWARD)
@@ -592,7 +592,7 @@ mod tests {
         let now = Instant::now();
         let mut animation = TransitionAnim::new(
             PageTransition::SpringSlide {
-                spring: aura_motion::SpringConfig::default(),
+                spring: taim_motion::SpringConfig::default(),
             },
             TransitionKind::Push,
             now,

@@ -1,6 +1,6 @@
-# Gestures in Vyom-Aura
+# Gestures in Vyom-Taim
 
-User interaction on modern devices is dominated by touch and precise pointer events. The `aura-gesture` crate provides a sophisticated gesture recognition system built around the concept of a **Gesture Arena**. This ensures that complex, overlapping gestures are resolved predictably and smoothly. Whether you're building for desktop with a mouse, or a mobile device with multi-touch, the gesture system provides a unified abstraction.
+User interaction on modern devices is dominated by touch and precise pointer events. The `taim-gesture` crate provides a sophisticated gesture recognition system built around the concept of a **Gesture Arena**. This ensures that complex, overlapping gestures are resolved predictably and smoothly. Whether you're building for desktop with a mouse, or a mobile device with multi-touch, the gesture system provides a unified abstraction.
 
 ## 1. Why a Gesture Arena?
 
@@ -36,7 +36,7 @@ The lifecycle of a gesture through the Arena involves several distinct phases:
 
 ## 3. The `Recognizer` Trait
 
-Every gesture in `aura-gesture` implements the `Recognizer` trait. This trait defines the core contract between the gesture logic and the Arena. You can implement this trait to create entirely custom gestures.
+Every gesture in `taim-gesture` implements the `Recognizer` trait. This trait defines the core contract between the gesture logic and the Arena. You can implement this trait to create entirely custom gestures.
 
 ```rust
 pub trait Recognizer {
@@ -73,7 +73,7 @@ pub enum Disposition {
 
 ## 4. Built-in Recognizers
 
-`aura-gesture` provides a rich set of built-in recognizers for common interactions, configurable to suit different needs.
+`taim-gesture` provides a rich set of built-in recognizers for common interactions, configurable to suit different needs.
 
 ### `TapRecognizer`
 Detects a brief pointer down and up without significant movement.
@@ -116,9 +116,9 @@ Detects two pointers rotating around a central axis.
 
 Many physics-based UI interactions (like momentum scrolling or flinging a card) rely on knowing exactly how fast the pointer was moving when it was released.
 
-`aura-gesture` includes a robust `VelocityTracker`. It uses a least-squares polynomial fit over the last few milliseconds of pointer data (typically the last 100ms) to calculate a smooth, accurate velocity vector. This is essential because digitizer hardware often reports slightly jittery coordinates. A simple `(current - previous) / time` calculation would yield highly erratic velocities.
+`taim-gesture` includes a robust `VelocityTracker`. It uses a least-squares polynomial fit over the last few milliseconds of pointer data (typically the last 100ms) to calculate a smooth, accurate velocity vector. This is essential because digitizer hardware often reports slightly jittery coordinates. A simple `(current - previous) / time` calculation would yield highly erratic velocities.
 
-Recognizers like `Pan` and `Swipe` utilize this internally and provide the final calculated velocity in their callback events, which you can then plug directly into an `aura-motion` `Decay` animation.
+Recognizers like `Pan` and `Swipe` utilize this internally and provide the final calculated velocity in their callback events, which you can then plug directly into an `taim-motion` `Decay` animation.
 
 ---
 
@@ -132,7 +132,7 @@ When a user drags inside a nested scroll view, the system must decide which view
 1.  **Child First (Pre-Scroll)**: The inner child scroll view is given the opportunity to consume the drag delta first.
 2.  **Parent Overflow**: If the child hits its scroll boundary (e.g., it reaches the absolute bottom), it cannot consume any more delta in that direction. It passes the remaining unconsumed drag delta up to the parent.
 3.  **Momentum Transfer (Fling)**: If the child is flung (swiped) and hits its boundary while still moving, the remaining velocity is transferred to the parent. This causes the parent to seamlessly take over the momentum scroll, feeling like a single continuous physical motion.
-4.  **Overscroll**: If the parent also hits its boundary, the velocity can be used to drive an overscroll bounce effect (using an `aura-motion` Spring).
+4.  **Overscroll**: If the parent also hits its boundary, the velocity can be used to drive an overscroll bounce effect (using an `taim-motion` Spring).
 
 ---
 
@@ -155,8 +155,8 @@ Understanding how an OS event turns into a UI change is critical for debugging c
 Here is how you might implement a swipe-to-dismiss interaction for a list item using the provided recognizers.
 
 ```rust
-use aura_ui::prelude::*;
-use aura_gesture::{SwipeRecognizer, Direction};
+use taim_ui::prelude::*;
+use taim_gesture::{SwipeRecognizer, Direction};
 
 fn swipeable_card(id: String, content: String, cx: &mut Context) -> impl Widget {
     // We attach a raw recognizer rather than using a high-level helper like on_tap
@@ -190,8 +190,8 @@ fn swipeable_card(id: String, content: String, cx: &mut Context) -> impl Widget 
 Implementing pinch-to-zoom involves tracking the scale delta provided by the `PinchRecognizer` and applying it to a render transform.
 
 ```rust
-use aura_ui::prelude::*;
-use aura_gesture::PinchRecognizer;
+use taim_ui::prelude::*;
+use taim_gesture::PinchRecognizer;
 
 #[derive(Default, Clone, State)]
 struct ImageState {
@@ -245,7 +245,7 @@ For example, placing a `SwipeRecognizer` (which requires a fast flick) directly 
 
 To resolve such scenarios, carefully tune `min_velocity` and `min_distance` properties on your recognizers, ensuring the specific interaction you want to occur takes precedence when appropriate. Testing on real devices is always highly recommended.
 
-Additionally, `aura-gesture` provides a debug mode that visually indicates which recognizers are active and which one won the arena, which can be invaluable when fine-tuning these interactions. You can enable it via `aura_gesture::set_debug_mode(true)`.
+Additionally, `taim-gesture` provides a debug mode that visually indicates which recognizers are active and which one won the arena, which can be invaluable when fine-tuning these interactions. You can enable it via `taim_gesture::set_debug_mode(true)`.
 
 ### Common Conflict Scenarios
 1.  **Horizontal Scroll inside a Vertical Scroll**: Usually handled correctly by `NestedScroll` constraints if configured. However, make sure horizontal `PanRecognizer` requires enough horizontal distance to prevent diagonal scrolling from accidentally grabbing the horizontal gesture if vertical was intended.

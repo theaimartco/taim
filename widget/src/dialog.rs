@@ -2,9 +2,9 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-//! use aura::widget::{dialog, stack, text};
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+//! use taim::widget::{dialog, stack, text};
 //!
 //! #[derive(Clone)]
 //! enum Message {
@@ -29,7 +29,7 @@
 //!
 //! # Why a `stack`, and not an overlay
 //!
-//! aura renders floating content through `overlay::Overlay`, which has no
+//! taim renders floating content through `overlay::Overlay`, which has no
 //! `semantics` hook: anything drawn that way is **invisible to the
 //! accessibility engine**. A modal is the one thing that must never be
 //! invisible to a screen reader, so [`Dialog`] is an ordinary widget with
@@ -45,9 +45,9 @@
 //!
 //! A modal owns focus for as long as it is open: Tab must not escape into
 //! the inert page behind it. That is
-//! `aura_accessibility::focus::Scope`'s job, and it lives in application
+//! `taim_accessibility::focus::Scope`'s job, and it lives in application
 //! state (focus outlives any single view). This widget reports
-//! [`Role::Window`](aura_core::semantics::Role::Window) and offers
+//! [`Role::Window`](taim_core::semantics::Role::Window) and offers
 //! `DISMISS`, which is what a caller pushes a `Scope` *for*; see
 //! [`Dialog::is_modal`] and `docs/accessibility/contract.md`.
 
@@ -66,7 +66,7 @@ use crate::core::{
 };
 
 /// The smallest a dialog may be, matching
-/// `aura_design::components::dialog::Dialog`'s own minimum.
+/// `taim_design::components::dialog::Dialog`'s own minimum.
 const MIN_SIZE: Size = Size {
     width: 280.0,
     height: 120.0,
@@ -159,7 +159,7 @@ where
     /// Always `true`: a dialog that did not own focus would let Tab wander
     /// into the page it is covering, which is visually inert but still
     /// reachable. A caller pushes an
-    /// `aura_accessibility::focus::Scope { trapped: true }` for as long as
+    /// `taim_accessibility::focus::Scope { trapped: true }` for as long as
     /// the dialog is in the view.
     pub const fn is_modal(&self) -> bool {
         true
@@ -541,7 +541,7 @@ impl Catalog for Theme {
     }
 }
 
-/// The default styling of a [`Dialog`] for aura's own theme.
+/// The default styling of a [`Dialog`] for taim's own theme.
 pub fn default(theme: &Theme) -> Style {
     let palette = theme.palette();
 

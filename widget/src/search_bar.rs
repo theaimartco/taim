@@ -2,9 +2,9 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-//! use aura::widget::search_bar;
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+//! use taim::widget::search_bar;
 //!
 //! #[derive(Clone)]
 //! enum Message {
@@ -32,7 +32,7 @@
 //! owns the chrome and delegates every keystroke.
 //!
 //! The consequence for accessibility is the good one: the inner field
-//! reports [`Role::TextField`](aura_core::semantics::Role::TextField)
+//! reports [`Role::TextField`](taim_core::semantics::Role::TextField)
 //! with its own value and actions, and this widget reports nothing of
 //! its own rather than wrapping it in a second, competing node.
 //!
@@ -476,7 +476,7 @@ where
 /// These used to be assembled from quads, on the reasoning that "a search
 /// bar should not depend on an icon font being installed -- the software
 /// fallback and headless tests have no font loader at all". That is not
-/// true: `Aura-Icons.ttf` is compiled into the binary and loaded
+/// true: `Taim-Icons.ttf` is compiled into the binary and loaded
 /// unconditionally by the text stack, and the software renderer draws it
 /// exactly as the GPU one does -- which the golden suite now proves on every
 /// run.
@@ -565,7 +565,7 @@ impl Catalog for Theme {
     }
 }
 
-/// The default styling of a [`SearchBar`] for aura's own theme.
+/// The default styling of a [`SearchBar`] for taim's own theme.
 pub fn default(theme: &Theme) -> Style {
     let palette = theme.palette();
 

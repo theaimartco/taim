@@ -1,17 +1,17 @@
-//! The `icon_button` widget: behavior, semantics, and Aura theming.
+//! The `icon_button` widget: behavior, semantics, and Taim theming.
 //!
-//! `aura_design::components::icon_button::IconButton` states the contract
+//! `taim_design::components::icon_button::IconButton` states the contract
 //! ("an icon-only control's accessible name is mandatory"). This proves
 //! the real widget honors it, and behaves the way a button must.
 
-use aura::advanced::widget::{self, Widget};
-use aura::advanced::{Layout, Shell, layout, mouse};
-use aura::widget::icon_button;
-use aura::{Event, Point, Rectangle, Size, Theme};
-use aura_core::semantics::{Actions, Role, State};
-use aura_core::{shell::Waker, window};
-use aura_renderer::Renderer;
-use aura_widget::icon_button as icon_button_mod;
+use taim::advanced::widget::{self, Widget};
+use taim::advanced::{Layout, Shell, layout, mouse};
+use taim::widget::icon_button;
+use taim::{Event, Point, Rectangle, Size, Theme};
+use taim_core::semantics::{Actions, Role, State};
+use taim_core::{shell::Waker, window};
+use taim_renderer::Renderer;
+use taim_widget::icon_button as icon_button_mod;
 
 type Message = &'static str;
 
@@ -21,9 +21,9 @@ const BOUNDS: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -94,7 +94,7 @@ impl<'a> Harness<'a> {
         )
     }
 
-    fn semantics(&self) -> Option<aura_core::semantics::Node> {
+    fn semantics(&self) -> Option<taim_core::semantics::Node> {
         Widget::<Message, Theme, Renderer>::semantics(
             &self.widget,
             &self.tree,
@@ -165,19 +165,19 @@ fn a_cancelled_touch_does_not_activate() {
     let mut harness = Harness::new(icon_button('x', "Close").on_press("closed"));
 
     let _ = harness.dispatch(
-        Event::Touch(aura_core::touch::Event::FingerPressed {
-            id: aura_core::touch::Finger(0),
+        Event::Touch(taim_core::touch::Event::FingerPressed {
+            id: taim_core::touch::Finger(0),
             position: inside(),
-            metadata: aura_core::pointer::Metadata::NONE,
+            metadata: taim_core::pointer::Metadata::NONE,
         }),
         inside(),
     );
 
     let _ = harness.dispatch(
-        Event::Touch(aura_core::touch::Event::FingerLost {
-            id: aura_core::touch::Finger(0),
+        Event::Touch(taim_core::touch::Event::FingerLost {
+            id: taim_core::touch::Finger(0),
             position: inside(),
-            metadata: aura_core::pointer::Metadata::NONE,
+            metadata: taim_core::pointer::Metadata::NONE,
         }),
         inside(),
     );
@@ -233,7 +233,7 @@ fn a_disabled_icon_button_keeps_its_name_but_offers_nothing() {
 
 #[test]
 fn an_icon_button_meets_the_minimum_touch_target() {
-    use aura_design::components::MIN_TOUCH_TARGET;
+    use taim_design::components::MIN_TOUCH_TARGET;
 
     let harness = Harness::new(icon_button('x', "Close").on_press("closed"));
     let bounds = Layout::new(&harness.node).bounds();
@@ -244,7 +244,7 @@ fn an_icon_button_meets_the_minimum_touch_target() {
 
 #[test]
 fn an_undersized_icon_button_is_clamped_up_to_the_touch_target() {
-    use aura_design::components::MIN_TOUCH_TARGET;
+    use taim_design::components::MIN_TOUCH_TARGET;
 
     // A caller asking for a 12px button is asking for something nobody can
     // reliably hit. The control refuses rather than obeying.

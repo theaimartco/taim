@@ -1,26 +1,26 @@
 //! The `list_tile` widget: slot layout, behavior, and semantics.
 //!
-//! Realises `aura_design::components::list_tile::ListTile`. The contract
+//! Realises `taim_design::components::list_tile::ListTile`. The contract
 //! says a tile's height comes from its line count and that a
 //! non-interactive tile is presentation; this proves the widget does both.
 
-use aura::advanced::widget::{self, Widget};
-use aura::advanced::{Layout, Shell, layout, mouse};
-use aura::widget::{list_tile, space, text};
-use aura::{Element, Event, Point, Rectangle, Size, Theme};
-use aura_core::semantics::{Actions, Role, State};
-use aura_core::{shell::Waker, window};
-use aura_renderer::Renderer;
-use aura_widget::list_tile as list_tile_mod;
+use taim::advanced::widget::{self, Widget};
+use taim::advanced::{Layout, Shell, layout, mouse};
+use taim::widget::{list_tile, space, text};
+use taim::{Element, Event, Point, Rectangle, Size, Theme};
+use taim_core::semantics::{Actions, Role, State};
+use taim_core::{shell::Waker, window};
+use taim_renderer::Renderer;
+use taim_widget::list_tile as list_tile_mod;
 
 type Message = &'static str;
 
 const WIDTH: f32 = 320.0;
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -97,7 +97,7 @@ impl<'a> Harness<'a> {
         )
     }
 
-    fn semantics(&self) -> Option<aura_core::semantics::Node> {
+    fn semantics(&self) -> Option<taim_core::semantics::Node> {
         Widget::<Message, Theme, Renderer>::semantics(
             &self.widget,
             &self.tree,
@@ -135,10 +135,10 @@ fn a_tiles_height_comes_from_its_line_count_not_its_content() {
 }
 
 #[test]
-fn the_declared_heights_match_the_aura_design_contract() {
+fn the_declared_heights_match_the_taim_design_contract() {
     // Two sources, one set of numbers: a drift here would mean the
     // contract and the widget disagree about what a list looks like.
-    use aura_design::components::list_tile::ListLines;
+    use taim_design::components::list_tile::ListLines;
 
     assert_eq!(list_tile_mod::Lines::One.height(), ListLines::One.height());
     assert_eq!(list_tile_mod::Lines::Two.height(), ListLines::Two.height());
@@ -277,7 +277,7 @@ fn a_selected_tile_reports_its_selection() {
 
 #[test]
 fn an_interactive_tile_meets_the_minimum_touch_target() {
-    use aura_design::components::MIN_TOUCH_TARGET;
+    use taim_design::components::MIN_TOUCH_TARGET;
 
     let harness = Harness::new(list_tile(body()).on_press("opened"));
 

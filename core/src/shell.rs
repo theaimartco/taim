@@ -1,4 +1,4 @@
-//! Communicate with the aura runtime from widgets.
+//! Communicate with the taim runtime from widgets.
 use crate::clipboard;
 use crate::damage;
 use crate::event;
@@ -293,7 +293,7 @@ impl<'a, Message> Shell<'a, Message> {
     }
 }
 
-/// A waker can be used to wake up the aura runtime and, consequently, trigger
+/// A waker can be used to wake up the taim runtime and, consequently, trigger
 /// wake events concurrently from widget logic.
 #[derive(Clone)]
 pub struct Waker {
@@ -313,7 +313,7 @@ impl Waker {
         Self::new(|| {})
     }
 
-    /// Wakes up the aura runtime as soon as possible.
+    /// Wakes up the taim runtime as soon as possible.
     ///
     /// You normally want to call this concurrently (e.g. from a different thread).
     pub fn wake(&self) {

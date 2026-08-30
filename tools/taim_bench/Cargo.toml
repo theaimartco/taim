@@ -1,0 +1,72 @@
+[package]
+name = "taim_bench"
+description = "Deterministic benchmark laboratory for the VYOM Taim fork (phase.md Phase 1)"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# Enables the counting allocator used by `metrics::allocations`. Off by
+# default because a global counting allocator adds overhead to every
+# allocation in the process, including the harness itself; only turn it
+# on for a dedicated allocation-counting run.
+profiling = []
+
+[[bin]]
+name = "taim_bench"
+path = "src/main.rs"
+
+[dependencies]
+taim-motion.workspace = true
+taim_core.workspace = true
+taim_graphics.workspace = true
+taim_futures.workspace = true
+# `wgpu-bare` (not just `wgpu`) is required for `taim_renderer::Renderer`
+# to resolve to the `Primary`/`Secondary` fallback dispatcher instead of
+# a single hard-coded backend (see `renderer/src/lib.rs`'s `#[cfg(all(
+# feature = "wgpu-bare", feature = "tiny-skia"))]` gate) -- the root
+# `taim` crate's own `wgpu` feature sets both `wgpu-bare` and
+# `taim_renderer/wgpu` together, but at the `taim_renderer` crate level
+# those are independent, so both must be requested explicitly.
+#
+# `x11`/`wayland` are required here even though `taim_bench` never opens a
+# window: `taim_tiny_skia` always compiles its windowed `Compositor` (via
+# `softbuffer`) alongside its unrelated `Headless` renderer path, and
+# `softbuffer` needs at least one platform backend feature enabled to
+# have any variants in its internal dispatch enums. Every other crate
+# that depends on `taim_tiny_skia` (the root `taim` crate, `taim_winit`)
+# already enables one of these by default; `taim_bench` must do the same
+# to build at all, not to actually use windowing.
+taim_renderer = { workspace = true, features = ["wgpu", "wgpu-bare", "tiny-skia", "image", "geometry", "x11", "wayland"] }
+taim_runtime.workspace = true
+# Needed by `scenes::effect_ladder` to quantify the real effect cost
+# model (`taim_wgpu::effects`), which is where the separable/downsampled
+# blur cost and texture-pool budgeting live. `taim_renderer`'s `wgpu`
+# feature pulls the same crate in, but does not re-export `effects`.
+taim_wgpu.workspace = true
+taim_widget = { workspace = true, features = ["image", "canvas"] }
+
+serde.workspace = true
+serde.features = ["derive"]
+
+log.workspace = true
+
+# `executor` is needed for `futures::executor::block_on`, used once at
+# startup to await `Renderer::new`'s headless backend negotiation; not
+# enabled by the workspace's own `futures` entry (no other production
+# crate needs synchronous blocking).
+futures = { workspace = true, features = ["executor"] }
+
+[dependencies.serde_json]
+version = "1.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Used by `metrics::memory` to read RSS from `/proc/self/status`; no
+# extra dependency needed beyond `std::fs`, kept here as documentation of
+# the platform assumption (see docs/performance/methodology.md).

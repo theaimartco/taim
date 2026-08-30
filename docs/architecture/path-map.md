@@ -8,34 +8,34 @@
 
 `phase.md` describes the target layout in terms of `core/`, `runtime/`,
 `graphics/`, `wgpu/`, `widget/`, `tools/`, and `tests/`. This checkout is an
-unmodified-in-structure `aura` fork (crate names still carry the `aura_`
+unmodified-in-structure `taim` fork (crate names still carry the `taim_`
 prefix; roadmap rule 7 says not to mass-rename yet). The mapping is
 one-to-one for every directory the roadmap names:
 
 | Roadmap module | Actual directory | Actual crate name | Notes |
 |---|---|---|---|
-| `core/` | `core/` | `aura_core` | Matches. |
-| `runtime/` | `runtime/` | `aura_runtime` | Matches. |
-| `graphics/` | `graphics/` | `aura_graphics` | Matches. |
-| `wgpu/` | `wgpu/` | `aura_wgpu` | Matches. |
-| `widget/` | `widget/` | `aura_widget` | Matches. |
-| `tools/` | *(does not exist yet)* | — | First created in Phase 1 (`tools/aura_bench`). |
+| `core/` | `core/` | `taim_core` | Matches. |
+| `runtime/` | `runtime/` | `taim_runtime` | Matches. |
+| `graphics/` | `graphics/` | `taim_graphics` | Matches. |
+| `wgpu/` | `wgpu/` | `taim_wgpu` | Matches. |
+| `widget/` | `widget/` | `taim_widget` | Matches. |
+| `tools/` | *(does not exist yet)* | — | First created in Phase 1 (`tools/taim_bench`). |
 | `tests/` | *(does not exist yet)* | — | First created in Phase 0 (`tests/smoke.rs`). |
 
 Additional directories present in this checkout that the roadmap's module
 table does not name, kept as-is because they are load-bearing for the
-existing `aura` public API and have no roadmap replacement yet:
+existing `taim` public API and have no roadmap replacement yet:
 
 | Directory | Crate name | Role |
 |---|---|---|
-| `src/` | `aura` | Root/facade crate; re-exports the others as the public `aura` API. |
-| `program/` | `aura_program` | `Program` trait and message plumbing shared by `Application`/`Daemon`. |
-| `renderer/` | `aura_renderer` | Renderer-selection glue between `aura_wgpu` and `aura_tiny_skia`. |
-| `futures/` | `aura_futures` | Executor/subscription primitives. |
-| `debug/` | `aura_debug` | Pluggable debug/telemetry API (span timing, hot-reload hook). |
-| `tiny_skia/` | `aura_tiny_skia` | Software rasterizer fallback (kept live per roadmap rule 6). |
-| `winit/` | `aura_winit` | `winit`-based windowing/runtime backend (kept live per roadmap rule 6 pending Phase 14). |
-| `benches/` | *(part of root `aura` package)* | `cargo bench` targets (`cpu`, `wgpu`), gated on `canvas`. |
+| `src/` | `taim` | Root/facade crate; re-exports the others as the public `taim` API. |
+| `program/` | `taim_program` | `Program` trait and message plumbing shared by `Application`/`Daemon`. |
+| `renderer/` | `taim_renderer` | Renderer-selection glue between `taim_wgpu` and `taim_tiny_skia`. |
+| `futures/` | `taim_futures` | Executor/subscription primitives. |
+| `debug/` | `taim_debug` | Pluggable debug/telemetry API (span timing, hot-reload hook). |
+| `tiny_skia/` | `taim_tiny_skia` | Software rasterizer fallback (kept live per roadmap rule 6). |
+| `winit/` | `taim_winit` | `winit`-based windowing/runtime backend (kept live per roadmap rule 6 pending Phase 14). |
+| `benches/` | *(part of root `taim` package)* | `cargo bench` targets (`cpu`, `wgpu`), gated on `canvas`. |
 
 ## Workspace members removed in Phase 0
 
@@ -45,20 +45,20 @@ corresponding directory on disk, which made every `cargo metadata` /
 
 | Listed member | Crate name | Directory found on disk? | Action |
 |---|---|---|---|
-| `beacon` | `aura_beacon` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and `debug/Cargo.toml`'s (former) `enable` feature. |
-| `devtools` | `aura_devtools` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and the root `debug`/`time-travel` features and their call sites in `src/daemon.rs` / `src/application.rs`. |
-| `highlighter` | `aura_highlighter` | No | Removed in Phase 0, then **restored** as the Aura-owned `aura-highlighter` workspace member. The root/`widget` `highlighter` features now resolve to a real dependency, so they build instead of failing. See [aura-highlighter](../../aura-highlighter/src/lib.rs) for the scope it deliberately does and does not cover. |
-| `selector` | `aura_selector` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and `runtime`'s `selector` feature. Deleted `runtime/src/widget/selector.rs` and its `#[cfg(feature = "selector")] pub mod selector;` declaration in `runtime/src/widget.rs`. |
-| `test` | `aura_test` | No | Removed from `[workspace.members]` and `[workspace.dependencies]`. This crate had zero references anywhere else in the tree — it was dead even before the directory went missing. |
-| `tester` | `aura_tester` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and the root `tester` feature and its call sites in `src/daemon.rs` / `src/application.rs`. |
+| `beacon` | `taim_beacon` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and `debug/Cargo.toml`'s (former) `enable` feature. |
+| `devtools` | `taim_devtools` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and the root `debug`/`time-travel` features and their call sites in `src/daemon.rs` / `src/application.rs`. |
+| `highlighter` | `taim_highlighter` | No | Removed in Phase 0, then **restored** as the Taim-owned `taim-highlighter` workspace member. The root/`widget` `highlighter` features now resolve to a real dependency, so they build instead of failing. See [taim-highlighter](../../taim-highlighter/src/lib.rs) for the scope it deliberately does and does not cover. |
+| `selector` | `taim_selector` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and `runtime`'s `selector` feature. Deleted `runtime/src/widget/selector.rs` and its `#[cfg(feature = "selector")] pub mod selector;` declaration in `runtime/src/widget.rs`. |
+| `test` | `taim_test` | No | Removed from `[workspace.members]` and `[workspace.dependencies]`. This crate had zero references anywhere else in the tree — it was dead even before the directory went missing. |
+| `tester` | `taim_tester` | No | Removed from `[workspace.members]`, `[workspace.dependencies]`, and the root `tester` feature and its call sites in `src/daemon.rs` / `src/application.rs`. |
 | `examples/*` | *(glob)* | No (`examples/` absent) | Removed from `[workspace.members]`. Phase 18 recreates a scoped `examples/vyom_shell/`; nothing else in this roadmap needs a general `examples/*` glob before then. |
 
 None of these six crates are needed by any phase before the point where
-the roadmap explicitly reintroduces an Aura-owned equivalent (`selector`-like
+the roadmap explicitly reintroduces an Taim-owned equivalent (`selector`-like
 widget querying is not yet scheduled; syntax highlighting has since
-returned as `aura-highlighter`; hot-reload/time-travel debugging is
-superseded by `aura-profiler` and Aura Lab in Phase 15). Per the roadmap's own instruction ("restore a
-deleted capability only when a later phase explicitly needs an Aura-owned
+returned as `taim-highlighter`; hot-reload/time-travel debugging is
+superseded by `taim-profiler` and Taim Lab in Phase 15). Per the roadmap's own instruction ("restore a
+deleted capability only when a later phase explicitly needs an Taim-owned
 replacement"), Phase 0 did not stub or recreate any of them.
 
 See `docs/architecture/feature-policy.md` for the full list of Cargo

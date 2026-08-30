@@ -1,9 +1,9 @@
 //! The icon font must declare the family the renderers ask for.
 //!
-//! It did not. `graphics/fonts/Aura-Icons.ttf` declared `Iced-Icons` --
+//! It did not. `graphics/fonts/Taim-Icons.ttf` declared `Iced-Icons` --
 //! inherited from the fork, renamed on disk but not inside the file -- while
 //! `wgpu/src/lib.rs` and `tiny_skia/src/lib.rs` both looked it up as
-//! `Font::new("Aura-Icons")`. Font lookup is by declared family name, so it
+//! `Font::new("Taim-Icons")`. Font lookup is by declared family name, so it
 //! matched nothing: every checkmark, dropdown arrow, and scrollbar arrow in
 //! the framework resolved to a missing glyph.
 //!
@@ -27,7 +27,7 @@ fn read_u32(bytes: &[u8], at: usize) -> u32 {
 }
 
 fn parse() -> IconFont {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/graphics/fonts/Aura-Icons.ttf");
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/graphics/fonts/Taim-Icons.ttf");
     let bytes = std::fs::read(path).expect("the icon font must be present");
 
     let table_count = read_u16(&bytes, 4) as usize;
@@ -111,9 +111,9 @@ fn the_font_declares_the_family_the_renderers_look_up() {
     let font = parse();
 
     assert_eq!(
-        font.family, "Aura-Icons",
+        font.family, "Taim-Icons",
         "the font declares `{}`, but wgpu and tiny_skia both ask for \
-         `Aura-Icons`. Lookup is by declared family, so a mismatch means \
+         `Taim-Icons`. Lookup is by declared family, so a mismatch means \
          every icon glyph silently resolves to nothing.",
         font.family
     );
@@ -129,7 +129,7 @@ fn the_glyphs_the_renderers_address_by_codepoint_still_exist() {
     for (codepoint, what) in [
         (0xF00C, "CHECKMARK_ICON"),
         (0xE800, "ARROW_DOWN_ICON"),
-        (0xE801, "AURA_LOGO"),
+        (0xE801, "TAIM_LOGO"),
         (0xE802, "SCROLL_UP_ICON"),
         (0xE803, "SCROLL_DOWN_ICON"),
         (0xE804, "SCROLL_LEFT_ICON"),
@@ -145,7 +145,7 @@ fn the_glyphs_the_renderers_address_by_codepoint_still_exist() {
 
 #[test]
 fn every_icon_constant_resolves_to_a_real_glyph() {
-    use aura_widget::icon::Icon;
+    use taim_widget::icon::Icon;
 
     let font = parse();
 

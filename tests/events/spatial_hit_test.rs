@@ -1,9 +1,9 @@
-//! Compares `aura_runtime::hit_test::Index` against the exhaustive
-//! linear oracle (`aura_runtime::hit_test::hit_test`) over real widget
+//! Compares `taim_runtime::hit_test::Index` against the exhaustive
+//! linear oracle (`taim_runtime::hit_test::hit_test`) over real widget
 //! trees, complementing `hit_test.rs`'s own unit tests (which only
-//! exercise a synthetic `Node` type, not real `aura_core::Widget`s).
+//! exercise a synthetic `Node` type, not real `taim_core::Widget`s).
 //!
-//! Walks the real tree via `aura_core::widget::visit::Widgets`, the same
+//! Walks the real tree via `taim_core::widget::visit::Widgets`, the same
 //! adapter `UserInterface::hit_test` uses. This file used to walk a
 //! hand-built `Shape` mirroring the tree, and so constructed every
 //! widget twice and trusted the copies to match.
@@ -16,17 +16,17 @@
 //! layouts (overlapping siblings, nested rows) rather than only the
 //! grid-of-leaves stress test `hit_test.rs` runs internally.
 
-use aura::advanced::Layout;
-use aura::advanced::widget::{self, Widget};
-use aura::{Element, Length, Point, Rectangle, Size, Theme};
-use aura_core::widget::visit;
-use aura_renderer::Renderer;
-use aura_runtime::hit_test::{self, Index};
+use taim::advanced::Layout;
+use taim::advanced::widget::{self, Widget};
+use taim::{Element, Length, Point, Rectangle, Size, Theme};
+use taim_core::widget::visit;
+use taim_renderer::Renderer;
+use taim_runtime::hit_test::{self, Index};
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -46,9 +46,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Probe {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &aura::advanced::layout::Limits,
-    ) -> aura::advanced::layout::Node {
-        aura::advanced::layout::Node::new(Size::new(self.size, self.size))
+        _limits: &taim::advanced::layout::Limits,
+    ) -> taim::advanced::layout::Node {
+        taim::advanced::layout::Node::new(Size::new(self.size, self.size))
     }
 
     fn draw(
@@ -56,9 +56,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Probe {
         _tree: &widget::Tree,
         _renderer: &mut Renderer,
         _theme: &Theme,
-        _style: &aura::advanced::renderer::Style,
+        _style: &taim::advanced::renderer::Style,
         _layout: Layout<'_>,
-        _cursor: aura::advanced::mouse::Cursor,
+        _cursor: taim::advanced::mouse::Cursor,
         _viewport: &Rectangle,
     ) {
     }
@@ -77,7 +77,7 @@ fn probe(size: f32) -> Element<'static, ()> {
 struct Tree<'a> {
     root: Element<'a, ()>,
     tree: widget::Tree,
-    node: aura::advanced::layout::Node,
+    node: taim::advanced::layout::Node,
 }
 
 impl<'a> Tree<'a> {
@@ -91,7 +91,7 @@ impl<'a> Tree<'a> {
         let node = root.as_widget_mut().layout(
             &mut tree,
             &renderer,
-            &aura::advanced::layout::Limits::new(Size::ZERO, limits),
+            &taim::advanced::layout::Limits::new(Size::ZERO, limits),
         );
 
         Self { root, tree, node }
@@ -149,7 +149,7 @@ fn assert_index_matches_oracle_everywhere(tree: &mut Tree<'_>, bounds: Rectangle
 
 #[test]
 fn the_index_agrees_with_the_oracle_over_overlapping_siblings() {
-    use aura::widget::stack;
+    use taim::widget::stack;
 
     let mut tree = Tree::new(
         stack([probe(50.0), probe(50.0), probe(50.0)]),
@@ -165,7 +165,7 @@ fn the_index_agrees_with_the_oracle_over_overlapping_siblings() {
 
 #[test]
 fn the_index_agrees_with_the_oracle_over_a_dense_grid_of_rows() {
-    use aura::widget::row;
+    use taim::widget::row;
 
     let mut tree = Tree::new(
         row((0..20).map(|_| probe(10.0))).spacing(2),
@@ -181,7 +181,7 @@ fn the_index_agrees_with_the_oracle_over_a_dense_grid_of_rows() {
 
 #[test]
 fn the_index_agrees_with_the_oracle_over_a_nested_two_level_tree() {
-    use aura::widget::row;
+    use taim::widget::row;
 
     let mut tree = Tree::new(
         row([row([probe(10.0), probe(10.0)]).into(), probe(10.0)]),
@@ -197,7 +197,7 @@ fn the_index_agrees_with_the_oracle_over_a_nested_two_level_tree() {
 
 #[test]
 fn the_index_agrees_with_the_oracle_using_a_smaller_custom_cell_size() {
-    use aura::widget::stack;
+    use taim::widget::stack;
 
     let mut tree = Tree::new(stack([probe(50.0), probe(50.0)]), Size::new(200.0, 200.0));
 

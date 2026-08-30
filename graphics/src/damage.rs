@@ -1,8 +1,8 @@
-//! Production damage-region tracking for the Aura rendering pipeline.
+//! Production damage-region tracking for the Taim rendering pipeline.
 //!
 //! This module provides the damage tracking system that determines which
 //! regions of the surface need redrawing after a frame change. It builds
-//! on top of the renderer-neutral vocabulary from [`aura_core::damage`]
+//! on top of the renderer-neutral vocabulary from [`taim_core::damage`]
 //! (Phase 2) to provide concrete region tracking, clipping, transform
 //! application, merge heuristics, and full-screen fallback.
 //!
@@ -22,7 +22,7 @@
 //! - Filters expand damage by their sampling radius.
 //! - Too many/scattered rectangles collapse to a full-surface redraw.
 //!
-//! [`aura_core::damage`]: crate::core::damage
+//! [`taim_core::damage`]: crate::core::damage
 
 use crate::core::{Point, Rectangle, Size, Transformation};
 use smallvec::SmallVec;
@@ -231,7 +231,7 @@ impl DamageRegion {
     /// This transforms damage from local coordinates to device
     /// coordinates (or between coordinate spaces). Uses the
     /// `Rectangle * Transformation` operator already defined in
-    /// aura_core.
+    /// taim_core.
     pub fn apply_transform(&mut self, transform: Transformation) {
         if self.is_full || transform == Transformation::IDENTITY {
             return;

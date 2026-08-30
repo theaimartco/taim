@@ -5,7 +5,7 @@
 //! Everything here arrives from outside the process. A compositor sends
 //! surface geometry; a font file declares its own metrics; a pointer
 //! reports a position; an application passes a `Length` it computed from
-//! a server response. Aura does not get to assume any of it is sane, and
+//! a server response. Taim does not get to assume any of it is sane, and
 //! "sane" is doing a lot of work in a language where `f32` includes NaN,
 //! infinity, and negative zero.
 //!
@@ -31,19 +31,19 @@
 //! These tests exist because that failure is invisible at every layer
 //! until something divides by it.
 
-use aura::widget::{column, container, row, text};
-use aura::{Element, Length, Point, Rectangle, Size, Theme};
-use aura_core::damage;
-use aura_core::layout::Limits;
-use aura_renderer::Renderer;
-use aura_runtime::user_interface::{Cache, UserInterface};
+use taim::widget::{column, container, row, text};
+use taim::{Element, Length, Point, Rectangle, Size, Theme};
+use taim_core::damage;
+use taim_core::layout::Limits;
+use taim_renderer::Renderer;
+use taim_runtime::user_interface::{Cache, UserInterface};
 
 type Message = &'static str;
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )

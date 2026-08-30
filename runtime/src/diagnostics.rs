@@ -15,7 +15,7 @@
 //!
 //! # Counters and traces
 //!
-//! [`Counters`] answers *how many times*; `aura_profiler` answers *how
+//! [`Counters`] answers *how many times*; `taim_profiler` answers *how
 //! long, and why*. They are separate on purpose — a counter is an atomic
 //! add with no timestamp and no buffer, cheap enough to leave on in a
 //! benchmark, while a trace costs a clock read and a ring slot.
@@ -50,7 +50,7 @@ pub enum Phase {
     Event,
     /// Layout computation (`Widget::layout`).
     Layout,
-    /// Semantic tree computation (see [`aura_core::semantics`]).
+    /// Semantic tree computation (see [`taim_core::semantics`]).
     Semantics,
     /// Paint preparation (`Widget::draw`).
     PaintPreparation,
@@ -225,7 +225,7 @@ mod tests {
     }
 }
 
-/// Records this module's [`Phase`]s into an `aura_profiler` trace.
+/// Records this module's [`Phase`]s into an `taim_profiler` trace.
 ///
 /// Held by a caller that wants timings as well as counts. Cloning is
 /// cheap; every clone shares one buffer.
@@ -233,14 +233,14 @@ mod tests {
 /// # Why the mapping is not one-to-one
 ///
 /// [`Phase`] is the *runtime pipeline's* vocabulary and
-/// [`aura_profiler::Phase`] is the *frame's*. They mostly agree, and
+/// [`taim_profiler::Phase`] is the *frame's*. They mostly agree, and
 /// where they do not the difference is real rather than cosmetic:
 ///
-/// - [`Phase::PaintPreparation`] maps to [`aura_profiler::Phase::Paint`]:
+/// - [`Phase::PaintPreparation`] maps to [`taim_profiler::Phase::Paint`]:
 ///   the profiler does not distinguish preparing a draw from issuing it,
 ///   because a developer reading a flame chart cannot act on the
 ///   distinction.
-/// - [`Phase::Upload`] maps to [`aura_profiler::Phase::Submit`]: an atlas
+/// - [`Phase::Upload`] maps to [`taim_profiler::Phase::Submit`]: an atlas
 ///   write is work handed to the GPU.
 /// - [`Phase::DamageFallback`] is **not** a phase at all. It is the
 ///   record of the damage tracker giving up, which is a *cause* — see
@@ -253,17 +253,17 @@ mod tests {
 /// class of bug as the mapping being wrong — and harder to notice.
 #[derive(Debug, Clone)]
 pub struct Trace {
-    collector: aura_profiler::Collector,
+    collector: taim_profiler::Collector,
 }
 
 impl Trace {
     /// A trace recording into `collector`.
-    pub fn new(collector: aura_profiler::Collector) -> Self {
+    pub fn new(collector: taim_profiler::Collector) -> Self {
         Self { collector }
     }
 
     /// The collector being recorded into.
-    pub fn collector(&self) -> &aura_profiler::Collector {
+    pub fn collector(&self) -> &taim_profiler::Collector {
         &self.collector
     }
 
@@ -271,14 +271,14 @@ impl Trace {
     ///
     /// `None` for [`Phase::DamageFallback`], which is a cause rather than
     /// a span of time.
-    pub fn phase_of(phase: Phase) -> Option<aura_profiler::Phase> {
+    pub fn phase_of(phase: Phase) -> Option<taim_profiler::Phase> {
         match phase {
-            Phase::Diff => Some(aura_profiler::Phase::Diff),
-            Phase::Event => Some(aura_profiler::Phase::Input),
-            Phase::Layout => Some(aura_profiler::Phase::Layout),
-            Phase::Semantics => Some(aura_profiler::Phase::Semantics),
-            Phase::PaintPreparation => Some(aura_profiler::Phase::Paint),
-            Phase::Upload => Some(aura_profiler::Phase::Submit),
+            Phase::Diff => Some(taim_profiler::Phase::Diff),
+            Phase::Event => Some(taim_profiler::Phase::Input),
+            Phase::Layout => Some(taim_profiler::Phase::Layout),
+            Phase::Semantics => Some(taim_profiler::Phase::Semantics),
+            Phase::PaintPreparation => Some(taim_profiler::Phase::Paint),
+            Phase::Upload => Some(taim_profiler::Phase::Submit),
             Phase::DamageFallback => None,
         }
     }
@@ -292,7 +292,7 @@ impl Trace {
         let at = self.collector.now();
 
         self.collector
-            .record(|| aura_profiler::Event::PhaseBegin { phase, at });
+            .record(|| taim_profiler::Event::PhaseBegin { phase, at });
     }
 
     /// Marks the end of `phase`.
@@ -304,7 +304,7 @@ impl Trace {
         let at = self.collector.now();
 
         self.collector
-            .record(|| aura_profiler::Event::PhaseEnd { phase, at });
+            .record(|| taim_profiler::Event::PhaseEnd { phase, at });
     }
 
     /// Opens a span for `phase`, closed when the returned [`Span`] drops.
@@ -341,7 +341,7 @@ impl Trace {
         let at = self.collector.now();
 
         self.collector
-            .record(|| aura_profiler::Event::FrameBegin { frame: number, at });
+            .record(|| taim_profiler::Event::FrameBegin { frame: number, at });
 
         Frame {
             trace: self.clone(),
@@ -352,16 +352,16 @@ impl Trace {
     /// Records that the damage tracker fell back to a full redraw, and
     /// the frame it cost.
     ///
-    /// A [`aura_profiler::Event::Missed`] rather than a phase span: this
+    /// A [`taim_profiler::Event::Missed`] rather than a phase span: this
     /// is the *explanation* for a frame's cost, and recording it as a
     /// diagnostic is what keeps it in the buffer when telemetry is being
     /// dropped under pressure — which is exactly when a damage fallback
     /// is most likely and most worth knowing about.
-    pub fn damage_fallback(&self, frame: u64, over: aura_profiler::Nanos) {
-        self.collector.record(|| aura_profiler::Event::Missed {
+    pub fn damage_fallback(&self, frame: u64, over: taim_profiler::Nanos) {
+        self.collector.record(|| taim_profiler::Event::Missed {
             frame,
             over,
-            cause: aura_profiler::Cause::Phase(aura_profiler::Phase::Damage),
+            cause: taim_profiler::Cause::Phase(taim_profiler::Phase::Damage),
         });
     }
 }
@@ -389,7 +389,7 @@ impl Drop for Frame {
 
         self.trace
             .collector
-            .record(|| aura_profiler::Event::FrameEnd {
+            .record(|| taim_profiler::Event::FrameEnd {
                 frame: self.number,
                 at,
             });
@@ -465,7 +465,7 @@ mod trace_tests {
 
     #[test]
     fn a_traced_phase_spans_from_begin_to_end() {
-        let trace = Trace::new(aura_profiler::Collector::enabled());
+        let trace = Trace::new(taim_profiler::Collector::enabled());
 
         trace.begin(Phase::Layout);
         trace.end(Phase::Layout);
@@ -473,7 +473,7 @@ mod trace_tests {
         let events = trace.collector().events();
 
         assert_eq!(events.len(), 2);
-        assert_eq!(events[0].phase(), Some(aura_profiler::Phase::Layout));
+        assert_eq!(events[0].phase(), Some(taim_profiler::Phase::Layout));
         assert!(
             events[1].at() >= events[0].at(),
             "a phase cannot end before it began"
@@ -482,7 +482,7 @@ mod trace_tests {
 
     #[test]
     fn a_disabled_collector_records_nothing() {
-        let trace = Trace::new(aura_profiler::Collector::disabled());
+        let trace = Trace::new(taim_profiler::Collector::disabled());
 
         trace.begin(Phase::Layout);
         trace.end(Phase::Layout);
@@ -497,7 +497,7 @@ mod trace_tests {
         // return is not reached, and the span stays open -- silently
         // charging the rest of the frame, and every frame after it, to
         // whichever phase leaked.
-        let trace = Trace::new(aura_profiler::Collector::enabled());
+        let trace = Trace::new(taim_profiler::Collector::enabled());
 
         fn returns_early(trace: &Trace, early: bool) {
             let _span = trace.span(Phase::PaintPreparation);
@@ -516,8 +516,8 @@ mod trace_tests {
         assert_eq!(events.len(), 2, "the span must close on the early path");
         assert!(matches!(
             events[1],
-            aura_profiler::Event::PhaseEnd {
-                phase: aura_profiler::Phase::Paint,
+            taim_profiler::Event::PhaseEnd {
+                phase: taim_profiler::Phase::Paint,
                 ..
             }
         ));
@@ -527,7 +527,7 @@ mod trace_tests {
     fn a_span_closes_when_a_panic_unwinds_through_it() {
         // A panic mid-frame must not leave the profiler believing `Paint`
         // never ended -- the next trace read would be nonsense.
-        let trace = Trace::new(aura_profiler::Collector::enabled());
+        let trace = Trace::new(taim_profiler::Collector::enabled());
 
         let panicked = std::panic::catch_unwind({
             let trace = trace.clone();
@@ -551,7 +551,7 @@ mod trace_tests {
         // Without a frame boundary, a trace is a list of phase spans with
         // nothing to group them -- and every per-frame statistic needs to
         // know where one frame stops.
-        let trace = Trace::new(aura_profiler::Collector::enabled());
+        let trace = Trace::new(taim_profiler::Collector::enabled());
 
         {
             let _frame = trace.frame(7);
@@ -562,12 +562,12 @@ mod trace_tests {
 
         assert!(matches!(
             events.first(),
-            Some(aura_profiler::Event::FrameBegin { frame: 7, .. })
+            Some(taim_profiler::Event::FrameBegin { frame: 7, .. })
         ));
         assert!(
             matches!(
                 events.last(),
-                Some(aura_profiler::Event::FrameEnd { frame: 7, .. })
+                Some(taim_profiler::Event::FrameEnd { frame: 7, .. })
             ),
             "the frame must close after the phases inside it: {events:?}"
         );
@@ -577,7 +577,7 @@ mod trace_tests {
     fn a_frame_is_not_a_phase() {
         // A frame that was also a phase would be counted inside itself,
         // and its bar would be the sum of every other bar plus itself.
-        let trace = Trace::new(aura_profiler::Collector::enabled());
+        let trace = Trace::new(taim_profiler::Collector::enabled());
 
         drop(trace.frame(1));
 
@@ -592,7 +592,7 @@ mod trace_tests {
 
     #[test]
     fn a_disabled_collector_records_no_frames() {
-        let trace = Trace::new(aura_profiler::Collector::disabled());
+        let trace = Trace::new(taim_profiler::Collector::disabled());
 
         drop(trace.frame(1));
 
@@ -604,7 +604,7 @@ mod trace_tests {
         // It is a diagnostic, so it outlives the telemetry around it --
         // and a fallback is most likely exactly when the buffer is
         // overflowing.
-        let trace = Trace::new(aura_profiler::Collector::with_capacity(4, true));
+        let trace = Trace::new(taim_profiler::Collector::with_capacity(4, true));
 
         trace.damage_fallback(1, 5_000_000);
 
@@ -618,7 +618,7 @@ mod trace_tests {
                 .collector()
                 .events()
                 .iter()
-                .any(|event| matches!(event, aura_profiler::Event::Missed { frame: 1, .. })),
+                .any(|event| matches!(event, taim_profiler::Event::Missed { frame: 1, .. })),
             "the explanation must outlive the measurements"
         );
     }

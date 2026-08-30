@@ -2,19 +2,19 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub fn text<T>(t: T) -> aura_core::widget::Text<'static, aura_core::Theme, ()> { unimplemented!() } }
-//! #            pub use aura_core::color; }
+//! # mod taim { pub mod widget { pub fn text<T>(t: T) -> taim_core::widget::Text<'static, taim_core::Theme, ()> { unimplemented!() } }
+//! #            pub use taim_core::color; }
 //! # pub type State = ();
-//! # pub type Element<'a, Message> = aura_core::Element<'a, Message, aura_core::Theme, ()>;
-//! use aura::widget::text;
-//! use aura::color;
+//! # pub type Element<'a, Message> = taim_core::Element<'a, Message, taim_core::Theme, ()>;
+//! use taim::widget::text;
+//! use taim::color;
 //!
 //! enum Message {
 //!     // ...
 //! }
 //!
 //! fn view(state: &State) -> Element<'_, Message> {
-//!     text("Hello, this is aura!")
+//!     text("Hello, this is taim!")
 //!         .size(20)
 //!         .color(color!(0x0000ff))
 //!         .into()
@@ -36,19 +36,19 @@ pub use text::{Alignment, Ellipsis, LineHeight, Shaping, Wrapping};
 ///
 /// # Example
 /// ```no_run
-/// # mod aura { pub mod widget { pub fn text<T>(t: T) -> aura_core::widget::Text<'static, aura_core::Theme, ()> { unimplemented!() } }
-/// #            pub use aura_core::color; }
+/// # mod taim { pub mod widget { pub fn text<T>(t: T) -> taim_core::widget::Text<'static, taim_core::Theme, ()> { unimplemented!() } }
+/// #            pub use taim_core::color; }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = aura_core::Element<'a, Message, aura_core::Theme, ()>;
-/// use aura::widget::text;
-/// use aura::color;
+/// # pub type Element<'a, Message> = taim_core::Element<'a, Message, taim_core::Theme, ()>;
+/// use taim::widget::text;
+/// use taim::color;
 ///
 /// enum Message {
 ///     // ...
 /// }
 ///
 /// fn view(state: &State) -> Element<'_, Message> {
-///     text("Hello, this is aura!")
+///     text("Hello, this is taim!")
 ///         .size(20)
 ///         .color(color!(0x0000ff))
 ///         .into()

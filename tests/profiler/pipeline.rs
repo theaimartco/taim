@@ -1,6 +1,6 @@
 //! The profiler, reached the way an application reaches it.
 //!
-//! `aura_profiler`'s own tests prove the collector and the export. They do
+//! `taim_profiler`'s own tests prove the collector and the export. They do
 //! not prove that anything *calls* it — which is the gap the accessibility
 //! engine sat in for an entire phase: every stage correct, tested, and
 //! wired to nothing.
@@ -8,13 +8,13 @@
 //! These drive a real `UserInterface` through a real frame and read the
 //! trace that falls out.
 
-use aura::widget::{button, column, text};
-use aura::{Element, Size, Theme};
-use aura_profiler::export;
-use aura_profiler::{Collector, Phase as Traced};
-use aura_renderer::Renderer;
-use aura_runtime::diagnostics::Trace;
-use aura_runtime::user_interface::{Cache, UserInterface};
+use taim::widget::{button, column, text};
+use taim::{Element, Size, Theme};
+use taim_profiler::export;
+use taim_profiler::{Collector, Phase as Traced};
+use taim_renderer::Renderer;
+use taim_runtime::diagnostics::Trace;
+use taim_runtime::user_interface::{Cache, UserInterface};
 
 type Message = &'static str;
 
@@ -24,9 +24,9 @@ const WINDOW: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -68,10 +68,10 @@ fn a_real_frame_produces_a_real_trace() {
 
     let mut messages = Vec::new();
     let _ = ui.update(
-        &aura_core::window::Headless,
-        &aura_core::shell::Waker::noop(),
+        &taim_core::window::Headless,
+        &taim_core::shell::Waker::noop(),
         &[],
-        aura_core::mouse::Cursor::Unavailable,
+        taim_core::mouse::Cursor::Unavailable,
         &mut renderer,
         &mut messages,
     );
@@ -79,8 +79,8 @@ fn a_real_frame_produces_a_real_trace() {
     ui.draw(
         &mut renderer,
         &Theme::Dark,
-        &aura_core::renderer::Style::default(),
-        aura_core::mouse::Cursor::Unavailable,
+        &taim_core::renderer::Style::default(),
+        taim_core::mouse::Cursor::Unavailable,
     );
 
     let _ = ui.semantics(&renderer);
@@ -119,8 +119,8 @@ fn a_frames_time_is_attributed_to_its_phases() {
     ui.draw(
         &mut renderer,
         &Theme::Dark,
-        &aura_core::renderer::Style::default(),
-        aura_core::mouse::Cursor::Unavailable,
+        &taim_core::renderer::Style::default(),
+        taim_core::mouse::Cursor::Unavailable,
     );
 
     let totals = export::phase_totals(&collector.events());
@@ -158,16 +158,16 @@ fn every_span_the_pipeline_opens_is_closed() {
     ui.draw(
         &mut renderer,
         &Theme::Dark,
-        &aura_core::renderer::Style::default(),
-        aura_core::mouse::Cursor::Unavailable,
+        &taim_core::renderer::Style::default(),
+        taim_core::mouse::Cursor::Unavailable,
     );
 
     let mut open: Vec<Traced> = Vec::new();
 
     for event in collector.events() {
         match event {
-            aura_profiler::Event::PhaseBegin { phase, .. } => open.push(phase),
-            aura_profiler::Event::PhaseEnd { phase, .. } => {
+            taim_profiler::Event::PhaseBegin { phase, .. } => open.push(phase),
+            taim_profiler::Event::PhaseEnd { phase, .. } => {
                 let found = open.iter().rposition(|held| *held == phase);
 
                 assert!(found.is_some(), "{phase:?} ended without beginning");
@@ -208,8 +208,8 @@ fn a_trace_survives_a_relayout() {
     ui.draw(
         &mut renderer,
         &Theme::Dark,
-        &aura_core::renderer::Style::default(),
-        aura_core::mouse::Cursor::Unavailable,
+        &taim_core::renderer::Style::default(),
+        taim_core::mouse::Cursor::Unavailable,
     );
 
     assert!(phases(&collector).contains(&Traced::Paint));
@@ -225,10 +225,10 @@ fn an_application_that_did_not_ask_for_a_trace_records_nothing() {
 
     let mut messages = Vec::new();
     let _ = ui.update(
-        &aura_core::window::Headless,
-        &aura_core::shell::Waker::noop(),
+        &taim_core::window::Headless,
+        &taim_core::shell::Waker::noop(),
         &[],
-        aura_core::mouse::Cursor::Unavailable,
+        taim_core::mouse::Cursor::Unavailable,
         &mut renderer,
         &mut messages,
     );
@@ -236,8 +236,8 @@ fn an_application_that_did_not_ask_for_a_trace_records_nothing() {
     ui.draw(
         &mut renderer,
         &Theme::Dark,
-        &aura_core::renderer::Style::default(),
-        aura_core::mouse::Cursor::Unavailable,
+        &taim_core::renderer::Style::default(),
+        taim_core::mouse::Cursor::Unavailable,
     );
 
     assert!(
@@ -261,11 +261,11 @@ fn a_trace_of_a_real_frame_exports_something_a_tool_can_open() {
     ui.draw(
         &mut renderer,
         &Theme::Dark,
-        &aura_core::renderer::Style::default(),
-        aura_core::mouse::Cursor::Unavailable,
+        &taim_core::renderer::Style::default(),
+        taim_core::mouse::Cursor::Unavailable,
     );
 
-    let trace = export::aura(&collector);
+    let trace = export::taim(&collector);
 
     assert!(trace.starts_with("{\"schema\":1,"), "{trace}");
     assert!(trace.contains("\"phase\":\"layout\""), "{trace}");

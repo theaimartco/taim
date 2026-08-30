@@ -1,6 +1,6 @@
 [package]
-name = "aura_renderer"
-description = "The official renderer for aura"
+name = "taim_renderer"
+description = "The official renderer for taim"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -14,29 +14,29 @@ keywords.workspace = true
 workspace = true
 
 [features]
-wgpu = ["aura_wgpu/default"]
-wgpu-bare = ["aura_wgpu"]
-tiny-skia = ["aura_tiny_skia"]
-image = ["aura_tiny_skia?/image", "aura_wgpu?/image"]
-svg = ["aura_tiny_skia?/svg", "aura_wgpu?/svg"]
-svg-text = ["aura_tiny_skia?/svg-text", "aura_wgpu?/svg-text"]
-svg-raster-images = ["aura_tiny_skia?/svg-raster-images", "aura_wgpu?/svg-raster-images"]
-geometry = ["aura_graphics/geometry", "aura_tiny_skia?/geometry", "aura_wgpu?/geometry"]
-web-colors = ["aura_wgpu?/web-colors"]
-webgl = ["aura_wgpu?/webgl"]
-fira-sans = ["aura_graphics/fira-sans"]
-strict-assertions = ["aura_wgpu?/strict-assertions"]
-x11 = ["aura_tiny_skia?/x11"]
-wayland = ["aura_tiny_skia?/wayland"]
+wgpu = ["taim_wgpu/default"]
+wgpu-bare = ["taim_wgpu"]
+tiny-skia = ["taim_tiny_skia"]
+image = ["taim_tiny_skia?/image", "taim_wgpu?/image"]
+svg = ["taim_tiny_skia?/svg", "taim_wgpu?/svg"]
+svg-text = ["taim_tiny_skia?/svg-text", "taim_wgpu?/svg-text"]
+svg-raster-images = ["taim_tiny_skia?/svg-raster-images", "taim_wgpu?/svg-raster-images"]
+geometry = ["taim_graphics/geometry", "taim_tiny_skia?/geometry", "taim_wgpu?/geometry"]
+web-colors = ["taim_wgpu?/web-colors"]
+webgl = ["taim_wgpu?/webgl"]
+fira-sans = ["taim_graphics/fira-sans"]
+strict-assertions = ["taim_wgpu?/strict-assertions"]
+x11 = ["taim_tiny_skia?/x11"]
+wayland = ["taim_tiny_skia?/wayland"]
 
 [dependencies]
-aura_graphics.workspace = true
+taim_graphics.workspace = true
 
-aura_tiny_skia.workspace = true
-aura_tiny_skia.optional = true
+taim_tiny_skia.workspace = true
+taim_tiny_skia.optional = true
 
-aura_wgpu.workspace = true
-aura_wgpu.optional = true
+taim_wgpu.workspace = true
+taim_wgpu.optional = true
 
 log.workspace = true
 thiserror.workspace = true

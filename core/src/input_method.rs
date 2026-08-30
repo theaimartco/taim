@@ -130,8 +130,8 @@ pub enum Purpose {
 impl InputMethod {
     /// Merges two [`InputMethod`] strategies, prioritizing the first one when both open:
     /// ```
-    /// # use aura_core::input_method::{InputMethod, Purpose, Preedit};
-    /// # use aura_core::{Point, Rectangle, Size};
+    /// # use taim_core::input_method::{InputMethod, Purpose, Preedit};
+    /// # use taim_core::{Point, Rectangle, Size};
     ///
     /// let open = InputMethod::Enabled {
     ///     cursor: Rectangle::new(Point::ORIGIN, Size::UNIT),

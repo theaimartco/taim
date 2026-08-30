@@ -1,6 +1,6 @@
-# Animations in Vyom-Aura
+# Animations in Vyom-Taim
 
-Animations are a critical component of any modern user interface. In Vyom-Aura, the `aura-motion` crate provides a robust, physics-based animation system that makes it easy to build fluid, responsive, and interruptible UI experiences.
+Animations are a critical component of any modern user interface. In Vyom-Taim, the `taim-motion` crate provides a robust, physics-based animation system that makes it easy to build fluid, responsive, and interruptible UI experiences.
 
 ## 1. Physics-based vs. Duration-based Animations
 
@@ -14,7 +14,7 @@ Traditionally, UI animations have been duration-based. You tell an object to mov
 
 ### The Physics-based Solution
 
-`aura-motion` prioritizes physics-based animations, specifically using **Springs**. Instead of defining how long an animation takes, you define the physical properties of the motion: its stiffness and damping.
+`taim-motion` prioritizes physics-based animations, specifically using **Springs**. Instead of defining how long an animation takes, you define the physical properties of the motion: its stiffness and damping.
 
 - **Continuous Velocity**: Physics engines maintain velocity across interruptions. If a user grabs a moving element and flings it back, the momentum smoothly transitions.
 - **Natural Feel**: Real-world objects don't move with perfectly cubic easing curves over fixed durations. They have mass, and they are affected by friction and tension.
@@ -24,7 +24,7 @@ Traditionally, UI animations have been duration-based. You tell an object to mov
 
 ## 2. Spring Animations Deep Dive
 
-The `Spring` is the workhorse of `aura-motion`. It is defined by a `SpringConfig`.
+The `Spring` is the workhorse of `taim-motion`. It is defined by a `SpringConfig`.
 
 ### `SpringConfig`
 
@@ -40,7 +40,7 @@ A `SpringConfig` takes three primary parameters:
 ### Example: Configuring a Spring
 
 ```rust
-use aura_motion::{Spring, SpringConfig};
+use taim_motion::{Spring, SpringConfig};
 
 // A bouncy spring
 let bouncy_spring = Spring::new(
@@ -73,11 +73,11 @@ When a spring animation's target is changed while it is still running, the `Spri
 
 ## 3. Tween Animations
 
-While springs are preferred, there are times when you need a precise, duration-based animation—for example, a pulsing opacity effect or a loading spinner. For these, `aura-motion` provides the `Tween` API.
+While springs are preferred, there are times when you need a precise, duration-based animation—for example, a pulsing opacity effect or a loading spinner. For these, `taim-motion` provides the `Tween` API.
 
 ### Easing Curves
 
-A `Tween` moves from a start value to an end value over a specific duration, modified by an `Easing` function. `aura-motion` provides a comprehensive suite of standard easing curves:
+A `Tween` moves from a start value to an end value over a specific duration, modified by an `Easing` function. `taim-motion` provides a comprehensive suite of standard easing curves:
 
 -   **`Linear`**: Constant speed.
 -   **Quadratic (`QuadIn`, `QuadOut`, `QuadInOut`)**: Accelerates or decelerates using a power of 2. Good for simple hovers.
@@ -89,7 +89,7 @@ A `Tween` moves from a start value to an end value over a specific duration, mod
 If the standard curves don't meet your needs, you can define a custom cubic bezier curve, familiar to CSS developers.
 
 ```rust
-use aura_motion::{Tween, Easing, CubicBezier};
+use taim_motion::{Tween, Easing, CubicBezier};
 use std::time::Duration;
 
 let custom_tween = Tween::new(
@@ -117,7 +117,7 @@ The primary use case for `Decay` is momentum scrolling. When you flick a list, i
 -   **`Bounds`**: (Optional) Minimum and maximum values. If the decaying value hits a bound, it can either stop immediately or, if configured with a spring, bounce back.
 
 ```rust
-use aura_motion::{Decay, DecayConfig};
+use taim_motion::{Decay, DecayConfig};
 
 let scroll_momentum = Decay::new(
     DecayConfig {
@@ -131,7 +131,7 @@ let scroll_momentum = Decay::new(
 
 ## 5. Timeline Animations
 
-For complex, choreographed sequences, `aura-motion` offers the `Timeline` API. A `Timeline` allows you to chain multiple animations (Springs, Tweens, or pauses) together.
+For complex, choreographed sequences, `taim-motion` offers the `Timeline` API. A `Timeline` allows you to chain multiple animations (Springs, Tweens, or pauses) together.
 
 ### Segments
 
@@ -146,7 +146,7 @@ Timelines can be played in different directions:
 -   **`Alternate`**: Plays forward, then reverses, repeating as configured.
 
 ```rust
-use aura_motion::{Timeline, Tween, Easing};
+use taim_motion::{Timeline, Tween, Easing};
 use std::time::Duration;
 
 let mut timeline = Timeline::new();
@@ -160,7 +160,7 @@ timeline.play(Direction::Alternate);
 
 ## 6. PageTransition
 
-Navigating between screens should feel fluid. `aura-motion` includes built-in `PageTransition` types that can be applied to your router or navigation stack.
+Navigating between screens should feel fluid. `taim-motion` includes built-in `PageTransition` types that can be applied to your router or navigation stack.
 
 -   **`FORWARD`**: The standard iOS-style push. The new page slides in from the right while the old page slides out to the left slightly and fades.
 -   **`BACK`**: The reverse of `FORWARD`.
@@ -175,8 +175,8 @@ Navigating between screens should feel fluid. `aura-motion` includes built-in `P
 The easiest way to use animations in your UI tree is the `Transition` widget. It allows you to declaratively map an animation value to widget properties.
 
 ```rust
-use aura_ui::widgets::{Transition, Container, Text};
-use aura_motion::Spring;
+use taim_ui::widgets::{Transition, Container, Text};
+use taim_motion::Spring;
 
 // A simple hover transition
 Transition::new(
@@ -216,24 +216,24 @@ SharedElement::new(
 )
 ```
 
-When navigating from Screen A to Screen B, `aura-motion` automatically captures the bounding box of the element on Screen A, creates an overlay, and animates it to the bounding box of the element on Screen B.
+When navigating from Screen A to Screen B, `taim-motion` automatically captures the bounding box of the element on Screen A, creates an overlay, and animates it to the bounding box of the element on Screen B.
 
 ---
 
 ## 9. Reduced Motion and Accessibility
 
-Animations can cause discomfort or nausea for users with vestibular disorders. `aura-motion` respects system-level accessibility settings.
+Animations can cause discomfort or nausea for users with vestibular disorders. `taim-motion` respects system-level accessibility settings.
 
 ### `MotionPolicy`
 
 The `MotionPolicy` singleton determines whether animations should run.
 
--   **OS Detection**: On startup, `aura-motion` queries the host OS (macOS, Windows, Linux, iOS, Android) to check if "Prefers Reduced Motion" is enabled.
+-   **OS Detection**: On startup, `taim-motion` queries the host OS (macOS, Windows, Linux, iOS, Android) to check if "Prefers Reduced Motion" is enabled.
 -   **Automatic Override**: If reduced motion is preferred, all `Spring`, `Tween`, and `Decay` animations will instantly snap to their target values, completing in zero time.
 -   **Manual Control**: You can explicitly set the `MotionPolicy` if you need to override the system setting (e.g., for an in-app toggle).
 
 ```rust
-use aura_motion::MotionPolicy;
+use taim_motion::MotionPolicy;
 
 // Check current policy
 if MotionPolicy::get().allows_motion() {
@@ -248,8 +248,8 @@ if MotionPolicy::get().allows_motion() {
 Here is a complete example tying together state, springs, and the `Transition` widget to create an expandable card.
 
 ```rust
-use aura_ui::prelude::*;
-use aura_motion::{Spring, SpringConfig};
+use taim_ui::prelude::*;
+use taim_motion::{Spring, SpringConfig};
 
 #[derive(Default, Clone, State)]
 struct CardState {

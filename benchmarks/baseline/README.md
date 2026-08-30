@@ -1,6 +1,6 @@
 # Baseline reports
 
-One `<scene>.json` report per `aura_bench` scene, written by
+One `<scene>.json` report per `taim_bench` scene, written by
 `scripts/perf/run-baseline.sh`. 13 scenes are currently checked in.
 
 All 13 were captured on **2026-08-23** on `dev-workstation-01`, from a clean
@@ -24,11 +24,11 @@ F-02, F-03 and F-04 for the full analysis.
 
 ## How this is prevented from recurring
 
-- `tools/aura_bench/build.rs` captures the git commit and rustc version at
+- `tools/taim_bench/build.rs` captures the git commit and rustc version at
   build time, and re-runs when `HEAD`, the ref it resolves to, or the index
   changes -- watching `HEAD` alone silently went stale on every commit made
   while staying on one branch.
-- `aura_bench --save` refuses a report when any of `git_commit`,
+- `taim_bench --save` refuses a report when any of `git_commit`,
   `rustc_version`, or `device` is unknown (`--allow-unidentified` opts out),
   **and** refuses one captured from a dirty worktree (`--allow-dirty` opts
   out). Either flag prints a warning, and a report saved with either must not

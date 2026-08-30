@@ -6,20 +6,20 @@
 //! There is no `proptest`/`quickcheck` dependency in this workspace, so
 //! this file drives its own cases from a small deterministic PRNG
 //! (splitmix64), the same technique
-//! `tools/aura_bench/src/scenes/ten_thousand_rows.rs` already uses to
+//! `tools/taim_bench/src/scenes/ten_thousand_rows.rs` already uses to
 //! avoid pulling in an external crate for this -- a fixed seed makes a
 //! failure reproducible without needing to capture whatever case a real
 //! property-testing library happened to shrink to.
-use aura::advanced::layout;
-use aura::advanced::widget;
-use aura::widget::{column, grid, row, text};
-use aura::{Element, Length, Size};
-use aura_renderer::Renderer;
+use taim::advanced::layout;
+use taim::advanced::widget;
+use taim::widget::{column, grid, row, text};
+use taim::{Element, Length, Size};
+use taim_renderer::Renderer;
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -142,10 +142,10 @@ fn assert_children_within_parent(node: &layout::Node, context: &str) {
     }
 }
 
-fn random_row<'a>(rng: &mut Prng, scale: f32) -> Element<'a, (), aura::Theme, Renderer> {
+fn random_row<'a>(rng: &mut Prng, scale: f32) -> Element<'a, (), taim::Theme, Renderer> {
     let count = 1 + rng.range(6);
 
-    let children: Vec<Element<'a, (), aura::Theme, Renderer>> = (0..count)
+    let children: Vec<Element<'a, (), taim::Theme, Renderer>> = (0..count)
         .map(|i| {
             let width = rng.finite_f32(200.0 * scale).max(1.0);
 
@@ -156,10 +156,10 @@ fn random_row<'a>(rng: &mut Prng, scale: f32) -> Element<'a, (), aura::Theme, Re
     row(children).into()
 }
 
-fn random_column<'a>(rng: &mut Prng, scale: f32) -> Element<'a, (), aura::Theme, Renderer> {
+fn random_column<'a>(rng: &mut Prng, scale: f32) -> Element<'a, (), taim::Theme, Renderer> {
     let count = 1 + rng.range(6);
 
-    let children: Vec<Element<'a, (), aura::Theme, Renderer>> = (0..count)
+    let children: Vec<Element<'a, (), taim::Theme, Renderer>> = (0..count)
         .map(|i| {
             let height = rng.finite_f32(200.0 * scale).max(1.0);
 
@@ -242,10 +242,10 @@ fn grid_layout_is_always_finite_non_negative_and_within_limits_across_random_cas
                 let count = 1 + rng.range(30);
                 let columns = 1 + rng.range(6);
 
-                let children: Vec<Element<'_, (), aura::Theme, Renderer>> =
+                let children: Vec<Element<'_, (), taim::Theme, Renderer>> =
                     (0..count).map(|i| text(format!("{i}")).into()).collect();
 
-                let mut element: Element<'_, (), aura::Theme, Renderer> =
+                let mut element: Element<'_, (), taim::Theme, Renderer> =
                     grid(children).columns(columns).into();
 
                 let limits = random_limits(&mut rng, scale);

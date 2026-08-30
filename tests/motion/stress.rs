@@ -10,7 +10,7 @@
 //! in `spring.rs`/`interruption.rs`/`golden/transitions.rs`; the last
 //! two are proven here.
 
-use aura_motion::{Bounds, Decay, Easing, Spring, SpringConfig, Timestamp, Transition};
+use taim_motion::{Bounds, Decay, Easing, Spring, SpringConfig, Timestamp, Transition};
 
 /// A spring settling from an impulse must reach rest in a bounded number
 /// of fixed steps -- the per-animation guarantee the 1,000-animation

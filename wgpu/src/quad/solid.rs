@@ -26,7 +26,7 @@ impl Layer {
     pub fn new(device: &wgpu::Device) -> Self {
         let instances = Buffer::new(
             device,
-            "aura_wgpu.quad.solid.buffer",
+            "taim_wgpu.quad.solid.buffer",
             quad::INITIAL_INSTANCES,
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
@@ -61,21 +61,24 @@ impl Pipeline {
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
         constants_layout: &wgpu::BindGroupLayout,
+        backdrop_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("aura_wgpu.quad.solid.pipeline"),
-            bind_group_layouts: &[Some(constants_layout)],
+            label: Some("taim_wgpu.quad.solid.pipeline"),
+            bind_group_layouts: &[Some(constants_layout), Some(backdrop_layout)],
             immediate_size: 0,
         });
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("aura_wgpu.quad.solid.shader"),
+            label: Some("taim_wgpu.quad.solid.shader"),
             source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(concat!(
                 include_str!("../shader/color.wgsl"),
                 "\n",
                 include_str!("../shader/material.wgsl"),
                 "\n",
                 include_str!("../shader/quad.wgsl"),
+                "\n",
+                include_str!("../shader/quad/backdrop.wgsl"),
                 "\n",
                 include_str!("../shader/vertex.wgsl"),
                 "\n",
@@ -84,7 +87,7 @@ impl Pipeline {
         });
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("aura_wgpu.quad.solid.pipeline"),
+            label: Some("taim_wgpu.quad.solid.pipeline"),
             layout: Some(&layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -115,6 +118,8 @@ impl Pipeline {
                         9 => Uint32,
                         // Material: roughness, thickness, ior, dispersion
                         10 => Float32x4,
+                        // Transmission
+                        11 => Float32,
                     ),
                 }],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
@@ -147,11 +152,13 @@ impl Pipeline {
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         constants: &'a wgpu::BindGroup,
+        backdrop: &'a wgpu::BindGroup,
         layer: &'a Layer,
         range: Range<usize>,
     ) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, constants, &[]);
+        render_pass.set_bind_group(1, backdrop, &[]);
         render_pass.set_vertex_buffer(0, layer.instances.slice(..));
 
         render_pass.draw(0..6, range.start as u32..range.end as u32);

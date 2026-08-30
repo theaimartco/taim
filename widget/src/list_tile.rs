@@ -3,9 +3,9 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-//! use aura::widget::{list_tile, text};
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+//! use taim::widget::{list_tile, text};
 //!
 //! #[derive(Clone)]
 //! enum Message {
@@ -27,7 +27,7 @@
 //! its neighbours out of alignment. It is also what lets a virtualized
 //! list compute positions without measuring every row.
 //!
-//! This realises `aura_design::components::list_tile::ListTile`, whose
+//! This realises `taim_design::components::list_tile::ListTile`, whose
 //! `ListLines::height` owns the same numbers.
 
 use crate::core::border::Border;
@@ -58,7 +58,7 @@ pub enum Lines {
 impl Lines {
     /// The tile height, in logical pixels, this line count needs.
     ///
-    /// These are the same numbers `aura_design`'s `ListLines::height`
+    /// These are the same numbers `taim_design`'s `ListLines::height`
     /// declares; each step adds one line's worth rather than an arbitrary
     /// value.
     pub const fn height(self) -> f32 {
@@ -636,7 +636,7 @@ impl Catalog for Theme {
     }
 }
 
-/// The default styling of a [`ListTile`] for aura's own theme.
+/// The default styling of a [`ListTile`] for taim's own theme.
 pub fn default(theme: &Theme, status: Status, selected: bool) -> Style {
     let palette = theme.palette();
 

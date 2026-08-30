@@ -1,6 +1,6 @@
 //! The colour-space contract, asserted against the build that ships.
 //!
-//! Aura's renderer has one documented colour contract
+//! Taim's renderer has one documented colour contract
 //! (`docs/architecture/color-pipeline.md`):
 //!
 //! ```text
@@ -33,7 +33,7 @@
 // Clippy's `assertions_on_constants` is right in general and wrong here.
 #![allow(clippy::assertions_on_constants)]
 
-use aura_graphics::color;
+use taim_graphics::color;
 
 /// The default build must composite in linear light.
 ///
@@ -47,7 +47,7 @@ fn the_default_build_composites_in_linear_light() {
         color::GAMMA_CORRECTION,
         "this build does not composite in linear light. `web-colors` is \
          enabled somewhere in the feature graph -- most likely re-introduced \
-         either into the `aura` crate's `default` list or through a \
+         either into the `taim` crate's `default` list or through a \
          dev-dependency that does not set `default-features = false`. Every \
          blend in the framework is operating on gamma-encoded components."
     );
@@ -77,7 +77,7 @@ fn the_legacy_web_colours_build_is_explicitly_non_linear() {
 #[test]
 #[cfg(not(feature = "web-colors"))]
 fn packing_applies_the_srgb_transfer() {
-    let packed = color::pack(aura_core::Color::from_rgb(0.5, 0.5, 0.5));
+    let packed = color::pack(taim_core::Color::from_rgb(0.5, 0.5, 0.5));
     let [red, ..] = packed.components();
 
     assert!(
@@ -90,7 +90,7 @@ fn packing_applies_the_srgb_transfer() {
 #[test]
 fn packing_never_transfers_alpha() {
     for alpha in [0.0, 0.25, 0.5, 1.0] {
-        let packed = color::pack(aura_core::Color::from_rgba8(0x80, 0x80, 0x80, alpha));
+        let packed = color::pack(taim_core::Color::from_rgba8(0x80, 0x80, 0x80, alpha));
 
         assert!(
             (packed.components()[3] - alpha).abs() < 1e-6,
@@ -106,8 +106,8 @@ fn packing_never_transfers_alpha() {
 /// leave these two exactly right and move only the midtones.
 #[test]
 fn black_and_white_are_fixed_points() {
-    let black = color::pack(aura_core::Color::BLACK).components();
-    let white = color::pack(aura_core::Color::WHITE).components();
+    let black = color::pack(taim_core::Color::BLACK).components();
+    let white = color::pack(taim_core::Color::WHITE).components();
 
     for channel in 0..3 {
         assert!(black[channel].abs() < 1e-6, "black moved: {black:?}");
@@ -132,7 +132,7 @@ fn black_and_white_are_fixed_points() {
 #[test]
 #[cfg(not(feature = "web-colors"))]
 fn authored_bytes_decode_into_the_working_space() {
-    use aura_tiny_skia::{decode_channel, encode_channel};
+    use taim_tiny_skia::{decode_channel, encode_channel};
 
     // sRGB mid-grey is ~0.214 in linear light, so 128 must become ~55.
     // Passing it through unchanged is the bug.

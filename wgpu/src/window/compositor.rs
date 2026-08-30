@@ -27,7 +27,7 @@ pub enum ColorPolicy {
     /// including the 10-bit ones, clamps. A surface that clamps cannot show a
     /// highlight brighter than paper no matter how much precision it has.
     ///
-    /// The rest of the pipeline needs no change to feed it. Aura's fragment
+    /// The rest of the pipeline needs no change to feed it. Taim's fragment
     /// shaders already emit linear light and rely on an sRGB surface to encode
     /// it in hardware, so pointing them at a half-float target simply stops
     /// discarding the range they were always producing.
@@ -77,7 +77,7 @@ fn select_format(
     }
 }
 
-/// A window graphics backend for aura powered by `wgpu`.
+/// A window graphics backend for taim powered by `wgpu`.
 pub struct Compositor {
     instance: wgpu::Instance,
     adapter: wgpu::Adapter,
@@ -229,7 +229,7 @@ impl Compositor {
         for required_limits in limits {
             let result = adapter
                 .request_device(&wgpu::DeviceDescriptor {
-                    label: Some("aura_wgpu::window::compositor device descriptor"),
+                    label: Some("taim_wgpu::window::compositor device descriptor"),
                     required_features,
                     required_limits: required_limits.clone(),
                     memory_hints: wgpu::MemoryHints::MemoryUsage,
@@ -670,7 +670,7 @@ impl From<backend::Settings> for Settings {
 /// configuration, if set.
 ///
 /// The value returned by this function can be changed by setting
-/// the `AURA_PRESENT_MODE` env variable. The possible values are:
+/// the `TAIM_PRESENT_MODE` env variable. The possible values are:
 ///
 /// - `vsync` → [`wgpu::PresentMode::AutoVsync`]
 /// - `no_vsync` → [`wgpu::PresentMode::AutoNoVsync`]
@@ -679,7 +679,7 @@ impl From<backend::Settings> for Settings {
 /// - `fifo_relaxed` → [`wgpu::PresentMode::FifoRelaxed`]
 /// - `mailbox` → [`wgpu::PresentMode::Mailbox`]
 pub fn present_mode_from_env() -> Option<wgpu::PresentMode> {
-    let present_mode = std::env::var("AURA_PRESENT_MODE").ok()?;
+    let present_mode = std::env::var("TAIM_PRESENT_MODE").ok()?;
 
     match present_mode.to_lowercase().as_str() {
         "vsync" => Some(wgpu::PresentMode::AutoVsync),

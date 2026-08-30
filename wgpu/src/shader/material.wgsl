@@ -1,6 +1,6 @@
 // Physically-grounded surface shading.
 //
-// A line-by-line mirror of `aura_core::material`. The two implementations
+// A line-by-line mirror of `taim_core::material`. The two implementations
 // must agree: one decides what a test asserts and the other decides what a
 // person looks at, and a divergence between them is invisible until someone
 // photographs a screen. `tests/gpu/material_shading.rs` pins them together.
@@ -185,12 +185,7 @@ fn quad_specular(
     packed: vec4<f32>,
     light: vec3<f32>,
 ) -> f32 {
-    var material: Material;
-    material.roughness = packed.x;
-    material.thickness_mm = packed.y;
-    material.ior = packed.z;
-    material.dispersion = packed.w;
-    material.transmission = 0.0;
+    let material = unpack_material(packed, 0.0);
 
     // A surface that bends no light has no highlight. This is every widget
     // that has not asked for a material, so the common path costs one compare.
@@ -207,4 +202,90 @@ fn quad_specular(
     let view = vec3<f32>(0.0, 0.0, 1.0);
 
     return specular(normal, view, light, material);
+}
+
+// Rebuilds a `Material` from the instance attributes it is packed into.
+//
+// `packed` is `(roughness, thickness_mm, ior, dispersion)`; `transmission`
+// is a separate scalar because a `vec4` is one vertex location and a fifth
+// component would need a second.
+fn unpack_material(packed: vec4<f32>, transmission: f32) -> Material {
+    var material: Material;
+    material.roughness = packed.x;
+    material.thickness_mm = packed.y;
+    material.ior = packed.z;
+    material.dispersion = packed.w;
+    material.transmission = transmission;
+
+    return material;
+}
+
+// The per-channel screen displacement a transmissive surface applies to what
+// it shows through itself.
+//
+// This is the half of a material that a backdrop blur cannot reproduce. A
+// blur samples straight back and translates rigidly; this returns how far
+// the slab actually bends the ray at this fragment's viewing angle, per
+// channel, so the edge of a pane separates colour the way glass does.
+//
+// Returns three offsets in pixels, red through blue, along `direction`.
+// Sampling with them is `quad_transmission`'s job, in `quad/backdrop.wgsl` --
+// this file stays pure physics with no texture access, so
+// `tests/gpu/material_shading.rs` can compile it against the CPU reference.
+//
+// PHYSICAL-UNITS SIMPLIFICATION, deliberate and documented: the renderer
+// tracks a logical-to-physical scale factor but no physical pixel density,
+// so `refraction_offset_mm`'s millimetres are treated as logical pixels by
+// the caller. The displacement is proportional to real refraction and
+// correct in direction and relative magnitude, but is not calibrated to a
+// panel. See `docs/architecture/material-pipeline.md`.
+fn dispersed_refraction_offsets(cos_theta: f32, material: Material) -> vec3<f32> {
+    let iors = dispersed_ior(material);
+
+    var per_channel: Material = material;
+    var offsets: vec3<f32>;
+
+    per_channel.ior = iors.r;
+    offsets.r = refraction_offset_mm(cos_theta, per_channel);
+
+    per_channel.ior = iors.g;
+    offsets.g = refraction_offset_mm(cos_theta, per_channel);
+
+    per_channel.ior = iors.b;
+    offsets.b = refraction_offset_mm(cos_theta, per_channel);
+
+    return offsets;
+}
+
+// Composites a quad's own colour with what it transmits.
+//
+// Returns the fill unchanged for an opaque material, so this is safe to call
+// unconditionally -- but callers should still gate on `transmission > 0.0`
+// to skip the texture reads.
+//
+// Fresnel decides the mix: at grazing incidence a pane reflects rather than
+// transmits, so its edge shows less of what is behind it than its centre
+// does. That is the behaviour a tinted blur has no way to express.
+fn blend_transmission(
+    fill: vec3<f32>,
+    behind: vec3<f32>,
+    packed: vec4<f32>,
+    transmission: f32,
+    distance: f32,
+    gradient: vec2<f32>,
+) -> vec3<f32> {
+    let material = unpack_material(packed, transmission);
+
+    let bevel = max(material.thickness_mm, 1.0);
+    let normal = sdf_normal(distance, gradient, bevel);
+    let view = vec3<f32>(0.0, 0.0, 1.0);
+
+    let cos_theta = clamp_finite(dot(normal, view), 0.0, 1.0, 1.0);
+    let reflectance = fresnel_schlick(cos_theta, normal_reflectance(material));
+
+    // How much of what is behind actually reaches the viewer: what the
+    // material transmits, less what its surface reflects away.
+    let transmitted = clamp(material.transmission * (1.0 - reflectance), 0.0, 1.0);
+
+    return mix(fill, behind, transmitted);
 }

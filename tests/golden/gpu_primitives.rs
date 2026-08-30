@@ -1,4 +1,4 @@
-//! Exact/tolerance pixel tests for `aura_wgpu`'s real GPU primitives,
+//! Exact/tolerance pixel tests for `taim_wgpu`'s real GPU primitives,
 //! rendered through the actual `wgpu` backend (not a synthetic oracle).
 //!
 //! Every test here skips (rather than fails) if no `wgpu`-compatible
@@ -13,18 +13,18 @@
 //! `docs/performance/methodology.md` already documents for timing
 //! measurements, applied to pixel values instead.
 
-use aura_core::{Color, Point, Rectangle, Size};
-use aura_wgpu::Renderer;
-use aura_wgpu::core::renderer::Quad;
-use aura_wgpu::graphics::Viewport;
+use taim_core::{Color, Point, Rectangle, Size};
+use taim_wgpu::Renderer;
+use taim_wgpu::core::renderer::Quad;
+use taim_wgpu::graphics::Viewport;
 
 /// The maximum allowed per-channel difference (out of 255) between an
 /// expected and actual pixel value.
 const TOLERANCE: i16 = 12;
 
 fn headless_wgpu_renderer() -> Option<Renderer> {
-    aura_futures::futures::executor::block_on(<Renderer as aura_core::renderer::Headless>::new(
-        aura_core::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
         Some("wgpu"),
     ))
 }
@@ -35,7 +35,7 @@ fn render_solid_quad(size: u32, scale_factor: f32, color: Color) -> Vec<u8> {
 
     let logical_size = Size::new(size as f32 / scale_factor, size as f32 / scale_factor);
 
-    <Renderer as aura_core::Renderer>::fill_quad(
+    <Renderer as taim_core::Renderer>::fill_quad(
         &mut renderer,
         Quad {
             bounds: Rectangle::new(Point::ORIGIN, logical_size),

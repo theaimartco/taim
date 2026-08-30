@@ -3,7 +3,7 @@
 //! [`Node`] describes what a widget subtree means to an assistive
 //! technology (a screen reader, a switch-style navigator) without
 //! committing to any specific platform accessibility API. Phase 13's
-//! `aura-accessibility` crate builds the actual incremental tree,
+//! `taim-accessibility` crate builds the actual incremental tree,
 //! platform adapters, and focus/live-region behavior on top of this
 //! vocabulary; Phase 2 only defines the shape widgets will eventually
 //! report.
@@ -103,7 +103,7 @@ impl Node {
     ///
     /// A live region announces changes the user did not cause and is not
     /// looking at. Whether an announcement is actually *made* is not
-    /// decided here: `aura_accessibility::LiveRegions::announce` enforces
+    /// decided here: `taim_accessibility::LiveRegions::announce` enforces
     /// the privacy rules (a [`Role::SecureField`] never announces, no
     /// matter what this is set to).
     pub fn with_live(mut self, live: Live) -> Self {
@@ -179,10 +179,10 @@ impl Node {
 /// What kind of element a [`Node`] represents.
 ///
 /// This list mirrors the common subset of platform accessibility roles
-/// (ARIA, `AXRole`, `UIA` control types) that Aura's own widgets need;
+/// (ARIA, `AXRole`, `UIA` control types) that Taim's own widgets need;
 /// it is deliberately not exhaustive of every platform's role vocabulary,
 /// since platform adapters (Phase 13) are responsible for mapping an
-/// Aura [`Role`] onto whatever the local platform expects, including
+/// Taim [`Role`] onto whatever the local platform expects, including
 /// roles this enum has no equivalent for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -337,7 +337,7 @@ bitflags::bitflags! {
 /// A request to perform an [`Actions`] member against a specific node,
 /// routed by its stable [`Id`].
 ///
-/// Phase 13's `aura-accessibility::actions` module is the eventual owner
+/// Phase 13's `taim-accessibility::actions` module is the eventual owner
 /// of turning a platform action invocation into an [`Action`] and
 /// routing it back to the originating widget; Phase 2 only defines its
 /// shape.

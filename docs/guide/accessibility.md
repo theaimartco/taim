@@ -1,6 +1,6 @@
-# Accessibility in Vyom-Aura
+# Accessibility in Vyom-Taim
 
-Accessibility (a11y) is a foundational pillar of the Vyom-Aura UI framework. This guide details how our accessibility architecture works, how to use it, and why it is critical for building inclusive applications.
+Accessibility (a11y) is a foundational pillar of the Vyom-Taim UI framework. This guide details how our accessibility architecture works, how to use it, and why it is critical for building inclusive applications.
 
 ## 1. Why Accessibility Matters
 
@@ -12,13 +12,13 @@ Accessibility is not a feature; it is a fundamental human right. Designing for a
 
 ## 2. The Semantic Tree
 
-Under the hood, Vyom-Aura maintains a **Semantic Tree** that runs parallel to the standard Widget Tree. This tree contains all the semantic information required by assistive technologies, stripped of visual and layout details.
+Under the hood, Vyom-Taim maintains a **Semantic Tree** that runs parallel to the standard Widget Tree. This tree contains all the semantic information required by assistive technologies, stripped of visual and layout details.
 
 ### Retained Semantic Forest
 The Semantic Tree is a retained structure. It doesn't rebuild from scratch every frame. Instead, it maintains a persistent representation of the UI's semantics, organized as a "Semantic Forest" to handle multiple windows or disparate UI roots seamlessly.
 
 ### Incremental Diffs (Change)
-When the Widget Tree updates, it emits incremental `Change` objects to the Semantic Tree. This diffing mechanism ensures high performance. Instead of sending the entire tree to the OS accessibility APIs, Vyom-Aura only sends what changed (e.g., a node's label updated, a checkbox was toggled, or a node was removed).
+When the Widget Tree updates, it emits incremental `Change` objects to the Semantic Tree. This diffing mechanism ensures high performance. Instead of sending the entire tree to the OS accessibility APIs, Vyom-Taim only sends what changed (e.g., a node's label updated, a checkbox was toggled, or a node was removed).
 
 ```rust
 // Example of how changes are propagated internally
@@ -34,7 +34,7 @@ Action routing is handled by the `Router` and `Dispatch` system. When an assisti
 
 ## 3. Automatic Semantics
 
-In Vyom-Aura, accessibility is built-in by default. All standard widgets (buttons, checkboxes, sliders, text inputs) automatically contribute their semantic information to the tree.
+In Vyom-Taim, accessibility is built-in by default. All standard widgets (buttons, checkboxes, sliders, text inputs) automatically contribute their semantic information to the tree.
 
 For instance, when you use a `Button` widget, you don't need to manually tag it as a button. The framework handles it.
 
@@ -60,7 +60,7 @@ MyCustomWidget::new()
 Focus management is crucial for accessibility, especially for keyboard and screen reader users.
 
 ### Focus and Scope
-Vyom-Aura uses a sophisticated focus system.
+Vyom-Taim uses a sophisticated focus system.
 - **Focus**: The currently active element receiving input.
 - **Scope**: A bounded region for focus. Scopes can be used to trap focus within a specific area, like a modal dialog.
 
@@ -81,7 +81,7 @@ Dialog::new()
 
 ## 5. Screen Readers and Platform Adapters
 
-Vyom-Aura integrates seamlessly with underlying operating systems via **AccessKit**, a cross-platform accessibility infrastructure.
+Vyom-Taim integrates seamlessly with underlying operating systems via **AccessKit**, a cross-platform accessibility infrastructure.
 
 ### Adapter and Capabilities
 The `Adapter` acts as a bridge between the internal Semantic Tree and AccessKit. It queries platform `Capabilities` to determine what accessibility features are supported and active.
@@ -90,7 +90,7 @@ The `Adapter` acts as a bridge between the internal Semantic Tree and AccessKit.
 A `Session` is established when an AT is detected. This prevents the framework from spending CPU cycles on accessibility translation when no AT is running.
 
 ### Supported ATs
-Through AccessKit, Vyom-Aura natively supports:
+Through AccessKit, Vyom-Taim natively supports:
 - **AT-SPI (Linux)**: Orca screen reader.
 - **VoiceOver (macOS/iOS)**: Native integration with Apple's accessibility APIs.
 - **UI Automation (Windows)**: Narrator, NVDA, and JAWS.
@@ -135,7 +135,7 @@ widget.on_key(|event| {
 
 ## 8. Reduced Motion
 
-Many users experience motion sickness or vestibular disorders triggered by UI animations. Vyom-Aura respects the OS-level "Reduce Motion" preference.
+Many users experience motion sickness or vestibular disorders triggered by UI animations. Vyom-Taim respects the OS-level "Reduce Motion" preference.
 
 The `MotionPolicy` defines how animations should behave. If the user prefers reduced motion, animations can be automatically snapped to their end state or replaced with simple crossfades.
 
@@ -152,7 +152,7 @@ if env.motion_policy() == MotionPolicy::Reduced {
 
 ## 9. High Contrast
 
-For users with low vision, a high contrast UI is essential. Vyom-Aura's color system supports a `HighContrast` color scheme alongside `Light` and `Dark`.
+For users with low vision, a high contrast UI is essential. Vyom-Taim's color system supports a `HighContrast` color scheme alongside `Light` and `Dark`.
 
 When the OS is set to High Contrast mode, the application automatically switches to the `HighContrast` theme, maximizing legibility with stark contrasting colors and pronounced borders.
 
@@ -161,7 +161,7 @@ When the OS is set to High Contrast mode, the application automatically switches
 Here is a comprehensive example demonstrating accessibility in action, including a form and a modal dialog with focus management and live regions.
 
 ```rust
-use vyom_aura::prelude::*;
+use taim::prelude::*;
 
 pub fn accessible_form_example() -> impl Widget {
     let show_dialog = use_state(|| false);
@@ -201,4 +201,4 @@ pub fn accessible_form_example() -> impl Widget {
 }
 ```
 
-This example demonstrates how easy it is to build accessible UIs with Vyom-Aura. The framework handles the heavy lifting, allowing you to focus on creating great experiences for all users.
+This example demonstrates how easy it is to build accessible UIs with Vyom-Taim. The framework handles the heavy lifting, allowing you to focus on creating great experiences for all users.

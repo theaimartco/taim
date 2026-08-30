@@ -1,23 +1,23 @@
 //! The `dialog` widget: dismissal, inertness, semantics, and the Phase 13
 //! focus trap end-to-end.
 //!
-//! Realises `aura_design::components::dialog::Dialog`. The contract says a
+//! Realises `taim_design::components::dialog::Dialog`. The contract says a
 //! modal that does not trap focus is a bug, not a variant; this proves the
-//! real widget reports what a real `aura_accessibility::Focus` needs to
+//! real widget reports what a real `taim_accessibility::Focus` needs to
 //! enforce that, and that the two compose.
 
-use aura_accessibility::focus::{Focus, Scope};
-use aura_accessibility::tree::Tree as SemanticTree;
+use taim_accessibility::focus::{Focus, Scope};
+use taim_accessibility::tree::Tree as SemanticTree;
 
-use aura::advanced::widget::{self, Widget};
-use aura::advanced::{Layout, Shell, layout, mouse};
-use aura::widget::{button, dialog, text};
-use aura::{Element, Event, Point, Rectangle, Size, Theme};
-use aura_core::keyboard;
-use aura_core::semantics::{Actions, Role};
-use aura_core::{shell::Waker, window};
-use aura_renderer::Renderer;
-use aura_widget::dialog as dialog_mod;
+use taim::advanced::widget::{self, Widget};
+use taim::advanced::{Layout, Shell, layout, mouse};
+use taim::widget::{button, dialog, text};
+use taim::{Element, Event, Point, Rectangle, Size, Theme};
+use taim_core::keyboard;
+use taim_core::semantics::{Actions, Role};
+use taim_core::{shell::Waker, window};
+use taim_renderer::Renderer;
+use taim_widget::dialog as dialog_mod;
 
 type Message = &'static str;
 
@@ -27,9 +27,9 @@ const WINDOW: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -124,7 +124,7 @@ impl<'a> Harness<'a> {
         )
     }
 
-    fn semantics(&self) -> Option<aura_core::semantics::Node> {
+    fn semantics(&self) -> Option<taim_core::semantics::Node> {
         Widget::<Message, Theme, Renderer>::semantics(
             &self.widget,
             &self.tree,
@@ -183,7 +183,7 @@ fn the_surface_is_centred_and_never_larger_than_the_window() {
 
 #[test]
 fn the_surface_respects_its_minimum_size() {
-    // From aura_design::components::dialog: 280x120.
+    // From taim_design::components::dialog: 280x120.
     let harness = Harness::new(dialog(text("ok")));
     let surface = harness.surface();
 
@@ -349,22 +349,22 @@ fn a_dialog_declares_itself_modal_so_a_caller_can_trap_focus() {
 #[test]
 fn a_real_dialogs_node_can_own_a_real_focus_trap() {
     // The integration Phase 13 exists for: the widget reports a Window
-    // node, and `aura_accessibility::Focus` confines Tab to it.
+    // node, and `taim_accessibility::Focus` confines Tab to it.
     let dialog_harness = Harness::new(dialog(body()).on_dismiss("dismissed"));
     let dialog_node = dialog_harness.semantics().unwrap();
     let dialog_id = dialog_node.id.clone();
 
     // A page behind, and the dialog with a control inside it.
-    let behind = aura_core::semantics::Node::new(
-        aura_core::widget::Id::unique(),
+    let behind = taim_core::semantics::Node::new(
+        taim_core::widget::Id::unique(),
         Rectangle::new(Point::ORIGIN, Size::new(100.0, 40.0)),
         Role::Button,
     )
     .with_actions(Actions::ACTIVATE | Actions::FOCUS);
     let behind_id = behind.id.clone();
 
-    let inside = aura_core::semantics::Node::new(
-        aura_core::widget::Id::unique(),
+    let inside = taim_core::semantics::Node::new(
+        taim_core::widget::Id::unique(),
         Rectangle::new(Point::new(400.0, 300.0), Size::new(80.0, 40.0)),
         Role::Button,
     )

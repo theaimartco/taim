@@ -7,16 +7,16 @@
 //! stops agreeing to) produce frames, submit work, or lay
 //! out/paint anything.
 
-use aura::advanced::widget::{self, Widget};
-use aura::advanced::{Layout, mouse, renderer};
-use aura::{Element, Length, Rectangle, Size, Theme};
-use aura_renderer::Renderer;
-use aura_runtime::frame_scheduler::{MotionId, Scheduler};
-use aura_runtime::user_interface::{self, UserInterface};
+use taim::advanced::widget::{self, Widget};
+use taim::advanced::{Layout, mouse, renderer};
+use taim::{Element, Length, Rectangle, Size, Theme};
+use taim_renderer::Renderer;
+use taim_runtime::frame_scheduler::{MotionId, Scheduler};
+use taim_runtime::user_interface::{self, UserInterface};
 use std::time::{Duration, Instant};
 
-use aura_core::animation::MotionClock;
-use aura_motion::{Easing, Transition};
+use taim_core::animation::MotionClock;
+use taim_motion::{Easing, Transition};
 
 /// A widget that records every time it is asked to compute layout or
 /// draw, and never requests a redraw or reports any change on its own --
@@ -36,10 +36,10 @@ impl<Message> Widget<Message, Theme, Renderer> for Quiet {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &aura::advanced::layout::Limits,
-    ) -> aura::advanced::layout::Node {
+        _limits: &taim::advanced::layout::Limits,
+    ) -> taim::advanced::layout::Node {
         self.layout_calls.set(self.layout_calls.get() + 1);
-        aura::advanced::layout::Node::new(Size::new(10.0, 10.0))
+        taim::advanced::layout::Node::new(Size::new(10.0, 10.0))
     }
 
     fn draw(
@@ -57,9 +57,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Quiet {
 }
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -76,7 +76,7 @@ fn a_scheduler_with_nothing_pending_never_produces_a_frame() {
     }
 }
 
-/// Drives a real [`aura_motion::Transition`] through the real
+/// Drives a real [`taim_motion::Transition`] through the real
 /// [`Scheduler`], proving the two systems compose the way `phase.md`
 /// Phase 9's "idle resumes immediately when motion completes" requires:
 /// while the transition is running, a driver keeps it registered and the
@@ -175,7 +175,7 @@ fn an_unchanging_real_ui_settles_and_stops_requesting_redraws() {
     // Promote the frame's recorded layer exactly as the compositor does at
     // the beginning of the next frame. The second draw must replay that
     // retained display list without re-entering the widget.
-    aura::advanced::Renderer::reset(&mut renderer, Rectangle::with_size(Size::new(200.0, 200.0)));
+    taim::advanced::Renderer::reset(&mut renderer, Rectangle::with_size(Size::new(200.0, 200.0)));
     ui.draw(
         &mut renderer,
         &Theme::Light,
@@ -192,8 +192,8 @@ fn an_unchanging_real_ui_settles_and_stops_requesting_redraws() {
     // not even call `update` again without an event to process, but
     // this proves that if it did, an unchanging widget contributes no
     // further layout work and requests no redraw.
-    let window = aura_core::window::Headless;
-    let waker = aura_core::shell::Waker::noop();
+    let window = taim_core::window::Headless;
+    let waker = taim_core::shell::Waker::noop();
     let mut messages = Vec::new();
 
     let (state, _statuses) = ui.update(

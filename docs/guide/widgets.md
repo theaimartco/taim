@@ -1,6 +1,6 @@
-# Vyom-Aura Widget Reference Guide
+# Vyom-Taim Widget Reference Guide
 
-This comprehensive reference guide covers the vast array of widgets available in Vyom-Aura, categorized by function. It provides detailed documentation, methods, types, styling, and robust, realistic code examples for each widget.
+This comprehensive reference guide covers the vast array of widgets available in Vyom-Taim, categorized by function. It provides detailed documentation, methods, types, styling, and robust, realistic code examples for each widget.
 
 ---
 

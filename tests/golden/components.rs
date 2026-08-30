@@ -11,9 +11,9 @@
 //! Changing any assertion here must be deliberate, exactly as
 //! re-approving a golden image would be.
 
-use aura::widget::date::{Date, days_in_month, is_leap_year};
-use aura::widget::time_picker::Time;
-use aura_core::touch::MIN_TARGET;
+use taim::widget::date::{Date, days_in_month, is_leap_year};
+use taim::widget::time_picker::Time;
+use taim_core::touch::MIN_TARGET;
 
 /// Every interactive control must present a target at least this large.
 /// Pinned against the core constant so the two cannot drift apart.
@@ -23,7 +23,7 @@ const TOUCH_FLOOR: f32 = 48.0;
 fn the_touch_target_floor_matches_the_core_policy() {
     assert_eq!(
         TOUCH_FLOOR, MIN_TARGET,
-        "this oracle's floor must track aura_core::touch::MIN_TARGET"
+        "this oracle's floor must track taim_core::touch::MIN_TARGET"
     );
 }
 
@@ -58,7 +58,7 @@ fn month_lengths_are_pinned_for_both_kinds_of_year() {
 
 #[test]
 fn weekdays_are_pinned_against_the_real_calendar() {
-    use aura::widget::date::Weekday;
+    use taim::widget::date::Weekday;
 
     // Fixed reference points, including one before the epoch and one on
     // a leap day, since those are where day-count arithmetic breaks.

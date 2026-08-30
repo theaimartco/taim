@@ -6,9 +6,9 @@
 //! These are CPU-verifiable geometry/cost properties of the effect
 //! model, independent of any GPU device or approved pixel image.
 
-use aura_core::{Point, Rectangle, Size, Vector};
-use aura_graphics::quality::Tier;
-use aura_wgpu::effects::{Effect, Graph, backdrop_blur::BackdropBlur, blur::Blur, shadow::Shadow};
+use taim_core::{Point, Rectangle, Size, Vector};
+use taim_graphics::quality::Tier;
+use taim_wgpu::effects::{Effect, Graph, backdrop_blur::BackdropBlur, blur::Blur, shadow::Shadow};
 
 fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
     Rectangle::new(Point::new(x, y), Size::new(w, h))

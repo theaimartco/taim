@@ -17,10 +17,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
 //! #
-//! use aura::widget::{pane_grid, text};
+//! use taim::widget::{pane_grid, text};
 //!
 //! struct State {
 //!     panes: pane_grid::State<Pane>,
@@ -51,7 +51,7 @@
 //! The [`pane_grid` example] showcases how to use a [`PaneGrid`] with resizing,
 //! drag and drop, and hotkey support.
 //!
-//! [`pane_grid` example]: https://github.com/theaimartco/vyom-aura/tree/master/examples/pane_grid
+//! [`pane_grid` example]: https://github.com/theaimartco/taim/tree/master/examples/pane_grid
 mod axis;
 mod configuration;
 mod content;
@@ -115,10 +115,10 @@ const THICKNESS_RATIO: f32 = 25.0;
 ///
 /// # Example
 /// ```no_run
-/// # mod aura { pub mod widget { pub use aura_widget::*; } pub use aura_widget::Renderer; pub use aura_widget::core::*; }
-/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
+/// # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::Renderer; pub use taim_widget::core::*; }
+/// # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
 /// #
-/// use aura::widget::{pane_grid, text};
+/// use taim::widget::{pane_grid, text};
 ///
 /// struct State {
 ///     panes: pane_grid::State<Pane>,

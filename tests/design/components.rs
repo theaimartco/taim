@@ -12,32 +12,32 @@
 //! quietly skip part of the contract and a newly added one is covered the
 //! moment it joins [`every_component`].
 
-use aura_design::components::app_bar::{AppBar, AppBarKind};
-use aura_design::components::bottom_sheet::{Anchor, BottomSheet};
-use aura_design::components::button::{Button, ButtonKind};
-use aura_design::components::card::Card;
-use aura_design::components::dialog::Dialog;
-use aura_design::components::icon_button::IconButton;
-use aura_design::components::list_tile::{ListLines, ListTile};
-use aura_design::components::menu::Menu;
-use aura_design::components::navigation::{Navigation, NavigationMode};
-use aura_design::components::notification::{Notification, Privacy};
-use aura_design::components::progress::Progress;
-use aura_design::components::selection::{Selection, SelectionKind};
-use aura_design::components::slider::Slider;
-use aura_design::components::text_field::TextField;
-use aura_design::components::toast::Toast;
-use aura_design::components::tooltip::{Tooltip, Trigger};
-use aura_design::components::window_chrome::WindowChrome;
-use aura_design::components::*;
+use taim_design::components::app_bar::{AppBar, AppBarKind};
+use taim_design::components::bottom_sheet::{Anchor, BottomSheet};
+use taim_design::components::button::{Button, ButtonKind};
+use taim_design::components::card::Card;
+use taim_design::components::dialog::Dialog;
+use taim_design::components::icon_button::IconButton;
+use taim_design::components::list_tile::{ListLines, ListTile};
+use taim_design::components::menu::Menu;
+use taim_design::components::navigation::{Navigation, NavigationMode};
+use taim_design::components::notification::{Notification, Privacy};
+use taim_design::components::progress::Progress;
+use taim_design::components::selection::{Selection, SelectionKind};
+use taim_design::components::slider::Slider;
+use taim_design::components::text_field::TextField;
+use taim_design::components::toast::Toast;
+use taim_design::components::tooltip::{Tooltip, Trigger};
+use taim_design::components::window_chrome::WindowChrome;
+use taim_design::components::*;
 
-use aura_design::icon::Icon;
-use aura_design::state::Interaction;
-use aura_design::theme::Theme;
-use aura_design::tokens::{Contrast, Scheme};
+use taim_design::icon::Icon;
+use taim_design::state::Interaction;
+use taim_design::theme::Theme;
+use taim_design::tokens::{Contrast, Scheme};
 
-use aura_core::Size;
-use aura_core::semantics::{Actions, Role};
+use taim_core::Size;
+use taim_core::semantics::{Actions, Role};
 
 const EVERY_SCHEME: [Scheme; 3] = [Scheme::Light, Scheme::Dark, Scheme::HighContrast];
 
@@ -510,7 +510,7 @@ fn every_component_supports_rtl_large_text_and_reads_without_effects() {
 
 #[test]
 fn every_component_declares_a_token_only_adaptive_layout() {
-    use aura_design::tokens::Spacing;
+    use taim_design::tokens::Spacing;
 
     // "Theme tokens only -- no unexplained hard-coded spacing values":
     // every padding/gap must literally be a value from the scale.
@@ -952,7 +952,7 @@ fn a_collapsing_app_bar_shrinks_and_others_do_not() {
 
 #[test]
 fn progress_clamps_its_fraction_and_substitutes_reduced_motion() {
-    use aura_motion::{Effect, MotionPolicy};
+    use taim_motion::{Effect, MotionPolicy};
 
     let determinate = Progress {
         value: Some(2.0),
@@ -992,15 +992,15 @@ fn menu_typeahead_matches_prefixes_case_insensitively() {
 
 /// The touch-target floor is a *policy*, and a policy that two crates
 /// state independently is a policy that will eventually disagree with
-/// itself. `phase.md` sets 48px; `aura-design` and the widgets must both
+/// itself. `phase.md` sets 48px; `taim-design` and the widgets must both
 /// mean that same 48px, and the compatibility floor must stay an
 /// explicit, separately-named opt-out rather than a second default.
 #[test]
 fn the_touch_target_policy_has_exactly_one_source() {
     assert_eq!(
         MIN_TOUCH_TARGET,
-        aura_core::touch::MIN_TARGET,
-        "aura-design must re-export the core constant, not restate it"
+        taim_core::touch::MIN_TARGET,
+        "taim-design must re-export the core constant, not restate it"
     );
     assert_eq!(
         MIN_TOUCH_TARGET, 48.0,
@@ -1009,7 +1009,7 @@ fn the_touch_target_policy_has_exactly_one_source() {
 
     assert_eq!(
         MIN_TOUCH_TARGET_COMPATIBILITY,
-        aura_core::touch::MIN_TARGET_COMPATIBILITY
+        taim_core::touch::MIN_TARGET_COMPATIBILITY
     );
     const {
         assert!(

@@ -2,21 +2,21 @@
 
 ## iced
 
-Aura is a fork of [iced](https://github.com/iced-rs/iced), created by
+Taim is a fork of [iced](https://github.com/iced-rs/iced), created by
 **Héctor Ramón Jiménez** and the iced contributors.
 
 The fork point is upstream commit
 [`56b706fc`](https://github.com/iced-rs/iced/commit/56b706fc) ("Fix lints for
 Rust 1.97", 2026-07-09). Every commit before it in this repository's history is
-iced's; there are 6,831 of them, against 11 of Aura's own at the time of
-writing. Run `git log 56b706fc..HEAD` to see exactly what Aura has added.
+iced's; there are 6,831 of them, against 11 of Taim's own at the time of
+writing. Run `git log 56b706fc..HEAD` to see exactly what Taim has added.
 
 **The following originate with iced and remain substantially its work:**
 
 - The application model — `boot` / `update` / `view`, `Task`, `Subscription`
 - The `Widget` trait, the element/tree model, and the layout system
 - The great majority of `widget/` — every control inherited rather than added
-  by Aura, including `button`, `checkbox`, `radio`, `slider`, `text_input`,
+  by Taim, including `button`, `checkbox`, `radio`, `slider`, `text_input`,
   `text_editor`, `scrollable`, `pane_grid`, `canvas`, `markdown`, and the
   layout primitives
 - The `wgpu` renderer's quad, triangle, text, and image pipelines, its layer
@@ -25,12 +25,12 @@ writing. Run `git log 56b706fc..HEAD` to see exactly what Aura has added.
 - The `winit` shell integration, the `futures` executors, and `program/`
 - The theme and palette system
 
-**What Aura adds** (see `git log 56b706fc..HEAD`, and `Capstone.md` §3 for a
+**What Taim adds** (see `git log 56b706fc..HEAD`, and `Capstone.md` §3 for a
 verified inventory): the damage and invalidation model, keyed structural
-reconciliation, retained layers, the frame scheduler, `aura-gesture`,
-`aura-accessibility`, `aura-design`, `aura-motion`, `aura-profiler`,
-`aura-highlighter`, `aura-platform-vyom`, the mobile widget set, and the
-`aura_bench` / `aura_lab` tooling.
+reconciliation, retained layers, the frame scheduler, `taim-gesture`,
+`taim-accessibility`, `taim-design`, `taim-motion`, `taim-profiler`,
+`taim-highlighter`, `taim-platform-vyom`, the mobile widget set, and the
+`taim_bench` / `taim_lab` tooling.
 
 iced is MIT licensed. That licence, and its copyright notice, are reproduced in
 `LICENSE` unchanged and continue to govern the inherited code.
@@ -43,10 +43,10 @@ iced is MIT licensed. That licence, and its copyright notice, are reproduced in
   copyright (c) 2012-2015 The Mozilla Foundation and Telefonica S.A.,
   licensed under the **SIL Open Font License 1.1**. The full licence is
   vendored beside it as `graphics/fonts/FiraSans-LICENSE.txt`, as the OFL
-  requires. Enabled by default (the `fira-sans` feature) so an Aura
+  requires. Enabled by default (the `fira-sans` feature) so an Taim
   application renders the same on every machine.
 
-- **`graphics/fonts/Aura-Icons.ttf`** — the icon font. Seven glyphs at
+- **`graphics/fonts/Taim-Icons.ttf`** — the icon font. Seven glyphs at
   `U+E800`–`U+E805` and `U+F00C` are **iced's**, inherited with the fork and
   preserved byte for byte because the renderers address them by codepoint
   (`Text::CHECKMARK_ICON` and friends). The 36 glyphs from `U+E900` up were
@@ -54,7 +54,7 @@ iced is MIT licensed. That licence, and its copyright notice, are reproduced in
 
 ### Icons
 
-`assets/icons/*.svg` and `graphics/fonts/Aura-Icons.ttf` are generated from
+`assets/icons/*.svg` and `graphics/fonts/Taim-Icons.ttf` are generated from
 `scripts/assets/icon_geometry.py` by `scripts/assets/build-icon-font.py`. No
 third-party icon set is vendored, so there is no separate attribution
 requirement. `assets/icons/manifest.toml` records each icon's codepoint,
@@ -63,7 +63,7 @@ grid, RTL mirroring, and licence.
 ### Still iced's
 
 `docs/logo.svg`, `docs/logo-no-shadow.svg`, `widget/assets/iced-logo.svg`, and
-`docs/graphs/*.png` are **iced's**, inherited with the fork. Aura has no logo
+`docs/graphs/*.png` are **iced's**, inherited with the fork. Taim has no logo
 of its own; these are placeholders and must be replaced before any public
 release.
 
@@ -71,7 +71,7 @@ release.
 
 ## Dependencies
 
-Aura's dependency graph is enumerated by `cargo tree` and its licences are
+Taim's dependency graph is enumerated by `cargo tree` and its licences are
 enforced by `deny.toml` and `.github/workflows/licenses.yml`. `DEPENDENCIES.md`
 records the policy for adding one.
 
@@ -87,4 +87,4 @@ Two dependencies deserve specific mention for the work they do here:
 `Cross.toml` currently cross-compiles using **iced's** published container
 images (`ghcr.io/iced-rs/aarch64`, `ghcr.io/iced-rs/armv7`). This is a build
 dependency on another project's infrastructure and should be replaced with
-Aura's own images before release.
+Taim's own images before release.

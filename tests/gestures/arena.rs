@@ -1,5 +1,5 @@
 //! Competition/cancellation/capture state matrix for
-//! `aura_gesture::arena::Arena`, exercised with the real recognizers
+//! `taim_gesture::arena::Arena`, exercised with the real recognizers
 //! shipped alongside it (`Tap`, `Pan`, `LongPress`) rather than
 //! `arena.rs`'s own synthetic test doubles, so this suite proves the
 //! arena and a realistic mix of recognizers agree, not just the arena
@@ -12,13 +12,13 @@
 //! - losing recognizers receive cancellation exactly once;
 //! - captured pointers keep routing outside their original bounds.
 
-use aura_gesture::arena::{Arena, Priority, Resolution, Team};
-use aura_gesture::long_press::LongPress;
-use aura_gesture::pan::Pan;
-use aura_gesture::tap::Tap;
+use taim_gesture::arena::{Arena, Priority, Resolution, Team};
+use taim_gesture::long_press::LongPress;
+use taim_gesture::pan::Pan;
+use taim_gesture::tap::Tap;
 
-use aura_core::pointer::{DeviceKind, Id as PointerId, Metadata, Phase, Pointer};
-use aura_core::time::{Duration, Instant};
+use taim_core::pointer::{DeviceKind, Id as PointerId, Metadata, Phase, Pointer};
+use taim_core::time::{Duration, Instant};
 
 fn epoch() -> Instant {
     static EPOCH: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
@@ -34,7 +34,7 @@ fn pointer(phase: Phase, x: f32, y: f32, millis: u64) -> Pointer {
         id: PointerId::from_raw(1),
         device: DeviceKind::Touch,
         phase,
-        position: aura_core::Point::new(x, y),
+        position: taim_core::Point::new(x, y),
         timestamp: t(millis),
         metadata: Metadata::NONE,
         captured: false,
@@ -94,7 +94,7 @@ fn a_long_press_resolves_via_tick_with_no_new_pointer_event() {
 
 #[test]
 fn every_losing_entrant_is_cancelled_exactly_once() {
-    use aura_gesture::recognizer::{Disposition, Recognizer, Verdict};
+    use taim_gesture::recognizer::{Disposition, Recognizer, Verdict};
     use std::cell::Cell;
     use std::rc::Rc;
 
@@ -148,7 +148,7 @@ fn every_losing_entrant_is_cancelled_exactly_once() {
 
 #[test]
 fn a_team_wins_or_loses_as_one_unit() {
-    use aura_gesture::recognizer::{Disposition, Recognizer, Verdict};
+    use taim_gesture::recognizer::{Disposition, Recognizer, Verdict};
 
     struct AlwaysAccepts;
 
@@ -202,7 +202,7 @@ fn a_team_wins_or_loses_as_one_unit() {
 
 #[test]
 fn a_system_priority_entrant_wins_a_same_pass_tie_over_a_normal_one() {
-    use aura_gesture::recognizer::{Disposition, Recognizer, Verdict};
+    use taim_gesture::recognizer::{Disposition, Recognizer, Verdict};
 
     struct AlwaysAccepts;
 
@@ -267,7 +267,7 @@ fn a_cancel_pointer_phase_resolves_the_arena_as_cancelled() {
 
 #[test]
 fn every_entrant_rejecting_resolves_with_no_winner() {
-    use aura_gesture::recognizer::{Disposition, Recognizer, Verdict};
+    use taim_gesture::recognizer::{Disposition, Recognizer, Verdict};
 
     struct AlwaysRejects;
 

@@ -3,7 +3,7 @@
 //! [`Path`]: super::Path
 pub use crate::geometry::Style;
 
-use aura_core::Color;
+use taim_core::Color;
 
 /// The style of a stroke.
 #[derive(Debug, Clone, Copy)]

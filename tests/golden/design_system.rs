@@ -11,11 +11,11 @@
 //! A change to any of these must update this oracle deliberately, exactly
 //! as re-approving a golden image would.
 
-use aura_design::components::button::{Button, ButtonKind};
-use aura_design::components::{ComponentSpec, Density, ViewportClass};
-use aura_design::state::Interaction;
-use aura_design::theme::Theme;
-use aura_design::tokens::{ColorTokens, Contrast, Radius, Scheme, Spacing};
+use taim_design::components::button::{Button, ButtonKind};
+use taim_design::components::{ComponentSpec, Density, ViewportClass};
+use taim_design::state::Interaction;
+use taim_design::theme::Theme;
+use taim_design::tokens::{ColorTokens, Contrast, Radius, Scheme, Spacing};
 
 const EVERY_SCHEME: [Scheme; 3] = [Scheme::Light, Scheme::Dark, Scheme::HighContrast];
 
@@ -37,7 +37,7 @@ fn semantic_states_resolve_deterministically_in_every_theme() {
 
 #[test]
 fn the_state_layer_ramp_is_pinned_and_ordered() {
-    // The approved state-layer alphas. These are the whole of Aura's
+    // The approved state-layer alphas. These are the whole of Taim's
     // interaction feedback; changing one changes how every control feels.
     let colors = ColorTokens::for_scheme(Scheme::Dark);
 

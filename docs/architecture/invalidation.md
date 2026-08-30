@@ -174,7 +174,7 @@ optimization the way `Option<&T>` can, since `f32` has no spare bit
 pattern reserved for `None`, so each costs a full `Rectangle` plus a
 discriminant, rounded up for alignment).
 
-**Measured impact.** Comparing `aura_bench`'s `idle_shell` and
+**Measured impact.** Comparing `taim_bench`'s `idle_shell` and
 `ten_thousand_rows` scenes against the Phase 1 baseline
 (`benchmarks/baseline/*.json`), both scenes that build/diff many small
 `Tree` nodes per frame, on `dev-workstation-01` (same unpinned-governor

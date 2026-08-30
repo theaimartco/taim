@@ -31,7 +31,7 @@ use rustc_hash::FxHashMap;
 ///
 /// It was. `Descriptor` previously carried a `bytes_per_pixel: u8` that was
 /// only ever set in tests, and only ever set to `4`. That is wrong for every
-/// format Aura uses outside 8-bit colour, and wrong by exactly 2x for the
+/// format Taim uses outside 8-bit colour, and wrong by exactly 2x for the
 /// half-float intermediates HDR compositing depends on -- so a budget sized
 /// against it would permit twice the memory it intended the moment HDR was
 /// switched on.

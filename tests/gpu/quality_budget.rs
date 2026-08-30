@@ -16,17 +16,17 @@
 //! These tests drive the real `Renderer`, through the real effect path, and
 //! assert on production telemetry rather than on internals.
 
-use aura_core::Renderer as _;
-use aura_core::{Color, Rectangle, Size};
-use aura_graphics::quality::Tier;
-use aura_wgpu::Renderer;
-use aura_wgpu::graphics::Viewport;
+use taim_core::Renderer as _;
+use taim_core::{Color, Rectangle, Size};
+use taim_graphics::quality::Tier;
+use taim_wgpu::Renderer;
+use taim_wgpu::graphics::Viewport;
 
 const SIDE: u32 = 512;
 
 fn renderer() -> Option<Renderer> {
-    aura_futures::futures::executor::block_on(<Renderer as aura_core::renderer::Headless>::new(
-        aura_core::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
         None,
     ))
 }
@@ -48,7 +48,7 @@ fn blurred_frame(renderer: &mut Renderer) {
     renderer.reset(Rectangle::with_size(logical));
 
     renderer.fill_quad(
-        aura_core::renderer::Quad {
+        taim_core::renderer::Quad {
             bounds: Rectangle {
                 x: 64.0,
                 y: 64.0,
@@ -61,7 +61,7 @@ fn blurred_frame(renderer: &mut Renderer) {
     );
 
     let _ = renderer.add_effect(
-        aura_wgpu::effects::Effect::Blur(aura_wgpu::effects::blur::Blur { radius: 8.0 }),
+        taim_wgpu::effects::Effect::Blur(taim_wgpu::effects::blur::Blur { radius: 8.0 }),
         renderer.quality(),
     );
 
@@ -159,7 +159,7 @@ fn recovery_refuses_the_blur_outright() {
 
     assert!(
         !renderer.add_effect(
-            aura_wgpu::effects::Effect::Blur(aura_wgpu::effects::blur::Blur { radius: 8.0 }),
+            taim_wgpu::effects::Effect::Blur(taim_wgpu::effects::blur::Blur { radius: 8.0 }),
             Tier::Recovery,
         ),
         "Recovery admitted a positive-radius blur"
@@ -167,7 +167,7 @@ fn recovery_refuses_the_blur_outright() {
 
     assert!(
         renderer.add_effect(
-            aura_wgpu::effects::Effect::Blur(aura_wgpu::effects::blur::Blur { radius: 8.0 }),
+            taim_wgpu::effects::Effect::Blur(taim_wgpu::effects::blur::Blur { radius: 8.0 }),
             Tier::Balanced,
         ),
         "Balanced rejected a blur well inside its radius limit"

@@ -1,7 +1,7 @@
-//! Dirty-subtree correctness tests for `aura_runtime::semantics`,
-//! against real `aura_core::Widget`s.
+//! Dirty-subtree correctness tests for `taim_runtime::semantics`,
+//! against real `taim_core::Widget`s.
 //!
-//! `aura_runtime::semantics::build`'s own unit tests exercise a
+//! `taim_runtime::semantics::build`'s own unit tests exercise a
 //! synthetic arena; these tests additionally confirm the same
 //! incremental-reuse behavior holds against real widgets going through
 //! [`Widget::semantics`], [`Widget::visit_children`], and
@@ -13,27 +13,27 @@
 //! `UserInterface::semantics` uses -- rather than a hand-rolled one, so
 //! what is tested here is what an application actually runs.
 
-use aura::advanced::Layout;
-use aura::advanced::widget::{self, Widget};
-use aura::{Element, Length, Rectangle, Size, Theme};
-use aura_core::widget::tree::DirtyFlags;
-use aura_core::widget::visit::{self, Visit};
-use aura_renderer::Renderer;
-use aura_runtime::semantics;
+use taim::advanced::Layout;
+use taim::advanced::widget::{self, Widget};
+use taim::{Element, Length, Rectangle, Size, Theme};
+use taim_core::widget::tree::DirtyFlags;
+use taim_core::widget::visit::{self, Visit};
+use taim_renderer::Renderer;
+use taim_runtime::semantics;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 fn headless_renderer() -> Renderer {
-    aura_futures::futures::executor::block_on(
-        <Renderer as aura::advanced::renderer::Headless>::new(
-            aura::advanced::renderer::Settings::default(),
+    taim_futures::futures::executor::block_on(
+        <Renderer as taim::advanced::renderer::Headless>::new(
+            taim::advanced::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
     .expect("tiny-skia renderer must be available")
 }
 
-/// A leaf widget that reports a [`aura_core::semantics::Node`] naming
+/// A leaf widget that reports a [`taim_core::semantics::Node`] naming
 /// itself, and counts how many times it has been asked to.
 struct Labeled {
     name: &'static str,
@@ -49,9 +49,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Labeled {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &aura::advanced::layout::Limits,
-    ) -> aura::advanced::layout::Node {
-        aura::advanced::layout::Node::new(Size::new(10.0, 10.0))
+        _limits: &taim::advanced::layout::Limits,
+    ) -> taim::advanced::layout::Node {
+        taim::advanced::layout::Node::new(Size::new(10.0, 10.0))
     }
 
     fn draw(
@@ -59,9 +59,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Labeled {
         _tree: &widget::Tree,
         _renderer: &mut Renderer,
         _theme: &Theme,
-        _style: &aura::advanced::renderer::Style,
+        _style: &taim::advanced::renderer::Style,
         _layout: Layout<'_>,
-        _cursor: aura::advanced::mouse::Cursor,
+        _cursor: taim::advanced::mouse::Cursor,
         _viewport: &Rectangle,
     ) {
     }
@@ -70,14 +70,14 @@ impl<Message> Widget<Message, Theme, Renderer> for Labeled {
         &self,
         _tree: &widget::Tree,
         layout: Layout<'_>,
-    ) -> Option<aura_core::semantics::Node> {
+    ) -> Option<taim_core::semantics::Node> {
         self.calls.borrow_mut().push(self.name);
 
         Some(
-            aura_core::semantics::Node::new(
+            taim_core::semantics::Node::new(
                 widget::Id::unique(),
                 layout.bounds(),
-                aura_core::semantics::Role::StaticText,
+                taim_core::semantics::Role::StaticText,
             )
             .with_name(self.name),
         )
@@ -104,9 +104,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Group<Message> {
         &mut self,
         tree: &mut widget::Tree,
         renderer: &Renderer,
-        limits: &aura::advanced::layout::Limits,
-    ) -> aura::advanced::layout::Node {
-        aura::advanced::layout::Node::with_children(
+        limits: &taim::advanced::layout::Limits,
+    ) -> taim::advanced::layout::Node {
+        taim::advanced::layout::Node::with_children(
             Size::new(10.0 * self.children.len() as f32, 10.0),
             self.children
                 .iter_mut()
@@ -116,7 +116,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Group<Message> {
                     child
                         .as_widget_mut()
                         .layout(tree, renderer, limits)
-                        .move_to(aura::Point::new(index as f32 * 10.0, 0.0))
+                        .move_to(taim::Point::new(index as f32 * 10.0, 0.0))
                 })
                 .collect(),
         )
@@ -127,9 +127,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Group<Message> {
         _tree: &widget::Tree,
         _renderer: &mut Renderer,
         _theme: &Theme,
-        _style: &aura::advanced::renderer::Style,
+        _style: &taim::advanced::renderer::Style,
         _layout: Layout<'_>,
-        _cursor: aura::advanced::mouse::Cursor,
+        _cursor: taim::advanced::mouse::Cursor,
         _viewport: &Rectangle,
     ) {
     }
@@ -169,12 +169,12 @@ fn group(children: Vec<Element<'static, ()>>) -> Element<'static, ()> {
 /// meaningful, and returns the `(Tree, layout::Node)` pair the caller
 /// must keep alive alongside `root` for as long as a
 /// [`semantics::Widgets`] borrows them.
-fn layout_root(root: &mut Element<'_, ()>) -> (widget::Tree, aura::advanced::layout::Node) {
+fn layout_root(root: &mut Element<'_, ()>) -> (widget::Tree, taim::advanced::layout::Node) {
     let renderer = headless_renderer();
     let mut tree = widget::Tree::new(root.as_widget());
     tree.diff(root.as_widget_mut());
 
-    let limits = aura::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
     let node = root.as_widget_mut().layout(&mut tree, &renderer, &limits);
 
     (tree, node)
@@ -184,8 +184,8 @@ fn layout_root(root: &mut Element<'_, ()>) -> (widget::Tree, aura::advanced::lay
 fn build(
     root: &mut Element<'_, ()>,
     tree: &mut widget::Tree,
-    node: &aura::advanced::layout::Node,
-) -> Vec<aura_core::semantics::Node> {
+    node: &taim::advanced::layout::Node,
+) -> Vec<taim_core::semantics::Node> {
     semantics::build(&mut semantics::Widgets::new(
         root.as_widget_mut(),
         tree,
@@ -194,8 +194,8 @@ fn build(
 }
 
 /// Names of every node in `forest`, depth-first.
-fn names(forest: &[aura_core::semantics::Node]) -> Vec<&str> {
-    fn recurse<'a>(nodes: &'a [aura_core::semantics::Node], out: &mut Vec<&'a str>) {
+fn names(forest: &[taim_core::semantics::Node]) -> Vec<&str> {
+    fn recurse<'a>(nodes: &'a [taim_core::semantics::Node], out: &mut Vec<&'a str>) {
         for node in nodes {
             out.push(node.name.as_deref().unwrap());
             recurse(&node.children, out);

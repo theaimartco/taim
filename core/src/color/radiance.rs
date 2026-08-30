@@ -5,7 +5,7 @@ use crate::color::space::{self, ColorSpace};
 
 use glam::Vec3;
 
-/// A scene-referred color: linear light, in Aura's compositing space.
+/// A scene-referred color: linear light, in Taim's compositing space.
 ///
 /// [`Color`] is an *authored* color. Its components are bounded to `0.0..=1.0`
 /// and encoded with the sRGB transfer function, because that is what a
@@ -22,7 +22,7 @@ use glam::Vec3;
 /// instead of a light source. Nothing in this type clamps.
 ///
 /// ```
-/// use aura_core::color::{Color, Radiance};
+/// use taim_core::color::{Color, Radiance};
 ///
 /// // An ordinary authored color becomes ordinary diffuse light.
 /// let plain = Radiance::from(Color::WHITE);

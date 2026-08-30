@@ -1,12 +1,12 @@
-//! Create and run aura applications step by step.
+//! Create and run taim applications step by step.
 //!
 //! # Example
 //! ```no_run,standalone_crate
-//! use aura::widget::{button, column, text, Column};
-//! use aura::Theme;
+//! use taim::widget::{button, column, text, Column};
+//! use taim::Theme;
 //!
-//! pub fn main() -> aura::Result {
-//!     aura::application(u64::default, update, view)
+//! pub fn main() -> taim::Result {
+//!     taim::application(u64::default, update, view)
 //!         .theme(Theme::Dark)
 //!         .centered()
 //!         .run()
@@ -41,7 +41,7 @@ use crate::{
     Theme,
 };
 
-use aura_debug as debug;
+use taim_debug as debug;
 
 use std::borrow::Cow;
 
@@ -49,14 +49,14 @@ pub mod timed;
 
 pub use timed::timed;
 
-/// Creates an aura [`Application`] given its boot, update, and view logic.
+/// Creates an taim [`Application`] given its boot, update, and view logic.
 ///
 /// # Example
 /// ```no_run,standalone_crate
-/// use aura::widget::{button, column, text, Column};
+/// use taim::widget::{button, column, text, Column};
 ///
-/// pub fn main() -> aura::Result {
-///     aura::application(u64::default, update, view).run()
+/// pub fn main() -> taim::Result {
+///     taim::application(u64::default, update, view).run()
 /// }
 ///
 /// #[derive(Debug, Clone)]
@@ -114,7 +114,7 @@ where
         type Message = Message;
         type Theme = Theme;
         type Renderer = Renderer;
-        type Executor = aura_futures::backend::default::Executor;
+        type Executor = taim_futures::backend::default::Executor;
 
         fn name() -> &'static str {
             let name = std::any::type_name::<State>();
@@ -142,7 +142,7 @@ where
             Settings::default()
         }
 
-        fn window(&self) -> Option<aura_core::window::Settings> {
+        fn window(&self) -> Option<taim_core::window::Settings> {
             Some(window::Settings::default())
         }
     }
@@ -163,9 +163,9 @@ where
     }
 }
 
-/// The underlying definition and configuration of an aura application.
+/// The underlying definition and configuration of an taim application.
 ///
-/// You can use this API to create and run aura applications
+/// You can use this API to create and run taim applications
 /// step by step—without coupling your logic to a trait
 /// or a specific type.
 ///
@@ -474,7 +474,7 @@ impl<P: Program> Program for Application<P> {
         debug::hot(|| self.raw.subscription(state))
     }
 
-    fn theme(&self, state: &Self::State, window: aura_core::window::Id) -> Option<Self::Theme> {
+    fn theme(&self, state: &Self::State, window: taim_core::window::Id) -> Option<Self::Theme> {
         debug::hot(|| self.raw.theme(state, window))
     }
 
@@ -609,13 +609,13 @@ where
 /// Any implementors of this trait can be provided as an argument to
 /// [`Application::theme`].
 ///
-/// `aura` provides two implementors:
+/// `taim` provides two implementors:
 /// - the built-in [`Theme`] itself
 /// - and any `Fn(&State) -> impl Into<Option<Theme>>`.
 pub trait ThemeFn<State, Theme> {
     /// Returns the theme of the [`Application`] for the current state.
     ///
-    /// If `None` is returned, `aura` will try to use a theme that
+    /// If `None` is returned, `taim` will try to use a theme that
     /// matches the system color scheme.
     fn theme(&self, state: &State) -> Option<Theme>;
 }

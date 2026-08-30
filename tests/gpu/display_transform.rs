@@ -15,10 +15,10 @@
 //! cannot answer the question, and a suite that goes red on such a machine
 //! teaches its readers to ignore it.
 
-use aura_core::color::display::{Display, DisplayTransform, GamutMap, ToneMap};
-use aura_core::color::{Color, Radiance};
-use aura_wgpu::display::Pipeline;
-use aura_wgpu::wgpu;
+use taim_core::color::display::{Display, DisplayTransform, GamutMap, ToneMap};
+use taim_core::color::{Color, Radiance};
+use taim_wgpu::display::Pipeline;
+use taim_wgpu::wgpu;
 
 /// Full precision in and out: the point is to compare arithmetic, not to
 /// measure how much a half-float target rounds it.
@@ -32,7 +32,7 @@ fn device() -> Option<(wgpu::Device, wgpu::Queue)> {
         ..wgpu::InstanceDescriptor::new_without_display_handle()
     });
 
-    aura_futures::futures::executor::block_on(async {
+    taim_futures::futures::executor::block_on(async {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -324,10 +324,10 @@ fn a_highlight_reaches_an_hdr_panel_brighter_than_white() {
 mod present_path {
     use super::*;
 
-    use aura_core::Renderer as _;
-    use aura_core::{Rectangle, Size};
-    use aura_wgpu::graphics::{Shell, Viewport};
-    use aura_wgpu::{Engine, Renderer};
+    use taim_core::Renderer as _;
+    use taim_core::{Rectangle, Size};
+    use taim_wgpu::graphics::{Shell, Viewport};
+    use taim_wgpu::{Engine, Renderer};
 
     const WIDTH: u32 = 64;
     const HEIGHT: u32 = 64;
@@ -343,7 +343,7 @@ mod present_path {
             ..wgpu::InstanceDescriptor::new_without_display_handle()
         });
 
-        aura_futures::futures::executor::block_on(async {
+        taim_futures::futures::executor::block_on(async {
             let adapter = instance
                 .request_adapter(&wgpu::RequestAdapterOptions {
                     power_preference: wgpu::PowerPreference::HighPerformance,
@@ -372,7 +372,7 @@ mod present_path {
 
             Some(Renderer::new(
                 engine,
-                aura_core::renderer::Settings::default(),
+                taim_core::renderer::Settings::default(),
             ))
         })
     }
@@ -384,7 +384,7 @@ mod present_path {
 
         for (offset, color) in [(8.0, Color::WHITE), (32.0, Color::from_rgb(0.5, 0.5, 0.5))] {
             renderer.fill_quad(
-                aura_core::renderer::Quad {
+                taim_core::renderer::Quad {
                     bounds: Rectangle {
                         x: offset,
                         y: offset,
@@ -613,10 +613,10 @@ mod present_path {
         // routed through `present_hdr`, because its pipelines cannot draw
         // into a float intermediate at all -- the failure is a render-pass
         // validation error, not a wrong color.
-        assert!(!aura_wgpu::display::Target::carries_hdr(
+        assert!(!taim_wgpu::display::Target::carries_hdr(
             wgpu::TextureFormat::Rgba8UnormSrgb
         ));
-        assert!(aura_wgpu::display::Target::carries_hdr(
+        assert!(taim_wgpu::display::Target::carries_hdr(
             wgpu::TextureFormat::Rgba16Float
         ));
     }
@@ -626,9 +626,9 @@ mod authoring {
     use super::present_path::*;
     use super::*;
 
-    use aura_core::Renderer as _;
-    use aura_core::{Rectangle, Size};
-    use aura_design::tokens::LuminanceTokens;
+    use taim_core::Renderer as _;
+    use taim_core::{Rectangle, Size};
+    use taim_design::tokens::LuminanceTokens;
 
     #[test]
     fn an_authored_highlight_reaches_the_surface_brighter_than_white() {
@@ -650,7 +650,7 @@ mod authoring {
 
         // Ordinary white, for comparison.
         renderer.fill_quad(
-            aura_core::renderer::Quad {
+            taim_core::renderer::Quad {
                 bounds: Rectangle {
                     x: 4.0,
                     y: 4.0,
@@ -664,7 +664,7 @@ mod authoring {
 
         // The same white, emitting.
         renderer.fill_quad(
-            aura_core::renderer::Quad {
+            taim_core::renderer::Quad {
                 bounds: Rectangle {
                     x: 36.0,
                     y: 36.0,
@@ -695,8 +695,8 @@ mod authoring {
             "ordinary white should land at 1.0, got {plain}"
         );
 
-        if !aura_wgpu::graphics::color::GAMMA_CORRECTION {
-            // `web-colors` is a *default* feature of the `aura` crate, and
+        if !taim_wgpu::graphics::color::GAMMA_CORRECTION {
+            // `web-colors` is a *default* feature of the `taim` crate, and
             // the root crate lists itself as a dev-dependency with defaults
             // on, so there is no way to build this suite without it today.
             // Under it the renderer blends sRGB-encoded components directly:
@@ -739,7 +739,7 @@ mod authoring {
     fn the_default_luminance_emits_nothing_extra() {
         // The safety half: a quad that says nothing about luminance must be
         // bit-identical to one that never had the field.
-        assert!((aura_core::renderer::Quad::default().luminance - 1.0).abs() < f32::EPSILON);
+        assert!((taim_core::renderer::Quad::default().luminance - 1.0).abs() < f32::EPSILON);
         assert!(!LuminanceTokens::default().is_hdr());
     }
 }

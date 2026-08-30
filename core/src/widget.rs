@@ -31,12 +31,12 @@ use crate::{cache, semantics};
 /// - [`custom_widget`], a demonstration of how to build a custom widget that
 ///   draws a circle.
 /// - [`geometry`], a custom widget showcasing how to draw geometry with the
-///   `Mesh2D` primitive in [`aura_wgpu`].
+///   `Mesh2D` primitive in [`taim_wgpu`].
 ///
-/// [examples]: https://github.com/theaimartco/vyom-aura/tree/master/examples
-/// [`custom_widget`]: https://github.com/theaimartco/vyom-aura/tree/master/examples/custom_widget
-/// [`geometry`]: https://github.com/theaimartco/vyom-aura/tree/master/examples/geometry
-/// [`aura_wgpu`]: https://github.com/theaimartco/vyom-aura/tree/master/wgpu
+/// [examples]: https://github.com/theaimartco/taim/tree/master/examples
+/// [`custom_widget`]: https://github.com/theaimartco/taim/tree/master/examples/custom_widget
+/// [`geometry`]: https://github.com/theaimartco/taim/tree/master/examples/geometry
+/// [`taim_wgpu`]: https://github.com/theaimartco/taim/tree/master/wgpu
 pub trait Widget<Message, Theme, Renderer>
 where
     Renderer: crate::Renderer,

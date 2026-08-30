@@ -2,14 +2,14 @@
 //! or re-competing once a pointer is captured, and coalesces
 //! high-frequency move events per `core::event::Coalescing`.
 //!
-//! [`Router`] is the piece that turns `aura_gesture::Arena` (one
+//! [`Router`] is the piece that turns `taim_gesture::Arena` (one
 //! contact's competition) and `hit_test::Index` (spatial lookup) into
 //! something a runtime can actually drive across many contacts and many
 //! frames:
 //!
-//! - **Capture table**: once an [`aura_gesture::arena::Resolution::Won`]
+//! - **Capture table**: once an [`taim_gesture::arena::Resolution::Won`]
 //!   names a winner, [`Router`] remembers which [`hit_test::Path`] owns
-//!   that [`aura_core::pointer::Id`] for the remainder of its lifetime.
+//!   that [`taim_core::pointer::Id`] for the remainder of its lifetime.
 //!   Every subsequent event for that pointer routes directly to the
 //!   capture, skipping [`hit_test::Index::hit_test`] and arena
 //!   competition entirely -- the concrete meaning of `phase.md`'s
@@ -22,11 +22,11 @@
 //!   time (the routing decision itself never needs to see more than
 //!   one), but [`coalesce`] is provided separately for a caller with a
 //!   backlog of queued events to collapse before ever reaching
-//!   [`Router::route`], per [`aura_core::event::Coalescing`]'s
+//!   [`Router::route`], per [`taim_core::event::Coalescing`]'s
 //!   contract.
 use crate::core::pointer::{Id as PointerId, Phase, Pointer};
 
-use aura_gesture::arena::{Arena, Resolution};
+use taim_gesture::arena::{Arena, Resolution};
 
 use crate::hit_test::Path;
 
@@ -34,7 +34,7 @@ use crate::hit_test::Path;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Routing {
     /// No arena exists for this pointer and none was started (e.g. a
-    /// `Move`/`Up`/`Cancel` for an [`aura_core::pointer::Id`] the router
+    /// `Move`/`Up`/`Cancel` for an [`taim_core::pointer::Id`] the router
     /// has never seen a `Down` for, which should not normally happen but
     /// is not this module's job to treat as an error).
     None,
@@ -119,7 +119,7 @@ impl Router {
     /// Panics if `id` is already tracked -- a `Down` for a contact that
     /// is already down is a caller bug (every contact's lifetime starts
     /// with exactly one `Down`, per
-    /// [`aura_core::pointer::Phase::Down`]'s own contract).
+    /// [`taim_core::pointer::Phase::Down`]'s own contract).
     pub fn start(&mut self, id: PointerId, path: Path, arena: Arena) {
         assert!(
             !self.contacts.contains_key(&id),
@@ -224,7 +224,7 @@ impl Router {
     /// most notably) have now elapsed, returning the [`Routing`] for
     /// each contact that changed state this tick.
     ///
-    /// [`LongPress`]: aura_gesture::long_press::LongPress
+    /// [`LongPress`]: taim_gesture::long_press::LongPress
     pub fn tick(&mut self, now: crate::core::time::Instant) -> Vec<(PointerId, Routing)> {
         let mut changes = Vec::new();
 
@@ -282,7 +282,7 @@ impl Router {
 }
 
 /// Coalesces a backlog of pointer-derived events for the same contact,
-/// per [`aura_core::event::Coalescing`]: consecutive
+/// per [`taim_core::event::Coalescing`]: consecutive
 /// [`Phase::Move`] events collapse to the latest one, while every
 /// [`Phase::Down`]/[`Phase::Up`]/[`Phase::Cancel`] is preserved
 /// individually and in order -- the concrete meaning of `phase.md`'s
@@ -316,8 +316,8 @@ mod tests {
     use super::*;
     use crate::core::pointer::{DeviceKind, Metadata};
     use crate::core::time::{Duration, Instant};
-    use aura_gesture::arena::{Priority, Team};
-    use aura_gesture::recognizer::{Disposition, Recognizer, Verdict};
+    use taim_gesture::arena::{Priority, Team};
+    use taim_gesture::recognizer::{Disposition, Recognizer, Verdict};
 
     fn epoch() -> Instant {
         static EPOCH: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();

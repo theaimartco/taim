@@ -2,10 +2,10 @@
 //!
 //! # Example
 //! ```no_run
-//! # mod aura { pub mod widget { pub use aura_widget::*; } }
+//! # mod taim { pub mod widget { pub use taim_widget::*; } }
 //! # pub type State = ();
-//! # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-//! use aura::widget::container;
+//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+//! use taim::widget::container;
 //!
 //! enum Message {
 //!     // ...
@@ -23,6 +23,7 @@ use crate::core::alignment::{self, Alignment};
 use crate::core::border::{self, Border};
 use crate::core::gradient::{self, Gradient};
 use crate::core::layout;
+use crate::core::material::Material;
 use crate::core::mouse;
 use crate::core::overlay;
 use crate::core::renderer;
@@ -40,10 +41,10 @@ use crate::core::{
 ///
 /// # Example
 /// ```no_run
-/// # mod aura { pub mod widget { pub use aura_widget::*; } }
+/// # mod taim { pub mod widget { pub use taim_widget::*; } }
 /// # pub type State = ();
-/// # pub type Element<'a, Message> = aura_widget::core::Element<'a, Message, aura_widget::Theme, aura_widget::Renderer>;
-/// use aura::widget::container;
+/// # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
+/// use taim::widget::container;
 ///
 /// enum Message {
 ///     // ...
@@ -437,13 +438,18 @@ pub fn draw_background<Renderer>(renderer: &mut Renderer, style: &Style, bounds:
 where
     Renderer: core::Renderer,
 {
-    if style.background.is_some() || style.border.width > 0.0 || style.shadow.color.a > 0.0 {
+    if style.background.is_some()
+        || style.border.width > 0.0
+        || style.shadow.color.a > 0.0
+        || style.material != Material::OPAQUE
+    {
         renderer.fill_quad(
             renderer::Quad {
                 bounds,
                 border: style.border,
                 shadow: style.shadow,
                 snap: style.snap,
+                material: style.material,
                 ..renderer::Quad::default()
             },
             style
@@ -466,6 +472,13 @@ pub struct Style {
     pub shadow: Shadow,
     /// Whether the container should be snapped to the pixel grid.
     pub snap: bool,
+    /// What the container is made of.
+    ///
+    /// [`Material::OPAQUE`] by default, which is what a container already
+    /// draws without this field. A material makes the container's fill
+    /// respond to the scene light, and -- once it transmits -- to what is
+    /// behind it. See [`taim_core::material`] for the physical properties.
+    pub material: Material,
 }
 
 impl Default for Style {
@@ -476,6 +489,7 @@ impl Default for Style {
             border: Border::default(),
             shadow: Shadow::default(),
             snap: renderer::CRISP,
+            material: Material::OPAQUE,
         }
     }
 }
@@ -495,6 +509,11 @@ impl Style {
             border: border.into(),
             ..self
         }
+    }
+
+    /// Updates the material of the [`Style`].
+    pub fn material(self, material: Material) -> Self {
+        Self { material, ..self }
     }
 
     /// Updates the background of the [`Style`].

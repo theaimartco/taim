@@ -1,0 +1,17 @@
+[package]
+name = "taim-highlighter"
+description = "Dependency-free incremental syntax highlighting for Taim"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+taim_core.workspace = true
