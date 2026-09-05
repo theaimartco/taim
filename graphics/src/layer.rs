@@ -41,6 +41,15 @@ pub trait Layer: Default {
 
     /// Merges a [`Layer`] with the current one.
     fn merge(&mut self, _layer: &mut Self);
+
+    /// Estimates the owned bytes retained by this layer.
+    ///
+    /// Backends may override this with batch-capacity accounting. The default
+    /// still charges the layer object itself, so every cache entry has a
+    /// positive bounded cost.
+    fn estimated_bytes(&self) -> usize {
+        std::mem::size_of_val(self)
+    }
 }
 
 /// A stack of layers used for drawing.
@@ -178,14 +187,50 @@ impl<T: Layer> Stack<T> {
         }
     }
 
+    /// Moves multiple disjoint recorded ranges into independent display lists
+    /// and resets this stack for a new frame.
+    pub fn take_ranges(
+        &mut self,
+        ranges: &[std::ops::Range<usize>],
+        new_bounds: Rectangle,
+    ) -> Vec<Self> {
+        let recorded = std::mem::take(self);
+        self.reset(new_bounds);
+
+        let active_count = recorded.active_count;
+        let mut layers = recorded
+            .layers
+            .into_iter()
+            .take(active_count)
+            .map(Some)
+            .collect::<Vec<_>>();
+
+        ranges
+            .iter()
+            .map(|range| {
+                let start = range.start.min(active_count);
+                let end = range.end.min(active_count).max(start);
+                let layers = layers[start..end]
+                    .iter_mut()
+                    .filter_map(Option::take)
+                    .collect::<Vec<_>>();
+                let active_count = layers.len();
+
+                Self {
+                    layers,
+                    transformations: vec![Transformation::IDENTITY],
+                    opacities: vec![1.0],
+                    previous: Vec::new(),
+                    current: 0,
+                    active_count,
+                }
+            })
+            .collect()
+    }
+
     /// Moves a retained display list into this frame and returns the range
     /// occupied by the replayed layers.
     pub fn replay_owned(&mut self, mut display_list: Self) -> std::ops::Range<usize> {
-        debug_assert_eq!(
-            self.current, 0,
-            "retained replay must start at the frame root"
-        );
-
         let start = self.active_count;
         let count = display_list.active_count;
 
@@ -199,6 +244,15 @@ impl<T: Layer> Stack<T> {
         }
 
         start..self.active_count
+    }
+
+    /// Returns the estimated bytes owned by the active display list.
+    pub fn estimated_bytes(&self) -> usize {
+        std::mem::size_of::<Self>()
+            + self.layers[..self.active_count]
+                .iter()
+                .map(|layer| layer.estimated_bytes().max(4 * 1024))
+                .sum::<usize>()
     }
 
     /// Flushes and settles any primitives in the [`Stack`].

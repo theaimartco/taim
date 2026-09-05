@@ -1,0 +1,17 @@
+[package]
+name = "taim-raster"
+description = "Flat scene encoding and tiled compute-raster contracts for Taim"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+bytemuck.workspace = true

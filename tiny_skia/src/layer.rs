@@ -385,6 +385,38 @@ impl graphics::Layer for Layer {
         self.text.append(&mut layer.text);
         self.images.append(&mut layer.images);
     }
+
+    fn estimated_bytes(&self) -> usize {
+        let primitive_bytes = self
+            .primitives
+            .iter()
+            .map(|item| match item {
+                Item::Live(_) | Item::Cached(_, _, _) => std::mem::size_of_val(item),
+                Item::Group(items, _, _) => {
+                    std::mem::size_of_val(item)
+                        + items.capacity() * std::mem::size_of::<Primitive>()
+                }
+            })
+            .sum::<usize>();
+        let text_bytes = self
+            .text
+            .iter()
+            .map(|item| match item {
+                Item::Live(_) | Item::Cached(_, _, _) => std::mem::size_of_val(item),
+                Item::Group(items, _, _) => {
+                    std::mem::size_of_val(item) + items.capacity() * std::mem::size_of::<Text>()
+                }
+            })
+            .sum::<usize>();
+
+        std::mem::size_of::<Self>()
+            + self.quads.capacity() * std::mem::size_of::<(Quad, Background)>()
+            + self.primitives.capacity() * std::mem::size_of::<Item<Primitive>>()
+            + primitive_bytes
+            + self.images.capacity() * std::mem::size_of::<Image>()
+            + self.text.capacity() * std::mem::size_of::<Item<Text>>()
+            + text_bytes
+    }
 }
 
 #[derive(Debug, Clone)]

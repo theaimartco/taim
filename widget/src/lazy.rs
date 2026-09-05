@@ -48,6 +48,10 @@ where
         }
     }
 
+    pub(crate) fn replace_dependency(&mut self, dependency: Dependency) {
+        self.dependency = dependency;
+    }
+
     fn with_element<T>(&self, f: impl FnOnce(&Element<'_, Message, Theme, Renderer>) -> T) -> T {
         f(self
             .element
@@ -71,6 +75,29 @@ where
             .borrow_mut()
             .as_mut()
             .unwrap())
+    }
+
+    /// Reconnects a freshly rebuilt lazy widget to the element retained in
+    /// its persistent tree state.
+    ///
+    /// Most containers keep one widget value alive from diff through draw.
+    /// Virtualized containers intentionally rebuild lightweight item widgets
+    /// for each phase, so their new `Lazy` value has an empty bridge even
+    /// though its [`Tree`] still owns the cached element. Reattaching here
+    /// makes lazy and reactive items valid virtual-list children without
+    /// rebuilding their subtrees.
+    fn ensure_element(&self, tree: &Tree)
+    where
+        Message: 'static,
+        Theme: 'static,
+        Renderer: 'static,
+    {
+        if self.element.borrow().is_none() {
+            let current = tree
+                .state
+                .downcast_ref::<Internal<Message, Theme, Renderer>>();
+            *self.element.borrow_mut() = Some(current.element.clone());
+        }
     }
 }
 
@@ -109,10 +136,6 @@ where
     }
 
     fn diff(&mut self, tree: &mut Tree) {
-        let current = tree
-            .state
-            .downcast_mut::<Internal<Message, Theme, Renderer>>();
-
         let new_hash = {
             let mut hasher = FxHasher::default();
             self.dependency.hash(&mut hasher);
@@ -120,18 +143,38 @@ where
             hasher.finish()
         };
 
-        if current.hash != new_hash {
-            current.hash = new_hash;
+        let (element, changed) = {
+            let current = tree
+                .state
+                .downcast_mut::<Internal<Message, Theme, Renderer>>();
+            let changed = current.hash != new_hash;
 
-            let element = (self.view)(&self.dependency).into();
-            current.element = Rc::new(RefCell::new(Some(element)));
+            if changed {
+                current.hash = new_hash;
+                let element = (self.view)(&self.dependency).into();
+                current.element = Rc::new(RefCell::new(Some(element)));
+            }
+
+            (current.element.clone(), changed)
+        };
+
+        if changed {
+            tree.mark_dirty(
+                tree::DirtyFlags::LAYOUT | tree::DirtyFlags::PAINT | tree::DirtyFlags::SEMANTICS,
+            );
         }
 
-        (*self.element.borrow_mut()) = Some(current.element.clone());
+        (*self.element.borrow_mut()) = Some(element);
 
         self.with_element_mut(|element| {
             tree.diff_children(std::slice::from_mut(&mut element.as_widget_mut()));
         });
+
+        if tree.dirty().contains(tree::DirtyFlags::LAYOUT) {
+            for child in &mut tree.children {
+                child.mark_dirty(tree::DirtyFlags::LAYOUT);
+            }
+        }
     }
 
     fn size(&self) -> Size<Length> {
@@ -144,11 +187,14 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        self.with_element_mut(|element| {
-            element
-                .as_widget_mut()
-                .layout(&mut tree.children[0], renderer, limits)
-        })
+        self.ensure_element(tree);
+        let node = self.with_element_mut(|element| {
+            tree.children[0].layout_with_cache(*limits, |child| {
+                element.as_widget_mut().layout(child, renderer, limits)
+            })
+        });
+        tree.clear_dirty(tree::DirtyFlags::LAYOUT);
+        node
     }
 
     fn visit_children(
@@ -157,6 +203,7 @@ where
         layout: Layout<'_>,
         visit: &mut dyn FnMut(&mut dyn visit::Visit),
     ) {
+        self.ensure_element(tree);
         self.with_element_mut(|element| {
             visit(&mut visit::Widgets::new(
                 element.as_widget_mut(),
@@ -173,6 +220,7 @@ where
         renderer: &Renderer,
         operation: &mut dyn widget::Operation,
     ) {
+        self.ensure_element(tree);
         self.with_element_mut(|element| {
             element
                 .as_widget_mut()
@@ -190,6 +238,7 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        self.ensure_element(tree);
         self.with_element_mut(|element| {
             element.as_widget_mut().update(
                 &mut tree.children[0],
@@ -201,6 +250,21 @@ where
                 viewport,
             );
         });
+
+        if shell.is_layout_invalid().is_some() {
+            tree.children[0].mark_dirty(tree::DirtyFlags::LAYOUT);
+            tree.mark_dirty(tree::DirtyFlags::LAYOUT | tree::DirtyFlags::PAINT);
+        }
+
+        if shell.are_widgets_invalid() {
+            tree.children[0].mark_dirty(tree::DirtyFlags::all());
+            tree.mark_dirty(tree::DirtyFlags::all());
+        }
+
+        if shell.is_semantics_invalid() {
+            tree.children[0].mark_dirty(tree::DirtyFlags::SEMANTICS);
+            tree.mark_dirty(tree::DirtyFlags::SEMANTICS);
+        }
     }
 
     fn mouse_interaction(
@@ -211,6 +275,7 @@ where
         viewport: &Rectangle,
         renderer: &Renderer,
     ) -> mouse::Interaction {
+        self.ensure_element(tree);
         self.with_element(|element| {
             element.as_widget().mouse_interaction(
                 &tree.children[0],
@@ -232,16 +297,22 @@ where
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
+        self.ensure_element(tree);
         self.with_element(|element| {
-            element.as_widget().draw(
-                &tree.children[0],
-                renderer,
-                theme,
-                style,
-                layout,
-                cursor,
-                viewport,
-            );
+            let child = &tree.children[0];
+            let mut hasher = FxHasher::default();
+            child.id().hash(&mut hasher);
+            let key = hasher.finish();
+            let revision = child.revision().value();
+            let bounds = layout.bounds();
+
+            if !renderer.replay_retained_layer(key, revision, bounds) {
+                renderer.start_retained_layer(key, revision, bounds);
+                element
+                    .as_widget()
+                    .draw(child, renderer, theme, style, layout, cursor, viewport);
+                renderer.end_retained_layer();
+            }
         });
     }
 
@@ -253,6 +324,7 @@ where
         viewport: &Rectangle,
         translation: Vector,
     ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
+        self.ensure_element(tree);
         let overlay = InnerBuilder {
             cell: self.element.borrow().as_ref().unwrap().clone(),
             element: self

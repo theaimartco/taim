@@ -10,3 +10,6 @@ mod idle;
 
 #[path = "runtime/occlusion.rs"]
 mod occlusion;
+
+#[path = "runtime/retained_replay_probe.rs"]
+mod retained_replay_probe;

@@ -40,5 +40,8 @@ pub use shell::Shell;
 pub use text::Text;
 pub use viewport::Viewport;
 
+#[cfg(feature = "raster")]
+pub use taim_raster as raster;
+
 pub use taim_core as core;
 pub use taim_futures as futures;

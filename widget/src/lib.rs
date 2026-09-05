@@ -1,7 +1,5 @@
 //! Use the built-in widgets or create your own.
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
-)]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 pub use taim_renderer as renderer;
 pub use taim_renderer::core;
@@ -15,6 +13,8 @@ mod column;
 mod constraint;
 mod mouse_area;
 mod pin;
+#[cfg(feature = "signal")]
+mod reactive;
 mod responsive;
 mod safe_area;
 mod stack;
@@ -120,6 +120,9 @@ pub use pin::Pin;
 pub use progress_bar::ProgressBar;
 #[doc(no_inline)]
 pub use radio::Radio;
+#[cfg(feature = "signal")]
+#[doc(no_inline)]
+pub use reactive::{Invalidation as ReactiveInvalidation, Reactive};
 #[doc(no_inline)]
 pub use responsive::Responsive;
 #[doc(no_inline)]

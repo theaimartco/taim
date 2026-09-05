@@ -398,6 +398,8 @@ fn run(config: &Config) -> Result<Report, String> {
         scenes::animated_cards::NAME => scenes::animated_cards::AnimatedCards,
         scenes::multitouch::NAME => scenes::multitouch::Multitouch,
         scenes::motion_stress::NAME => scenes::motion_stress::MotionStress,
+        scenes::signal_list::HUNDRED_THOUSAND_NAME => scenes::signal_list::HundredThousand,
+        scenes::signal_list::MILLION_NAME => scenes::signal_list::Million,
         scenes::damage_churn::NAME => scenes::damage_churn::DamageChurn,
         scenes::effect_ladder::NAME => scenes::effect_ladder::EffectLadder,
         scenes::virtual_list::NAME => scenes::virtual_list::VirtualListScene,
@@ -470,6 +472,18 @@ impl NewScene for scenes::motion_stress::MotionStress {
     }
 }
 
+impl NewScene for scenes::signal_list::HundredThousand {
+    fn new_from_config(config: &Config) -> Self {
+        Self::new(config.seed)
+    }
+}
+
+impl NewScene for scenes::signal_list::Million {
+    fn new_from_config(config: &Config) -> Self {
+        Self::new(config.seed)
+    }
+}
+
 impl NewScene for scenes::damage_churn::DamageChurn {
     fn new_from_config(_config: &Config) -> Self {
         Self::new()
@@ -537,9 +551,10 @@ fn warm_up<S: Scene>(
 ) -> Result<(), String> {
     let deadline = Instant::now() + config.warm_up;
     let mut frame_index = 0_u64;
+    let mut cache = user_interface::Cache::new();
 
     while Instant::now() < deadline {
-        let _phases = drive_one_frame(scene, renderer, config, frame_index)?;
+        let _phases = drive_one_frame(scene, renderer, config, frame_index, &mut cache)?;
         frame_index += 1;
     }
 
@@ -554,6 +569,7 @@ fn measure<S: Scene>(
     let mut frame_samples = FrameTimeSamples::new();
     let mut latency_samples = Vec::new();
     let mut pacing_samples = pacing::PacingSamples::new();
+    let mut cache = user_interface::Cache::new();
 
     let allocations_before = allocations::snapshot();
 
@@ -569,7 +585,7 @@ fn measure<S: Scene>(
         let mut phases_for_pacing = None;
 
         let latency_sample = latency::measure(|| {
-            let phases = drive_one_frame(scene, renderer, config, frame_index)
+            let phases = drive_one_frame(scene, renderer, config, frame_index, &mut cache)
                 .expect("frame drive should not fail during a measured run");
             phases_for_pacing = Some(phases);
             frame_samples.push(phases);
@@ -614,6 +630,7 @@ fn drive_one_frame<S: Scene>(
     renderer: &mut Renderer,
     config: &Config,
     frame_index: u64,
+    cache: &mut user_interface::Cache,
 ) -> Result<FramePhases, String> {
     let messages = scene.advance(frame_index);
     for message in messages {
@@ -628,7 +645,7 @@ fn drive_one_frame<S: Scene>(
         let mut ui = UserInterface::build(
             view,
             taim_core::Size::new(config.viewport.0, config.viewport.1),
-            user_interface::Cache::new(),
+            std::mem::take(cache),
             renderer,
         );
 
@@ -636,6 +653,8 @@ fn drive_one_frame<S: Scene>(
         let waker = taim_core::shell::Waker::noop();
 
         let update_start = Instant::now();
+
+        scene.before_update(frame_index);
 
         let (_state, _statuses) = ui.update(
             &window,
@@ -668,6 +687,8 @@ fn drive_one_frame<S: Scene>(
         );
 
         let present = present_start.elapsed();
+
+        *cache = ui.into_cache();
 
         (update, draw, present)
     };

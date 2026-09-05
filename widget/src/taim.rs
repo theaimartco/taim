@@ -45,7 +45,6 @@
 //! [`Theme`], so the two cannot drift apart again.
 
 use crate::core::border;
-use crate::core::material::Material;
 use crate::core::{Background, Border, Color, Shadow, Vector};
 
 use taim_design::components::button::{Button as TaimButton, ButtonKind};
@@ -1187,7 +1186,7 @@ impl crate::markdown::Catalog for Theme {
                 },
                 shadow: Shadow::default(),
                 snap: crate::core::renderer::CRISP,
-                material: Material::OPAQUE,
+                material: crate::core::material::Material::OPAQUE,
             }
         })
     }

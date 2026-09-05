@@ -297,12 +297,19 @@ impl<'a, Message> Shell<'a, Message> {
 /// wake events concurrently from widget logic.
 #[derive(Clone)]
 pub struct Waker {
-    wake: Arc<dyn Fn() + Send + Sync + 'static>,
+    wake: Arc<dyn Fn(Option<u64>) + Send + Sync + 'static>,
 }
 
 impl Waker {
     /// Creates a new [`Waker`] with the given `wake` function.
     pub fn new(wake: impl Fn() + Send + Sync + 'static) -> Self {
+        Self {
+            wake: Arc::new(move |_| wake()),
+        }
+    }
+
+    /// Creates a waker that preserves an optional reactive routing token.
+    pub fn new_tagged(wake: impl Fn(Option<u64>) + Send + Sync + 'static) -> Self {
         Self {
             wake: Arc::new(wake),
         }
@@ -317,7 +324,12 @@ impl Waker {
     ///
     /// You normally want to call this concurrently (e.g. from a different thread).
     pub fn wake(&self) {
-        (self.wake)();
+        (self.wake)(None);
+    }
+
+    /// Wakes the runtime for one process-local reactive source.
+    pub fn wake_reactive(&self, source: u64) {
+        (self.wake)(Some(source));
     }
 }
 
@@ -344,6 +356,23 @@ mod tests {
 
     fn shell(messages: &mut Vec<()>) -> Shell<'_, ()> {
         Shell::new(&window::Headless, Waker::noop(), messages)
+    }
+
+    #[test]
+    fn tagged_waker_preserves_reactive_tokens_and_general_wakes() {
+        let observed = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink = Arc::clone(&observed);
+        let waker = Waker::new_tagged(move |source| {
+            sink.lock().expect("wake log lock poisoned").push(source);
+        });
+
+        waker.wake_reactive(42);
+        waker.wake();
+
+        assert_eq!(
+            *observed.lock().expect("wake log lock poisoned"),
+            vec![Some(42), None]
+        );
     }
 
     #[test]

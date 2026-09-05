@@ -202,11 +202,11 @@ where
     fn diff(&mut self, tree: &mut Tree) {
         tree.diff_children(&mut self.children);
 
-        // No widget's `diff` currently reports fine-grained "my content
-        // changed in a way that affects measurement" (see
-        // `widget::tree::Tree::layout_with_cache`'s own documentation:
-        // this is unwired even for the single-slot cache it provides).
-        // Until that lands, any `diff` pass is conservatively assumed to
+        // Ordinary Elm widget properties do not report fine-grained "my
+        // content changed in a way that affects measurement" revisions.
+        // Signal-backed lazy subtrees have that contract, but a general Row
+        // may still contain legacy children. Any Row `diff` pass is therefore
+        // conservatively assumed to
         // be able to invalidate a child's measurement, so the cache is
         // cleared here rather than risk serving a stale `Node` for
         // changed content. This still lets `layout` calls that happen

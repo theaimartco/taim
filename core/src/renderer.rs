@@ -273,6 +273,9 @@ pub struct Settings {
     ///
     /// By default, it will be set to `16.0`.
     pub default_text_size: Pixels,
+
+    /// Rasterization path requested by the application.
+    pub rasterizer: Rasterizer,
 }
 
 impl Default for Settings {
@@ -280,6 +283,30 @@ impl Default for Settings {
         Self {
             default_font: Font::DEFAULT,
             default_text_size: Pixels(16.0),
+            rasterizer: Rasterizer::Automatic,
         }
+    }
+}
+
+/// Rasterization path selected for a renderer.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum Rasterizer {
+    /// Prefer the tiled compute path when the backend supports it and fall
+    /// back to the established quad/triangle path otherwise.
+    #[default]
+    Automatic,
+    /// Request the tiled compute path, falling back when unavailable.
+    Compute,
+    /// Always use the established quad/triangle path.
+    Legacy,
+}
+
+#[cfg(test)]
+mod settings_tests {
+    use super::{Rasterizer, Settings};
+
+    #[test]
+    fn automatic_rasterization_is_the_fallback_safe_default() {
+        assert_eq!(Settings::default().rasterizer, Rasterizer::Automatic);
     }
 }

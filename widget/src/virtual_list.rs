@@ -67,6 +67,8 @@ where
     width: Length,
     height: Length,
     builder: Box<dyn Fn(usize) -> Element<'a, Message, Theme, Renderer> + 'a>,
+    reactive_router: Option<Box<dyn Fn(u64) -> Option<usize> + 'a>>,
+    reactive_value_router: Option<Box<dyn Fn(u64) -> Option<usize> + 'a>>,
 }
 
 impl<'a, Message, Theme, Renderer> VirtualList<'a, Message, Theme, Renderer>
@@ -88,6 +90,8 @@ where
             width: Length::Fill,
             height: Length::Fill,
             builder: Box::new(builder),
+            reactive_router: None,
+            reactive_value_router: None,
         }
     }
 
@@ -105,6 +109,8 @@ where
             width: Length::Fill,
             height: Length::Fill,
             builder: Box::new(builder),
+            reactive_router: None,
+            reactive_value_router: None,
         }
     }
 
@@ -130,6 +136,31 @@ where
     /// exactly the items that intersect the viewport and no more.
     pub fn cache_extent(mut self, pixels: impl Into<Pixels>) -> Self {
         self.cache_extent = pixels.into().0.max(0.0);
+        self
+    }
+
+    /// Installs an O(1) mapping from a reactive wake token to the logical
+    /// item that owns it.
+    ///
+    /// Without this mapping a source-tagged wake must instantiate visible
+    /// item widgets to discover which one is interested. Large data models
+    /// normally already know the row associated with each source, so exposing
+    /// that relation lets the list visit only the matching live slot.
+    pub fn route_reactive(mut self, route: impl Fn(u64) -> Option<usize> + 'a) -> Self {
+        self.reactive_router = Some(Box::new(route));
+        self
+    }
+
+    /// Installs an O(1) mapping for live-value reactive items.
+    ///
+    /// This is the lowest-cost form of [`Self::route_reactive`]. A matching
+    /// event marks the live slot's retained paint range dirty directly,
+    /// without constructing its ephemeral item widget or dispatching the
+    /// internal event through it. The routed item must use
+    /// [`crate::reactive_value`] and must not derive structure, geometry, or
+    /// semantics from the source value.
+    pub fn route_reactive_value(mut self, route: impl Fn(u64) -> Option<usize> + 'a) -> Self {
+        self.reactive_value_router = Some(Box::new(route));
         self
     }
 }
@@ -263,6 +294,7 @@ impl Positions {
 struct Slot {
     index: usize,
     tree: Tree,
+    layout: layout::Node,
 }
 
 /// The internal, per-instance state of a [`VirtualList`]: its own scroll
@@ -273,6 +305,9 @@ struct Slot {
 struct State {
     offset: f32,
     slots: Vec<Slot>,
+    targeted_relayout: Option<usize>,
+    laid_out_size: Option<Size>,
+    laid_out_offset: f32,
     keyboard_modifiers: keyboard::Modifiers,
 }
 
@@ -290,6 +325,9 @@ impl Default for State {
         Self {
             offset: 0.0,
             slots: Vec::new(),
+            targeted_relayout: None,
+            laid_out_size: None,
+            laid_out_offset: 0.0,
             keyboard_modifiers: keyboard::Modifiers::default(),
         }
     }
@@ -342,18 +380,38 @@ where
 
         let visible = (state.offset, state.offset + size.height);
         let range = positions.visible_range(visible, self.cache_extent);
+        let targeted_relayout = state.targeted_relayout.take();
+        let can_reuse_unchanged = targeted_relayout.is_some()
+            && state.laid_out_size == Some(size)
+            && state.laid_out_offset == state.offset;
 
         let mut slots = std::mem::take(&mut state.slots);
         let mut new_slots = Vec::with_capacity(range.len());
         let mut nodes = Vec::with_capacity(range.len());
 
         for index in range {
+            let exact_position = slots.iter().position(|slot| slot.index == index);
+            let previous = exact_position.map(|position| slots.remove(position));
+            let position = Point::new(0.0, positions.start_of(index) - state.offset);
+
+            if can_reuse_unchanged
+                && targeted_relayout != Some(index)
+                && let Some(previous) = previous
+            {
+                let node = previous.layout.clone().move_to(position);
+                nodes.push(node.clone());
+                new_slots.push(Slot {
+                    index,
+                    tree: previous.tree,
+                    layout: node,
+                });
+                continue;
+            }
+
             let mut element = (self.builder)(index);
 
-            let mut item_tree = slots
-                .iter()
-                .position(|slot| slot.index == index)
-                .map(|position| slots.remove(position).tree)
+            let mut item_tree = previous
+                .map(|slot| slot.tree)
                 .or_else(|| (!slots.is_empty()).then(|| slots.remove(0).tree))
                 .unwrap_or_else(|| Tree::new(element.as_widget()));
 
@@ -367,12 +425,13 @@ where
             let node = element
                 .as_widget_mut()
                 .layout(&mut item_tree, renderer, &item_limits)
-                .move_to(Point::new(0.0, positions.start_of(index) - state.offset));
+                .move_to(position);
 
-            nodes.push(node);
+            nodes.push(node.clone());
             new_slots.push(Slot {
                 index,
                 tree: item_tree,
+                layout: node,
             });
         }
 
@@ -382,6 +441,8 @@ where
         // into an ever-growing cache, defeating virtualization's whole
         // memory guarantee.
         state.slots = new_slots;
+        state.laid_out_size = Some(size);
+        state.laid_out_offset = state.offset;
 
         layout::Node::with_children(size, nodes)
     }
@@ -463,6 +524,7 @@ where
                 state.offset = (state.offset + dy).max(0.0);
 
                 if state.offset != previous {
+                    state.targeted_relayout = None;
                     shell.invalidate_layout();
                     shell.request_redraw();
                     shell.capture_event();
@@ -470,8 +532,49 @@ where
             }
         }
 
+        let routed_index = if let Event::Reactive(source) = event {
+            self.reactive_router
+                .as_ref()
+                .and_then(|route| route(*source))
+        } else {
+            None
+        };
+
+        let routed_value_index = if let Event::Reactive(source) = event {
+            self.reactive_value_router
+                .as_ref()
+                .and_then(|route| route(*source))
+        } else {
+            None
+        };
+
+        if let Some(index) = routed_value_index {
+            if let Some(slot) = state.slots.iter_mut().find(|slot| slot.index == index) {
+                slot.tree.mark_dirty(widget::tree::DirtyFlags::PAINT);
+
+                if let Some(child) = slot.tree.children.first_mut() {
+                    child.mark_dirty(widget::tree::DirtyFlags::PAINT);
+                }
+
+                shell.request_redraw();
+            }
+
+            return;
+        }
+
         for (slot, layout) in state.slots.iter_mut().zip(layout.children()) {
+            if routed_index.is_some_and(|index| slot.index != index) {
+                continue;
+            }
+
             let mut element = (self.builder)(slot.index);
+
+            if routed_index.is_none()
+                && let Event::Reactive(source) = event
+                && element.as_widget().reactive_source() != Some(*source)
+            {
+                continue;
+            }
 
             element.as_widget_mut().update(
                 &mut slot.tree,
@@ -482,6 +585,10 @@ where
                 shell,
                 viewport,
             );
+
+            if routed_index == Some(slot.index) && shell.is_layout_invalid().is_some() {
+                state.targeted_relayout = Some(slot.index);
+            }
 
             if shell.is_event_captured() {
                 return;

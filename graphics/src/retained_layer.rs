@@ -399,6 +399,106 @@ impl Default for RetainedLayerCache {
     }
 }
 
+/// A renderer-neutral, byte-bounded LRU store for backend-native retained
+/// display lists.
+///
+/// [`RetainedLayerCache`] stores Taim's portable [`DisplayList`]. Renderers
+/// also need to retain their already-batched native command lists; this store
+/// applies the same bounded-lifetime policy without prescribing their value
+/// type.
+#[derive(Debug)]
+pub struct RetainedStore<V> {
+    entries: FxHashMap<u64, Stored<V>>,
+    budget_bytes: usize,
+    current_bytes: usize,
+    clock: u64,
+}
+
+#[derive(Debug)]
+struct Stored<V> {
+    value: V,
+    bytes: usize,
+    last_access: u64,
+}
+
+impl<V> RetainedStore<V> {
+    /// Creates an empty store with the given byte budget.
+    pub fn with_budget(budget_bytes: usize) -> Self {
+        Self {
+            entries: FxHashMap::default(),
+            budget_bytes,
+            current_bytes: 0,
+            clock: 0,
+        }
+    }
+
+    /// Removes and returns `key`, ready for zero-copy replay.
+    pub fn take(&mut self, key: u64) -> Option<V> {
+        self.clock = self.clock.wrapping_add(1);
+        let stored = self.entries.remove(&key)?;
+        self.current_bytes = self.current_bytes.saturating_sub(stored.bytes);
+        Some(stored.value)
+    }
+
+    /// Inserts a native display list and returns the number of entries evicted.
+    ///
+    /// An entry larger than the complete budget is rejected without evicting
+    /// useful existing entries.
+    pub fn insert(&mut self, key: u64, value: V, bytes: usize) -> usize {
+        if bytes > self.budget_bytes {
+            return 0;
+        }
+
+        if let Some(previous) = self.entries.remove(&key) {
+            self.current_bytes = self.current_bytes.saturating_sub(previous.bytes);
+        }
+
+        let mut evictions = 0;
+        while self.current_bytes.saturating_add(bytes) > self.budget_bytes {
+            let Some(lru) = self
+                .entries
+                .iter()
+                .min_by_key(|(_, stored)| stored.last_access)
+                .map(|(key, _)| *key)
+            else {
+                break;
+            };
+
+            if let Some(removed) = self.entries.remove(&lru) {
+                self.current_bytes = self.current_bytes.saturating_sub(removed.bytes);
+                evictions += 1;
+            }
+        }
+
+        self.clock = self.clock.wrapping_add(1);
+        self.current_bytes = self.current_bytes.saturating_add(bytes);
+        let _ = self.entries.insert(
+            key,
+            Stored {
+                value,
+                bytes,
+                last_access: self.clock,
+            },
+        );
+        evictions
+    }
+
+    /// Returns the bytes charged to currently cached entries.
+    pub fn current_bytes(&self) -> usize {
+        self.current_bytes
+    }
+
+    /// Returns the number of cached native display lists.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns whether this store has no cached display lists.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -678,5 +778,32 @@ mod tests {
         telem.hits = 3;
         telem.misses = 1;
         assert!((telem.hit_rate() - 0.75).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn native_store_keeps_multiple_entries_within_its_byte_budget() {
+        let mut store = RetainedStore::with_budget(12);
+
+        assert_eq!(store.insert(1, "one", 4), 0);
+        assert_eq!(store.insert(2, "two", 4), 0);
+        assert_eq!(store.insert(3, "three", 4), 0);
+        assert_eq!(store.len(), 3);
+        assert_eq!(store.current_bytes(), 12);
+        assert_eq!(store.take(2), Some("two"));
+        assert_eq!(store.current_bytes(), 8);
+    }
+
+    #[test]
+    fn native_store_evicts_lru_entries_and_rejects_oversized_values() {
+        let mut store = RetainedStore::with_budget(8);
+
+        assert_eq!(store.insert(1, "one", 4), 0);
+        assert_eq!(store.insert(2, "two", 4), 0);
+        assert_eq!(store.insert(3, "three", 4), 1);
+        assert_eq!(store.take(1), None);
+        assert_eq!(store.take(2), Some("two"));
+
+        assert_eq!(store.insert(4, "too large", 9), 0);
+        assert_eq!(store.take(4), None);
     }
 }

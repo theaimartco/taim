@@ -7,15 +7,9 @@
 //! `taim_widget::VirtualList` widget, so its measured cost is exactly
 //! what a real application embedding a `VirtualList` would pay.
 //!
-//! `taim_bench`'s harness (`main.rs`'s `drive_one_frame`) rebuilds a
-//! fresh `UserInterface` -- and therefore a fresh `VirtualList` widget
-//! `Tree`, with its scroll offset reset to zero -- every single frame
-//! (see `user_interface::Cache::new()` at that call site); no widget's
-//! internal state persists from one measured frame to the next in this
-//! harness. So rather than pretending to track a `VirtualList`'s scroll
-//! position across frames from the scene side (which would measure
-//! nothing real, since the widget itself never sees it), this scene
-//! injects a real `mouse::Event::WheelScrolled` via
+//! `taim_bench` rebuilds the view each frame while carrying the previous
+//! `UserInterface` cache forward, matching the normal Elm runtime loop.
+//! This scene injects a real `mouse::Event::WheelScrolled` via
 //! [`Scene::input_events`] every frame, so what gets measured is the
 //! genuine cost of "a `VirtualList` receives one scroll event and
 //! re-renders," including an occasional huge one-shot delta to exercise
@@ -47,8 +41,7 @@ pub enum Mode {
 }
 
 /// What a frame does to the scene's own state (row content churn only --
-/// scrolling is driven separately via [`Scene::input_events`], see this
-/// module's own doc comment for why).
+/// scrolling is driven separately via [`Scene::input_events`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Message {
     /// Updates the text of one row, simulating a live data change (e.g.

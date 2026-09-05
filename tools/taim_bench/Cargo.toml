@@ -45,12 +45,13 @@ taim_futures.workspace = true
 # to build at all, not to actually use windowing.
 taim_renderer = { workspace = true, features = ["wgpu", "wgpu-bare", "tiny-skia", "image", "geometry", "x11", "wayland"] }
 taim_runtime.workspace = true
+taim-signal.workspace = true
 # Needed by `scenes::effect_ladder` to quantify the real effect cost
 # model (`taim_wgpu::effects`), which is where the separable/downsampled
 # blur cost and texture-pool budgeting live. `taim_renderer`'s `wgpu`
 # feature pulls the same crate in, but does not re-export `effects`.
 taim_wgpu.workspace = true
-taim_widget = { workspace = true, features = ["image", "canvas"] }
+taim_widget = { workspace = true, features = ["image", "canvas", "signal"] }
 
 serde.workspace = true
 serde.features = ["derive"]

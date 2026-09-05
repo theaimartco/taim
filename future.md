@@ -1,8 +1,9 @@
 # Taim Future — The Twenty-Five Year Architecture
 
-**Repository:** `taim` · **Branch:** `capstone-open-findings` · **Head:** `9f9167e4`
-**Written:** 2026-08-24 · **Revised:** 2026-08-25 · **Horizon:** 2051
-**Toolchain verified:** `cargo test --workspace` → **1,851 passed, 0 failed**, 64 binaries, this tree.
+**Repository:** `taim` · **Audit baseline:** `capstone-open-findings` @ `9f9167e4` · **Current head:** `main` @ `69be2af4`
+**Written:** 2026-08-24 · **Revised:** 2026-09-02 · **Horizon:** 2051
+**Original toolchain verification:** `cargo test --workspace` → **1,851 passed, 0 failed**, 64 binaries.
+**Current verification:** `cargo test --workspace --all-targets -- --test-threads=1` → **exit 0**; all CI budgets pass *(2026-09-02)*.
 
 > **Revision, 2026-08-25.** Pillar II is under construction; §Pillar II carries its
 > progress, its measurements, and the four bugs it produced. Three audit findings changed
@@ -12,9 +13,120 @@
 > **Ceiling 6b** records that one `Engine` fixes one texture format for every pipeline.
 > Corrections are marked inline rather than silently applied.
 
+> **Implementation checkpoint, 2026-09-02.** Pillar II's software path is now
+> complete: linear-light compositing is the default, the feature matrix can
+> actually exercise both colour contracts, authorable luminance is live, and
+> panel descriptions flow into the display transform. Pillar III's forward
+> path is also live for rounded quads, including configurable scene lighting,
+> refraction, and dispersion. VYOM now has bounded shared-memory buffers and a
+> real attach/damage/commit call, but the hardware gate remains open because
+> this tree has not presented through a real compositor. `taim-signal` now
+> supplies thread-safe signals, automatically tracked memos, and live event-loop
+> wakeups. Signal-backed `Reactive` subtrees use incremental layout and native,
+> byte-bounded retained replay without rebuilding the application root. The
+> 100,000/1,000,000-row flat-cost proof gate remains open. Details are corrected
+> at the affected ceilings and pillars.
+
 ---
 
 ## 0. How to read this document
+
+> **H0 tooling checkpoint, 2026-09-05.**
+> `scripts/perf/measure-app.py` now launches an actual application, observes an
+> opt-in first-successful-present marker, samples the application's RSS after
+> warmup, and optionally samples one explicit hardware energy counter. The
+> `measurement` feature wires the marker into winit's successful present path;
+> default builds omit it. See
+> [`docs/testing/application-measurements.md`](docs/testing/application-measurements.md)
+> for commands, scope, and limitations. Contract tests and the instrumented
+> `mobile_shell` release build pass. The desktop smoke test timed out before
+> the marker, so **no application performance result or hardware gate is
+> claimed**. First visible pixel, whole-device energy, controlled cold starts,
+> and the remaining H0–H4 deliverables are still open.
+>
+> **Attempt, 2026-09-06.** A real GNOME/mutter Wayland session (`gnome-shell`,
+> `Xwayland`, working `wayland-0`/`X0` sockets, `xdpyinfo` and `xwininfo` both
+> answering) was confirmed running in this sandbox — not a stub. Built
+> `cargo build -p mobile_shell --release --features taim/measurement` clean,
+> then ran `scripts/perf/measure-app.py` exactly per the docs. Result:
+> `"status": "failed"`, `"error": "first-present marker timed out..."`, all
+> numeric fields `null` — the same outcome as 2026-09-05, now against a
+> confirmed-live compositor, so the prior "no display" theory is ruled out.
+> Follow-up with the marker env var set directly and no script timeout (waited
+> 60 s) still produced no marker file. `lsof`/`/proc/<pid>/fd` on the running
+> process show it genuinely connecting to `/run/user/1000/wayland-0`, opening
+> `smithay-client-toolkit` and dmabuf/syncobj state, and touching the real
+> nvidia DRI render nodes — this is not a silent crash or a no-op stub, it is
+> a real client that gets partway into GPU/Wayland setup and then never
+> reaches the instrumented successful-`present()` path. Process CPU ticks stay
+> flat over multiple 2 s samples (idle-blocked, not spinning or crash-looping).
+> No stderr/log output at all, including under `RUST_LOG=debug`, because
+> `examples/mobile_shell` never installs a logger, so the actual stall point is
+> still undiagnosed. **Still no application performance result or hardware
+> gate claimed** — this narrows the blocker from "untested display
+> availability" to "a real Wayland client that stalls before first present in
+> this environment," which needs logging and/or compositor-side diagnosis, not
+> a display, to move further. No code was changed to reach this conclusion.
+>
+> **Diagnosed and fixed, 2026-09-06.** Added `env_logger::init()` to
+> `examples/mobile_shell/src/main.rs` (new dev dependency on the example only,
+> `env_logger = "0.11"`; the rest of the workspace already logs through the
+> `log` facade but nothing previously installed a subscriber, so
+> `RUST_LOG=...` had never produced output from any binary) plus a handful of
+> targeted `log::trace!`/`log::debug!` calls in `winit/src/lib.rs` at the
+> platform `WindowEvent` dispatch point, the `RedrawRequested` handler entry,
+> and immediately around the `compositor.present()` call. Rebuilt and ran
+> against the same live GNOME/mutter session with `RUST_LOG=taim_winit=trace`.
+> The log showed `RedrawRequested` firing (from winit's own post-map
+> `Resized`/`ScaleFactorChanged` events) but execution never reached the new
+> log line just before `compositor.present()` — narrowing the stall to the
+> body of the `RedrawRequested` arm itself, before the present call.
+>
+> Root cause: `winit/src/window.rs`'s `WindowManager::insert` starts every new
+> window's frame `Scheduler` in `State::Idle` (`runtime/src/frame_scheduler.rs`),
+> under which `Scheduler::should_produce_frame` is unconditionally `false`.
+> `winit/src/lib.rs`'s `Event::WindowCreated` handler never calls the
+> `Window::request_redraw` wrapper that would move the scheduler to
+> `State::Requested` — it only calls `window.raw.set_visible(true)`. Every
+> other initial-redraw call site in the file (`NewEvents(StartCause::Init)`,
+> the `Resized`/`Occluded(false)` `WindowEvent` handlers) calls
+> `window.raw.request_redraw()` directly on the raw winit window, which asks
+> winit to emit a `RedrawRequested` event but does not touch `window.scheduler`.
+> The only code path that ever calls the real wrapper
+> (`window.request_redraw(redraw_request)`, which does update the scheduler)
+> lives inside successful `RedrawRequested`/input-event processing — which
+> itself is gated by `should_produce_frame`. Net effect: a newly created
+> window's scheduler never leaves `Idle` until *something* first gets past the
+> gate, and nothing ever does, so every `RedrawRequested` winit ever delivers
+> is silently dropped by `winit/src/lib.rs:~785`
+> (`if !window.scheduler.should_produce_frame(Instant::now()) { continue; }`)
+> forever. This is a genuine, platform-independent bug in the Phase 6 frame
+> scheduler wiring, not a sandbox or compositor limitation; it plausibly means
+> no window running on the current tree's `winit` backend has ever rendered a
+> first frame anywhere, which is consistent with this being the first time the
+> tree was run against a live compositor at all.
+>
+> Fix: `winit/src/lib.rs`'s `Event::WindowCreated` handler now calls
+> `window.request_redraw(window::RedrawRequest::NextFrame)` once, right after
+> `set_visible`, putting the scheduler in `State::Requested` before the first
+> `RedrawRequested` can arrive. Verified end to end: rebuilt
+> `mobile_shell --release --features taim/measurement`, log now shows
+> `RedrawRequested` immediately followed by `Calling compositor present` and
+> `compositor present Ok`, and the marker file is created. Ran
+> `scripts/perf/measure-app.py --warmup 5 --duration 15` against the live
+> GNOME/mutter session and got a real, `"status": "ok"` result:
+> **`first_present_observed_upper_bound_ms`: 435.73** (this run's warmup/duration,
+> an upper bound including process launch per the harness's own caveat, not a
+> tuned cold-start protocol) and **steady-state RSS: 157,999,104 bytes
+> (~150.7 MiB)**, constant across 151 samples. `first_pixel_ms` and `energy`
+> remain `null` (unmeasured, as the harness documents). `cargo test --workspace
+> --all-targets -- --test-threads=1` and `cargo check --workspace --all-targets`
+> both pass after the fix (51 test binaries, 0 failed). This closes the
+> first-present and steady-state-RSS rows below with a real number for the
+> first time; cold start proper (a controlled, storage-cold launch protocol),
+> whole-device energy, and first pixel are still open, and the Flutter/React
+> Native comparison in `benchmarks/competitors/README.md` still has no
+> captured result.
 
 `Capstone.md` answers *"can Taim catch and pass Flutter and React Native?"* It is a
 catch-up plan, and it is correct as far as it goes. This document answers a different
@@ -76,33 +188,34 @@ document is how.
 
 | Command | Result |
 |---|---|
-| `cargo check --workspace --all-targets` | **exit 0**, 9.18s incremental |
-| Rust source, excluding `target/` | **560 files, 158,925 lines** |
-| Test functions (`#[test]` + `#[tokio::test]`) | **1,634** |
+| `cargo check --workspace --all-targets` | **exit 0** *(2026-09-04)* |
+| Rust source, excluding `target/` | **589 files, 172,874 lines** *(2026-09-06, after this session's additive work: `examples/trivial/`, `taim-showcase/src/lib.rs` + tests)* |
+| Test functions (`#[test]` + `#[tokio::test]`) | **1,864** *(2026-09-06)* |
 | Compute shaders (`@compute` / `ComputePipeline` in `wgpu/`) | **0 matches** |
-| `RetainedLayerCache` call sites outside its own tests | **0** |
-| `Tree::layout_with_cache` call sites outside its own tests | **0** |
-| `effects::pool::Pool` call sites outside its own tests | **0** *(added 2026-08-25)* |
+| Byte-bounded native retained-store production users | **2** — `wgpu` and `tiny_skia` |
+| `Tree::layout_with_cache` production callers | **1** — signal-capable `Lazy` subtree |
+| `effects::pool::Pool` call sites outside its own tests | **live in `Renderer::draw`** *(2026-08-31)* |
 | Threads spawned on the frame path | **0** |
-| `graphics::color::GAMMA_CORRECTION` in a default build | **`false`** *(added 2026-08-25 — see Ceiling 3)* |
-| Configurations of the integration suite in which it is `true` | **none** *(added 2026-08-25)* |
+| `graphics::color::GAMMA_CORRECTION` in a default build | **`true`** *(2026-08-31 — see Ceiling 3)* |
+| Integration configurations that exercise it | **default and `--no-default-features`; legacy `web-colors` separately proves `false`** |
 
 Crate sizes, measured:
 
 | Crate | Files | Lines | Role |
 |---|---:|---:|---|
-| `widget` | 96 | 52,273 | 75 public constructors |
-| `core` | 94 | 19,686 | types, layout, text, input, semantics |
-| `wgpu` | 40 | 11,493 | GPU backend |
-| `tools` | 34 | 8,489 | bench harness, Taim Lab, profiler CLI |
+| `widget` | 97 | 52,878 | 75 public constructors + reactive subtree |
+| `core` | 98 | 22,498 | types, layout, text, input, semantics |
+| `wgpu` | 41 | 13,558 | GPU backend |
+| `tools` | 35 | 8,666 | bench harness, Taim Lab, profiler CLI |
 | `runtime` | 23 | 8,012 | reconcile, schedule, hit-test |
-| `graphics` | 31 | 7,881 | damage, layers, display list |
-| `taim-accessibility` | 15 | 5,203 | semantic tree + AT-SPI bridge |
-| `winit` | 7 | 4,314 | shell, event loop |
+| `graphics` | 31 | 8,081 | damage, layers, display list |
+| `taim-accessibility` | 15 | 5,307 | semantic tree + AT-SPI bridge |
+| `winit` | 8 | 4,351 | shell, event loop |
 | `taim-gesture` | 12 | 3,844 | arena and recognisers |
-| `tiny_skia` | 10 | 3,326 | CPU renderer, golden backend |
-| `taim-design` | 31 | 2,501 | tokens + 17 component styles |
-| `taim-platform-vyom` | 13 | 1,760 | Wayland/Smithay backend |
+| `taim-signal` | 1 | 646 | signals, memos, subscriptions |
+| `tiny_skia` | 10 | 3,756 | CPU renderer, golden backend |
+| `taim-design` | 33 | 2,890 | tokens + 17 component styles |
+| `taim-platform-vyom` | 16 | 2,963 | Wayland/Smithay backend |
 | `taim-motion` | 11 | 1,081 | springs, decay, timelines |
 
 ## 3. What is genuinely strong
@@ -202,6 +315,11 @@ frame path:
 - `winit/src/clipboard.rs:60,107` — clipboard
 - `runtime/src/task.rs:480,502` — application task executor
 
+*(Verified 2026-09-06: a fifth site now exists, `winit/src/lib.rs:1741`, spawning a
+thread to gather `system_information` for `system::Action::GetInformation`. It is gated
+behind the non-default `sysinfo` feature and, like the four above, is not on the frame
+path, so it does not change this ceiling's conclusion.)*
+
 Layout, paint recording, primitive batching, and GPU submission all happen on one thread,
 in sequence. Flutter has had a separate raster thread since 2015 and Impeller compiles
 shaders concurrently. **Taim is competing against a two-thread pipeline with one thread
@@ -210,7 +328,7 @@ table. See Pillar VIII.
 
 ---
 
-### Ceiling 3 — The colour pipeline is 8-bit sRGB with no colour management
+### Ceiling 3 — Historical: the colour pipeline was 8-bit sRGB with no colour management
 
 > **RESOLVED 2026-08-25.** Linear-light compositing is now the production default on
 > both backends, `web-colors` is opt-in legacy, and `--no-default-features` genuinely
@@ -240,9 +358,9 @@ table. See Pillar VIII.
 > — which is the point, since the current blending is mathematically wrong — and requires
 > re-capturing all 40 committed goldens.
 
-`graphics/src/color.rs` is the whole story: a `Packed([f32; 4])`, and `pack()` either
+At the audit date, `graphics/src/color.rs` was the whole story: a `Packed([f32; 4])`, and `pack()` either
 calls `color.into_linear()` or passes sRGB components straight through under the
-`web-colors` feature. There is no white point, no primaries, no transfer function, no
+`web-colors` feature. There was no white point, no primaries, no transfer function, no
 peak-luminance concept, no tone mapping, and no path to a display that can do more than
 sRGB.
 
@@ -286,9 +404,10 @@ See Pillar IV.
 
 ---
 
-### Ceiling 6 — Incremental layout, retained layers, and the effect budget are machinery without adoption
+### Ceiling 6 — Historical: incremental layout and retained caching lacked adoption
 
-**Three** substantial subsystems are fully built, fully tested, and **called by nothing**:
+At the audit date, **three** substantial subsystems were fully built, fully tested, and
+**called by nothing**:
 
 - `Tree::layout_with_cache` (`core/src/widget/tree.rs:289`) — constraint/revision-based
   layout reuse. Call sites outside its own tests: **zero**. `widget/src/row.rs:207`
@@ -305,9 +424,9 @@ See Pillar IV.
   Its `Descriptor::bytes_per_pixel` is only ever set in tests, always to `4`, so it has
   also never seen a half-float intermediate.
 
-And retention cannot be adopted incrementally, because `recording_retained_frame` is a
-single `Option` and `end_retained_layer` panics without a matching start —
-**the recorder has to become a stack before any widget can call it.**
+Retention also could not be adopted incrementally because
+`recording_retained_frame` was a single `Option`: a nested boundary replaced
+the outer recording's metadata.
 
 This is a specific and recurring failure mode in this repository: build the mechanism,
 test the mechanism, never wire the mechanism. It is worth naming explicitly, because the
@@ -325,7 +444,31 @@ nothing has ever asked it to do.
 >   every HDR frame by half. Proven by `tests/gpu/quality_budget.rs`.
 > - **`PipelineCache`** — retained and resolving per target format. See Ceiling 6b.
 >
-> `RetainedLayerCache` and `Tree::layout_with_cache` remain **TEST-ONLY**, unchanged.
+> **Updated 2026-08-31.** Root retained replay became **LIVE** through
+> `UserInterface::draw` on both renderers. The recorders are stacks, so a nested
+> retained boundary balances its own clip without destroying its parent, and
+> `tests/runtime/retained_replay_probe.rs` proves both halves of the contract:
+> an unchanged interface does not re-enter widget paint, while a rebuilt view
+> with changed content never replays stale pixels. The backend currently caches
+> the outermost completed range, which already contains its nested ranges.
+>
+>
+> **RESOLVED 2026-09-02.** Pillar VII supplied the missing validity proof.
+> `Lazy::layout` now calls `Tree::layout_with_cache` for its child, and
+> signal revisions dirty only a `Reactive` subtree. Both native renderers use
+> `graphics::retained_layer::RetainedStore`: a 64 MiB, multi-entry, byte-bounded
+> LRU of already-batched native ranges. Nested recordings are balanced and the
+> innermost non-overlapping ranges are retained, so unchanged sibling subtrees
+> survive while one reactive subtree changes. Runtime tests prove both quiet
+> replay and live signal mutation without an application-root rebuild. Cache
+> validity also includes the complete ancestor transform and opacity, preventing
+> movement or fades from replaying batches recorded in an old render context.
+>
+> The older portable `RetainedLayerCache<DisplayList>` remains available but is
+> not the production storage type: retaining backend-native batches avoids a
+> second translation and supports zero-copy take/replay/reinsert. Legacy Elm
+> rebuilds intentionally keep conservative root invalidation; signal-backed
+> subtrees are the opt-in path with the stronger revision contract.
 
 ---
 
@@ -372,11 +515,18 @@ This is cheap to fix now (a format-keyed pipeline cache, which
 
 ---
 
-### Ceiling 7 — Nothing presents through VYOM
+### Ceiling 7 — VYOM has a present path, but no hardware proof
 
-`taim-platform-vyom` creates surfaces, negotiates capabilities, handles configure, and
-can submit `wl_surface.damage_buffer`. It **attaches no buffers**. Nothing has ever
-appeared on a screen through this backend.
+> **Partially resolved 2026-08-31.** `taim-platform-vyom` now owns a bounded,
+> release-aware buffer pool, creates `wl_shm` backing, writes exact-sized BGRA
+> frames, and calls `wl_surface.attach` followed by damage and commit. The
+> protocol call that was missing is no longer missing, and the lifecycle is
+> covered by deterministic tests.
+>
+> The proof gate is still open. This environment has no Wayland/VYOM session,
+> so the path has not received real `wl_buffer.release` events or put a pixel
+> on a physical display. The source says this explicitly; a compiling protocol
+> path is not being relabelled as a shipped device.
 
 Every strategic advantage in Section 1 — the entire moat — is downstream of this one
 gap. Until a VYOM surface presents a real frame, the compositor advantage is a document,
@@ -396,17 +546,186 @@ is not the axis buyers decide on. The three that are:
 
 | Axis | Taim | Flutter | Status |
 |---|---|---|---|
-| Cold start to first pixel | **unmeasured** | ~300–800 ms typical | no harness exists |
-| Steady-state app memory | **unmeasured** (196.7 MiB is the *harness*) | 60–120 MiB typical | no harness exists |
-| Energy per hour of use | **unmeasured** | measurable | no harness exists |
+| First present (upper bound) | **~431–701 ms observed**, n=6 (2 succeeded, 4 exited before steady state), `uncontrolled` cache state *(2026-09-06)* | ~300–800 ms typical (first pixel) | real captures, but an upper bound including process launch, not first pixel, not a controlled cold-start protocol, and not yet a stable baseline — see below |
+| Steady-state app memory | **~150.7–155.6 MiB**, n=2 successful runs (2 of 6 total runs produced RSS data) *(2026-09-06)* | 60–120 MiB typical | real captures, but only 2 samples and they disagree with each other by ~4.2 MiB median — not yet a baseline |
+| Energy per hour of use | **unmeasured** | measurable | optional hardware-domain counter harness exists; whole-device measurement open |
 | Frame cost p95 | 57.59 µs | ~1–4 ms typical | **won, and by a lot** |
 
-Binary size *is* measured — 20.53 MiB unstripped, **15.76 MiB stripped** for
-`mobile_shell`, against a 22 MiB budget. That number is not competitive with the story
-this document tells and Pillar XIII addresses it.
+Binary size *is* measured — 20.53 MiB unstripped, 15.76 MiB stripped for `mobile_shell`
+as of 2026-08-23, against a 22 MiB budget. Re-measured fresh on 2026-09-06 against the
+current tree: 21.19 MiB unstripped / 16.38 MiB stripped before Pillar XIII's first lever,
+**20.76 MiB unstripped / 15.96 MiB stripped after** dropping the default font embed. That
+number is still not competitive with the story this document tells; Pillar XIII addresses
+it and the size gate (4 MiB stripped) remains open.
 
 And per `benchmarks/competitors/README.md`, **no Flutter or React Native comparison exists
 in this repository.** The rules for a fair one are written down; no result has been captured.
+
+**2026-09-06 — a live display was found and tried; the stall was diagnosed and fixed;
+first-present and steady-state-RSS are measured for the first time.** This sandbox turned
+out to have a real, running GNOME/mutter Wayland session (confirmed with `xdpyinfo`,
+`xwininfo`, live `gnome-shell`/`Xwayland` processes, and working `/run/user/1000/wayland-0`
+and `/tmp/.X11-unix/X0` sockets — not a placeholder env var). An initial attempt against
+this live session reproduced the earlier timeout exactly (marker never created; process
+genuinely touching the real Wayland socket and nvidia DRI render nodes, then going
+CPU-idle before ever reaching the instrumented `present()` call), which ruled out "no
+display available" as the cause but left the actual stall point undiagnosed, since nothing
+in the tree installed a `log` subscriber (the workspace logs through the `log` facade
+everywhere, but `RUST_LOG=...` had never produced output from any binary).
+
+Diagnosis: added `env_logger::init()` to `examples/mobile_shell/src/main.rs` (new
+dependency on that example only) plus a few targeted `log::trace!`/`log::debug!` calls in
+`winit/src/lib.rs` bracketing the platform `WindowEvent` dispatch, the `RedrawRequested`
+handler entry, and the `compositor.present()` call. Re-running with `RUST_LOG` set showed
+`RedrawRequested` firing but execution never reaching the line just before `present()` —
+pinning the stall inside that handler, before presenting.
+
+Root cause, confirmed by reading `winit/src/window.rs` and `runtime/src/frame_scheduler.rs`:
+a newly created window's frame `Scheduler` starts in `State::Idle`
+(`WindowManager::insert`), under which `Scheduler::should_produce_frame` is unconditionally
+`false`. `winit/src/lib.rs`'s `Event::WindowCreated` handler never calls the
+`Window::request_redraw` wrapper that would move the scheduler out of `Idle` — every other
+initial-redraw call site (`NewEvents(StartCause::Init)`, the `Resized`/`Occluded(false)`
+handlers) calls `window.raw.request_redraw()` directly on the raw winit window, which
+requests a `RedrawRequested` event from winit but never touches `window.scheduler`. The
+only call site that updates the scheduler lives inside successful `RedrawRequested`
+processing — itself gated by `should_produce_frame`. So a fresh window's scheduler never
+leaves `Idle`, and `winit/src/lib.rs`'s `if !window.scheduler.should_produce_frame(...) {
+continue; }` silently drops every `RedrawRequested` winit ever delivers, forever. This is a
+genuine, platform-independent bug in the Phase 6 frame-scheduler wiring — not a sandbox or
+compositor limitation — and it plausibly means no window on this tree's `winit` backend had
+ever rendered a first frame anywhere before this session, consistent with this being the
+first run against a live compositor.
+
+Fix (small, verified): `Event::WindowCreated` now calls
+`window.request_redraw(window::RedrawRequest::NextFrame)` once, right after
+`set_visible`, before the first `RedrawRequested` can arrive. Verified end to end: the log
+now shows `RedrawRequested` immediately followed by a successful `compositor.present()`,
+the marker file is created, and `scripts/perf/measure-app.py --warmup 5 --duration 15`
+against the same live GNOME/mutter session returned a real `"status": "ok"` result:
+**`first_present_observed_upper_bound_ms`: 435.73** (this run's parameters, an upper bound
+including process launch per the harness's own caveat — not first pixel, and not a
+controlled cold-start protocol) and **steady-state RSS: 157,999,104 bytes (~150.7 MiB)**,
+constant across 151 samples. `cargo test --workspace --all-targets -- --test-threads=1`
+and `cargo check --workspace --all-targets` both pass after the fix.
+
+**Net: the first-present and steady-state-memory rows above now carry one real,
+uncontrolled-cache-state measurement each — the first ever captured.** First pixel (the
+marker is an explicit upper-bound proxy, not presentation feedback), a controlled
+storage-cold launch protocol, and whole-device energy (requires an external power meter)
+remain open, as does the Flutter/React Native comparison in
+`benchmarks/competitors/README.md`.
+
+**2026-09-06 — five more independent runs, per the docs' own instruction to repeat and
+preserve every report including failures; the single prior run was an anecdote, not a
+baseline.** Same build (`cargo build -p mobile_shell --release --features
+taim/measurement`, unchanged binary, sha256 `78d14058e7...73d8c`), same invocation
+(`scripts/perf/measure-app.py --warmup 5 --duration 15`), same live GNOME/mutter session,
+run back to back with no code changes in between. Results, in order, not averaged:
+
+| Run | Status | `first_present_observed_upper_bound_ms` | `steady_rss_bytes` (min / median / max, samples) |
+|---|---|---|---|
+| Original (2026-09-06, earlier) | ok | 435.73 | 157,999,104 constant, 151 samples |
+| 1 | ok | 700.93 | 160,415,744 / 162,185,216 / 163,176,448, 151 samples |
+| 2 | **failed** — "application exited during measurement" | 486.17 (marker fired before exit) | null |
+| 3 | **failed** — "application exited during measurement" | 460.79 (marker fired before exit) | null |
+| 4 | **failed** — "application exited during warmup" | 430.74 (marker fired before exit) | null |
+| 5 | **failed** — "application exited during warmup" | 485.24 (marker fired before exit) | null |
+
+**This is not a clean baseline — it is real, uncomfortable variance that must not be
+averaged away:**
+
+- **4 of 6 total runs (67%) failed** with the application exiting mid-measurement or
+  mid-warmup, after the marker had already fired. The scheduler fix makes the first
+  present happen; it does not make the process survive the following 15–20 seconds
+  reliably in this sandbox. No zombie or hung processes were left behind (`pgrep -af
+  mobile_shell` clean after every run) — the app is exiting, not hanging — but the cause
+  of the exit is undiagnosed and is a new, separate open question from the scheduler bug.
+- Across the two runs that *did* produce a first-present number, first-present
+  observations for the 6 total runs span **430.74 ms to 700.93 ms**, a spread of over
+  270 ms (~63% of the low end) on identical binary and command. Even the failed runs'
+  marker timestamps fall inside that same wide band, so the spread is not an artifact of
+  the two successful runs alone.
+- Only 2 of 6 runs produced any RSS data at all, and those two disagree with each other
+  more than either disagrees with itself: 157,999,104 bytes constant across 151 samples in
+  the original run, versus 160,415,744–163,176,448 bytes (median 162,185,216) in run 1 —
+  i.e. run 1 alone is not internally constant the way the original run was, and the two
+  runs' medians differ by ~4.2 MiB. "Steady-state RSS ~150–156 MiB" is a defensible range
+  from the evidence in hand; "~150.7 MiB, constant" (the original single-run framing) is
+  not supported once a second run is added.
+- **Conclusion for the scorecard above:** first-present upper bound should be read as
+  **~431–701 ms observed (n=6, 2 successful, 4 failed before steady state)**, not a single
+  435.73 ms point value, and steady-state RSS as **~150.7–155.6 MiB (n=2 successful runs)**,
+  not a single constant figure. The high failure rate is itself a finding: this
+  measurement is not yet reliable enough to call a baseline, and the exit-during-run
+  failure mode needs its own diagnosis (logging, as was done for the original scheduler
+  bug) before these numbers should be trusted for any go/no-go decision.
+
+**Golden-suite and full-workspace re-confirmation after the scheduler fix, run fresh in
+this session:** `cargo test --test golden` — **114 passed, 0 failed** (all pixel goldens,
+both themes, byte-for-byte against the committed images; the fix changes only when the
+first redraw is requested for a newly created window, and produces no visual difference in
+the golden suite's headless rendering path). `cargo test --workspace --all-targets --
+--test-threads=1` — **exit 0, 51 test binaries, 0 failed**, matching the count and result
+already recorded above for this same command.
+
+**2026-09-06 — early-exit failure mode investigated with `RUST_LOG=debug`; partially
+diagnosed, not fixed, further reproduction stopped mid-investigation by explicit
+instruction.** Same binary as above (`sha256 78d14058e7...73d8c`), same `measure-app.py
+--warmup 5 --duration 15` invocation. 12 back-to-back runs were captured with full
+`RUST_LOG=debug` output before this investigation was ordered to stop launching the app
+further: 8 succeeded (`first_present_observed_upper_bound_ms` clustered **475.5–502.9 ms**
+this batch — narrower than the 430.74–700.93 ms spread recorded in the prior five-run
+batch, consistent with the same measurement being noisy run-to-run rather than bimodal),
+and 4 failed — one `"application RSS unavailable"` and three `"application exited during
+warmup"`.
+
+Evidence gathered from the three `"exited during warmup"` logs: in every one, the captured
+log stream ends abruptly a few lines after a `RedrawRequested for id ...` /
+`Calling compositor present for id Id(1)` / `compositor present Ok for id Id(1)` sequence —
+**no Rust panic message, no backtrace, and no `CloseRequested`, `Destroyed`, or
+`Focused(false)` `WindowEvent` trace line appears anywhere before the log simply stops.**
+This rules out a panic (there is no panic banner from Rust's default hook, and
+`winit/src/lib.rs` installs none of its own) as the visible cause.
+
+To separate a harness artifact from an app-level exit, the binary was also run 5 times
+**directly**, bypassing `measure-app.py` entirely (`RUST_LOG=debug
+TAIM_FIRST_PRESENT_MARKER=... target/release/mobile_shell &`, backgrounded, checked after
+20 s). All 5 direct runs had **already exited on their own before the 20 s check — in every
+case with exit status 0** (a clean process exit, not a signal/crash), and none of the 5
+logs show a `CloseRequested`/`Destroyed`/`Focused(false)` event before the point where
+output stops. `pgrep -af mobile_shell` was clean after all runs (no zombies, no lingering
+processes at any point in this investigation).
+
+**What this evidence does and does not establish:**
+- **Rules out:** a `measure-app.py`-specific artifact (SIGTERM sent too early, a warmup/
+  duration race) — the exit reproduces identically with no harness involved at all. Also
+  rules out a crash/panic/segfault — exit status is consistently **0**, and no panic banner
+  ever appears.
+- **Does not establish:** the actual trigger. Exit status 0 combined with no logged
+  `CloseRequested`/`Destroyed` event before the cutoff is consistent with several distinct
+  mechanisms this session did not distinguish between: (a) `winit/src/lib.rs`'s
+  `event_loop.exit()` being reached via a control-flow path this session's log statements
+  don't bracket (there are three `event_loop.exit()` call sites in `winit/src/lib.rs`
+  besides the logged `Destroyed`-when-empty path, and none of them has a `log::debug!`
+  immediately before it); (b) the sandboxed compositor closing the connection in a way
+  winit surfaces as a normal loop exit rather than a traced `WindowEvent`; (c) stdout/
+  stderr buffering losing the final one or two log lines that would have named the actual
+  event, since the captured stream in every failing case cuts off mid-sequence rather than
+  at a natural boundary. Distinguishing between these would need a `log::debug!` placed at
+  each remaining `event_loop.exit()` call site and at least one more reproduction to catch
+  it — which this session was explicitly told not to do.
+- **Reproduction was stopped by explicit instruction before the cause could be pinned to a
+  specific line.** No fix was attempted, in line with the task's own rule against guessing
+  at a fix for a mechanism not yet fully understood. Frequency in this session's 12-run
+  batch was 4/12 (33%), roughly consistent with (not identical to) the 4/6 (67%) recorded
+  in the prior batch — both are small samples of a real, intermittent failure, not a stable
+  rate.
+- **Open follow-up, precisely scoped for the next session:** add `log::debug!` immediately
+  before each of the three currently-unlogged `event_loop.exit()` call sites in
+  `winit/src/lib.rs`, flush the logger explicitly (or set `RUST_LOG_STYLE`/use
+  `env_logger::Builder` with a line-buffered target) so a final event is never lost to
+  buffering, reproduce until a failing run is caught again, and read which site fired.
 
 ---
 
@@ -431,12 +750,12 @@ Ratings are against Flutter 3.x and React Native 0.7x as of 2026-08.
 | Frame cost, framework-side | **A** | B | C | 224× margin at 60 Hz, worst p99 |
 | Damage / partial redraw | **A−** | C | D | correct swapchain-depth accumulation |
 | Memory safety | **A** | B | C | `unsafe_code = "deny"` workspace-wide |
-| Test discipline | **A−** | B+ | B | 1,634 tests, golden suite on CPU |
+| Test discipline | **A−** | B+ | B | 1,864 test functions, golden suite on CPU |
 | Accessibility architecture | **A−** | B | C+ | tree built unconditionally, live bus |
 | Rasterisation quality | C | **B+** | B | MSAA vs Impeller vs Skia |
-| Colour / HDR | **D** | C+ | C | sRGB only, no management |
+| Colour / HDR | **B−** | C+ | C | scene-referred path live; physical-panel gate open |
 | Text | C+ | **A−** | B+ | CPU atlas vs full-featured stacks |
-| Reactivity cost | **D** | B | C+ | full rebuild + full relayout |
+| Reactivity cost | **C+** | B | C+ | fine-grained path live; scale gate open |
 | Threading | **D** | A | B | one thread vs raster thread |
 | Cold start | **?** | B | C | unmeasured |
 | Binary size | C− | B | B− | 15.76 MiB stripped |
@@ -509,6 +828,31 @@ Every pillar below is a clause of that sentence.
 
 **Ceiling addressed:** 4. **Horizon:** H2. **Cost:** 6–9 months, 1–2 engineers.
 
+### Progress — 2026-09-04
+
+The backend-independent foundation exists; the GPU rasterizer does not yet.
+`taim-raster` is a workspace crate with a validated, append-only, POD scene
+encoding for path segments, path ranges, clip-stack entries, material IDs, and
+painter-ordered draw objects. Every stream exposes its exact upload bytes. A
+deterministic CPU reference bins segments into row-major 16×16 tile lists and
+culls them against a damage rectangle, with tests for ordering, invalid input,
+clip ancestry, byte layout, determinism, and damage culling.
+The reference side also clips closed polygon paths exactly against each pixel
+and computes area coverage with the shoelace formula, producing row-major
+8-bit masks for byte comparison with the future `fine` shader. Axis-aligned
+full, half, and empty coverage cases are exact and open contours are rejected.
+
+`renderer::Settings::rasterizer` now exposes `Automatic`, `Compute`, and
+`Legacy`, while the current backends safely remain on the legacy path. The
+crate is feature-wired through `taim_graphics`, `taim_wgpu`, `taim_renderer`,
+and the root crate without making unfinished compute code a default feature.
+
+Still open: curve encoding/flattening policy, GPU buffer ownership, the
+`path_coarse`, `coarse`, and `fine` compute pipelines, analytic coverage and
+clip evaluation, linear-HDR output integration, capability negotiation, and
+the 5,000-overlapping-rectangle accuracy/performance proof gate. This progress
+is the data contract those stages need, not a claim that the pillar is done.
+
 ### The design
 
 Replace vertex/fragment quad rendering plus MSAA with a Vello-class compute pipeline.
@@ -565,19 +909,23 @@ worth far less on a pipeline that re-uploads the whole scene every frame.
 **Ceiling addressed:** 3. **Horizon:** H1. **Cost:** 6–10 weeks. **This is the highest
 value-per-week item in the entire document.**
 
-### Progress — 2026-08-25
+### Progress — 2026-08-31
 
-Started, and further along than the estimate suggested, because of one favourable
-discovery and one blocking one.
+The software path is complete. One favourable discovery shortened the renderer
+work; one blocking feature-policy defect was found, fixed, and turned into a
+permanent feature-matrix test.
 
 **The favourable one.** The fragment shaders already emit **linear light** and rely on an
 sRGB surface to apply the transfer in hardware. Pointing them at a half-float target
 therefore needs no shader change at all — it simply stops discarding range they were
 always producing. That removed most of the renderer work this pillar had budgeted for.
 
-**The blocking one.** See Ceiling 3's correction. `web-colors` is a default feature, it
-disables linear compositing entirely, and the integration suite cannot switch it off.
-**Everything below is built and proven; none of it does anything in a default build.**
+**The former blocker.** See Ceiling 3's correction. `web-colors` used to be a
+default feature and the integration suite could not switch it off. It is now
+opt-in legacy compatibility, the workspace dependency disables defaults, and
+the shipping binaries explicitly select the production feature set. Both
+`cargo test --no-default-features --test color` and the `web-colors` variant
+exercise their respective contracts.
 
 | Stage | State | Evidence |
 |---|---|---|
@@ -587,9 +935,10 @@ disables linear compositing entirely, and the integration suite cannot switch it
 | Display transform — BT.2390 EETF, gamut mapping | done | `core/src/color/display.rs`, 22 tests |
 | WGSL mirror + CPU/GPU conformance | done | `wgpu/src/shader/display.wgsl`, `tests/gpu/display_transform.rs`, 5 GPU tests |
 | Transform on the live present path | done | `Renderer::present_hdr`, 3 GPU tests |
-| Authorable luminance — `Quad::luminance`, `LuminanceTokens` | done, **inert** | 9 tests; blocked by `web-colors` |
-| f16 effect intermediates | satisfied by construction | the effect pipeline takes the engine's format; unverifiable until linear |
-| Panel negotiation (`wp_color_management_v1`) | not started | needs Linux and a compositor |
+| Authorable luminance — `Quad::luminance`, `LuminanceTokens` | done, live | CPU output tests and real GPU colour-output tests |
+| f16 effect intermediates | done | HDR present always uses a half-float intermediate; budget pricing is format-aware |
+| Panel description (`wp_color_management_v1` vocabulary → `Display`) | done | `taim-platform-vyom/src/color_management.rs`; sanitisation and luminance invariants |
+| Colour-management protocol round trip on hardware | unverified | needs a compositor advertising the protocol and an HDR panel |
 
 **Measured, on a real GPU:** diffuse white reaches an HDR panel at 203 nits and a
 1,000-nit highlight reaches it above 900 — the gate, in the signal. And the HDR present
@@ -620,10 +969,10 @@ and visible only to a test that asked *what does the panel receive*. That is the
 lesson §3.2 records the effect pipeline learning, and §3.6 records the icon font
 teaching. It keeps costing this repository the same way.
 
-**What unblocks the rest:** the `web-colors` decision. Flipping it moves every blended
-pixel in the framework — which is the point, since the present blending is
-mathematically wrong — and requires re-capturing all 40 committed goldens. It is a
-one-line change; the work is in reviewing what moved.
+**The unblock is complete.** Removing `web-colors` from defaults moved every
+blended pixel for the intended mathematical reason. The committed goldens were
+recaptured and reviewed; `docs/testing/golden-linear-recapture.md` records the
+change, and `tests/color/contract.rs` prevents the feature leak from returning.
 
 ### The design
 
@@ -690,8 +1039,11 @@ single most persuasive demo available to this project and it costs ten weeks.
 
 **Ceiling addressed:** 3, 4. **Horizon:** H2. **Cost:** 4–6 months. Requires I and II.
 
-> **Foundation started 2026-08-25.** The physics exists, is tested, and the CPU and
-> GPU implementations are pinned to each other — but **nothing shades a material yet**.
+> **Forward path live 2026-08-31.** The physics exists, is tested, and the CPU
+> and GPU implementations are pinned to each other. `Quad::material` now
+> reaches the production quad instance and shader; the analytic rounded-box
+> SDF supplies its bevel normal, and a frame-level `SceneLight` controls the
+> highlight.
 >
 > Built: `core/src/material.rs` (Fresnel/Schlick, GGX, slab refraction, dispersion,
 > `F0` derived from IOR), `wgpu/src/shader/material.wgsl` as its mirror,
@@ -699,15 +1051,20 @@ single most persuasive demo available to this project and it costs ten weeks.
 > viewing angle on real hardware, and `taim-design`'s `MaterialTokens` for the semantic
 > roles. 25 tests. See `docs/architecture/material-pipeline.md`.
 >
-> Not built: no primitive carries a `Material`, there is no lighting pass, and nothing
-> calls `specular()` during a frame. A widget cannot ask for glass.
+> Built since the foundation: opaque compatibility, forward GGX lighting,
+> configurable light direction, backdrop capture, slab refraction, and
+> channel-separated dispersion. `MaterialTokens` reach widgets through the
+> Taim theme helpers. `tests/gpu/material_live.rs` proves material values move
+> real pixels; `tests/gpu/material_backdrop.rs` proves a glass pane transmits,
+> bends, and disperses what is behind it instead of behaving like a tint.
 >
 > **The dependency on Pillar I is narrower than this section assumed.** The full
 > deferred G-buffer does need a compute rasteriser, for coverage and gradients over
 > arbitrary paths. But `shader/quad.wgsl` already computes `rounded_box_sdf`, and an
 > SDF's gradient *is* a normal — so a lit, bevelled, refracting rounded rectangle needs
-> no compute stage and no extra attachment. `sdf_normal()` is written and unused. That
-> is the intended next step, and it is forward shading rather than deferred.
+> no compute stage and no extra attachment. That forward-shaded path is now
+> implemented. The deferred G-buffer described below remains future work for
+> arbitrary paths, inter-material lighting, depth, and contact shadows.
 
 ### The problem with every current "glass" UI
 
@@ -925,6 +1282,94 @@ non-engineer can verify with their own eyes.
 **Ceiling addressed:** 1. **Horizon:** H1. **Cost:** 4–6 months. **Largest measurable
 performance win available. Do this before Pillar I.**
 
+### Progress — 2026-09-02
+
+The foundation and framework adoption are live:
+
+- `taim-signal` is a standalone workspace crate. `Signal<T>` is thread-safe,
+  revisioned, and synchronously observable; `Memo<T>` lazily tracks signal and
+  memo dependencies, including dynamic dependency replacement. RAII
+  subscriptions disconnect on drop, and concurrent updates are tested.
+- `widget::Reactive` keeps a source alive, subscribes it to the runtime waker,
+  and synchronizes only its lazy subtree on the next `Event::Waken`. A source
+  mutation can rebuild, relayout, and repaint that subtree without invoking the
+  application's root `view`.
+- The lazy child is the first production user of `Tree::layout_with_cache`.
+  Its paint is wrapped in a revision-keyed retained boundary, and both native
+  renderers cache multiple subtree command ranges under a byte budget.
+- Runtime regression tests prove the unchanged path does no subtree build,
+  layout, or paint work; a live signal mutation wakes an already-built
+  interface and updates it exactly once without rebuilding the root.
+
+The paired proof workload now exists as `signal_list_100k` and
+`signal_list_1m` in `taim_bench`. The harness preserves `UserInterface` state
+between frames and performs the signal mutation inside the timed update phase;
+previously it discarded the complete UI cache each frame and changed scene
+state before timing, so it could not measure this contract at all. Lazy and
+reactive items can also reconnect to elements retained by a virtualized slot.
+Reactive sources now emit source-tagged wake events through the real `winit`
+proxy, `VirtualList::route_reactive` maps a token directly to its owning row,
+and targeted relayout clones cached sibling nodes. A paint-only invalidation
+tier preserves layout and semantics for fixed-geometry visual changes.
+`reactive_value` goes one step lower: it builds a fixed widget subtree once,
+passes that subtree the live source, and invalidates only its retained paint
+range when the source changes. `VirtualList::route_reactive_value` applies the
+same contract directly to a live slot, so targeted dispatch performs no row
+builder call, widget diff, or event traversal. Runtime regressions prove one
+value change performs one repaint with zero subtree rebuilds and zero
+relayouts, and the virtual-list regression proves zero row-builder calls during
+the routed event.
+
+This is not the completed proof gate. An exploratory release run on the
+`tiny-skia` backend with a three-second warm-up measured **7.356 µs p95** at
+100,000 rows and **8.198 µs p95** at 1,000,000 rows, versus **4.764 µs** for
+`idle_shell`. The 1m result is within 12% of 100k, so logical-length scaling is
+flat within the required 20%, but the results are still 54% and 72% above this
+run's idle cost. These were dirty-tree quick diagnostics, not baseline
+artifacts. They located the work in paint preparation and, at that point, the
+cost of reconstructing the one changed visual subtree; the live-value path now
+eliminates that reconstruction too. Logical-list traversal and unrelated-row
+relayout are no longer the cause. A clean 30-second reference run and further
+paint-path work remain before this pillar can be called complete.
+
+A later dirty-host diagnostic exercised the new live-value path with both a
+30-second warm-up and CPU affinity. It was not promotable: individual run p95s
+varied by more than 3×, run order changed the 100k result from 11.803 µs to
+8.025 µs, and the 1m case measured faster than 100k. Those contradictions are
+host noise, not evidence for or against the gate, and reinforce the requirement
+for a clean registered reference machine rather than replacing the earlier
+diagnostic with a more convenient number.
+
+**2026-09-06 diagnostic (this session).** Re-ran `idle_shell`, `signal_list_100k`
+and `signal_list_1m` on `tiny-skia` with the harness defaults (30 s warm-up, 5
+measured runs of 180 frames) on this sandboxed development machine, five
+independent invocations of each scene, no code changes. p95 by run:
+`idle_shell` 4.397, 3.786, 4.344, 2.721, 3.896 µs (mean 3.83); `signal_list_100k`
+5.470, 4.458, 5.057, 4.039, 5.017 µs (mean 4.81); `signal_list_1m` 5.841, 3.380,
+4.502, 5.352, 5.845 µs (mean 4.98). On the means, 100k is 25.6% over idle and 1m
+is 30.1% over idle — both over the 20% budget — while 1m vs 100k is within 3.6%,
+so the scale half continues to pass cleanly. But per-run ranges overlap
+directly: the lowest `signal_list_100k` and `signal_list_1m` samples (4.04 µs,
+3.38 µs) sit *below* the highest `idle_shell` sample (4.40 µs) from the same
+batch. That is the same host-noise signature the two prior diagnostics
+recorded, on a different day and a different measured value, which makes it a
+property of this environment rather than of a specific run.
+
+Reading the code path (`widget/src/virtual_list.rs`'s `route_reactive_value`
+handling of `Event::Reactive` at line 551, `widget/src/reactive.rs`) did not
+turn up an obvious O(logical-rows) cost on the value-routed path: the routed
+slot lookup is `state.slots.iter_mut().find(...)`, bounded by the number of
+*visible* (virtualized) slots, not by list length, which matches the flat
+100k-vs-1m scaling actually observed. No speculative change was made against
+that path, because nothing in this session's measurements isolated a specific
+line as the excess cost with any confidence above the noise floor above — and
+the instructions governing this work are explicit that a fix must target a
+bottleneck actually found, not one guessed at under noisy data. The idle-relative
+half of the gate is therefore still open. This is the third consecutive
+diagnostic to find the same thing: closing it needs a quiet, dedicated
+reference machine (CPU governor pinned, isolated cores, no co-scheduled load),
+not another run of this harness on shared/virtualized hardware.
+
 ### The design
 
 Fine-grained reactivity — signals — instead of view rebuilding. SolidJS proved the model
@@ -962,16 +1407,22 @@ them and enforce that a change stops at the lowest class that suffices:
 `runtime/src/user_interface.rs:129`'s unconditional
 `state.mark_dirty(DirtyFlags::PAINT)` is the line this pillar deletes.
 
+The live-value API and direct virtual-list route now stop above geometry and
+subtree reconstruction. The final step from retained-range repaint to the
+table's literal one-uniform-write contract belongs to the GPU-resident scene in
+Pillar IX; the current native display lists still have to re-record the one
+changed paint range.
+
 ### Then wire the two dormant subsystems
 
 Signals make Ceiling 6 tractable, because now there is a *reason* to ask whether a subtree
 changed:
 
-- `Tree::layout_with_cache` gets its first real caller. A subtree whose signals did not
-  fire returns its cached node.
-- `RetainedLayerCache` gets adopted — but **first** make `recording_retained_frame` a
-  stack, as Ceiling 6 requires. A subtree that has not invalidated replays its retained
-  layer instead of re-recording.
+- `Tree::layout_with_cache` has its first real caller. A lazy subtree whose signals did
+  not fire returns its cached node.
+- The renderers now use a bounded multi-entry `RetainedStore` for native command
+  ranges. A subtree that has not invalidated replays its retained layer instead
+  of re-recording; nested sibling ranges remain independently reusable.
 
 ### The projected win
 
@@ -985,18 +1436,23 @@ in list length instead of linear.**
 
 Do not break the Elm API. Add signals alongside it:
 
-1. `taim-signal` ships standalone with its own tests. No framework changes.
-2. `Signal<T>` becomes usable as a widget property anywhere a value is taken today.
-3. A signal-driven `view` becomes an opt-in `Program` variant.
+1. **Done:** `taim-signal` ships standalone with its own tests.
+2. **Partly done:** `Signal<T>` drives any subtree through `widget::reactive`; direct
+   signal overloads for every individual widget property are not required for adoption.
+3. **Done at subtree granularity:** a signal-driven view is opt-in without a new
+   `Program` variant; live event-loop wakeup bypasses the root application view.
 4. Elm-style `view()` is reimplemented *on top of* signals — a single root signal that
    invalidates everything, which is exactly today's semantics. **Both models coexist
-   permanently, and the old one costs nothing to keep.**
+   permanently, and the old one costs nothing to keep.** This compatibility
+   refactor remains optional and is not part of the performance proof.
 
 ### The proof gate
 
-`tests/bench` gains a scene that mutates one row in a 100,000-row list, once per frame.
+`taim_bench` contains paired scenes that mutate one visible row in a 100,000-row and a
+1,000,000-row list, once per measured frame.
 **Gate: frame cost is within 20% of `idle_shell` (6.51 µs), and does not change when the
-list grows to 1,000,000 rows.** That gate is the whole pillar in one line.
+list grows to 1,000,000 rows.** The scale half currently passes; the idle-relative half
+does not. That gate is the whole pillar in one line.
 
 ---
 
@@ -1034,11 +1490,248 @@ speedup on 16 cores for layout-bound scenes, and zero change to any golden.** If
 moves, the parallelisation is wrong — determinism is non-negotiable and the golden suite
 is exactly the instrument that proves it.
 
+### 2026-09-06 — feasibility/scoping pass, no implementation attempted
+
+This pass was scoping only, per this pillar's own stated cost (4–6 months, multi-engineer)
+and prerequisites. No parallel layout code was written, no threading was added to the
+frame path, and no production file was modified.
+
+**Proof-gate machine: not available here, and this doesn't prove anything about a real
+16-core target.** `nproc` in this sandbox reports **20 logical cores**, which superficially
+clears the "16-core machine" number in the gate, but a shared/virtualized development
+sandbox is not a legitimate proof-gate host: Pillar VII's own 2026-09-06 diagnostic in this
+same document, on this same class of machine, records run-to-run p95 variance over 3× and
+run order flipping which scene measures faster — host noise large enough to swallow a
+2.5× speedup claim in either direction. A real gate run needs a dedicated, pinned-affinity,
+governor-locked 4-core and 16-core reference pair, which this sandbox is not and cannot
+simulate by having 20 `nproc` cores available to a noisy shared host.
+
+**Prerequisite check — "signals first": not satisfied yet.** Pillar VII's own proof gate
+(above) states plainly: "The scale half currently passes; the idle-relative half does
+not." The 2026-09-06 Pillar VII diagnostic found `signal_list_100k`/`signal_list_1m`
+still 25–30% over `idle_shell`, over the 20% budget, and attributed the remaining gap to
+host noise versus a located bottleneck — i.e. still open, not close-to-open. This pillar's
+own text is explicit: "Parallel layout on a tree that is fully invalidated every frame
+parallelises the wrong work and wins little." Since the reactive/signal path has not yet
+been proven to stop invalidation at fine granularity end-to-end (only subtree- and
+value-granularity paths are proven so far, per Pillar VII's progress notes), parallelising
+layout now would risk parallelising exactly the "wrong work" this pillar warns against.
+**Verdict: prerequisite not met. Do not start Pillar VIII implementation yet.**
+
+**The `&mut self` → `&self` migration surface, characterized without changing it:**
+
+- The `Widget` trait's `layout` method is declared at `core/src/widget.rs:51-56` as
+  `fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &layout::Limits) ->
+  layout::Node`. A parallel implementor of the same trait exists for `overlay::Element` at
+  `core/src/overlay.rs:28` and `core/src/overlay/element.rs:65` (`fn layout(&mut self,
+  renderer: &Renderer, bounds: Size) -> layout::Node`), which would need the same
+  treatment if overlay layout is ever to run off the main thread too.
+- **64 files under `widget/src/` implement this exact `&mut self` signature** (confirmed
+  by `grep -rn "fn layout(" widget/src/*.rs | wc -l` matching the trait's parameter shape),
+  plus the built-in `Text` widget at `core/src/widget/text.rs:235-247`.
+- **What layout actually mutates, checked by reading the bodies (not assumed):** in every
+  implementation sampled — `widget/src/row.rs:234`, `widget/src/scrollable.rs:409`,
+  `widget/src/text_input.rs:273` (the real body; the trait impl at `:628` just forwards to
+  it), `core/src/widget/text.rs:238` — the mutation during layout lands on
+  `tree.state.downcast_mut::<State<_>>()` (a **`Tree`**-owned, per-node cache: paragraph
+  shaping cache, flex-solve cache, placeholder/value text cache), not on the widget's own
+  struct fields. `self.<field>` reads inside these bodies (`self.width`, `self.padding`,
+  `self.children`, `self.is_secure`, etc.) are all reads, not writes; a targeted check of
+  `sliver.rs`, `pane_grid.rs`, `text_editor.rs`, `combo_box.rs`, `navigator.rs`, and
+  `text/rich.rs` found no `self.field = ...` assignment inside any `layout` body either.
+  **This means the `&mut self` requirement on `layout` is structural, not semantic** — it
+  exists because layout recurses (`widget/src/row.rs:249` takes `&mut self.children` so it
+  can call `child.as_widget_mut().layout(...)` on each child, and `as_widget_mut()` at
+  `core/src/element.rs:41` itself demands `&mut self`), not because widgets need to mutate
+  their own persistent state while laying out. That is the good news for this migration:
+  the actual per-node mutable state (`Tree`) is already a separate, already-`&mut`
+  parameter, distinct from `self` — so `fn layout(&self, tree: &mut Tree, ...)` looks
+  *semantically* sound for the sampled implementations, contingent on a full audit of all
+  64, not the 6 sampled here.
+- **What would break, call-site-wise:** every recursive call of the shape
+  `child.as_widget_mut().layout(...)` (161 raw hits for `as_widget_mut()` across the repo,
+  ~62 files calling some `.layout(`) would need to become `child.as_widget().layout(...)`,
+  which is fine only if every transitive callee has also moved to `&self`. The two load-
+  bearing driver sites are `runtime/src/user_interface.rs:133` (`root.as_widget_mut()
+  .layout(&mut state, renderer, &layout::Limits::new(...))`, the top-level per-frame
+  layout call) and the overlay re-layout paths at `runtime/src/user_interface.rs:321` and
+  `:432` (re-run on resize/reflow). `layout::flex::resolve_cached` at
+  `core/src/layout/flex.rs:96`, which `row.rs`/`column.rs` delegate to, takes
+  `children: &mut [Element<...>]` today specifically to call `.as_widget_mut()` per child —
+  its signature would also need to drop to a shared reference. This is a whole-trait,
+  whole-callgraph edit in one shot (no incremental per-widget migration is possible,
+  because the trait is implemented polymorphically via `dyn Widget` — a mixed
+  `&self`/`&mut self` world can't coexist behind one vtable), which matches the 4–6 month,
+  multi-engineer estimate this pillar already carries rather than contradicting it.
+
+**Net for this pass:** no implementation attempted, correctly. The prerequisite (Pillar
+VII's idle-relative gate) is still open by the project's own numbers, the proof-gate
+hardware doesn't exist in this environment, and the migration — while it looks
+semantically survivable for the sampled call sites, since `Tree` already carries the real
+mutable layout state separately from `self` — is still an all-64-files, all-call-sites,
+one-shot trait change with no safe incremental path. Rushing any part of it now, on a
+prerequisite that isn't met and a gate that can't be measured here, would be exactly the
+kind of high-risk production change this task was scoped to avoid.
+
+### 2026-09-06 — `&mut self` → `&self` migration attempted, reverted: real exceptions found
+
+A follow-up pass this same day attempted exactly the narrow slice the prior scoping note
+described as "semantically survivable": change only `Widget::layout`'s (and the parallel
+`overlay::Overlay::layout`'s) receiver from `&mut self` to `&self`, mechanically, with **no**
+threading and **no** other trait method touched. This was explicitly scoped as a probe of
+the signature change alone, decoupled from the "signals first" prerequisite above (which
+remains unmet and blocks actual parallel execution regardless of this result).
+
+**Baseline (before any change):** `cargo check --workspace --all-targets` — clean, 0
+warnings. `cargo test --workspace` — every crate's test result line read `0 failed`
+(full log kept for this pass; representative counts: 195, 185, 126, 114, 110, 106, 93, 90,
+89 ... passed across suites, all `0 failed`).
+
+**What was done:** `core/src/widget.rs:52` and its `Widget`-for-`()` default impl,
+`core/src/overlay.rs:28`, `core/src/overlay/element.rs:65`, `core/src/element.rs`'s two
+`Element`/`Map` forwarding impls, and all 64 widget files under `widget/src/` plus
+`core/src/widget/text.rs` were mechanically converted (`&mut self` → `&self` on `layout`
+specifically), and every `as_widget_mut()`/`as_overlay_mut()`/`.iter_mut()` call site that
+existed *only* to call `.layout(` was updated to its shared-reference counterpart — this
+matched the prior estimate's shape (one-shot, whole-vtable) rather well; the actual
+call-site count fixed this way was in the same order of magnitude as the prior pass's
+~161-hit estimate for `as_widget_mut()`, though most of those hits were for other methods
+(`update`, `operate`) and correctly left untouched.
+
+**Where it broke, and why this is not a small thing:** after the mechanical pass, the
+compiler's own borrow-checker errors — not guesswork — surfaced **six** widgets that
+mutate their *own* struct fields (not `Tree`'s per-node state) from inside `layout`,
+directly contradicting the prior pass's 6-of-64 sample:
+
+- `widget/src/responsive.rs` — `layout` does `self.content = (self.view)(size);`: it
+  rebuilds and caches its child element in a `self`-owned field, sized by the incoming
+  layout constraint. This is not structural recursion; it is layout-time content
+  synthesis stored on the widget itself.
+- `widget/src/transition.rs` — `layout` does `self.last_limits = *limits; self.new_layout
+  = None;`, caching the limits used and invalidating a pending transition frame — again a
+  `self`-owned field, not `Tree` state.
+- `widget/src/reactive.rs` (new since the prior pass; not in its sample) — `layout` calls
+  `self.synchronize(tree)`, which calls `self.lazy.replace_dependency(..)` and
+  `Widget::diff(&mut self.lazy, tree)`: it rebuilds its own child widget in response to
+  signal state as part of laying out. This is exactly Pillar VII's reactive machinery
+  reaching into layout, and it is real, needed `&mut self` — not incidental.
+- `widget/src/tabs.rs`, `widget/src/segmented_control.rs`, `widget/src/bottom_nav_bar.rs`
+  — each calls `self.sync_selection()` from `layout`, which does
+  `self.<items>.iter_mut().for_each(|item| item.selected = ...)`: a direct write to a field
+  on the widget's own child descriptors (not `Tree`), used to keep the rendered selection
+  state consistent with the current `selected` index before measuring cells.
+
+Since `Widget` is used exclusively through `dyn Widget` (one vtable, confirmed again this
+pass), these six cannot keep `&mut self` while the other 58 widgets move to `&self` — the
+prior note's own words apply exactly: "a mixed `&self`/`&mut self` world can't coexist
+behind one vtable." Restructuring these six to route their mutation through `Tree` instead
+of `self` is a real, non-mechanical redesign of each widget's caching strategy (and, for
+`reactive.rs`, touches Pillar VII's in-flight signal-diffing contract directly) — not a
+drive-by fix, and explicitly out of this pass's scope per its own instructions ("do not
+force it," "do not paper over with unsafe interior-mutability hacks").
+
+Two smaller, contained exceptions were also found in the overlay hierarchy:
+`core/src/overlay/nested.rs`'s `Nested::layout` is an inherent method (not a `dyn Overlay`
+vtable member) that internally calls the *unrelated, unmigrated* `Overlay::overlay(&mut
+self, ..)` method to walk nested overlays, so it still needs `&mut self` itself; this one
+was reverted back to `&mut self` in isolation and cost nothing, since callers already hand
+it a `&mut Nested` regardless. Everything else in the overlay trait's own layout
+implementors (`Group`, `Element`, `menu::Menu`, `tooltip::Overlay`, `pane_grid`'s and
+`scrollable`'s trivial overlays, `themer`, `lazy::Component`, `lazy::Lazy`) converted
+cleanly — their mutation was confirmed, by reading each body, to be `RefCell`-mediated
+already (`with_overlay_maybe` takes `&self` and reborrows through a `RefCell` — a pattern
+already idiomatic in this exact codebase for exactly this reason) or absent entirely.
+
+**Verdict: reverted, in full, before any of this was left half-done.** Per this pass's own
+hard constraint — "a clean revert with an honest 'this needs more scoping than expected'
+is a fully acceptable and valued outcome; a forced, partially-broken migration is not" —
+every file touched (`core/src/widget.rs`, `core/src/element.rs`, `core/src/overlay.rs`,
+`core/src/overlay/element.rs`, `core/src/overlay/group.rs`, `core/src/overlay/nested.rs`
+[net no-op], `core/src/widget/text.rs`, all 64 `widget/src/*.rs` layout implementors
+including `widget/src/reactive.rs`, `widget/src/row.rs`, `widget/src/lazy.rs`,
+`widget/src/virtual_list.rs`) was restored to its exact pre-pass content. The working tree
+after this pass is byte-identical (`git status --short`) to the working tree before it,
+including the unrelated in-flight changes from other work that were already present and
+were never touched. Post-revert `cargo check --workspace --all-targets` is clean (0
+warnings) and `cargo test --workspace` reproduces the same 0-failed result on every suite
+as the pre-pass baseline (only wall-clock timings differ, as expected from run-to-run
+noise).
+
+**What this changes about the pillar's own estimate:** the prior note's line — "looks
+*semantically* sound for the sampled implementations, contingent on a full audit of all
+64" — is now resolved by that full audit, and the answer is no, not as a pure mechanical
+rename. At least 6 of 64 widgets (9%) need genuine restructuring, not just a signature
+change, before `&self` layout is possible at all. Combined with "signals first" still being
+open (per this pillar's own verdict above), there are now **two** independent blockers on
+Pillar VIII, not one: the idle-relative proof gate, and a newly-confirmed non-mechanical
+widget-state redesign for at least `responsive`, `transition`, `reactive`, `tabs`,
+`segmented_control`, and `bottom_nav_bar` (and possibly others not yet driven to a
+compiler error, since the compile-error method only surfaces a conflict once every *other*
+call site in the same build has already been converted). Whoever picks this up next should
+budget real design time for those six specifically — most plausibly, giving each an
+explicit `Tree`-owned cache slot for what it currently stores on `self`, the same shape the
+64-widget majority already uses — before attempting the trait-wide signature change again.
+No production code differs from before this pass; nothing here is a regression.
+
 ---
 
 ## Pillar IX — GPU-resident scene, delta-uploaded
 
 **Ceiling addressed:** 1, 6. **Horizon:** H2–H3. **Cost:** 3–4 months. Requires I and VII.
+
+### Scoping check — 2026-09-06, no implementation attempted
+
+Read this section plus Pillar I's and Pillar VII's progress notes end to end before
+touching anything, and then checked the actual code instead of taking the doc's
+dependency line on faith:
+
+- `taim-raster/src/lib.rs` (725 lines, the whole crate) contains **zero** occurrences of
+  `ComputePipeline`, `wgpu::Buffer`, `wgpu::Device`, or `create_compute_pipeline` —
+  confirmed by grep. Pillar I's own 2026-09-04 progress note says the same thing in
+  prose ("the GPU rasterizer does not yet [exist]"); this just verifies it against the
+  code. What exists is a validated, append-only, POD *CPU-side* scene encoding
+  (segments, ranges, clip-stack entries, material IDs, draw objects) and a CPU reference
+  rasterizer used for correctness tests. There is no persistent GPU buffer, no free-list
+  allocator, and nothing to patch with a `SceneEdit`, because there is no GPU-resident
+  scene of any kind yet — Pillar IX's design section describes a subsystem sitting on
+  top of infrastructure that does not exist.
+- Pillar VII's idle-relative proof gate ("frame cost is within 20% of `idle_shell`") is
+  still explicitly open per that section's own proof-gate line — the scale half passes,
+  the idle-relative half does not. So the second stated prerequisite is also unmet.
+- The doc's own dependency line (`Requires I and VII`) is therefore accurate, not
+  hand-waving, and this pillar has no honest entry point yet.
+
+**Today's actual upload path**, read in `wgpu/src/lib.rs` and `graphics/src/layer.rs`:
+there is no delta concept at all. `Layer::flush`/`merge`/`reset` rebuild layers per
+frame, `Backend::present` re-records and re-uploads the full batched primitive set every
+frame (`write_buffer` on the whole batch), and the only thing standing between that and
+"re-upload everything" is Pillar VII's `RetainedStore`
+(`graphics/src/retained_layer.rs`), which replays an already-recorded native command
+range verbatim when its subtree hasn't invalidated — a coarser, native-batch-level reuse
+mechanism, not a byte-level delta-upload one, and it does not currently drive any GPU
+buffer residency decision.
+
+**On a baseline number:** `RetainedLayer` already tracks `estimated_bytes()`
+(`graphics/src/retained_layer.rs:97,144`) and `RetainedStore` aggregates it into
+`CacheTelemetry::total_bytes` (`:185`, exposed via `.telemetry()` at `:355`). This is a
+real, already-existing accounting path — not something built for this pass — but it is
+(a) a heuristic byte *estimate* of retained command-range memory, not a measured
+GPU-upload byte count, and (b) not wired into `taim_bench` or any scene today: grepping
+`tools/taim_bench/src/` for `telemetry`/`total_bytes` returns nothing. Producing a real
+"before" number for Pillar IX's 1 KB/frame gate — e.g. via the existing
+`virtual_list`/`idle_shell` bench scenes — would require adding a small amount of
+telemetry plumbing to `taim_bench` that does not exist today. That is itself new
+instrumentation on the production bench harness, not a read-only measurement, so per
+this pass's scope it was not added; no fabricated or approximate number is reported here
+in its place.
+
+**Conclusion: no implementation work was started on Pillar I's compute pipelines or
+Pillar IX's GPU-resident buffer/`SceneEdit` design in this pass**, and no production code
+was changed. Both stated prerequisites are confirmed unmet by direct inspection of the
+code (not just the doc's own status prose), and the one candidate for "cheap real
+progress" — instrumenting `RetainedStore` telemetry through `taim_bench` for a baseline —
+is a small but genuine scope addition to the bench harness, not a no-op measurement, and
+was left for a dedicated pass rather than rushed in here.
 
 Today the display list is rebuilt and re-uploaded every frame. With signals, the *scene*
 is stable and only deltas move:
@@ -1089,6 +1782,51 @@ is positioned for that; a framework that ships pixels is not.
 **Gate: drive the full `taim-showcase` end to end with the screen off, through the
 semantic tree alone, with no visual renderer instantiated.** If that works, the inversion
 is real.
+
+> **Status 2026-09-06: partially met, and the attempt found a real bug.** The gate was
+> actually run, not reasoned about. `taim-showcase/src/lib.rs` now makes `Showcase`'s
+> view methods generic over the renderer — the same pattern every widget in this
+> workspace already uses — so `taim-showcase/tests/headless_semantics.rs` can build the
+> identical widget tree against `()`, the null renderer (`core/src/renderer/null.rs`,
+> built in under `debug_assertions`): no wgpu device, no tiny-skia canvas, no window, no
+> X11/Wayland connection anywhere. `cargo test -p taim-showcase --test
+> headless_semantics` reproduces it.
+>
+> **What is proven:** a real `UserInterface` built with no visual renderer publishes
+> `taim-showcase`'s full semantic tree (72+ entries, every control role present), and a
+> driver that reads only role/name/actions/bounds from that tree — never `Showcase`'s
+> `Message` type or fields — can pick a control, synthesize a pointer click at the
+> bounds the tree itself reported, and get back the exact message that control's real
+> `on_press`/`on_toggle` produces. That is the inversion's action-dispatch half, and it
+> works.
+>
+> **What is not met, and why:** reading the *effect* back through the tree does not yet
+> work in general. `a_widgets_semantic_state_can_go_stale_after_a_value_only_prop_change`
+> (same file) pins down a genuine, previously undocumented defect the gate's own
+> exercise surfaced: `runtime/src/user_interface.rs::build` marks a rebuilt tree
+> `DirtyFlags::PAINT` unconditionally but never `DirtyFlags::SEMANTICS`, and outside
+> `lazy.rs`/`navigator.rs`/`reactive.rs`/`virtual_list.rs` nothing in the `widget` crate
+> ever marks it either — `Widget::diff`'s default (`core/src/widget.rs:85-87`) leaves
+> dirty flags untouched. `taim_runtime::semantics::build`'s incremental engine treats a
+> clean `SEMANTICS` flag as "reuse the cached node," so a widget whose only state is an
+> external prop that changes between `view()` calls — `checkbox(self.checked)`, which is
+> to say the ordinary Elm-style pattern this entire framework is written in — keeps
+> serving its *first-frame* semantic node forever. This is not an artifact of the null
+> renderer or this test's harness: `winit/src/lib.rs:1345` and `:946` call the exact same
+> `UserInterface::build` / `semantics_changes` pair, so a real, on-screen application has
+> the identical stale tree. `tests/widgets/dirty_flags.rs` already named the gap in its
+> own doc comment — *"Phase 2 introduces no such caller itself"* — but nothing before
+> this file had actually driven a click from the tree back through to reading the tree
+> again to notice the caller still does not exist. Fixing it is a widget/runtime-level
+> change well beyond what this gate's own scope calls for; it is recorded here, and
+> pinned by a passing regression test, rather than attempted piecemeal.
+>
+> So: the semantic tree can drive the showcase with no renderer, and every
+> interaction reaches the real widget. Whether the tree itself stays truthful across
+> that interaction is not yet true in general, which means Pillar X's founding claim —
+> "the tree already knows every control, its role, its state" — is presently false for
+> exactly the pattern this framework is built around. The inversion is real for input;
+> it is not yet real for output.
 
 ---
 
@@ -1158,6 +1896,131 @@ competitor has — **resolve the static parts of a UI at compile time**:
 measure cold start — which, per Ceiling 8, has never been measured at all, and which needs
 a harness before it needs an optimisation.
 
+**2026-09-06 — first pass, honest status: gate still open.** Measured fresh in a
+build-only sandbox (`cargo build --release -p mobile_shell`, `stat -c%s`, then `strip`
+and re-`stat`; no display or GPU device involved):
+
+| | unstripped | stripped |
+|---|---|---|
+| Before (this tree, diverged from the 2026-08-23 baseline) | 21.19 MiB (22,214,416 B) | 16.38 MiB (17,175,408 B) |
+| After (font embed no longer default) | 20.76 MiB (21,771,528 B) | 15.96 MiB (16,732,784 B) |
+
+Only the font lever was safely applicable this pass:
+
+- **Font embed dropped from `default`.** `fira-sans` removed from `default` in
+  `Cargo.toml:35` and from `examples/mobile_shell/Cargo.toml`'s explicit feature list
+  (both crates' `default-features = false` + explicit lists otherwise stayed put).
+  `graphics/src/text.rs` already had a correct `cfg(not(feature = "fira-sans"))`
+  host-font fallback, so no rendering code changed. Determinism for the golden suite is
+  preserved on purpose, not by luck: this workspace's own `[dev-dependencies]` block in
+  `Cargo.toml` enables `fira-sans` explicitly for every integration test, independent of
+  the crate's `default` feature — confirmed by running the full `tests/golden.rs` suite
+  (114 tests, including `widget_gallery`'s font-rendered cases) after the change: all
+  pass, single-threaded. Saved ~430 KiB stripped, matching the doc's own estimate.
+- **Widget-set dead-code elimination**: not attempted. `pane_grid` and every other widget
+  module in `widget/src/lib.rs` are compiled unconditionally with no per-widget feature
+  gate; making them opt-in is a real API change (call sites break without the feature)
+  across many widgets, not a size-tuning edit, and matches this pillar's own stated
+  3–4 month cost rather than an incremental safe change.
+- **Release profile**: no change. A `[profile.release-opt]` already exists
+  (`Cargo.toml:209`) with `lto = true`, `codegen-units = 1`, `strip = "symbols"` — not a
+  new lever. The plain `[profile.release]` that `scripts/ci/check-budgets.sh` measures
+  deliberately has none of this: the script's own comment explains stripping the default
+  profile was rejected because it would silently change every consumer's release build to
+  buy a 1.5% budget win. That reasoning still holds, so it was left alone. (For reference,
+  measured but not adopted: `cargo build --profile release-opt -p mobile_shell` on the
+  pre-font-change tree produced a 12.96 MiB binary, already stripped by the profile.)
+- **Trivial-app gate (1.5 MiB): unmeasured.** No "trivial app" binary exists anywhere in
+  this repository to measure; inventing one was out of scope for this pass (not asked for,
+  and a new example is a real deliverable, not a measurement).
+
+**Net: gate not met, partially closed.** `mobile_shell` moved from 16.38 MiB to
+15.96 MiB stripped against the 4 MiB target — real but small, and the honest remaining
+gap (~12 MiB) needs the const layout solver, shader specialisation, and real per-widget
+dead-code elimination this section already named, none of which are safe same-day edits.
+`cargo check --workspace --all-targets` is clean and no test that passed before this
+change now fails (verified per-crate with `--test-threads=1`; a pre-existing SIGSEGV in
+`tests/golden.rs` under `--test-threads=2` and a pre-existing `taim_lab` build failure on
+this sandbox's platform were both reproduced unchanged on the pre-edit tree via `git
+stash`, so neither is a regression from this work).
+
+**2026-09-06 — trivial-app gate now measured: still open.** Added `examples/trivial`, the
+smallest possible real Taim application: a window rendering a single static `text` widget,
+nothing else. Its `Cargo.toml` deliberately mirrors `examples/mobile_shell`'s explicit
+feature list (`wgpu`, `tiny-skia`, `crisp`, `hinting`, `thread-pool`,
+`linux-theme-detection`, `x11`, `wayland`, no `fira-sans`) so it measures what a real app
+actually costs, not an artificially stripped one, and it was registered in the root
+`Cargo.toml` workspace `members` list — the only change outside the new example crate.
+Measured the same way as `mobile_shell` above (`cargo build --release -p trivial`,
+`stat -c%s`, then `strip` and re-`stat`; no display or GPU device involved):
+
+| | unstripped | stripped |
+|---|---|---|
+| `examples/trivial` | 20.24 MiB (21,227,352 B) | 15.57 MiB (16,321,904 B) |
+
+**Gate not met, by a wide margin: 15.57 MiB stripped against a 1.5 MiB target, roughly
+10x over.** This is not a surprise — a "trivial" app still links the whole framework
+(renderer, widget catalog, runtime, windowing) exactly like `mobile_shell` does, since
+neither Rust's linker nor this codebase currently does per-widget dead-code elimination
+(see the "not attempted" note above). The two binaries land within ~1 MiB of each other
+(15.57 MiB trivial vs 15.96 MiB mobile_shell) precisely because almost none of the size is
+the application code — it is framework weight paid regardless of what the app uses. That
+confirms, rather than changes, this section's own diagnosis: closing this gap needs the
+const layout solver, shader specialisation, and real per-widget dead-code elimination
+already named above, not a smaller example. `cargo check --workspace --all-targets` is
+clean (no new warnings) and `cargo test --workspace` passes in full with the new crate
+present.
+
+**2026-09-06 — same-day follow-up pass: no further safe reduction found; numbers
+re-verified, and both binaries have grown since the last measurement above for reasons
+unrelated to Pillar XIII.** Build-only sandbox again (no binary in this repository was
+executed at any point in this pass):
+
+- **Feature audit.** Re-read `Cargo.toml`'s `[features]` block and
+  `examples/mobile_shell/Cargo.toml`'s explicit list against
+  `scripts/ci/check-budgets.sh`'s own comment that this binary must measure "what a real
+  app costs to ship." Both `x11` and `wayland` are enabled together; that is not waste —
+  a real Linux desktop app built for distribution cannot know at build time which display
+  server its user's session will use, so shipping both backends is exactly what "what a
+  real app costs to ship" means, not an inflated example. No feature enabled here is
+  extraneous to that story, so none was removed.
+- **`cargo bloat`**: not present in this environment (`cargo bloat --version` →
+  `error: no such command: bloat`) and, per this task's own constraint, was not installed.
+  Skipped; no symbol-level attribution was produced this pass.
+- **Debug-info audit.** No `[profile.release]` section exists in `Cargo.toml` at all — the
+  plain release profile `scripts/ci/check-budgets.sh` measures is Cargo's unmodified
+  built-in default (`opt-level = 3`, `debug = false`, `strip = none`). No `debug = true` or
+  `split-debuginfo` setting is bloating the unstripped number; the doc's unstripped figures
+  reflect Cargo's stock release profile, not an accidental debug-info leak.
+- **Re-verified `release-opt` and the plain-release numbers on the current tree,**
+  `stat -c%s` only:
+
+  | | unstripped (`release`) | `strip --strip-all` | `release-opt` (LTO, strip=symbols) |
+  |---|---|---|---|
+  | `mobile_shell` | 22.21 MiB (23,293,904 B) | 17.10 MiB (17,927,424 B) | 13.89 MiB (14,563,384 B) |
+  | `trivial` | 20.25 MiB (21,236,728 B) | 15.57 MiB (16,329,712 B) | *(not rebuilt this pass)* |
+
+  `trivial`'s stripped size (15.57 MiB) is unchanged to the byte from the measurement
+  above, confirming that figure is stable. `mobile_shell`, by contrast, grew from
+  15.96 MiB stripped (this doc's last measurement) to 17.10 MiB stripped-all here, and
+  `release-opt` grew from the previously-recorded 12.96 MiB to 13.89 MiB. Both binaries
+  are built from the same explicit feature list as before, unchanged in this pass, so the
+  growth is not a feature-flag effect; the working tree currently carries substantial
+  uncommitted changes in `core/`, `widget/`, `graphics/`, and `renderer/` (per this
+  session's `git status`, predating this pass) plus new optional crates
+  (`taim-signal`, `taim-raster`) gated behind features `mobile_shell` does not enable —
+  the growth is consistent with ordinary code added to the always-linked core/widget/
+  renderer crates since the 15.96 MiB figure was taken, not with anything this pass
+  touched or should fix.
+- **Conclusion: no additional safe reduction found this pass.** No code was changed. The
+  feature list is already minimal for what this binary claims to represent, no debug-info
+  leak exists to fix, `cargo bloat` isn't available to attribute the remaining weight
+  further, and `release-opt` continues to work exactly as documented — it is just carrying
+  the tree's current (unrelated) size growth like everything else. The real remaining
+  levers are unchanged from every prior pass: the const layout solver, shader
+  specialisation, and per-widget dead-code elimination, all correctly out of scope for a
+  same-day pass.
+
 ---
 
 ## Pillar XIV — The authoring loop
@@ -1190,8 +2053,8 @@ the real content.
 
 | | |
 |---|---|
-| **Attach buffers in the VYOM backend.** Ceiling 7. Nothing presents. | P0 |
-| Cold start, energy, and steady-state memory harnesses. Ceiling 8. | P0 |
+| **Prove the VYOM buffer path on hardware.** Attach/damage/commit is built; Ceiling 7's physical-device gate remains. | P0 |
+| Cold start, energy, and steady-state memory harnesses. Application runner built; a real scheduler bug blocking all captures was found and fixed 2026-09-06, yielding first successful-but-noisy captures (first-present 431–701 ms, RSS ~150.7–155.6 MiB, n=6, 4 failed mid-run for an undiagnosed reason) — not yet a stable baseline. First-pixel, whole-device energy, and a controlled cold-start protocol remain open. Ceiling 8. | P0 |
 | One flagship application that ships, on VYOM, that people use daily. | P0 |
 | First honest Flutter comparison per `benchmarks/competitors/README.md`. | P1 |
 
@@ -1201,12 +2064,12 @@ frame on a device has no users, and a twenty-five year plan with no users is a h
 ### H1 — The visible generation gap (3–12 months)
 
 - **Pillar II — HDR compositing.** Highest value per week in the document.
-- **Pillar VII — `taim-signal`.** Largest measurable performance win.
+- **Pillar VII — `taim-signal`.** Foundation and subtree adoption live; flat-cost scale gate open.
 - **Pillar VI part 1** — high-rate input, present-time anchoring, direct scanout.
 - **Pillar V** — velocity in the scene, present-time re-timing.
 - **Pillar XIV part 1** — state-preserving hot reload.
-- Wire the two dormant subsystems (Ceiling 6): recorder-as-stack, then
-  `RetainedLayerCache`, then `layout_with_cache`.
+- **Done:** wire Ceiling 6's recorder stack, bounded native retained store, and
+  `layout_with_cache` into the reactive subtree path.
 
 **End state:** a device that visibly emits light other devices cannot, responds faster than
 any phone on the market, and holds a flat cost curve on lists a competitor chokes on.
@@ -1223,7 +2086,7 @@ any phone on the market, and holds a flat cost curve on lists a competitor choke
 ### H3 — The different category (2.5–6 years)
 
 - **Pillar IX** — GPU-resident scene.
-- **Pillar X** — semantics as source of truth; the agent-addressable UI.
+- **Pillar X** — semantics as source of truth; the agent-addressable UI. *(2026-09-06: input/dispatch through the tree alone, with zero visual renderer, now proven working — see Pillar X's own section. Reading state back has one confirmed open bug. Substantially ahead of this horizon's original estimate.)*
 - **Pillar XI** — spatial, physical units, foveation.
 - **Pillar XII** — NPU-assisted UI.
 
@@ -1352,10 +2215,9 @@ you keep building.
 
 ```bash
 # Structure
-find . -name "*.rs" -not -path "./target/*" | wc -l          # 560
-find . -name "*.rs" -not -path "./target/*" -exec cat {} + | wc -l   # 158925
-grep -rc "#\[test\]\|#\[tokio::test\]" --include="*.rs" . | grep -v target | \
-  awk -F: '{s+=$2} END {print s}'                            # 1634
+rg --files -g '*.rs' -g '!target/**' | wc -l                # 589 (2026-09-06)
+rg --files -g '*.rs' -g '!target/**' | xargs wc -l          # 172874 total (2026-09-06)
+rg -n '^\s*#\[(tokio::)?test\]' -g '*.rs' -g '!target/**' | wc -l  # 1864
 
 # Ceiling 1 — the unconditional full-tree paint invalidation
 grep -n "mark_dirty" runtime/src/user_interface.rs           # :129 PAINT, whole tree
@@ -1364,28 +2226,28 @@ grep -n "mark_dirty" runtime/src/user_interface.rs           # :129 PAINT, whole
 grep -rn "thread::spawn" --include="*.rs" core graphics runtime wgpu winit
 # → image decode, AT-SPI, clipboard, task executor. Nothing else.
 
-# Ceiling 3 — the entire colour model
-cat graphics/src/color.rs                                    # 52 lines, sRGB only
+# Ceiling 3 — the live colour contract and both feature modes
+rg -n "GAMMA_CORRECTION|web-colors" graphics/src/color.rs Cargo.toml
+cargo test --no-default-features --test color
+cargo test --no-default-features --features web-colors --test color
 
 # Ceiling 4 — no compute anywhere
 grep -rn "@compute\|ComputePipeline" wgpu/                   # (empty)
 
-# Ceiling 6 — machinery with no callers
-grep -rn "RetainedLayerCache" --include="*.rs" . | grep -v target | cut -d: -f1 | \
-  sort | uniq -c
-#   16  graphics/src/retained_layer.rs   ← its own definition + its own #[cfg(test)]
-#    1  graphics/src/text/cache.rs       ← a doc comment, line 23
-#   14  tests/graphics/retained_layers.rs
-# → zero production call sites.
+# Ceiling 6 — production adoption
+rg -n "RetainedStore" wgpu/src/lib.rs tiny_skia/src/lib.rs
+# → both native renderers own a byte-bounded multi-entry store.
 
-grep -rn "layout_with_cache" --include="*.rs" . | grep -v target | grep -v tests
-# → core's own definition and tests, plus one comment in widget/src/row.rs:207.
-# → zero production call sites.
+rg -n "layout_with_cache" widget/src/lazy.rs
+# → Lazy's child layout is cached in production.
 
-# Ceiling 7 — nothing presents
+# Ceiling 7 — a present path exists, but is unproven on hardware
 grep -n "attach" taim-platform-vyom/src/surface.rs
 # → may_attach_buffer(), a protocol-correctness predicate, and its test.
-#   No call to wl_surface.attach exists anywhere in the crate.
+#   (Verified 2026-09-06: surface.rs itself still has no wl_surface.attach call —
+#   that call now lives in `Toplevel::attach_and_commit`, taim-platform-vyom/src/event_loop.rs:291,
+#   `self.surface.attach(Some(buffer), 0, 0)`. The crate-wide "no attach call anywhere"
+#   claim this comment made at the audit date no longer holds; see Ceiling 7's prose above.)
 
 # Build state
 cargo check --workspace --all-targets                        # exit 0

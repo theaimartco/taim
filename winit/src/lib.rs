@@ -30,6 +30,8 @@ pub mod clipboard;
 pub mod conversion;
 
 mod error;
+#[cfg(all(feature = "measurement", not(target_arch = "wasm32")))]
+mod measurement;
 mod proxy;
 mod window;
 
@@ -37,7 +39,6 @@ pub use clipboard::Clipboard;
 pub use error::Error;
 pub use proxy::Proxy;
 
-#[cfg(feature = "hinting")]
 use crate::core::Renderer;
 use crate::core::backend;
 use crate::core::mouse;
@@ -680,6 +681,22 @@ async fn run_instance<P>(
                     window.raw.set_visible(true);
                 }
 
+                // A freshly inserted window's scheduler starts in
+                // `State::Idle` (`Scheduler::new`), under which
+                // `should_produce_frame` is `false` for every subsequent
+                // `RedrawRequested`. Nothing else transitions a new
+                // window's scheduler out of `Idle` before the first
+                // user input arrives, so without this the window would
+                // sit fully rendered-never: winit keeps delivering
+                // `RedrawRequested` (e.g. after its own initial
+                // `Resized`/`ScaleFactorChanged`), and every one of them
+                // is silently dropped by the scheduler gate. Requesting
+                // the first frame through the wrapper (not
+                // `window.raw.request_redraw()`) puts the scheduler in
+                // `State::Requested` so that first `RedrawRequested`
+                // actually reaches `present`.
+                window.request_redraw(window::RedrawRequest::NextFrame);
+
                 events.push((
                     id,
                     core::Event::Window(window::Event::Opened {
@@ -756,6 +773,11 @@ async fn run_instance<P>(
                         event: event::WindowEvent::RedrawRequested,
                         ..
                     } => {
+                        // Diagnostic (see `future.md`, Ceiling 8 / H0):
+                        // confirms whether the platform ever delivers the
+                        // redraw that leads to the first `present()` call.
+                        log::debug!("RedrawRequested for id `{id:?}`");
+
                         let Some(mut current_compositor) = compositor.as_mut() else {
                             continue;
                         };
@@ -987,6 +1009,11 @@ async fn run_instance<P>(
                         window.scheduler.submit(Instant::now());
 
                         let present_span = debug::present(id);
+                        // Diagnostic (see `future.md`, Ceiling 8 / H0):
+                        // brackets the actual GPU present call, the last
+                        // unlogged step between `RedrawRequested` and the
+                        // measurement marker.
+                        log::debug!("Calling compositor present for id `{id:?}`");
                         match current_compositor.present(
                             &mut window.renderer,
                             &mut window.surface,
@@ -996,6 +1023,9 @@ async fn run_instance<P>(
                         ) {
                             Ok(()) => {
                                 present_span.finish();
+                                log::debug!("compositor present Ok for id `{id:?}`");
+                                #[cfg(all(feature = "measurement", not(target_arch = "wasm32")))]
+                                measurement::first_present();
 
                                 // No real async presentation-feedback
                                 // source is wired yet (see
@@ -1066,6 +1096,14 @@ async fn run_instance<P>(
                         event: window_event,
                         window_id,
                     } => {
+                        // Diagnostic (see `future.md`, Ceiling 8 / H0): the
+                        // only way to tell "no window events are arriving
+                        // at all" apart from "an event arrived but was
+                        // ignored" without a debugger attached.
+                        log::trace!(
+                            "WindowEvent for id `{window_id:?}`: {window_event:?}"
+                        );
+
                         if !is_daemon
                             && matches!(window_event, winit::event::WindowEvent::Destroyed)
                             && !is_window_opening

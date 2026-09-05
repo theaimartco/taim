@@ -422,6 +422,14 @@ impl Batch {
                 .any(|gradient| gradient.quad.transmission > 0.0)
     }
 
+    /// Returns the heap bytes reserved by this batch.
+    pub fn estimated_bytes(&self) -> usize {
+        std::mem::size_of::<Self>()
+            + self.solids.capacity() * std::mem::size_of::<Solid>()
+            + self.gradients.capacity() * std::mem::size_of::<Gradient>()
+            + self.order.capacity() * std::mem::size_of::<(Kind, usize)>()
+    }
+
     /// Adds a [`Quad`] with the provided `Background` type to the quad [`Layer`].
     ///
     /// `luminance` scales the light the fill emits; see

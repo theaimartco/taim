@@ -44,6 +44,8 @@ struct RetainedFrame {
     key: u64,
     revision: u64,
     bounds: Rectangle,
+    transformation: Transformation,
+    opacity: f32,
     display_list: layer::Stack,
 }
 
@@ -52,7 +54,30 @@ struct ActiveRetainedFrame {
     key: u64,
     revision: u64,
     bounds: Rectangle,
+    transformation: Transformation,
+    opacity: f32,
     range: std::ops::Range<usize>,
+}
+
+fn innermost_retained_frames(frames: Vec<ActiveRetainedFrame>) -> Vec<ActiveRetainedFrame> {
+    let keep = frames
+        .iter()
+        .enumerate()
+        .map(|(index, candidate)| {
+            !frames.iter().enumerate().any(|(other_index, other)| {
+                index != other_index
+                    && candidate.range.start <= other.range.start
+                    && candidate.range.end >= other.range.end
+                    && (candidate.range != other.range || index > other_index)
+            })
+        })
+        .collect::<Vec<_>>();
+
+    frames
+        .into_iter()
+        .zip(keep)
+        .filter_map(|(frame, keep)| keep.then_some(frame))
+        .collect()
 }
 
 #[derive(Debug)]
@@ -60,6 +85,8 @@ struct RecordingRetainedFrame {
     key: u64,
     revision: u64,
     bounds: Rectangle,
+    transformation: Transformation,
+    opacity: f32,
     start: usize,
 }
 
@@ -71,9 +98,12 @@ struct RecordingRetainedFrame {
 pub struct Renderer {
     settings: renderer::Settings,
     layers: layer::Stack,
-    retained_frame: Option<RetainedFrame>,
-    active_retained_frame: Option<ActiveRetainedFrame>,
-    recording_retained_frame: Option<RecordingRetainedFrame>,
+    retained_frames: graphics::retained_layer::RetainedStore<RetainedFrame>,
+    active_retained_frames: Vec<ActiveRetainedFrame>,
+    /// Nested retained recordings, outermost first. Reset retains the
+    /// innermost non-overlapping ranges so sibling subtrees remain reusable
+    /// without storing the same native batches twice.
+    recording_retained_frames: Vec<RecordingRetainedFrame>,
     retained_layer_statistics: core::renderer::RetainedLayerStatistics,
     engine: Engine, // TODO: Shared engine
 }
@@ -83,9 +113,11 @@ impl Renderer {
         Self {
             settings,
             layers: layer::Stack::new(),
-            retained_frame: None,
-            active_retained_frame: None,
-            recording_retained_frame: None,
+            retained_frames: graphics::retained_layer::RetainedStore::with_budget(
+                graphics::retained_layer::RetainedLayerCache::DEFAULT_BUDGET,
+            ),
+            active_retained_frames: Vec::new(),
+            recording_retained_frames: Vec::new(),
             retained_layer_statistics: core::renderer::RetainedLayerStatistics::default(),
             engine: Engine::new(),
         }
@@ -258,19 +290,26 @@ impl core::Renderer for Renderer {
     }
 
     fn replay_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) -> bool {
-        let had_cached_frame = self.retained_frame.is_some();
+        let transformation = self.layers.transformation();
+        let opacity = self.layers.opacity();
+        let retained = self.retained_frames.take(key);
+        let had_cached_frame = retained.is_some();
 
-        if let Some(retained) = self.retained_frame.take()
+        if let Some(retained) = retained
             && retained.key == key
             && retained.revision == revision
             && retained.bounds == bounds
+            && retained.transformation == transformation
+            && retained.opacity == opacity
         {
             let range = self.layers.replay_owned(retained.display_list);
             self.retained_layer_statistics.hits += 1;
-            self.active_retained_frame = Some(ActiveRetainedFrame {
+            self.active_retained_frames.push(ActiveRetainedFrame {
                 key,
                 revision,
                 bounds,
+                transformation,
+                opacity,
                 range,
             });
             return true;
@@ -278,8 +317,6 @@ impl core::Renderer for Renderer {
 
         self.retained_layer_statistics.misses += 1;
         if had_cached_frame {
-            // The sole cached display list was incompatible with this draw
-            // context and was dropped by `take` above.
             self.retained_layer_statistics.evictions += 1;
         }
 
@@ -288,27 +325,33 @@ impl core::Renderer for Renderer {
 
     fn start_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) {
         let start = self.layers.active_count();
+        let transformation = self.layers.transformation();
+        let opacity = self.layers.opacity();
         self.layers.push_clip(bounds);
-        self.recording_retained_frame = Some(RecordingRetainedFrame {
+        self.recording_retained_frames.push(RecordingRetainedFrame {
             key,
             revision,
             bounds,
+            transformation,
+            opacity,
             start,
         });
     }
 
     fn end_retained_layer(&mut self) {
+        let recording = self
+            .recording_retained_frames
+            .pop()
+            .expect("end_retained_layer without start_retained_layer");
         self.layers.pop_clip();
         let end = self.layers.active_count();
-        let recording = self
-            .recording_retained_frame
-            .take()
-            .expect("end_retained_layer without start_retained_layer");
 
-        self.active_retained_frame = Some(ActiveRetainedFrame {
+        self.active_retained_frames.push(ActiveRetainedFrame {
             key: recording.key,
             revision: recording.revision,
             bounds: recording.bounds,
+            transformation: recording.transformation,
+            opacity: recording.opacity,
             range: recording.start..end,
         });
     }
@@ -341,14 +384,31 @@ impl core::Renderer for Renderer {
     }
 
     fn reset(&mut self, new_bounds: Rectangle) {
-        if let Some(active) = self.active_retained_frame.take() {
-            let display_list = self.layers.take_range(active.range, new_bounds);
-            self.retained_frame = Some(RetainedFrame {
-                key: active.key,
-                revision: active.revision,
-                bounds: active.bounds,
-                display_list,
-            });
+        if !self.active_retained_frames.is_empty() {
+            let active =
+                innermost_retained_frames(std::mem::take(&mut self.active_retained_frames));
+            let ranges = active
+                .iter()
+                .map(|frame| frame.range.clone())
+                .collect::<Vec<_>>();
+            let display_lists = self.layers.take_ranges(&ranges, new_bounds);
+
+            for (active, display_list) in active.into_iter().zip(display_lists) {
+                let bytes = display_list.estimated_bytes();
+                let evictions = self.retained_frames.insert(
+                    active.key,
+                    RetainedFrame {
+                        key: active.key,
+                        revision: active.revision,
+                        bounds: active.bounds,
+                        transformation: active.transformation,
+                        opacity: active.opacity,
+                        display_list,
+                    },
+                    bytes,
+                );
+                self.retained_layer_statistics.evictions += evictions as u64;
+            }
         } else {
             self.layers.reset(new_bounds);
         }
@@ -603,5 +663,75 @@ mod tests {
         let statistics = core::Renderer::retained_layer_statistics(&renderer);
         assert_eq!(statistics.misses, 1);
         assert_eq!(statistics.evictions, 1);
+    }
+
+    #[test]
+    fn nested_retained_recordings_balance_and_replay_the_innermost_list() {
+        let mut renderer = Renderer::new(renderer::Settings::default());
+        let outer = Rectangle::with_size(Size::new(100.0, 100.0));
+        let inner = Rectangle::new(Point::new(10.0, 10.0), Size::new(20.0, 20.0));
+
+        core::Renderer::reset(&mut renderer, outer);
+        core::Renderer::start_retained_layer(&mut renderer, 1, 1, outer);
+        core::Renderer::start_retained_layer(&mut renderer, 2, 1, inner);
+        core::Renderer::fill_quad(
+            &mut renderer,
+            renderer::Quad {
+                bounds: inner,
+                ..renderer::Quad::default()
+            },
+            Color::BLACK,
+        );
+        core::Renderer::end_retained_layer(&mut renderer);
+        core::Renderer::end_retained_layer(&mut renderer);
+
+        assert!(renderer.recording_retained_frames.is_empty());
+        assert_eq!(renderer.active_retained_frames.len(), 2);
+
+        core::Renderer::reset(&mut renderer, outer);
+        assert!(core::Renderer::replay_retained_layer(
+            &mut renderer,
+            2,
+            1,
+            inner
+        ));
+        assert_eq!(core::Renderer::retained_layer_statistics(&renderer).hits, 1);
+    }
+
+    #[test]
+    fn retained_replay_rejects_changed_ancestor_transform_and_opacity() {
+        let mut renderer = Renderer::new(renderer::Settings::default());
+        let bounds = Rectangle::with_size(Size::new(100.0, 100.0));
+
+        core::Renderer::reset(&mut renderer, bounds);
+        core::Renderer::start_transformation(&mut renderer, Transformation::translate(10.0, 5.0));
+        core::Renderer::start_retained_layer(&mut renderer, 1, 1, bounds);
+        core::Renderer::end_retained_layer(&mut renderer);
+        core::Renderer::end_transformation(&mut renderer);
+        core::Renderer::reset(&mut renderer, bounds);
+
+        assert!(!core::Renderer::replay_retained_layer(
+            &mut renderer,
+            1,
+            1,
+            bounds
+        ));
+
+        core::Renderer::start_opacity(&mut renderer, 0.5);
+        core::Renderer::start_retained_layer(&mut renderer, 2, 1, bounds);
+        core::Renderer::end_retained_layer(&mut renderer);
+        core::Renderer::end_opacity(&mut renderer);
+        core::Renderer::reset(&mut renderer, bounds);
+
+        assert!(!core::Renderer::replay_retained_layer(
+            &mut renderer,
+            2,
+            1,
+            bounds
+        ));
+
+        let statistics = core::Renderer::retained_layer_statistics(&renderer);
+        assert_eq!(statistics.misses, 2);
+        assert_eq!(statistics.evictions, 2);
     }
 }

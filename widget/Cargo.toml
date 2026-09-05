@@ -34,6 +34,7 @@ advanced = []
 # Enables syntax highlighting of fenced code blocks in the `markdown`
 # widget, and the `taim-highlighter` adapter for `text_editor`.
 highlighter = ["dep:taim-highlighter"]
+signal = ["lazy", "dep:taim-signal"]
 
 [dependencies]
 taim-design = { workspace = true, optional = true }
@@ -41,6 +42,7 @@ taim-highlighter = { workspace = true, optional = true }
 taim-motion.workspace = true
 taim_renderer.workspace = true
 taim_runtime.workspace = true
+taim-signal = { workspace = true, optional = true }
 
 num-traits.workspace = true
 log.workspace = true
