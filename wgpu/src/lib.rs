@@ -76,6 +76,8 @@ struct RetainedFrame {
     key: u64,
     revision: u64,
     bounds: Rectangle,
+    transformation: Transformation,
+    opacity: f32,
     scale_factor: Option<f32>,
     display_list: layer::Stack,
 }
@@ -85,8 +87,31 @@ struct ActiveRetainedFrame {
     key: u64,
     revision: u64,
     bounds: Rectangle,
+    transformation: Transformation,
+    opacity: f32,
     scale_factor: Option<f32>,
     range: std::ops::Range<usize>,
+}
+
+fn innermost_retained_frames(frames: Vec<ActiveRetainedFrame>) -> Vec<ActiveRetainedFrame> {
+    let keep = frames
+        .iter()
+        .enumerate()
+        .map(|(index, candidate)| {
+            !frames.iter().enumerate().any(|(other_index, other)| {
+                index != other_index
+                    && candidate.range.start <= other.range.start
+                    && candidate.range.end >= other.range.end
+                    && (candidate.range != other.range || index > other_index)
+            })
+        })
+        .collect::<Vec<_>>();
+
+    frames
+        .into_iter()
+        .zip(keep)
+        .filter_map(|(frame, keep)| keep.then_some(frame))
+        .collect()
 }
 
 #[derive(Debug)]
@@ -94,6 +119,8 @@ struct RecordingRetainedFrame {
     key: u64,
     revision: u64,
     bounds: Rectangle,
+    transformation: Transformation,
+    opacity: f32,
     scale_factor: Option<f32>,
     start: usize,
 }
@@ -132,9 +159,14 @@ pub struct Renderer {
 
     layers: layer::Stack,
     scale_factor: Option<f32>,
-    retained_frame: Option<RetainedFrame>,
-    active_retained_frame: Option<ActiveRetainedFrame>,
-    recording_retained_frame: Option<RecordingRetainedFrame>,
+    retained_frames: graphics::retained_layer::RetainedStore<RetainedFrame>,
+    active_retained_frames: Vec<ActiveRetainedFrame>,
+    /// Nested retained recordings, outermost first.
+    ///
+    /// Completed recordings are reduced to the innermost non-overlapping
+    /// ranges at reset, allowing sibling widget subtrees to remain reusable
+    /// independently without storing the same native batches twice.
+    recording_retained_frames: Vec<RecordingRetainedFrame>,
     retained_layer_statistics: core::renderer::RetainedLayerStatistics,
     /// The damage of the last few frames, deep enough to cover the swapchain.
     /// See [`Renderer::accumulate_damage`].
@@ -208,9 +240,11 @@ impl Renderer {
             settings,
             layers: layer::Stack::new(),
             scale_factor: None,
-            retained_frame: None,
-            active_retained_frame: None,
-            recording_retained_frame: None,
+            retained_frames: graphics::retained_layer::RetainedStore::with_budget(
+                graphics::retained_layer::RetainedLayerCache::DEFAULT_BUDGET,
+            ),
+            active_retained_frames: Vec::new(),
+            recording_retained_frames: Vec::new(),
             retained_layer_statistics: core::renderer::RetainedLayerStatistics::default(),
             damage_history: std::collections::VecDeque::new(),
             frame_damage: None,
@@ -600,10 +634,23 @@ impl Renderer {
         let physical_bounds =
             Rectangle::<f32>::from(Rectangle::with_size(viewport.physical_size()));
 
-        // A retained range must keep its layer boundaries intact until the
-        // next frame moves it into the cache. Merging would drain commands
-        // across that boundary and make the cached display list incomplete.
-        if self.active_retained_frame.is_some() {
+        // Some layer boundaries carry semantics, not just batching hints:
+        //
+        // - a retained range must remain extractable on the next reset;
+        // - a transmissive quad must capture the frame after earlier layers
+        //   have drawn and before its own layer draws;
+        // - an effect graph belongs to its layer (Layer::merge deliberately
+        //   cannot append graphs).
+        //
+        // Merging any of these would either make a retained list incomplete,
+        // make glass sample the clear frame, or silently drop an effect.
+        let preserve_layer_boundaries = !self.active_retained_frames.is_empty()
+            || self
+                .layers
+                .iter()
+                .any(|layer| layer.quads.needs_backdrop() || !layer.effects.is_empty());
+
+        if preserve_layer_boundaries {
             self.layers.flush();
         } else {
             self.layers.merge();
@@ -799,13 +846,8 @@ impl Renderer {
         use std::mem::ManuallyDrop;
 
         // Before the draw loop, which borrows `self.layers`.
-        eprintln!("DBG layers={} any_needs={}", self.layers.iter().count(), self.layers.iter().any(|layer| layer.quads.needs_backdrop()));
-        for (i, l) in self.layers.iter().enumerate() {
-            eprintln!("DBG   layer {i}: quads_empty={} needs_backdrop={}", l.quads.is_empty(), l.quads.needs_backdrop());
-        }
         if self.layers.iter().any(|layer| layer.quads.needs_backdrop()) {
             self.prepare_quad_backdrop(frame_texture);
-            eprintln!("DBG prepared backdrop: {}", self.quad_backdrop.is_some());
         }
 
         let mut render_pass =
@@ -1343,21 +1385,28 @@ impl core::Renderer for Renderer {
     }
 
     fn replay_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) -> bool {
+        let transformation = self.layers.transformation();
+        let opacity = self.layers.opacity();
         let scale_factor = self.scale_factor;
-        let had_cached_frame = self.retained_frame.is_some();
+        let retained = self.retained_frames.take(key);
+        let had_cached_frame = retained.is_some();
 
-        if let Some(retained) = self.retained_frame.take()
+        if let Some(retained) = retained
             && retained.key == key
             && retained.revision == revision
             && retained.bounds == bounds
+            && retained.transformation == transformation
+            && retained.opacity == opacity
             && retained.scale_factor == scale_factor
         {
             let range = self.layers.replay_owned(retained.display_list);
             self.retained_layer_statistics.hits += 1;
-            self.active_retained_frame = Some(ActiveRetainedFrame {
+            self.active_retained_frames.push(ActiveRetainedFrame {
                 key,
                 revision,
                 bounds,
+                transformation,
+                opacity,
                 scale_factor,
                 range,
             });
@@ -1366,8 +1415,6 @@ impl core::Renderer for Renderer {
 
         self.retained_layer_statistics.misses += 1;
         if had_cached_frame {
-            // The sole cached display list was incompatible with this draw
-            // context and was dropped by `take` above.
             self.retained_layer_statistics.evictions += 1;
         }
 
@@ -1376,28 +1423,34 @@ impl core::Renderer for Renderer {
 
     fn start_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) {
         let start = self.layers.active_count();
+        let transformation = self.layers.transformation();
+        let opacity = self.layers.opacity();
         self.layers.push_clip(bounds);
-        self.recording_retained_frame = Some(RecordingRetainedFrame {
+        self.recording_retained_frames.push(RecordingRetainedFrame {
             key,
             revision,
             bounds,
+            transformation,
+            opacity,
             scale_factor: self.scale_factor,
             start,
         });
     }
 
     fn end_retained_layer(&mut self) {
+        let recording = self
+            .recording_retained_frames
+            .pop()
+            .expect("end_retained_layer without start_retained_layer");
         self.layers.pop_clip();
         let end = self.layers.active_count();
-        let recording = self
-            .recording_retained_frame
-            .take()
-            .expect("end_retained_layer without start_retained_layer");
 
-        self.active_retained_frame = Some(ActiveRetainedFrame {
+        self.active_retained_frames.push(ActiveRetainedFrame {
             key: recording.key,
             revision: recording.revision,
             bounds: recording.bounds,
+            transformation: recording.transformation,
+            opacity: recording.opacity,
             scale_factor: recording.scale_factor,
             range: recording.start..end,
         });
@@ -1440,15 +1493,32 @@ impl core::Renderer for Renderer {
     }
 
     fn reset(&mut self, new_bounds: Rectangle) {
-        if let Some(active) = self.active_retained_frame.take() {
-            let display_list = self.layers.take_range(active.range, new_bounds);
-            self.retained_frame = Some(RetainedFrame {
-                key: active.key,
-                revision: active.revision,
-                bounds: active.bounds,
-                scale_factor: active.scale_factor,
-                display_list,
-            });
+        if !self.active_retained_frames.is_empty() {
+            let active =
+                innermost_retained_frames(std::mem::take(&mut self.active_retained_frames));
+            let ranges = active
+                .iter()
+                .map(|frame| frame.range.clone())
+                .collect::<Vec<_>>();
+            let display_lists = self.layers.take_ranges(&ranges, new_bounds);
+
+            for (active, display_list) in active.into_iter().zip(display_lists) {
+                let bytes = display_list.estimated_bytes();
+                let evictions = self.retained_frames.insert(
+                    active.key,
+                    RetainedFrame {
+                        key: active.key,
+                        revision: active.revision,
+                        bounds: active.bounds,
+                        transformation: active.transformation,
+                        opacity: active.opacity,
+                        scale_factor: active.scale_factor,
+                        display_list,
+                    },
+                    bytes,
+                );
+                self.retained_layer_statistics.evictions += evictions as u64;
+            }
         } else {
             self.layers.reset(new_bounds);
         }

@@ -104,6 +104,14 @@ where
         delegate!(self, renderer, renderer.retained_layer_statistics())
     }
 
+    fn set_light(&mut self, light: core::material::SceneLight) {
+        delegate!(self, renderer, renderer.set_light(light));
+    }
+
+    fn light(&self) -> core::material::SceneLight {
+        delegate!(self, renderer, renderer.light())
+    }
+
     fn allocate_image(
         &mut self,
         handle: &image::Handle,
@@ -681,4 +689,71 @@ where
     B: compositor::Default,
 {
     type Compositor = Compositor<A::Compositor, B::Compositor>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct LightRenderer(core::material::SceneLight);
+
+    impl Default for LightRenderer {
+        fn default() -> Self {
+            Self(core::material::SceneLight::KEY)
+        }
+    }
+
+    impl core::Renderer for LightRenderer {
+        fn start_layer(&mut self, _bounds: Rectangle) {}
+
+        fn end_layer(&mut self) {}
+
+        fn start_transformation(&mut self, _transformation: Transformation) {}
+
+        fn end_transformation(&mut self) {}
+
+        fn fill_quad(&mut self, _quad: renderer::Quad, _background: impl Into<Background>) {}
+
+        fn allocate_image(
+            &mut self,
+            _handle: &image::Handle,
+            _callback: impl FnOnce(Result<image::Allocation, image::Error>) + Send + 'static,
+        ) {
+        }
+
+        fn hint(&mut self, _scale_factor: f32) {}
+
+        fn scale_factor(&self) -> Option<f32> {
+            None
+        }
+
+        fn reset(&mut self, _new_bounds: Rectangle) {}
+
+        fn set_light(&mut self, light: core::material::SceneLight) {
+            self.0 = light;
+        }
+
+        fn light(&self) -> core::material::SceneLight {
+            self.0
+        }
+    }
+
+    #[test]
+    fn scene_light_reaches_whichever_renderer_is_active() {
+        let key = core::material::SceneLight::KEY;
+        let moved = core::material::SceneLight {
+            direction: [-key.direction[0], key.direction[1], key.direction[2]],
+            ..key
+        };
+
+        let mut primary: Renderer<LightRenderer, LightRenderer> =
+            Renderer::Primary(LightRenderer::default());
+        core::Renderer::set_light(&mut primary, moved);
+        assert_eq!(core::Renderer::light(&primary), moved);
+
+        let mut secondary: Renderer<LightRenderer, LightRenderer> =
+            Renderer::Secondary(LightRenderer::default());
+        core::Renderer::set_light(&mut secondary, moved);
+        assert_eq!(core::Renderer::light(&secondary), moved);
+    }
 }

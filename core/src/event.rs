@@ -35,6 +35,9 @@ pub enum Event {
 
     /// A wake event, produced by a [`Waker`](crate::shell::Waker).
     Waken,
+
+    /// A wake event addressed to one reactive source.
+    Reactive(u64),
 }
 
 /// Whether an [`Event`] may be coalesced (merged with an adjacent event
@@ -84,7 +87,8 @@ impl Event {
             | Event::Window(_)
             | Event::InputMethod(_)
             | Event::Clipboard(_)
-            | Event::Waken => Coalescing::Critical,
+            | Event::Waken
+            | Event::Reactive(_) => Coalescing::Critical,
         }
     }
 
@@ -135,7 +139,8 @@ impl Event {
             | Event::Window(_)
             | Event::InputMethod(_)
             | Event::Clipboard(_)
-            | Event::Waken => None,
+            | Event::Waken
+            | Event::Reactive(_) => None,
         }
     }
 }
@@ -241,6 +246,7 @@ mod tests {
             Coalescing::Critical
         );
         assert_eq!(Event::Waken.coalescing(), Coalescing::Critical);
+        assert_eq!(Event::Reactive(7).coalescing(), Coalescing::Critical);
     }
 
     #[test]
@@ -325,5 +331,6 @@ mod tests {
             None
         );
         assert_eq!(Event::Waken.to_pointer(None, now()), None);
+        assert_eq!(Event::Reactive(7).to_pointer(None, now()), None);
     }
 }

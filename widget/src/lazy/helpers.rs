@@ -20,6 +20,57 @@ where
     Lazy::new(dependency, view)
 }
 
+/// Creates a lazily rebuilt subtree from a reactive source.
+///
+/// The subtree is reconstructed only when `source` advances its revision. An
+/// ordinary application `view` may therefore be rebuilt while every unchanged
+/// reactive subtree preserves its widget objects and state.
+#[cfg(feature = "signal")]
+pub fn reactive<'a, Message, Theme, Renderer, Source, View>(
+    source: Source,
+    view: impl Fn(Source::Value) -> View + 'a,
+) -> crate::Reactive<'a, Message, Theme, Renderer, Source, View>
+where
+    Source: taim_signal::Readable + 'a,
+    View: Into<Element<'static, Message, Theme, Renderer>>,
+{
+    crate::Reactive::new(source, view)
+}
+
+/// Creates a reactive subtree that promises to preserve layout and semantics.
+///
+/// Use this for visual-only values such as a fill colour or opacity. Violating
+/// the geometry promise can reuse a stale layout; use [`reactive`] whenever a
+/// source may affect size, structure, or semantic content.
+#[cfg(feature = "signal")]
+pub fn reactive_paint<'a, Message, Theme, Renderer, Source, View>(
+    source: Source,
+    view: impl Fn(Source::Value) -> View + 'a,
+) -> crate::Reactive<'a, Message, Theme, Renderer, Source, View>
+where
+    Source: taim_signal::Readable + 'a,
+    View: Into<Element<'static, Message, Theme, Renderer>>,
+{
+    crate::Reactive::new(source, view).paint_only()
+}
+
+/// Creates a fixed reactive subtree that reads its live source during paint.
+///
+/// Unlike [`reactive_paint`], this does not reconstruct or diff the subtree
+/// after a source change. The view receives the source itself and must keep its
+/// widget structure, geometry, and semantics independent of the current value.
+#[cfg(feature = "signal")]
+pub fn reactive_value<'a, Message, Theme, Renderer, Source, View>(
+    source: Source,
+    view: impl Fn(Source) -> View + 'a,
+) -> crate::Reactive<'a, Message, Theme, Renderer, Source, View>
+where
+    Source: taim_signal::Readable + 'a,
+    View: Into<Element<'static, Message, Theme, Renderer>>,
+{
+    crate::Reactive::value(source, view)
+}
+
 /// Turns an implementor of [`Component`] into an [`Element`] that can be
 /// embedded in any application.
 #[cfg(feature = "lazy")]

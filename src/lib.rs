@@ -544,6 +544,12 @@ pub use crate::program::Preset;
 pub use crate::program::message;
 pub use crate::runtime::exit;
 pub use taim_futures::Subscription;
+pub use taim_signal::{Memo, Signal};
+
+/// Fine-grained reactive state primitives.
+pub mod signal {
+    pub use taim_signal::*;
+}
 
 pub use Alignment::Center;
 pub use Length::{Fill, FillPortion, Fit, Shrink};

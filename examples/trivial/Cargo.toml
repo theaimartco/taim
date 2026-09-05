@@ -1,0 +1,25 @@
+[package]
+name = "trivial"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+# Mirrors `examples/mobile_shell/Cargo.toml`'s feature selection exactly:
+# the workspace `taim` dependency sets `default-features = false`, so this
+# example opts back in to what `taim`'s own `default` feature enables. This
+# crate exists to measure Pillar XIII's "trivial app" gate (future.md) --
+# the smallest possible real Taim application -- so it must be built the
+# same way a real app would be, not stripped down further than `default`.
+# `fira-sans` is deliberately absent, matching `taim`'s `default` feature.
+taim.workspace = true
+taim.features = [
+    "wgpu",
+    "tiny-skia",
+    "crisp",
+    "hinting",
+    "thread-pool",
+    "linux-theme-detection",
+    "x11",
+    "wayland",
+]

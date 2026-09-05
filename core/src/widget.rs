@@ -255,6 +255,12 @@ where
     fn cache_policy(&self) -> Option<cache::Policy> {
         None
     }
+
+    /// Returns the process-local reactive source directly represented by
+    /// this widget, if any.
+    fn reactive_source(&self) -> Option<u64> {
+        None
+    }
 }
 
 /// A zero-sized [`Widget`] that does nothing and will be filtered out by containers.

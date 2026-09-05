@@ -22,17 +22,23 @@ all-features = true
 maintenance = { status = "actively-developed" }
 
 [features]
-# `fira-sans` is default so an Taim application renders identically on every
-# machine. Without it text falls back to whatever the host happens to have
-# installed, which is not a look a framework can claim to control. Costs
-# ~430 KiB in the binary; see scripts/ci/check-budgets.sh.
+# `fira-sans` was default so a Taim application renders identically on every
+# machine, at a cost of ~430 KiB in the binary (see scripts/ci/check-budgets.sh
+# and Pillar XIII of future.md). It is no longer default: a shipping app on an
+# OS you control (VYOM ships the font system-wide) should not pay for a font
+# it can get for free, and without it text falls back to the host's own
+# sans-serif via `graphics/src/text.rs`, which is a defensible default rather
+# than a bug. Anything that needs machine-independent, deterministic
+# rendering -- the golden test suite in particular -- enables `fira-sans`
+# explicitly (see this workspace's `[dev-dependencies] taim.features` below);
+# it is not relying on this default.
 #
 # `web-colors` is deliberately NOT here. It was, and it made the shipping
 # renderer blend gamma-encoded components -- its own description below calls
 # that "broken". Linear-light compositing is the production default, and the
 # Web-compatibility behaviour is an explicit opt-in. See
 # `docs/architecture/color-pipeline.md` and `tests/color/contract.rs`.
-default = ["wgpu", "tiny-skia", "crisp", "hinting", "thread-pool", "linux-theme-detection", "x11", "wayland", "fira-sans"]
+default = ["wgpu", "tiny-skia", "crisp", "hinting", "thread-pool", "linux-theme-detection", "x11", "wayland", "signal"]
 # Enables the `wgpu` GPU-accelerated renderer with all its default features (Vulkan, Metal, DX12, OpenGL, and WebGPU)
 wgpu = ["wgpu-bare", "taim_renderer/wgpu"]
 # Enables the `wgpu` GPU-accelerated renderer with the minimum required features (no backends!)
@@ -58,6 +64,13 @@ markdown = ["taim_widget/markdown"]
 taim = ["taim_widget/taim"]
 # Enables lazy widgets
 lazy = ["taim_widget/lazy"]
+# Enables fine-grained reactive widget subtrees.
+signal = ["taim_widget/signal"]
+# Enables an opt-in first-successful-present marker for application measurement.
+measurement = ["taim_winit/measurement"]
+# Enables the experimental tiled compute-raster scene contract. The current
+# quad/triangle renderer remains the fallback until the GPU stages land.
+raster = ["taim_renderer/raster"]
 # Enables hot reloading (very experimental!)
 hot = ["taim_debug/hot"]
 # Enables the `thread-pool` futures executor as the `executor::Default` on native platforms
@@ -124,6 +137,7 @@ taim_core.workspace = true
 taim_futures.workspace = true
 taim_renderer.workspace = true
 taim_runtime.workspace = true
+taim-signal.workspace = true
 taim_widget.workspace = true
 taim_winit.workspace = true
 
@@ -211,10 +225,13 @@ members = [
     "taim-motion",
     "taim-platform-vyom",
     "taim-profiler",
+    "taim-raster",
+    "taim-signal",
     "taim-showcase",
     "core",
     "debug",
     "examples/mobile_shell",
+    "examples/trivial",
     "futures",
     "graphics",
     "program",
@@ -253,6 +270,8 @@ taim-highlighter = { version = "0.15.0-dev", path = "taim-highlighter" }
 taim-motion = { version = "0.15.0-dev", path = "taim-motion", default-features = false }
 taim-platform-vyom = { version = "0.15.0-dev", path = "taim-platform-vyom" }
 taim-profiler = { version = "0.15.0-dev", path = "taim-profiler" }
+taim-raster = { version = "0.15.0-dev", path = "taim-raster" }
+taim-signal = { version = "0.15.0-dev", path = "taim-signal" }
 # `default-features = false` here rather than at the dev-dependency, because
 # Cargo forbids an inherited dependency from overriding it. See the
 # dev-dependencies section for why it matters.

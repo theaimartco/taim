@@ -5,4 +5,32 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+# The workspace `taim` dependency sets `default-features = false` so the
+# integration suite can control its own feature matrix (see the comment at
+# `[workspace.dependencies]`). An example therefore has to opt back in, and
+# this list is deliberately what `taim`'s own `default` feature enables --
+# `scripts/ci/check-budgets.sh` measures this binary as "what a real app
+# costs to ship", so it must be built the way a real app would be.
+#
+# `fira-sans` is deliberately absent, matching `taim`'s `default` feature
+# (Pillar XIII of future.md): a real app does not pay ~430 KiB for a bundled
+# font it can get from the host/OS. An app that needs the bundled font for
+# pixel-identical rendering across machines opts back in explicitly.
 taim.workspace = true
+taim.features = [
+    "wgpu",
+    "tiny-skia",
+    "crisp",
+    "hinting",
+    "thread-pool",
+    "linux-theme-detection",
+    "x11",
+    "wayland",
+]
+
+# Diagnostic only: the workspace logs through the `log` facade everywhere
+# (see `Cargo.toml`'s `[workspace.dependencies]`) but nothing in the tree
+# installs a subscriber, so `RUST_LOG=...` has never produced output from
+# any binary. This example is the one used to diagnose the H0 measurement
+# stall (see `future.md`, Ceiling 8), so it gets the minimal subscriber.
+env_logger = "0.11"

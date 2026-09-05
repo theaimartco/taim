@@ -14,6 +14,7 @@ pub mod idle_shell;
 pub mod image_grid;
 pub mod motion_stress;
 pub mod multitouch;
+pub mod signal_list;
 pub mod ten_thousand_rows;
 pub mod text_edit;
 pub mod text_heavy;
@@ -64,6 +65,13 @@ pub trait Scene {
     fn input_events(&self, _frame_index: u64) -> Vec<Event> {
         Vec::new()
     }
+
+    /// Performs state mutation after the frame's UI has been rebuilt but
+    /// inside the measured update interval.
+    ///
+    /// Signal benchmarks use this hook so the timed work includes source
+    /// publication, wake handling, subtree reconstruction, and relayout.
+    fn before_update(&self, _frame_index: u64) {}
 }
 
 /// Looks up a scene by its [`Scene::name`], for the command-line `--scene`
@@ -80,6 +88,8 @@ pub fn names() -> &'static [&'static str] {
         animated_cards::NAME,
         multitouch::NAME,
         motion_stress::NAME,
+        signal_list::HUNDRED_THOUSAND_NAME,
+        signal_list::MILLION_NAME,
         damage_churn::NAME,
         effect_ladder::NAME,
         virtual_list::NAME,

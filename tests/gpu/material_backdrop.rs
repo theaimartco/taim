@@ -106,18 +106,20 @@ fn block_at(x: f32) -> impl Fn(&mut Renderer) {
     }
 }
 
-/// A backdrop split hard down the middle into red and blue.
+/// A backdrop split inside the pane's left bevel into red and blue.
 ///
 /// A sharp edge is what makes dispersion measurable: the channels sample it
 /// at different offsets, so near the bevel one channel has crossed the edge
 /// and another has not.
 fn red_blue_split(renderer: &mut Renderer) {
+    let split = PANE.x + 4.0;
+
     renderer.fill_quad(
         Quad {
             bounds: Rectangle {
                 x: 0.0,
                 y: 0.0,
-                width: (SIZE / 2) as f32,
+                width: split,
                 height: SIZE as f32,
             },
             ..Default::default()
@@ -128,9 +130,9 @@ fn red_blue_split(renderer: &mut Renderer) {
     renderer.fill_quad(
         Quad {
             bounds: Rectangle {
-                x: (SIZE / 2) as f32,
+                x: split,
                 y: 0.0,
-                width: (SIZE / 2) as f32,
+                width: SIZE as f32 - split,
                 height: SIZE as f32,
             },
             ..Default::default()
@@ -298,13 +300,24 @@ fn a_pane_separates_colour_at_its_bevel() {
     // separates "dispersion works" from "the pane happens to be colourful".
     needs_gpu!(renderer);
 
-    let dispersive = through_pane(&mut renderer, Material::GLASS, red_blue_split);
+    // The renderer does not know physical pixel density yet, so this 64 px
+    // proof uses a thicker, strongly dispersive authored pane to give the
+    // channel spread more than a sub-byte footprint. The ordinary 1.5 mm,
+    // 0.012 preset exercises the same arithmetic but its delta can quantise
+    // away at this resolution.
+    let glass = Material {
+        thickness_mm: 8.0,
+        dispersion: 0.25,
+        ..Material::GLASS
+    };
+
+    let dispersive = through_pane(&mut renderer, glass, red_blue_split);
 
     let achromatic = through_pane(
         &mut renderer,
         Material {
             dispersion: 0.0,
-            ..Material::GLASS
+            ..glass
         },
         red_blue_split,
     );

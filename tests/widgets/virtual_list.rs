@@ -12,6 +12,9 @@ use taim::{Length, Point, Rectangle, Size};
 use taim_core::{shell::Waker, window};
 use taim_renderer::Renderer;
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 fn headless_renderer() -> Renderer {
     taim_futures::futures::executor::block_on(
         <Renderer as taim::advanced::renderer::Headless>::new(
@@ -257,5 +260,48 @@ fn focus_can_traverse_visible_virtualized_rows() {
     assert!(
         count.total < 50,
         "an operation over the visible window must not reach every one of the 50 rows, proving virtualization is real"
+    );
+}
+
+#[test]
+fn a_routed_live_value_does_not_rebuild_its_row_during_dispatch() {
+    let renderer = headless_renderer();
+    let builds = Arc::new(AtomicUsize::new(0));
+    let counted_builds = Arc::clone(&builds);
+    let source = 41_u64;
+    let target = 3_usize;
+
+    let mut list = virtual_list(50, ROW_HEIGHT, move |i| {
+        let _ = counted_builds.fetch_add(1, Ordering::Relaxed);
+        text(format!("Row {i}")).into()
+    })
+    .route_reactive_value(move |candidate| (candidate == source).then_some(target))
+    .width(Length::Fixed(200.0))
+    .height(Length::Fixed(VIEWPORT_HEIGHT));
+
+    let mut tree = widget::Tree::new(&list as &dyn Widget<(), taim::Theme, Renderer>);
+    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
+    let node =
+        Widget::<(), taim::Theme, Renderer>::layout(&mut list, &mut tree, &renderer, &limits);
+    builds.store(0, Ordering::Relaxed);
+
+    let bounds = Rectangle::new(Point::ORIGIN, Size::new(200.0, VIEWPORT_HEIGHT));
+    let mut messages = Vec::new();
+    let mut shell = shell(&mut messages);
+    Widget::<(), taim::Theme, Renderer>::update(
+        &mut list,
+        &mut tree,
+        &taim::Event::Reactive(source),
+        Layout::new(&node),
+        mouse::Cursor::Unavailable,
+        &renderer,
+        &mut shell,
+        &bounds,
+    );
+
+    assert_eq!(builds.load(Ordering::Relaxed), 0);
+    assert_eq!(
+        shell.redraw_request(),
+        taim_core::window::RedrawRequest::NextFrame
     );
 }

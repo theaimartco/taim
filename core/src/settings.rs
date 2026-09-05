@@ -52,6 +52,11 @@ pub struct Settings {
     ///
     /// By default, it is enabled.
     pub vsync: bool,
+
+    /// Rasterization path requested from the renderer.
+    ///
+    /// Unsupported compute requests safely use the legacy path.
+    pub rasterizer: renderer::Rasterizer,
 }
 
 impl Default for Settings {
@@ -67,6 +72,7 @@ impl Default for Settings {
             power_preference: backend::PowerPreference::None,
             antialiasing: true,
             vsync: true,
+            rasterizer: renderer.rasterizer,
         }
     }
 }
@@ -76,6 +82,7 @@ impl From<&Settings> for renderer::Settings {
         Self {
             default_font: settings.default_font,
             default_text_size: settings.default_text_size,
+            rasterizer: settings.rasterizer,
         }
     }
 }

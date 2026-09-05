@@ -5,4 +5,31 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+# See `examples/mobile_shell/Cargo.toml`: the workspace `taim` dependency
+# disables default features, so every binary has to name what it needs.
 taim.workspace = true
+taim.features = [
+    "wgpu",
+    "tiny-skia",
+    "crisp",
+    "hinting",
+    "thread-pool",
+    "linux-theme-detection",
+    "x11",
+    "wayland",
+    "fira-sans",
+    # `Showcase`'s view methods are generic over the renderer (see
+    # `src/lib.rs`), so they need the `advanced` re-exports of the core
+    # renderer traits to state that bound without depending on
+    # `taim_core`/`taim_widget` directly.
+    "advanced",
+]
+
+[dev-dependencies]
+# `tests/headless_semantics.rs` builds a `UserInterface` directly, the way
+# `tests/golden/harness.rs` and `tests/accessibility/user_interface.rs` do
+# at the workspace root -- it needs the runtime and core vocabulary
+# straight from their crates, not the `taim` facade.
+taim_core.workspace = true
+taim_runtime.workspace = true
+taim-accessibility.workspace = true

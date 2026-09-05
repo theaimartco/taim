@@ -143,7 +143,13 @@ while IFS= read -r file; do
     unexpected_unsafe=$((unexpected_unsafe + 1))
   fi
 done < <(
-  grep -rl 'allow(unsafe_code)' --include='*.rs' . \
+  # Match the *attribute*, not the string. A plain `grep 'allow(unsafe_code)'`
+  # also matches prose: `taim-platform-vyom/src/shm.rs` explains in a doc
+  # comment why it does NOT use unsafe ("moving to `mmap` behind an audited
+  # `allow(unsafe_code)` is a later, measurable change") and was failing this
+  # check for saying so. A budget that fires on a file for documenting its own
+  # restraint trains people to ignore it.
+  grep -rlE '^[[:space:]]*#!?\[[^]]*allow\(unsafe_code' --include='*.rs' . \
     --exclude-dir=target --exclude-dir=.git 2>/dev/null |
     sed 's|^\./||' | sort -u
 )

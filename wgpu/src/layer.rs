@@ -403,6 +403,43 @@ impl graphics::Layer for Layer {
         // or just ignore if it's not strictly needed for merge yet.
         // Or if needed: layer.effects.effects().iter().for_each(|e| self.effects.push(*e, Tier::Ultra));
     }
+
+    fn estimated_bytes(&self) -> usize {
+        let triangle_contents = self
+            .triangles
+            .iter()
+            .map(|item| match item {
+                triangle::Item::Group { meshes, .. } => {
+                    meshes.capacity() * std::mem::size_of::<Mesh>()
+                }
+                triangle::Item::Cached { .. } => 0,
+            })
+            .sum::<usize>();
+        let text_contents = self
+            .text
+            .iter()
+            .map(|item| match item {
+                text::Item::Group { text, .. } => text.capacity() * std::mem::size_of::<Text>(),
+                text::Item::Cached { .. } => 0,
+            })
+            .sum::<usize>();
+
+        #[cfg(any(feature = "svg", feature = "image"))]
+        let image_bytes = self.images.capacity() * std::mem::size_of::<Image>();
+        #[cfg(not(any(feature = "svg", feature = "image")))]
+        let image_bytes = std::mem::size_of_val(&self.images);
+
+        std::mem::size_of::<Self>()
+            + self.quads.estimated_bytes()
+            + self.triangles.capacity() * std::mem::size_of::<triangle::Item>()
+            + triangle_contents
+            + self.primitives.capacity() * std::mem::size_of::<primitive::Instance>()
+            + image_bytes
+            + self.text.capacity() * std::mem::size_of::<text::Item>()
+            + text_contents
+            + self.pending_meshes.capacity() * std::mem::size_of::<Mesh>()
+            + self.pending_text.capacity() * std::mem::size_of::<Text>()
+    }
 }
 
 impl Default for Layer {

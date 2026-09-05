@@ -26,6 +26,7 @@ web-colors = ["taim_wgpu?/web-colors"]
 webgl = ["taim_wgpu?/webgl"]
 fira-sans = ["taim_graphics/fira-sans"]
 strict-assertions = ["taim_wgpu?/strict-assertions"]
+raster = ["taim_graphics/raster", "taim_wgpu?/raster"]
 x11 = ["taim_tiny_skia?/x11"]
 wayland = ["taim_tiny_skia?/wayland"]
 

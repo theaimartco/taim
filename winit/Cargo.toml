@@ -16,6 +16,8 @@ workspace = true
 [features]
 default = ["x11", "wayland"]
 debug = []
+# Opt-in first-successful-present marker for the external application harness.
+measurement = []
 sysinfo = ["dep:sysinfo"]
 hinting = []
 unconditional-rendering = []

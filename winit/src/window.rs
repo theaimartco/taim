@@ -67,10 +67,10 @@ where
             compositor.create_surface(window.clone(), surface_size.width, surface_size.height);
         let renderer = compositor.create_renderer(renderer_settings);
 
-        let waker = shell::Waker::new(move || {
+        let waker = shell::Waker::new_tagged(move |reactive| {
             proxy.send_action(taim_runtime::Action::Event {
                 window: id,
-                event: core::Event::Waken,
+                event: reactive.map_or(core::Event::Waken, core::Event::Reactive),
             });
         });
 

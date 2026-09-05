@@ -23,10 +23,12 @@ image = ["dep:image", "kamadak-exif"]
 svg = []
 web-colors = []
 fira-sans = []
+raster = ["dep:taim-raster"]
 
 [dependencies]
 taim_core.workspace = true
 taim_futures.workspace = true
+taim-raster = { workspace = true, optional = true }
 
 bitflags.workspace = true
 bytemuck.workspace = true

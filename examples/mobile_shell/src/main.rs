@@ -9,6 +9,11 @@ use taim::widget::{
 use taim::{Center, Element, Fill, Task};
 
 pub fn main() -> taim::Result {
+    // Diagnostic only (see `future.md`, Ceiling 8 / H0): nothing else in
+    // the tree installs a `log` subscriber, so `RUST_LOG=debug` has
+    // otherwise produced no output from this or any other binary.
+    env_logger::init();
+
     taim::application(Shell::new, Shell::update, Shell::view)
         .title("Taim — Mobile Shell")
         .run()
