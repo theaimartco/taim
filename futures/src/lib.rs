@@ -13,6 +13,7 @@ pub mod backend;
 pub mod event;
 pub mod executor;
 pub mod keyboard;
+pub mod scheduler;
 pub mod stream;
 pub mod subscription;
 
@@ -20,6 +21,7 @@ pub use executor::Executor;
 pub use maybe::{MaybeSend, MaybeSync};
 pub use platform::*;
 pub use runtime::Runtime;
+pub use scheduler::{CancelToken, SubscriptionEpoch, TaskId, TaskScheduler, WakeState};
 pub use subscription::Subscription;
 
 #[cfg(not(target_arch = "wasm32"))]

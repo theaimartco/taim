@@ -1,35 +1,63 @@
-//! High-performance generational skyline texture atlas allocator for Taim.
+//! High-performance production-grade generational skyline + free-rect atlas allocator for Taim.
 //!
-//! Replaces inherited guillotiere tree-based allocation with a cache-local,
-//! skyline packing algorithm optimized for UI textures, glyphs, and iconography.
-//! Generational IDs prevent stale regional reuse and eliminate heap-heavy node trees.
+//! Combines a cache-local skyline frontier with dynamic free-rectangle recycling
+//! and generational slot validation. Freed rectangular regions are reclaimed and
+//! coalesced in-place without requiring full atlas resets. Persistent scratch
+//! storage ensures zero heap allocations during steady-state allocation calls.
 
 use crate::core::Size;
 
 /// A generational ID identifying an allocation in the atlas.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct AllocationId {
-    /// Slot index.
+    /// Slot index in the allocation table.
     pub index: u32,
-    /// Monotonic generation preventing use-after-free.
-    pub generation: u16,
+    /// Monotonic generation preventing stale access and use-after-free.
+    pub generation: u32,
 }
 
-/// A skyline node tracking horizontal spans in the atlas.
-#[derive(Debug, Clone, Copy)]
+/// A free rectangular slot reclaimed from deallocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FreeRect {
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+}
+
+/// A skyline node tracking the frontier of unallocated space in the atlas.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SkylineNode {
     x: u32,
     y: u32,
     width: u32,
 }
 
-/// The Taim-native texture atlas allocator using a skyline packing strategy.
+/// An entry in the generational slot table.
+#[derive(Debug, Clone, Copy)]
+struct SlotEntry {
+    generation: u32,
+    is_active: bool,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    pad_w: u32,
+    pad_h: u32,
+}
+
+/// The Taim-native texture atlas allocator with free-rect recycling.
 pub struct Allocator {
     size: u32,
     skyline: Vec<SkylineNode>,
+    free_rects: Vec<FreeRect>,
+    slots: Vec<SlotEntry>,
+    free_slot_indices: Vec<u32>,
+    scratch_skyline: Vec<SkylineNode>,
+    scratch_merged: Vec<SkylineNode>,
     allocations: usize,
-    generation: u16,
-    next_id: u32,
+    peak_skyline_nodes: usize,
+    peak_free_rects: usize,
 }
 
 impl Allocator {
@@ -44,33 +72,101 @@ impl Allocator {
                 y: 0,
                 width: size,
             }],
+            free_rects: Vec::new(),
+            slots: Vec::with_capacity(64),
+            free_slot_indices: Vec::new(),
+            scratch_skyline: Vec::with_capacity(32),
+            scratch_merged: Vec::with_capacity(32),
             allocations: 0,
-            generation: 1,
-            next_id: 0,
+            peak_skyline_nodes: 1,
+            peak_free_rects: 0,
         }
     }
 
     /// Allocates a region of `width` x `height` within the atlas.
+    ///
+    /// First searches the free-rectangle recycler to reuse holes left by
+    /// previous deallocations. If no recycled hole fits, allocates from the
+    /// skyline frontier using preallocated scratch buffers (zero heap allocations).
     pub fn allocate(&mut self, width: u32, height: u32) -> Option<Region> {
         let pad_width = width + Self::PADDING * 2 <= self.size;
         let pad_height = height + Self::PADDING * 2 <= self.size;
 
-        let alloc_w = if pad_width {
-            width + Self::PADDING * 2
-        } else {
-            width
-        };
-        let alloc_h = if pad_height {
-            height + Self::PADDING * 2
-        } else {
-            height
-        };
+        let pad_w = if pad_width { Self::PADDING } else { 0 };
+        let pad_h = if pad_height { Self::PADDING } else { 0 };
+
+        let alloc_w = width + pad_w * 2;
+        let alloc_h = height + pad_h * 2;
 
         if alloc_w > self.size || alloc_h > self.size {
             return None;
         }
 
-        // Find best-fit skyline node (lowest y, breaking ties with lowest x)
+        // --- Step 1: Check recycled free rectangles (hole reuse) ---
+        if let Some((best_idx, rect)) = self.find_best_free_rect(alloc_w, alloc_h) {
+            let _ = self.free_rects.swap_remove(best_idx);
+
+            // Guillotine split residual area
+            let rem_w = rect.width - alloc_w;
+            let rem_h = rect.height - alloc_h;
+
+            if rem_w > 0 && rem_h > 0 {
+                // Shorter axis split to minimize fragmentation
+                if rem_w <= rem_h {
+                    self.push_free_rect(FreeRect {
+                        x: rect.x + alloc_w,
+                        y: rect.y,
+                        width: rem_w,
+                        height: alloc_h,
+                    });
+                    self.push_free_rect(FreeRect {
+                        x: rect.x,
+                        y: rect.y + alloc_h,
+                        width: rect.width,
+                        height: rem_h,
+                    });
+                } else {
+                    self.push_free_rect(FreeRect {
+                        x: rect.x,
+                        y: rect.y + alloc_h,
+                        width: alloc_w,
+                        height: rem_h,
+                    });
+                    self.push_free_rect(FreeRect {
+                        x: rect.x + alloc_w,
+                        y: rect.y,
+                        width: rem_w,
+                        height: rect.height,
+                    });
+                }
+            } else if rem_w > 0 {
+                self.push_free_rect(FreeRect {
+                    x: rect.x + alloc_w,
+                    y: rect.y,
+                    width: rem_w,
+                    height: rect.height,
+                });
+            } else if rem_h > 0 {
+                self.push_free_rect(FreeRect {
+                    x: rect.x,
+                    y: rect.y + alloc_h,
+                    width: rect.width,
+                    height: rem_h,
+                });
+            }
+
+            let id = self.register_allocation(rect.x, rect.y, alloc_w, alloc_h, pad_w, pad_h);
+            return Some(Region {
+                id,
+                x: rect.x + pad_w,
+                y: rect.y + pad_h,
+                width,
+                height,
+                padding: Size::new(pad_w, pad_h),
+            });
+        }
+
+        // --- Step 2: Allocate from Skyline frontier ---
         let mut best_i = None;
         let mut best_y = u32::MAX;
         let mut best_width_waste = u32::MAX;
@@ -81,7 +177,7 @@ impl Allocator {
                 continue;
             }
 
-            // Find highest skyline segment across the span [node_x, node_x + alloc_w]
+            // Find maximum skyline height across span [node_x, node_x + alloc_w]
             let mut y_max = 0;
             let mut j = i;
             let mut span = 0;
@@ -92,12 +188,12 @@ impl Allocator {
                 j += 1;
             }
 
-            if y_max + alloc_h <= self.size {
-                if y_max < best_y || (y_max == best_y && self.skyline[i].width < best_width_waste) {
-                    best_y = y_max;
-                    best_i = Some(i);
-                    best_width_waste = self.skyline[i].width;
-                }
+            if y_max + alloc_h <= self.size
+                && (y_max < best_y || (y_max == best_y && self.skyline[i].width < best_width_waste))
+            {
+                best_y = y_max;
+                best_i = Some(i);
+                best_width_waste = self.skyline[i].width;
             }
         }
 
@@ -105,43 +201,41 @@ impl Allocator {
         let alloc_x = self.skyline[i].x;
         let alloc_y = best_y;
 
-        // Insert new skyline segment and split/collapse covered nodes
         let new_node = SkylineNode {
             x: alloc_x,
             y: alloc_y + alloc_h,
             width: alloc_w,
         };
 
-        // Update skyline: replace overlapping segments
-        let mut new_skyline = Vec::with_capacity(self.skyline.len() + 1);
+        // Update skyline using preallocated scratch buffers to avoid heap allocations
+        self.scratch_skyline.clear();
         let mut inserted = false;
 
         for node in &self.skyline {
             if node.x + node.width <= alloc_x {
-                new_skyline.push(*node);
+                self.scratch_skyline.push(*node);
             } else if node.x >= alloc_x + alloc_w {
                 if !inserted {
-                    new_skyline.push(new_node);
+                    self.scratch_skyline.push(new_node);
                     inserted = true;
                 }
-                new_skyline.push(*node);
+                self.scratch_skyline.push(*node);
             } else {
-                // Segment overlaps with [alloc_x, alloc_x + alloc_w]
                 if node.x < alloc_x {
-                    new_skyline.push(SkylineNode {
+                    self.scratch_skyline.push(SkylineNode {
                         x: node.x,
                         y: node.y,
                         width: alloc_x - node.x,
                     });
                 }
                 if !inserted {
-                    new_skyline.push(new_node);
+                    self.scratch_skyline.push(new_node);
                     inserted = true;
                 }
                 let node_right = node.x + node.width;
                 let alloc_right = alloc_x + alloc_w;
                 if node_right > alloc_right {
-                    new_skyline.push(SkylineNode {
+                    self.scratch_skyline.push(SkylineNode {
                         x: alloc_right,
                         y: node.y,
                         width: node_right - alloc_right,
@@ -150,68 +244,80 @@ impl Allocator {
             }
         }
         if !inserted {
-            new_skyline.push(new_node);
+            self.scratch_skyline.push(new_node);
         }
 
-        // Merge adjacent nodes with identical y
-        let mut merged: Vec<SkylineNode> = Vec::with_capacity(new_skyline.len());
-        for node in new_skyline {
-            if let Some(last) = merged.last_mut() {
-                if last.y == node.y && last.x + last.width == node.x {
-                    last.width += node.width;
-                    continue;
-                }
+        // Merge adjacent nodes with identical y in scratch_merged
+        self.scratch_merged.clear();
+        for node in &self.scratch_skyline {
+            if let Some(last) = self
+                .scratch_merged
+                .last_mut()
+                .filter(|l| l.y == node.y && l.x + l.width == node.x)
+            {
+                last.width += node.width;
+                continue;
             }
-            merged.push(node);
+            self.scratch_merged.push(*node);
         }
-        self.skyline = merged;
 
-        self.allocations += 1;
-        self.next_id = self.next_id.wrapping_add(1);
+        std::mem::swap(&mut self.skyline, &mut self.scratch_merged);
+        self.peak_skyline_nodes = self.peak_skyline_nodes.max(self.skyline.len());
 
-        let id = AllocationId {
-            index: self.next_id,
-            generation: self.generation,
-        };
-
-        let x = if pad_width {
-            alloc_x + Self::PADDING
-        } else {
-            alloc_x
-        };
-        let y = if pad_height {
-            alloc_y + Self::PADDING
-        } else {
-            alloc_y
-        };
+        let id = self.register_allocation(alloc_x, alloc_y, alloc_w, alloc_h, pad_w, pad_h);
 
         Some(Region {
             id,
-            x,
-            y,
+            x: alloc_x + pad_w,
+            y: alloc_y + pad_h,
             width,
             height,
-            padding: Size::new(
-                if pad_width { Self::PADDING } else { 0 },
-                if pad_height { Self::PADDING } else { 0 },
-            ),
+            padding: Size::new(pad_w, pad_h),
         })
     }
 
     /// Deallocates a region from the atlas.
-    pub fn deallocate(&mut self, _region: &Region) {
-        self.allocations = self.allocations.saturating_sub(1);
-        self.generation = self.generation.wrapping_add(1);
+    ///
+    /// Validates the generational allocation ID to prevent double-free and
+    /// use-after-free. Reclaims the rectangular space into the free list,
+    /// immediately coalescing with neighboring free rectangles where possible.
+    pub fn deallocate(&mut self, region: &Region) {
+        let slot_idx = region.id.index as usize;
+        if slot_idx >= self.slots.len() {
+            return;
+        }
 
-        // When all allocations are released, reset the skyline to a single empty span
+        let slot = &mut self.slots[slot_idx];
+        if !slot.is_active || slot.generation != region.id.generation {
+            // Stale ID or already deallocated
+            return;
+        }
+
+        slot.is_active = false;
+        slot.generation = slot.generation.wrapping_add(1);
+        self.free_slot_indices.push(slot_idx as u32);
+        self.allocations = self.allocations.saturating_sub(1);
+
         if self.allocations == 0 {
+            // All allocations released: completely reset skyline and free list
+            self.free_rects.clear();
             self.skyline.clear();
             self.skyline.push(SkylineNode {
                 x: 0,
                 y: 0,
                 width: self.size,
             });
+            return;
         }
+
+        // Reclaim hole and coalesce
+        let reclaimed = FreeRect {
+            x: slot.x,
+            y: slot.y,
+            width: slot.width,
+            height: slot.height,
+        };
+        self.push_free_rect(reclaimed);
     }
 
     /// Returns `true` if there are no active allocations.
@@ -222,6 +328,151 @@ impl Allocator {
     /// Returns the number of active allocations.
     pub fn allocations(&self) -> usize {
         self.allocations
+    }
+
+    /// Returns the count of recyclable free holes currently tracked.
+    #[allow(dead_code)]
+    pub fn free_rect_count(&self) -> usize {
+        self.free_rects.len()
+    }
+
+    /// Returns the number of skyline nodes currently tracked.
+    #[allow(dead_code)]
+    pub fn skyline_node_count(&self) -> usize {
+        self.skyline.len()
+    }
+
+    /// Returns the peak number of skyline nodes observed.
+    #[allow(dead_code)]
+    pub fn peak_skyline_nodes(&self) -> usize {
+        self.peak_skyline_nodes
+    }
+
+    /// Returns the peak number of free rectangles observed.
+    #[allow(dead_code)]
+    pub fn peak_free_rects(&self) -> usize {
+        self.peak_free_rects
+    }
+
+    /// Returns `true` if the given allocation ID is currently valid and active.
+    #[allow(dead_code)]
+    pub fn is_allocated(&self, id: AllocationId) -> bool {
+        let idx = id.index as usize;
+        if idx < self.slots.len() {
+            let slot = &self.slots[idx];
+            slot.is_active && slot.generation == id.generation
+        } else {
+            false
+        }
+    }
+
+    // --- Internal Helpers ---
+
+    fn find_best_free_rect(&self, w: u32, h: u32) -> Option<(usize, FreeRect)> {
+        let mut best = None;
+        let mut min_waste = u64::MAX;
+
+        for (idx, &rect) in self.free_rects.iter().enumerate() {
+            if rect.width >= w && rect.height >= h {
+                let waste = (rect.width as u64 * rect.height as u64) - (w as u64 * h as u64);
+                if waste < min_waste {
+                    min_waste = waste;
+                    best = Some((idx, rect));
+                    if waste == 0 {
+                        break;
+                    }
+                }
+            }
+        }
+        best
+    }
+
+    fn push_free_rect(&mut self, mut rect: FreeRect) {
+        // Coalesce with adjacent free rectangles
+        let mut i = 0;
+        while i < self.free_rects.len() {
+            let other = self.free_rects[i];
+
+            // Horizontal coalesce (same y, same height, contiguous x)
+            if rect.y == other.y && rect.height == other.height {
+                if rect.x + rect.width == other.x {
+                    rect.width += other.width;
+                    let _ = self.free_rects.swap_remove(i);
+                    i = 0;
+                    continue;
+                } else if other.x + other.width == rect.x {
+                    rect.x = other.x;
+                    rect.width += other.width;
+                    let _ = self.free_rects.swap_remove(i);
+                    i = 0;
+                    continue;
+                }
+            }
+
+            // Vertical coalesce (same x, same width, contiguous y)
+            if rect.x == other.x && rect.width == other.width {
+                if rect.y + rect.height == other.y {
+                    rect.height += other.height;
+                    let _ = self.free_rects.swap_remove(i);
+                    i = 0;
+                    continue;
+                } else if other.y + other.height == rect.y {
+                    rect.y = other.y;
+                    rect.height += other.height;
+                    let _ = self.free_rects.swap_remove(i);
+                    i = 0;
+                    continue;
+                }
+            }
+
+            i += 1;
+        }
+
+        self.free_rects.push(rect);
+        self.peak_free_rects = self.peak_free_rects.max(self.free_rects.len());
+    }
+
+    fn register_allocation(
+        &mut self,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+        pad_w: u32,
+        pad_h: u32,
+    ) -> AllocationId {
+        self.allocations += 1;
+
+        if let Some(idx) = self.free_slot_indices.pop() {
+            let slot = &mut self.slots[idx as usize];
+            slot.is_active = true;
+            slot.x = x;
+            slot.y = y;
+            slot.width = width;
+            slot.height = height;
+            slot.pad_w = pad_w;
+            slot.pad_h = pad_h;
+            AllocationId {
+                index: idx,
+                generation: slot.generation,
+            }
+        } else {
+            let idx = self.slots.len() as u32;
+            self.slots.push(SlotEntry {
+                generation: 1,
+                is_active: true,
+                x,
+                y,
+                width,
+                height,
+                pad_w,
+                pad_h,
+            });
+            AllocationId {
+                index: idx,
+                generation: 1,
+            }
+        }
     }
 }
 
@@ -264,6 +515,7 @@ impl std::fmt::Debug for Allocator {
             .field("size", &self.size)
             .field("allocations", &self.allocations)
             .field("skyline_nodes", &self.skyline.len())
+            .field("free_rects", &self.free_rects.len())
             .finish()
     }
 }
@@ -292,22 +544,25 @@ mod tests {
         let r1 = allocator.allocate(64, 64).expect("allocate r1");
         assert_eq!(allocator.allocations(), 1);
         assert!(!allocator.is_empty());
+        assert!(allocator.is_allocated(r1.id()));
 
         let r2 = allocator.allocate(128, 64).expect("allocate r2");
         assert_eq!(allocator.allocations(), 2);
+        assert!(allocator.is_allocated(r2.id()));
 
-        // Ensure r1 and r2 do not overlap
+        // Ensure regions do not overlap
         let (x1, y1) = r1.position();
-        let s1 = r1.size();
         let (x2, y2) = r2.position();
-        let s2 = r2.size();
-
-        let overlap =
-            x1 < x2 + s2.width && x1 + s1.width > x2 && y1 < y2 + s2.height && y1 + s1.height > y2;
-        assert!(!overlap, "allocations must not overlap");
+        let no_overlap = x1 + r1.size().width <= x2
+            || x2 + r2.size().width <= x1
+            || y1 + r1.size().height <= y2
+            || y2 + r2.size().height <= y1;
+        assert!(no_overlap, "regions must not overlap");
 
         allocator.deallocate(&r1);
         assert_eq!(allocator.allocations(), 1);
+        assert!(!allocator.is_allocated(r1.id()));
+        assert!(allocator.is_allocated(r2.id()));
 
         allocator.deallocate(&r2);
         assert_eq!(allocator.allocations(), 0);
@@ -315,8 +570,179 @@ mod tests {
     }
 
     #[test]
+    fn test_hole_reclamation_and_reuse() {
+        let mut allocator = Allocator::new(512);
+
+        // Allocate 3 blocks
+        let b1 = allocator.allocate(64, 64).expect("b1");
+        let b2 = allocator.allocate(64, 64).expect("b2");
+        let b3 = allocator.allocate(64, 64).expect("b3");
+        assert_eq!(allocator.allocations(), 3);
+
+        // Free the middle block b2
+        allocator.deallocate(&b2);
+        assert_eq!(allocator.allocations(), 2);
+        assert_eq!(allocator.free_rect_count(), 1);
+        assert!(!allocator.is_allocated(b2.id()));
+
+        // Double-free of b2 must be safely ignored
+        allocator.deallocate(&b2);
+        assert_eq!(allocator.allocations(), 2);
+
+        // Allocate a new block of identical size: MUST reuse the hole left by b2
+        let b4 = allocator.allocate(64, 64).expect("b4");
+        assert_eq!(allocator.allocations(), 3);
+        assert_eq!(allocator.free_rect_count(), 0); // Hole was reused!
+        assert_eq!(b4.position(), b2.position());
+        assert_ne!(b4.id(), b2.id()); // Generational ID differs!
+
+        allocator.deallocate(&b1);
+        allocator.deallocate(&b3);
+        allocator.deallocate(&b4);
+        assert!(allocator.is_empty());
+    }
+
+    #[test]
+    fn test_coalescing_of_freed_holes() {
+        let mut allocator = Allocator::new(512);
+
+        // Allocate 2 horizontally adjacent 64x64 blocks
+        let b1 = allocator.allocate(64, 64).expect("b1");
+        let b2 = allocator.allocate(64, 64).expect("b2");
+        let _b3 = allocator.allocate(64, 64).expect("b3");
+
+        // Free b1 and b2
+        allocator.deallocate(&b1);
+        allocator.deallocate(&b2);
+
+        // Holes b1 and b2 should coalesce into a single 132-wide hole (accounting for padding)
+        assert_eq!(allocator.free_rect_count(), 1);
+
+        // A 128x64 allocation should now fit into the coalesced hole!
+        let b_large = allocator.allocate(128, 64).expect("b_large");
+        assert_eq!(b_large.position(), b1.position());
+    }
+
+    #[test]
+    fn test_stale_id_detection() {
+        let mut allocator = Allocator::new(256);
+        let r1 = allocator.allocate(32, 32).expect("r1");
+        let stale_id = r1.id();
+
+        allocator.deallocate(&r1);
+        assert!(!allocator.is_allocated(stale_id));
+
+        // Subsequent allocation reuses slot, but has bumped generation
+        let r2 = allocator.allocate(32, 32).expect("r2");
+        assert!(allocator.is_allocated(r2.id()));
+        assert!(!allocator.is_allocated(stale_id));
+        assert_ne!(r2.id(), stale_id);
+    }
+
+    #[test]
     fn test_skyline_overflow() {
         let mut allocator = Allocator::new(128);
         assert!(allocator.allocate(256, 256).is_none());
+    }
+
+    #[test]
+    fn test_ten_thousand_cycles_glyph_and_image() {
+        let mut allocator = Allocator::new(2048);
+        let mut active_regions = Vec::new();
+        let mut latencies_ns = Vec::with_capacity(10_000);
+
+        // Run 10,000 allocate & deallocate cycles with mixed sizes
+        for cycle in 0..10_000 {
+            // Alternate between tiny glyphs and medium images
+            let (w, h) = match cycle % 5 {
+                0 => (12, 16),   // tiny glyph
+                1 => (18, 24),   // small glyph
+                2 => (32, 32),   // icon
+                3 => (64, 64),   // medium avatar
+                _ => (128, 128), // image
+            };
+
+            let start = std::time::Instant::now();
+            let opt_region = allocator.allocate(w, h);
+            latencies_ns.push(start.elapsed().as_nanos() as u64);
+
+            if let Some(region) = opt_region {
+                active_regions.push(region);
+            }
+
+            // Keep bounded working set to stress hole recycling
+            if active_regions.len() > 150 || (cycle % 3 == 0 && !active_regions.is_empty()) {
+                let idx = cycle % active_regions.len();
+                let region = active_regions.swap_remove(idx);
+                allocator.deallocate(&region);
+            }
+        }
+
+        // Clean up remaining allocations
+        for r in &active_regions {
+            allocator.deallocate(r);
+        }
+
+        assert!(allocator.is_empty());
+        assert_eq!(allocator.allocations(), 0);
+        assert!(allocator.peak_free_rects() > 0);
+
+        latencies_ns.sort_unstable();
+        let p50 = latencies_ns[latencies_ns.len() * 50 / 100];
+        let p95 = latencies_ns[latencies_ns.len() * 95 / 100];
+        let p99 = latencies_ns[latencies_ns.len() * 99 / 100];
+        println!(
+            "[Atlas Benchmark] 10,000 cycles: p50={}ns, p95={}ns, p99={}ns, peak_skyline={}, peak_free_rects={}",
+            p50,
+            p95,
+            p99,
+            allocator.peak_skyline_nodes(),
+            allocator.peak_free_rects()
+        );
+    }
+
+    #[test]
+    fn test_fragmentation_and_hole_reuse_pressure() {
+        let mut allocator = Allocator::new(1024);
+        let mut regions = Vec::new();
+
+        // Fill with 32x32 blocks
+        for _ in 0..64 {
+            if let Some(r) = allocator.allocate(32, 32) {
+                regions.push(r);
+            }
+        }
+        let total_initial = regions.len();
+
+        // Deallocate every other block to create holes
+        let mut freed_count = 0;
+        let mut i = 0;
+        while i < regions.len() {
+            let r = regions.swap_remove(i);
+            allocator.deallocate(&r);
+            freed_count += 1;
+            i += 1;
+        }
+
+        // The 32 freed blocks coalesce into larger contiguous free spans
+        assert!(allocator.free_rect_count() >= 1);
+
+        // Reallocate: all must fit into freed holes without growing the skyline
+        let skyline_before = allocator.skyline_node_count();
+        for _ in 0..freed_count {
+            let r = allocator
+                .allocate(32, 32)
+                .expect("must fit in recycled hole");
+            regions.push(r);
+        }
+
+        assert_eq!(regions.len(), total_initial);
+        assert_eq!(allocator.skyline_node_count(), skyline_before);
+
+        // Deallocate all
+        for r in &regions {
+            allocator.deallocate(r);
+        }
+        assert!(allocator.is_empty());
     }
 }
