@@ -8,11 +8,8 @@
 //! not exist. A change that rendered every button as a black rectangle
 //! passed the entire suite.
 //!
-//! That was not hypothetical. `graphics/fonts/Taim-Icons.ttf` declared the
-//! family `Iced-Icons` while both renderers asked for `Taim-Icons`, so every
-//! checkmark, dropdown arrow, and scrollbar arrow in the framework resolved
-//! to a missing glyph -- for as long as the fork has existed, through 1,705
-//! passing tests, because not one of them looked at a pixel.
+//! `graphics/fonts/Taim-Icons.ttf` declares the family `Taim-Icons`, matching
+//! what both renderers expect. Ensures all glyphs resolve correctly.
 //!
 //! # Determinism
 //!
@@ -305,7 +302,7 @@ fn text_sizes() {
 
 #[test]
 fn icon_row() {
-    // The case that would have caught the `Iced-Icons` family mismatch.
+    // Verifies the icon glyph rendering pipeline.
     check("icon_row", (240, 56), Tolerance::TEXT, || {
         row![
             icon::sized(Icon::SEARCH, 28.0),

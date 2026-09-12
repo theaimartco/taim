@@ -28,11 +28,12 @@ web-colors = ["taim_graphics/web-colors"]
 webgl = ["wgpu/webgl"]
 strict-assertions = []
 profiling = []
-raster = ["taim_graphics/raster"]
+raster = ["taim_graphics/raster", "dep:taim-raster"]
 
 [dependencies]
 taim_debug.workspace = true
 taim_graphics.workspace = true
+taim-raster = { workspace = true, optional = true }
 
 bitflags.workspace = true
 bytemuck.workspace = true

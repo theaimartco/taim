@@ -42,7 +42,7 @@ MIRROR_RTL = {
 
 # Codepoints the renderers hard-code; see wgpu/src/lib.rs `ICON_FONT`.
 LEGACY = {
-    0xE800: "down-dir", 0xE801: "iced", 0xE802: "uniE802", 0xE803: "uniE803",
+    0xE800: "down-dir", 0xE801: "taim", 0xE802: "uniE802", 0xE803: "uniE803",
     0xE804: "uniE804", 0xE805: "uniE805", 0xF00C: "ok",
 }
 

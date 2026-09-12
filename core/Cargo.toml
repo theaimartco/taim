@@ -22,6 +22,8 @@ advanced-shaping = []
 
 [dependencies]
 taim-motion = { workspace = true, features = ["std"] }
+taim-signal.workspace = true
+taim-raster.workspace = true
 bitflags.workspace = true
 bytes.workspace = true
 glam.workspace = true

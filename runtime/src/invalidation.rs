@@ -31,7 +31,7 @@
 //! [`Counters`]: crate::diagnostics::Counters
 
 use crate::core::damage;
-use crate::core::widget::Tree;
+use crate::core::widget::{Id, Tree};
 use crate::core::widget::tree::DirtyFlags;
 use crate::diagnostics::{self, Counters};
 
@@ -219,6 +219,73 @@ impl Default for Aggregator {
 pub fn record_paint(counters: &Counters, computed: bool) {
     if computed {
         counters.increment(diagnostics::Phase::PaintPreparation);
+    }
+}
+
+/// The fundamental reason an element or region was scheduled to repaint (Pillar XIV).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RepaintReason {
+    /// A reactive signal dependency changed value.
+    SignalChanged(String),
+    /// A parent container invalidated its subtree.
+    ParentInvalidation,
+    /// Layout constraints changed, altering bounds.
+    LayoutConstraintShift,
+    /// Damage accumulation overflowed maximum regions to full redraw.
+    DamageOverflow,
+    /// Continuous animation or transition tick.
+    AnimationTick,
+    /// Global theme revision or scheme changed.
+    ThemeRevisionChanged,
+    /// Direct pointer gesture or hover interaction.
+    PointerInteraction,
+    /// Explicit request or external shell trigger.
+    ExplicitRequest(String),
+}
+
+/// Attribution entry answering "Why did this repaint?" for a widget or tree node (Pillar XIV).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepaintCausality {
+    /// Target widget ID, if known.
+    pub widget_id: Option<Id>,
+    /// Dirty flags triggered by this change.
+    pub dirty_flags: DirtyFlags,
+    /// Primary causality reason.
+    pub reason: RepaintReason,
+    /// Associated human-readable description or signal name.
+    pub description: String,
+}
+
+/// A tracker recording per-frame repaint causality for live inspector diagnostics (Pillar XIV).
+#[derive(Debug, Default, Clone)]
+pub struct RepaintTracker {
+    entries: Vec<RepaintCausality>,
+}
+
+impl RepaintTracker {
+    /// Creates a new empty [`RepaintTracker`].
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Records a new repaint causality event.
+    pub fn record(&mut self, causality: RepaintCausality) {
+        self.entries.push(causality);
+    }
+
+    /// Answers "Why did this repaint?" for a specific widget.
+    pub fn why_did_it_repaint(&self, id: &Id) -> Option<&RepaintCausality> {
+        self.entries.iter().rev().find(|c| c.widget_id.as_ref() == Some(id))
+    }
+
+    /// Returns all recorded causality entries for the current frame.
+    pub fn all_causalities(&self) -> &[RepaintCausality] {
+        &self.entries
+    }
+
+    /// Clears the tracker at frame boundaries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
     }
 }
 
@@ -446,5 +513,37 @@ mod counter_wiring_tests {
         if Counters::is_active() {
             assert_eq!(counters.get(diagnostics::Phase::PaintPreparation), 2);
         }
+    }
+}
+
+#[cfg(test)]
+mod repaint_tracker_tests {
+    use super::*;
+
+    #[test]
+    fn answers_why_did_it_repaint_with_exact_signal_path() {
+        let mut tracker = RepaintTracker::new();
+        let target_id = Id::unique();
+
+        tracker.record(RepaintCausality {
+            widget_id: Some(target_id.clone()),
+            dirty_flags: DirtyFlags::PAINT,
+            reason: RepaintReason::SignalChanged("user_avatar_url".into()),
+            description: "Signal 'user_avatar_url' mutated".into(),
+        });
+
+        let causality = tracker.why_did_it_repaint(&target_id).expect("should find causality");
+        assert_eq!(causality.dirty_flags, DirtyFlags::PAINT);
+        assert_eq!(
+            causality.reason,
+            RepaintReason::SignalChanged("user_avatar_url".into())
+        );
+
+        // Missing widget query returns None
+        assert!(tracker.why_did_it_repaint(&Id::unique()).is_none());
+
+        // Frame clear empties recorded entries
+        tracker.clear();
+        assert!(tracker.all_causalities().is_empty());
     }
 }

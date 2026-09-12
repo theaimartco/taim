@@ -15,6 +15,8 @@ mod mouse_area;
 mod pin;
 #[cfg(feature = "signal")]
 mod reactive;
+#[cfg(feature = "signal")]
+pub mod component;
 mod responsive;
 mod safe_area;
 mod stack;
@@ -123,6 +125,8 @@ pub use radio::Radio;
 #[cfg(feature = "signal")]
 #[doc(no_inline)]
 pub use reactive::{Invalidation as ReactiveInvalidation, Reactive};
+#[cfg(feature = "signal")]
+pub use component::{ReactiveButton, ReactiveMount, ReactiveText, ReactiveVirtualList};
 #[doc(no_inline)]
 pub use responsive::Responsive;
 #[doc(no_inline)]

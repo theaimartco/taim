@@ -70,7 +70,7 @@ fn an_unchanged_interface_replays_without_reentering_widget_paint() {
     let mut ui = UserInterface::build(element, bounds, cache, &mut renderer);
 
     for _ in 0..5 {
-        let _ = ui.draw(
+        ui.draw(
             &mut renderer,
             &Theme::Light,
             &renderer::Style::default(),
@@ -213,7 +213,7 @@ fn rebuilding_changed_content_never_replays_stale_pixels() {
     for frame in 0..5 {
         let element: Element<'_, (), Theme, Renderer> = Element::new(Changing(frame as f32 / 5.0));
         let mut ui = UserInterface::build(element, bounds, cache, &mut renderer);
-        let _ = ui.draw(
+        ui.draw(
             &mut renderer,
             &Theme::Light,
             &renderer::Style::default(),

@@ -28,6 +28,8 @@ bytes.workspace = true
 taim_core.workspace = true
 taim_futures.workspace = true
 taim_graphics.workspace = true
+taim-raster.workspace = true
+taim-signal.workspace = true
 rustc-hash.workspace = true
 
 thiserror.workspace = true

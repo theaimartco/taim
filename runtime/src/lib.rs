@@ -23,6 +23,7 @@ pub mod memory_pressure;
 pub mod pointer_router;
 pub mod power_policy;
 pub mod quality_controller;
+pub mod reactive_ui;
 pub mod reconcile;
 pub mod recovery;
 pub mod semantics;
@@ -35,6 +36,7 @@ pub mod window;
 pub use taim_core as core;
 pub use taim_futures as futures;
 
+pub use reactive_ui::ReactiveUi;
 pub use task::Task;
 pub use user_interface::UserInterface;
 

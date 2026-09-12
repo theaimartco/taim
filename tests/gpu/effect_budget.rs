@@ -149,8 +149,14 @@ fn a_graph_admits_small_effects_within_the_tier_area_budget() {
 // ---------------------------------------------------------------------
 
 #[test]
-fn tier_budgets_are_monotonic_from_ultra_down_to_recovery() {
-    let tiers = [Tier::Ultra, Tier::Balanced, Tier::Efficient, Tier::Recovery];
+fn tier_budgets_are_monotonic_from_neural_down_to_recovery() {
+    let tiers = [
+        Tier::Neural,
+        Tier::Ultra,
+        Tier::Balanced,
+        Tier::Efficient,
+        Tier::Recovery,
+    ];
 
     for pair in tiers.windows(2) {
         let higher = pair[0].policy();
@@ -164,6 +170,18 @@ fn tier_budgets_are_monotonic_from_ultra_down_to_recovery() {
         assert!(!lower.backdrop_blur || higher.backdrop_blur);
         assert!(!lower.noise || higher.noise);
     }
+}
+
+#[test]
+fn neural_tier_activates_upscale_reconstruction() {
+    let neural = Tier::Neural.policy();
+    assert!(neural.neural_reconstruction);
+    assert_eq!(neural.resolution_scale, 0.5);
+    assert!(neural.texture_budget_bytes >= 128 * 1024 * 1024);
+
+    let ultra = Tier::Ultra.policy();
+    assert!(!ultra.neural_reconstruction);
+    assert_eq!(ultra.resolution_scale, 1.0);
 }
 
 #[test]

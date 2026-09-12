@@ -441,3 +441,68 @@ fn the_shader_produces_no_nan_for_any_authored_material() {
         );
     }
 }
+
+#[test]
+fn deferred_gbuffer_lighting_pass_executes_on_hardware() {
+    let Some((device, queue)) = device() else {
+        eprintln!("skipped: no wgpu adapter available");
+        return;
+    };
+
+    let width = 64;
+    let height = 64;
+    let format = wgpu::TextureFormat::Rgba8UnormSrgb;
+    let gbuffer = taim_wgpu::GBuffer::new(&device, format, width, height);
+
+    let target = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("test_target"),
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        view_formats: &[],
+    });
+    let target_view = target.create_view(&wgpu::TextureViewDescriptor::default());
+
+    let backdrop = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("test_backdrop"),
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING,
+        view_formats: &[],
+    });
+    let backdrop_view = backdrop.create_view(&wgpu::TextureViewDescriptor::default());
+
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("gbuffer_test_encoder"),
+    });
+
+    gbuffer.render_lighting(
+        &device,
+        &queue,
+        &mut encoder,
+        &target_view,
+        &backdrop_view,
+        taim_core::material::SceneLight::KEY,
+        4.0,
+    );
+
+    let submission = queue.submit([encoder.finish()]);
+    let _ = device.poll(wgpu::PollType::Wait {
+        submission_index: Some(submission),
+        timeout: None,
+    });
+}

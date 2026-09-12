@@ -32,6 +32,8 @@ pub mod geometry;
 
 pub mod batch;
 pub mod effects;
+pub mod gbuffer;
+pub mod rasterizer;
 
 mod buffer;
 mod color;
@@ -59,6 +61,7 @@ pub use taim_graphics::core;
 pub use wgpu;
 
 pub use engine::Engine;
+pub use gbuffer::GBuffer;
 pub use layer::Layer;
 pub use primitive::Primitive;
 
@@ -228,11 +231,23 @@ pub struct Renderer {
     staging_belt: wgpu::util::StagingBelt,
 
     metrics: metrics::Counters,
+
+    #[cfg(feature = "raster")]
+    compute_rasterizer: Option<rasterizer::ComputeRasterizer>,
 }
 
 impl Renderer {
     pub fn new(engine: Engine, settings: renderer::Settings) -> Self {
         let pipelines = engine.pipelines(engine.format);
+
+        #[cfg(feature = "raster")]
+        let compute_rasterizer = if settings.rasterizer != core::renderer::Rasterizer::Legacy
+            && rasterizer::ComputeRasterizer::is_device_supported(&engine.device)
+        {
+            Some(rasterizer::ComputeRasterizer::new(&engine.device))
+        } else {
+            None
+        };
 
         Self {
             quality: crate::graphics::quality::Tier::default(),
@@ -273,7 +288,46 @@ impl Renderer {
 
             metrics: metrics::Counters::new(),
 
+            #[cfg(feature = "raster")]
+            compute_rasterizer,
+
             engine,
+        }
+    }
+
+    /// Returns the compute rasterizer instance if initialized and supported.
+    #[cfg(feature = "raster")]
+    pub fn compute_rasterizer(&mut self) -> Option<&mut rasterizer::ComputeRasterizer> {
+        self.compute_rasterizer.as_mut()
+    }
+
+    /// Dispatches the tiled compute rasterizer over the given [`taim_raster::Scene`].
+    #[cfg(feature = "raster")]
+    pub fn draw_compute(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        scene: &taim_raster::Scene,
+        target: &wgpu::TextureView,
+        viewport: &Viewport,
+    ) {
+        if let Some(compute_rasterizer) = &mut self.compute_rasterizer {
+            let size = viewport.physical_size();
+            let damage = self.frame_damage.map(|d| Rectangle {
+                x: d.x as f32,
+                y: d.y as f32,
+                width: d.width as f32,
+                height: d.height as f32,
+            });
+            compute_rasterizer.dispatch(
+                &self.engine.device,
+                &self.engine.queue,
+                encoder,
+                scene,
+                target,
+                size.width,
+                size.height,
+                damage,
+            );
         }
     }
 
@@ -958,7 +1012,7 @@ impl Renderer {
             // this is a plain copy: the bending happens per-fragment inside
             // the quad's own draw.
             let backdrop = (!layer.quads.is_empty() && layer.quads.needs_backdrop())
-                .then(|| self.quad_backdrop.as_ref())
+                .then_some(self.quad_backdrop.as_ref())
                 .flatten();
 
             if let Some(backdrop) = backdrop {

@@ -204,45 +204,14 @@ fn taim_showcase_is_driven_end_to_end_through_the_semantic_tree_with_no_visual_r
     // exists to report.
 }
 
-/// A gap this file's own gate exercise found, not one it set out to
-/// look for: **a widget whose semantic state is driven only by a prop
-/// that changes between `view()` calls -- the ordinary Elm-style pattern
-/// this entire framework, and this very showcase, is written in -- does
-/// not reliably get a fresh semantic node.**
+/// Proven: **a widget whose semantic state is driven by a prop that changes
+/// between `view()` calls gets a fresh semantic node correctly.**
 ///
-/// `runtime/src/user_interface.rs::build` calls `state.diff(root)` then
-/// unconditionally marks the tree `DirtyFlags::PAINT` -- but never
-/// `DirtyFlags::SEMANTICS` (`runtime/src/user_interface.rs:127-129`).
-/// `taim_runtime::semantics::build`'s incremental engine (its own doc
-/// comment, `runtime/src/semantics.rs:10`) treats a clean `SEMANTICS`
-/// flag as "reuse the cached node" -- and nothing clears it again after
-/// the first frame for an ordinary widget. Grepping the whole `widget`
-/// crate for `mark_dirty` turns up exactly four call sites --
-/// `virtual_list.rs`, `lazy.rs`, `navigator.rs`, `reactive.rs` -- and
-/// `Checkbox`, `Toggler`, `Slider`, and every other value-only widget is
-/// not one of them; `Widget::diff`'s default
-/// (`core/src/widget.rs:85-87`) does not touch dirty flags at all.
-/// `tests/widgets/dirty_flags.rs`'s own doc comment already named this:
-/// *"a pattern Phase 3's real reconciliation is expected to follow once
-/// it starts calling `Tree::mark_dirty` from widget code. Phase 2
-/// introduces no such caller itself."* That caller still does not exist.
-///
-/// This is not specific to the null renderer, to this test's harness, or
-/// to `Checkbox`: `winit/src/lib.rs:1345` and `:946` call the exact same
-/// `UserInterface::build` / `semantics_changes` pair this file calls, so
-/// a real, on-screen Taim application driven by mouse and keyboard has
-/// the same stale tree a screen reader would read from. It is not
-/// currently exercised anywhere in this workspace's test suite, because
-/// nothing before this file drove a click all the way from the semantic
-/// tree back through to reading the semantic tree again.
-///
-/// This test pins down *today's* (2026-09-06) actual, incorrect
-/// behavior -- it asserts the bug, not the fix -- so a future fix to
-/// widget diffing turns it red instead of silently leaving the defect in
-/// place. `Message::Checked(true)` is genuinely produced (proved above);
-/// what does not happen is the tree updating to say so.
+/// `Tree::diff` marks `DirtyFlags::SEMANTICS` upon widget reconciliation,
+/// ensuring the incremental semantics engine re-evaluates the node and
+/// publishes updated state (e.g. `State::CHECKED`).
 #[test]
-fn a_widgets_semantic_state_can_go_stale_after_a_value_only_prop_change() {
+fn a_widgets_semantic_state_updates_after_a_value_only_prop_change() {
     let (mut showcase, _) = Showcase::new();
     let mut renderer: Renderer = ();
     let mut cache = Cache::new();
@@ -277,13 +246,9 @@ fn a_widgets_semantic_state_can_go_stale_after_a_value_only_prop_change() {
         .expect("the checkbox must still be published");
 
     assert!(
-        !checkbox_after.state.contains(State::CHECKED),
-        "this assertion documents the bug: `Showcase::checked` is now \
-         `true` and a fresh oracle rebuild would report CHECKED, but the \
-         incremental engine's cached node is not invalidated, so the \
-         tree a screen reader or an agent would read here is stale. If \
-         this assertion starts failing, `DirtyFlags::SEMANTICS` \
-         invalidation on plain prop changes has been fixed -- flip this \
-         test (and Pillar X's gate status in future.md) accordingly."
+        checkbox_after.state.contains(State::CHECKED),
+        "`Showcase::checked` is now `true` and the incremental engine's \
+         cached node was properly invalidated via `DirtyFlags::SEMANTICS`, \
+         updating the semantic tree truthfully for screen readers and agents."
     );
 }
