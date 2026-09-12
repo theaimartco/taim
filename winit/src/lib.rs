@@ -26,6 +26,7 @@ pub use winit;
 
 pub mod clipboard;
 pub mod conversion;
+pub mod frame_gate;
 
 mod error;
 #[cfg(all(feature = "measurement", not(target_arch = "wasm32")))]
@@ -35,6 +36,7 @@ mod window;
 
 pub use clipboard::Clipboard;
 pub use error::Error;
+pub use frame_gate::{DirtyFlags, FrameGate, PlatformEvent, TaimEvent, WindowStateTracker};
 pub use proxy::Proxy;
 
 use crate::core::Renderer;
@@ -65,6 +67,15 @@ use std::borrow::Cow;
 use std::mem::ManuallyDrop;
 use std::slice;
 use std::sync::Arc;
+
+/// Runs a native TAIM [`App`](program::App) with the provided settings.
+pub fn run_app<A>(app: A) -> Result<(), Error>
+where
+    A: program::App + 'static,
+    A::Theme: theme::Base,
+{
+    run(app.into_program())
+}
 
 /// Runs a [`Program`] with the provided settings.
 pub fn run<P>(program: P) -> Result<(), Error>
