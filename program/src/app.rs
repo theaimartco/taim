@@ -255,7 +255,15 @@ pub trait App: Sized {
         1.0
     }
 
+    /// Returns `true` if this application contract is executing via legacy compatibility.
+    fn is_legacy_compat() -> bool {
+        false
+    }
+
     /// Adapts this native [`App`] into a legacy [`Program`].
+    #[deprecated(
+        note = "Native App execution runs directly through AppRunner. into_program is compatibility only."
+    )]
     fn into_program(self) -> crate::compat::AppToProgram<Self> {
         crate::compat::AppToProgram(self)
     }
@@ -273,6 +281,10 @@ pub struct AppRunner<A: App> {
 }
 
 impl<A: App> AppRunner<A> {
+    /// Returns `true` if the underlying application is running through legacy compatibility.
+    pub fn is_legacy_compat(&self) -> bool {
+        A::is_legacy_compat()
+    }
     /// Boots a new [`AppRunner`] for the given [`App`].
     pub fn new(app: A) -> (Self, Task<A::Message>) {
         let mut context = AppContext::new();
