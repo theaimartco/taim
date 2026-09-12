@@ -158,6 +158,10 @@ impl<P: Program> App for ProgramAdapter<P> {
     fn scale_factor(&self, state: &Self::State, window: &WindowContext) -> f32 {
         self.program.scale_factor(state, window.id)
     }
+
+    fn is_legacy_compat() -> bool {
+        true
+    }
 }
 
 /// Adapter allowing a native [`App`] to be executed anywhere a legacy [`Program`] is expected.

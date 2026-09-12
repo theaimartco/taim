@@ -177,4 +177,37 @@ mod tests {
         let _task = instance.update(25);
         assert_eq!(*instance.state(), 75);
     }
+
+    #[test]
+    fn test_native_app_does_not_use_program_runtime() {
+        let app = CounterApp;
+        assert!(
+            !CounterApp::is_legacy_compat(),
+            "Native App must not be marked as legacy compat"
+        );
+
+        let (runner, _task) = AppRunner::new(app);
+        assert!(
+            !runner.is_legacy_compat(),
+            "Native AppRunner must not be marked as legacy compat"
+        );
+    }
+
+    #[test]
+    fn test_legacy_program_executes_through_native_app_runtime() {
+        let program = LegacyCounterProgram;
+        let adapter = compat::ProgramAdapter::new(program);
+        assert!(compat::ProgramAdapter::<LegacyCounterProgram>::is_legacy_compat());
+
+        // Driven by native AppRunner directly!
+        let (mut runner, _task) = AppRunner::new(adapter);
+        assert!(runner.is_legacy_compat());
+
+        let win_ctx = WindowContext::new(window::Id::unique(), 1.0);
+        assert_eq!(runner.title(&win_ctx), "Legacy Counter - Taim");
+        assert_eq!(*runner.state(), 50);
+
+        let _ = runner.update(30);
+        assert_eq!(*runner.state(), 80);
+    }
 }
