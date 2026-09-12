@@ -273,6 +273,7 @@ members = [
     "taim-showcase",
     "core",
     "debug",
+    "examples/ide",
     "examples/mobile_shell",
     "examples/trivial",
     "futures",
