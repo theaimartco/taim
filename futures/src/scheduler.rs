@@ -67,13 +67,24 @@ impl SubscriptionEpoch {
 use futures::task::ArcWake;
 
 /// Shared header for a task slot enabling atomic wake coalescing and lock-free cancellation.
-#[derive(Debug)]
 struct TaskSlotHeader {
     slot: u32,
     generation: AtomicU32,
     wake_state: AtomicU8,
     cancelled: AtomicBool,
     ready_queue: Arc<Mutex<Vec<u32>>>,
+    notifier: Arc<Mutex<Option<Arc<dyn Fn() + Send + Sync>>>>,
+}
+
+impl std::fmt::Debug for TaskSlotHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TaskSlotHeader")
+            .field("slot", &self.slot)
+            .field("generation", &self.generation.load(Ordering::Relaxed))
+            .field("wake_state", &self.wake_state.load(Ordering::Relaxed))
+            .field("cancelled", &self.cancelled.load(Ordering::Relaxed))
+            .finish()
+    }
 }
 
 /// A generational waker proxy ensuring stale wakes on recycled slots are safe NO-OPs.
@@ -114,8 +125,14 @@ impl ArcWake for TaskWaker {
                             if arc_self.header.generation.load(Ordering::Acquire)
                                 == arc_self.generation
                             {
-                                let mut queue = arc_self.header.ready_queue.lock().unwrap();
-                                queue.push(arc_self.header.slot);
+                                {
+                                    let mut queue = arc_self.header.ready_queue.lock().unwrap();
+                                    queue.push(arc_self.header.slot);
+                                }
+                                let notifier_guard = arc_self.header.notifier.lock().unwrap();
+                                if let Some(notifier) = notifier_guard.as_ref() {
+                                    notifier();
+                                }
                             }
                             break;
                         }
@@ -139,7 +156,6 @@ impl ArcWake for TaskWaker {
                     break;
                 }
                 WakeState::Cancelled | WakeState::Finished => {
-                    // Dead task
                     break;
                 }
             }
@@ -171,8 +187,14 @@ impl CancelToken {
             .wake_state
             .swap(WakeState::Cancelled as u8, Ordering::AcqRel);
         if prev != WakeState::Queued as u8 && prev != WakeState::Cancelled as u8 {
-            let mut queue = self.header.ready_queue.lock().unwrap();
-            queue.push(self.header.slot);
+            {
+                let mut queue = self.header.ready_queue.lock().unwrap();
+                queue.push(self.header.slot);
+            }
+            let notifier_guard = self.header.notifier.lock().unwrap();
+            if let Some(notifier) = notifier_guard.as_ref() {
+                notifier();
+            }
         }
     }
 
@@ -209,6 +231,18 @@ pub struct TaskScheduler {
     scratch_ready: Vec<u32>,
     epoch: SubscriptionEpoch,
     active_count: usize,
+    notifier: Arc<Mutex<Option<Arc<dyn Fn() + Send + Sync>>>>,
+}
+
+impl std::fmt::Debug for TaskScheduler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TaskScheduler")
+            .field("slots", &self.slots.len())
+            .field("free_slots", &self.free_slots)
+            .field("epoch", &self.epoch)
+            .field("active_count", &self.active_count)
+            .finish()
+    }
 }
 
 impl TaskScheduler {
@@ -221,7 +255,18 @@ impl TaskScheduler {
             scratch_ready: Vec::with_capacity(64),
             epoch: SubscriptionEpoch::INITIAL,
             active_count: 0,
+            notifier: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Sets an external notification callback invoked whenever a task transitions to ready.
+    pub fn set_notifier(&mut self, notifier: impl Fn() + Send + Sync + 'static) {
+        *self.notifier.lock().unwrap() = Some(Arc::new(notifier));
+    }
+
+    /// Returns `true` if there are any tasks in the ready queue waiting to be polled.
+    pub fn has_ready_tasks(&self) -> bool {
+        !self.ready_queue.lock().unwrap().is_empty()
     }
 
     /// Returns the number of currently active (non-finished) tasks.
@@ -298,6 +343,7 @@ impl TaskScheduler {
                 wake_state: AtomicU8::new(WakeState::Queued as u8),
                 cancelled: AtomicBool::new(false),
                 ready_queue: Arc::clone(&self.ready_queue),
+                notifier: Arc::clone(&self.notifier),
             });
 
             self.ready_queue.lock().unwrap().push(slot_idx);
@@ -654,5 +700,38 @@ mod tests {
 
         assert!(token.is_cancelled());
         assert!(!scheduler.is_valid(id));
+    }
+
+    #[test]
+    fn test_notifier_called_on_wake() {
+        use std::sync::atomic::AtomicUsize;
+
+        let mut scheduler = TaskScheduler::new();
+        let notify_count = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&notify_count);
+        scheduler.set_notifier(move || {
+            let _ = count.fetch_add(1, Ordering::SeqCst);
+        });
+
+        let captured_waker: Arc<Mutex<Option<std::task::Waker>>> = Arc::new(Mutex::new(None));
+        let waker_clone = Arc::clone(&captured_waker);
+
+        let fut = std::future::poll_fn(move |cx| {
+            *waker_clone.lock().unwrap() = Some(cx.waker().clone());
+            std::task::Poll::Pending
+        });
+
+        let (_id, _token) = scheduler.spawn(Box::pin(fut));
+        // First poll
+        assert_eq!(scheduler.poll_ready(), 1);
+        assert_eq!(notify_count.load(Ordering::SeqCst), 0);
+
+        // Wake the task
+        let waker = captured_waker.lock().unwrap().take().unwrap();
+        waker.wake();
+
+        assert_eq!(notify_count.load(Ordering::SeqCst), 1);
+        assert!(scheduler.has_ready_tasks());
+        assert_eq!(scheduler.poll_ready(), 1);
     }
 }
