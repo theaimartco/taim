@@ -7,8 +7,8 @@
 //!
 //! Evaluates the deferred lighting pass with `light.wgsl`.
 
-use bytemuck::{Pod, Zeroable};
 use crate::core::material::SceneLight;
+use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -127,19 +127,16 @@ impl GBuffer {
             mapped_at_creation: false,
         });
 
-        let default_materials = [
-            GpuMaterial {
-                roughness: 0.1,
-                thickness_mm: 8.0,
-                ior: 1.52,
-                dispersion: 0.04,
-                transmission: 0.85,
-                pad0: 0.0,
-                pad1: 0.0,
-                pad2: 0.0,
-            };
-            32
-        ];
+        let default_materials = [GpuMaterial {
+            roughness: 0.1,
+            thickness_mm: 8.0,
+            ior: 1.52,
+            dispersion: 0.04,
+            transmission: 0.85,
+            pad0: 0.0,
+            pad1: 0.0,
+            pad2: 0.0,
+        }; 32];
         let material_table_buf = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("taim_gbuffer::materials"),
             size: (default_materials.len() * std::mem::size_of::<GpuMaterial>()) as u64,
@@ -303,7 +300,11 @@ impl GBuffer {
         let uniforms = LightUniforms {
             light_dir,
             pixels_per_mm,
-            light_color: [light.radiance.red, light.radiance.green, light.radiance.blue],
+            light_color: [
+                light.radiance.red,
+                light.radiance.green,
+                light.radiance.blue,
+            ],
             light_intensity: light.radiance.alpha.max(1.0),
             viewport_width: self.width as f32,
             viewport_height: self.height as f32,

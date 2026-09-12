@@ -281,7 +281,11 @@ impl PaletteState {
     /// Opens the palette in file or action mode.
     pub fn open(&mut self, is_action_mode: bool) {
         self.is_open = true;
-        self.query = if is_action_mode { "> ".to_string() } else { String::new() };
+        self.query = if is_action_mode {
+            "> ".to_string()
+        } else {
+            String::new()
+        };
         self.selected_index = 0;
     }
 

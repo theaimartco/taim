@@ -6,6 +6,7 @@
 
 use crate::scene::{CrossAxisAlignment, FlexDirection, NodeDimension, NodeId, SceneArena};
 use crate::{Point, Rectangle, Size};
+use smallvec::SmallVec;
 
 /// Resolves the layout of the entire scene graph starting from the root node.
 pub fn solve_layout(arena: &mut SceneArena, available_size: Size) {
@@ -37,7 +38,8 @@ fn layout_node(arena: &mut SceneArena, node_id: NodeId, available_size: Size) ->
         };
 
         // If node is clean for layout and already measured, reuse existing size
-        if !node.dirty.intersects(taim_signal::DirtyFlags::LAYOUT) && node.local_bounds.width > 0.0 {
+        if !node.dirty.intersects(taim_signal::DirtyFlags::LAYOUT) && node.local_bounds.width > 0.0
+        {
             return Size::new(node.local_bounds.width, node.local_bounds.height);
         }
 
@@ -57,20 +59,32 @@ fn layout_node(arena: &mut SceneArena, node_id: NodeId, available_size: Size) ->
     let inner_height = (available_size.height - padding[0] - padding[2]).max(0.0);
     let inner_available = Size::new(inner_width, inner_height);
 
-    // Collect children
-    let mut children = Vec::new();
-    let mut curr_child = arena.get(node_id).and_then(|n| if n.first_child.is_some() { Some(n.first_child) } else { None });
+    // Collect children with zero allocation for typical UI elements (up to 8 children inline)
+    let mut children: SmallVec<[NodeId; 8]> = SmallVec::new();
+    let mut curr_child = arena.get(node_id).and_then(|n| {
+        if n.first_child.is_some() {
+            Some(n.first_child)
+        } else {
+            None
+        }
+    });
     while let Some(child_id) = curr_child {
         children.push(child_id);
-        curr_child = arena.get(child_id).and_then(|n| if n.next_sibling.is_some() { Some(n.next_sibling) } else { None });
+        curr_child = arena.get(child_id).and_then(|n| {
+            if n.next_sibling.is_some() {
+                Some(n.next_sibling)
+            } else {
+                None
+            }
+        });
     }
 
-    // Resolve children sizes
+    // Resolve children sizes with zero heap allocation for typical containers
     let mut total_main = 0.0;
     let mut max_cross: f32 = 0.0;
     let mut flex_sum = 0.0;
 
-    let mut measured_sizes = Vec::with_capacity(children.len());
+    let mut measured_sizes: SmallVec<[Option<Size>; 8]> = SmallVec::with_capacity(children.len());
 
     for &child_id in &children {
         let child_node = arena.get(child_id).unwrap();
@@ -163,7 +177,7 @@ fn layout_node(arena: &mut SceneArena, node_id: NodeId, available_size: Size) ->
 
     // Position children
     let mut current_offset = match direction {
-        FlexDirection::Row => padding[3], // left
+        FlexDirection::Row => padding[3],    // left
         FlexDirection::Column => padding[0], // top
     };
 
@@ -178,8 +192,12 @@ fn layout_node(arena: &mut SceneArena, node_id: NodeId, available_size: Size) ->
             FlexDirection::Row => {
                 let cross_pos = match align_items {
                     CrossAxisAlignment::Start => padding[0],
-                    CrossAxisAlignment::Center => padding[0] + (cross_avail - child_size.height).max(0.0) * 0.5,
-                    CrossAxisAlignment::End => padding[0] + (cross_avail - child_size.height).max(0.0),
+                    CrossAxisAlignment::Center => {
+                        padding[0] + (cross_avail - child_size.height).max(0.0) * 0.5
+                    }
+                    CrossAxisAlignment::End => {
+                        padding[0] + (cross_avail - child_size.height).max(0.0)
+                    }
                     CrossAxisAlignment::Stretch => padding[0],
                 };
                 let pos = (current_offset, cross_pos);
@@ -189,8 +207,12 @@ fn layout_node(arena: &mut SceneArena, node_id: NodeId, available_size: Size) ->
             FlexDirection::Column => {
                 let cross_pos = match align_items {
                     CrossAxisAlignment::Start => padding[3],
-                    CrossAxisAlignment::Center => padding[3] + (cross_avail - child_size.width).max(0.0) * 0.5,
-                    CrossAxisAlignment::End => padding[3] + (cross_avail - child_size.width).max(0.0),
+                    CrossAxisAlignment::Center => {
+                        padding[3] + (cross_avail - child_size.width).max(0.0) * 0.5
+                    }
+                    CrossAxisAlignment::End => {
+                        padding[3] + (cross_avail - child_size.width).max(0.0)
+                    }
                     CrossAxisAlignment::Stretch => padding[3],
                 };
                 let pos = (cross_pos, current_offset);
@@ -269,8 +291,8 @@ fn layout_node(arena: &mut SceneArena, node_id: NodeId, available_size: Size) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scene::{CrossAxisAlignment, FlexDirection, NodeDimension, NodeKind, SceneArena};
     use crate::Color;
+    use crate::scene::{CrossAxisAlignment, FlexDirection, NodeDimension, NodeKind, SceneArena};
 
     #[test]
     fn solves_simple_row_layout() {

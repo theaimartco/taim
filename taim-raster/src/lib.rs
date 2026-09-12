@@ -1247,7 +1247,8 @@ mod tests {
 
         let path = scene.paths()[path_id.0 as usize];
         assert_eq!(path.segment_count, 4);
-        let segs = &scene.segments()[path.first_segment as usize..(path.first_segment + path.segment_count) as usize];
+        let segs = &scene.segments()
+            [path.first_segment as usize..(path.first_segment + path.segment_count) as usize];
         assert_eq!(segs[0].from, [10.0, 20.0]);
         assert_eq!(segs[0].to, [110.0, 20.0]);
         assert_eq!(segs[1].from, [110.0, 20.0]);
@@ -1258,4 +1259,3 @@ mod tests {
         assert_eq!(segs[3].to, [10.0, 20.0]);
     }
 }
-

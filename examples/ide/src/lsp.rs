@@ -121,7 +121,10 @@ impl AutocompleteState {
             self.items.iter().collect()
         } else {
             let q = self.query.to_lowercase();
-            self.items.iter().filter(|i| i.label.to_lowercase().contains(&q)).collect()
+            self.items
+                .iter()
+                .filter(|i| i.label.to_lowercase().contains(&q))
+                .collect()
         }
     }
 
@@ -145,7 +148,11 @@ impl AutocompleteState {
     pub fn select_prev(&mut self) {
         let count = self.filtered().len();
         if count > 0 {
-            self.selected_index = if self.selected_index == 0 { count - 1 } else { self.selected_index - 1 };
+            self.selected_index = if self.selected_index == 0 {
+                count - 1
+            } else {
+                self.selected_index - 1
+            };
         }
     }
 }

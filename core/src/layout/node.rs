@@ -34,10 +34,9 @@ impl Node {
 
     /// Creates a new [`Node`] that wraps a single child with some [`Padding`].
     pub fn container(child: Self, padding: Padding) -> Self {
-        Self::with_children(
-            child.bounds.size().expand(padding),
-            vec![child.move_to(Point::new(padding.left, padding.top))],
-        )
+        let size = child.bounds.size().expand(padding);
+        let children = vec![child.move_to(Point::new(padding.left, padding.top))];
+        Self::with_children(size, children)
     }
 
     /// Returns the [`Size`] of the [`Node`].

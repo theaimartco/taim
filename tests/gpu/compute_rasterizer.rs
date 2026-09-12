@@ -3,14 +3,12 @@
 //! Evaluates the multi-stage compute rasterizer pipeline (`path_coarse`, `coarse`, `fine`)
 //! on real GPU hardware across 5,000 overlapping rounded rectangles with per-element clips.
 
-use taim_core::renderer::{Rasterizer, Settings};
 use taim_core::Rectangle;
-use taim_raster::{
-    CurveFlatteningPolicy, Encoder, MaterialId, ObjectVelocity, Rect, SceneEdit,
-};
+use taim_core::renderer::{Rasterizer, Settings};
+use taim_raster::{CurveFlatteningPolicy, Encoder, MaterialId, ObjectVelocity, Rect, SceneEdit};
+use taim_wgpu::Renderer;
 use taim_wgpu::rasterizer::ComputeRasterizer;
 use taim_wgpu::wgpu;
-use taim_wgpu::Renderer;
 
 fn device() -> Option<(wgpu::Device, wgpu::Queue)> {
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {

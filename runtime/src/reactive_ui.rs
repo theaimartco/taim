@@ -6,12 +6,12 @@
 //! running the sub-microsecond layout solver only when needed and streaming POD scene
 //! primitives directly to the GPU rasterizer (`taim-raster`).
 
+use crate::core::Size;
 use crate::core::event::Event;
 use crate::core::layout_solver::solve_layout;
 use crate::core::mouse;
 use crate::core::scene::{NodeId, SceneArena};
 use crate::core::touch;
-use crate::core::Size;
 use rustc_hash::FxHashMap;
 
 /// Callback invoked on user interaction with a scene node.
@@ -113,7 +113,10 @@ impl ReactiveUi {
     }
 
     /// Dispatches an event and computes resulting damage bounds for sub-4ms direct scanout.
-    pub fn dispatch_event_with_damage(&mut self, event: &Event) -> (bool, Option<crate::core::Rectangle>) {
+    pub fn dispatch_event_with_damage(
+        &mut self,
+        event: &Event,
+    ) -> (bool, Option<crate::core::Rectangle>) {
         let handled = self.dispatch_event(event);
         let damage = if handled {
             self.arena.damage_bounds()

@@ -43,8 +43,8 @@ use crate::core::text::editor::Editor as _;
 use crate::core::text::highlighter::{self, Highlighter};
 use crate::core::text::{self, LineHeight, Text, Wrapping};
 use crate::core::theme;
-use crate::core::touch;
 use crate::core::time::{Duration, Instant};
+use crate::core::touch;
 use crate::core::widget::operation;
 use crate::core::widget::{self, Widget};
 use crate::core::window;
@@ -1238,15 +1238,13 @@ impl<Message> Update<Message> {
             },
             Event::Touch(touch_event) => match touch_event {
                 touch::Event::FingerPressed { position, .. } => {
-                    let cursor_position = cursor
-                        .position_in(bounds)
-                        .or_else(|| {
-                            if bounds.contains(*position) {
-                                Some(Point::new(position.x - bounds.x, position.y - bounds.y))
-                            } else {
-                                None
-                            }
-                        });
+                    let cursor_position = cursor.position_in(bounds).or_else(|| {
+                        if bounds.contains(*position) {
+                            Some(Point::new(position.x - bounds.x, position.y - bounds.y))
+                        } else {
+                            None
+                        }
+                    });
 
                     if let Some(cursor_position) = cursor_position {
                         let cursor_position =
@@ -1267,15 +1265,13 @@ impl<Message> Update<Message> {
                 }
                 touch::Event::FingerMoved { position, .. } => match state.drag_click {
                     Some(mouse::click::Kind::Single) => {
-                        let cursor_position = cursor
-                            .position_in(bounds)
-                            .or_else(|| {
-                                if bounds.contains(*position) {
-                                    Some(Point::new(position.x - bounds.x, position.y - bounds.y))
-                                } else {
-                                    None
-                                }
-                            })?;
+                        let cursor_position = cursor.position_in(bounds).or_else(|| {
+                            if bounds.contains(*position) {
+                                Some(Point::new(position.x - bounds.x, position.y - bounds.y))
+                            } else {
+                                None
+                            }
+                        })?;
 
                         let cursor_position =
                             cursor_position - Vector::new(padding.left, padding.top);

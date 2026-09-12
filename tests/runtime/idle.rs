@@ -7,13 +7,13 @@
 //! stops agreeing to) produce frames, submit work, or lay
 //! out/paint anything.
 
+use std::time::{Duration, Instant};
 use taim::advanced::widget::{self, Widget};
 use taim::advanced::{Layout, mouse, renderer};
 use taim::{Element, Length, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::frame_scheduler::{MotionId, Scheduler};
 use taim_runtime::user_interface::{self, UserInterface};
-use std::time::{Duration, Instant};
 
 use taim_core::animation::MotionClock;
 use taim_motion::{Easing, Transition};

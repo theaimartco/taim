@@ -6,9 +6,7 @@
 //! ![The foundations of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/foundations.png?raw=true)
 //!
 //! [Taim]: https://github.com/theaimartco/taim
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
-)]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 pub mod alignment;
 pub mod animation;
 pub mod backend;
@@ -84,9 +82,9 @@ pub use pixels::Pixels;
 pub use point::Point;
 pub use rectangle::Rectangle;
 pub use renderer::Renderer;
+pub use rotation::Rotation;
 pub use scene::{NodeId, SceneArena, SceneNode};
 pub use semantics_driver::SemanticsDriver;
-pub use rotation::Rotation;
 pub use settings::Settings;
 pub use shadow::Shadow;
 pub use shell::Shell;

@@ -10,13 +10,13 @@ pub use core::widget::{Id, Void};
 mod action;
 mod adaptive;
 mod column;
+#[cfg(feature = "signal")]
+pub mod component;
 mod constraint;
 mod mouse_area;
 mod pin;
 #[cfg(feature = "signal")]
 mod reactive;
-#[cfg(feature = "signal")]
-pub mod component;
 mod responsive;
 mod safe_area;
 mod stack;
@@ -102,6 +102,8 @@ pub use checkbox::Checkbox;
 pub use column::Column;
 #[doc(no_inline)]
 pub use combo_box::ComboBox;
+#[cfg(feature = "signal")]
+pub use component::{ReactiveButton, ReactiveMount, ReactiveText, ReactiveVirtualList};
 #[doc(no_inline)]
 pub use constraint::Constraint;
 #[doc(no_inline)]
@@ -125,8 +127,6 @@ pub use radio::Radio;
 #[cfg(feature = "signal")]
 #[doc(no_inline)]
 pub use reactive::{Invalidation as ReactiveInvalidation, Reactive};
-#[cfg(feature = "signal")]
-pub use component::{ReactiveButton, ReactiveMount, ReactiveText, ReactiveVirtualList};
 #[doc(no_inline)]
 pub use responsive::Responsive;
 #[doc(no_inline)]

@@ -1,8 +1,8 @@
 //! Headless semantic and state verification tests for Taim Studio.
 
+use taim::widget::text_editor;
 use taim_ide::terminal::PanelTab;
 use taim_ide::{Message, Studio, ThemeMode};
-use taim::widget::text_editor;
 
 #[test]
 fn test_studio_initialization() {
@@ -40,7 +40,10 @@ fn test_theme_switching() {
     let _ = studio.update(Message::ThemeSelected(ThemeMode::HighContrast));
     assert_eq!(studio.theme_mode, ThemeMode::HighContrast);
     assert_eq!(studio.theme(), taim::Theme::HighContrast);
-    assert_eq!(studio.highlighter_theme(), taim_highlighter::Theme::HighContrast);
+    assert_eq!(
+        studio.highlighter_theme(),
+        taim_highlighter::Theme::HighContrast
+    );
 
     // Switch back to Dark
     let _ = studio.update(Message::ThemeSelected(ThemeMode::Dark));
@@ -351,11 +354,23 @@ fn test_source_control_git() {
     // Stage a file
     let file = studio.git.unstaged_changes[0].file_path.clone();
     let _ = studio.update(Message::GitStageFile(file.clone()));
-    assert!(studio.git.staged_changes.iter().any(|c| c.file_path == file));
+    assert!(
+        studio
+            .git
+            .staged_changes
+            .iter()
+            .any(|c| c.file_path == file)
+    );
 
     // Unstage the file
     let _ = studio.update(Message::GitUnstageFile(file.clone()));
-    assert!(studio.git.unstaged_changes.iter().any(|c| c.file_path == file));
+    assert!(
+        studio
+            .git
+            .unstaged_changes
+            .iter()
+            .any(|c| c.file_path == file)
+    );
 
     // Stage all
     let _ = studio.update(Message::GitStageAll);
@@ -372,7 +387,9 @@ fn test_source_control_git() {
     assert!(!studio.git.is_diff_view_open);
 
     // Commit changes
-    let _ = studio.update(Message::GitCommitMessageChanged("feat: add GPU acceleration".to_string()));
+    let _ = studio.update(Message::GitCommitMessageChanged(
+        "feat: add GPU acceleration".to_string(),
+    ));
     let _ = studio.update(Message::GitCommit);
     assert!(studio.git.staged_changes.is_empty());
     assert_eq!(studio.git.commit_history[0], "feat: add GPU acceleration");
@@ -400,13 +417,24 @@ fn test_run_and_debug_lifecycle() {
 
     // Breakpoints
     let bp_count = studio.debug.breakpoints.len();
-    let _ = studio.update(Message::DebugToggleBreakpoint("src/main.rs".to_string(), 100));
+    let _ = studio.update(Message::DebugToggleBreakpoint(
+        "src/main.rs".to_string(),
+        100,
+    ));
     assert_eq!(studio.debug.breakpoints.len(), bp_count + 1);
 
     // Watch expressions
-    let _ = studio.update(Message::DebugWatchInputChanged("studio.font_size".to_string()));
+    let _ = studio.update(Message::DebugWatchInputChanged(
+        "studio.font_size".to_string(),
+    ));
     let _ = studio.update(Message::DebugAddWatch);
-    assert!(studio.debug.watch_expressions.iter().any(|w| w.expression == "studio.font_size"));
+    assert!(
+        studio
+            .debug
+            .watch_expressions
+            .iter()
+            .any(|w| w.expression == "studio.font_size")
+    );
 
     // Stop Debugging
     let _ = studio.update(Message::DebugStop);
@@ -428,9 +456,23 @@ fn test_extensions_marketplace() {
     assert!(studio.extensions.filtered().iter().all(|e| e.is_installed));
 
     // Toggle install on uninstalled item
-    let target_id = studio.extensions.extensions.iter().find(|e| !e.is_installed).map(|e| e.id).unwrap();
+    let target_id = studio
+        .extensions
+        .extensions
+        .iter()
+        .find(|e| !e.is_installed)
+        .map(|e| e.id)
+        .unwrap();
     let _ = studio.update(Message::ExtensionToggleInstall(target_id));
-    assert!(studio.extensions.extensions.iter().find(|e| e.id == target_id).unwrap().is_installed);
+    assert!(
+        studio
+            .extensions
+            .extensions
+            .iter()
+            .find(|e| e.id == target_id)
+            .unwrap()
+            .is_installed
+    );
 }
 
 #[test]
@@ -450,9 +492,17 @@ fn test_multi_terminal_and_debug_repl() {
     assert_eq!(studio.terminal.active_channel, OutputChannel::CargoBuild);
 
     // Debug REPL evaluation
-    let _ = studio.update(Message::DebugReplInputChanged("taim::version()".to_string()));
+    let _ = studio.update(Message::DebugReplInputChanged(
+        "taim::version()".to_string(),
+    ));
     let _ = studio.update(Message::DebugReplSubmit);
-    assert!(studio.terminal.debug_logs.iter().any(|l| l.message.contains("0.15.0-dev")));
+    assert!(
+        studio
+            .terminal
+            .debug_logs
+            .iter()
+            .any(|l| l.message.contains("0.15.0-dev"))
+    );
 }
 
 #[test]
@@ -462,7 +512,13 @@ fn test_toast_notifications() {
 
     let first_id = studio.notifications.active_toasts[0].id;
     let _ = studio.update(Message::DismissNotification(first_id));
-    assert!(!studio.notifications.active_toasts.iter().any(|t| t.id == first_id));
+    assert!(
+        !studio
+            .notifications
+            .active_toasts
+            .iter()
+            .any(|t| t.id == first_id)
+    );
 }
 
 #[test]

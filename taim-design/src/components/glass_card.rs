@@ -153,4 +153,3 @@ mod tests {
         assert_eq!(selected_card.elevation(), Elevation::Raised);
     }
 }
-

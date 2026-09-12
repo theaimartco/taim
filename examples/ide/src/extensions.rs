@@ -60,7 +60,8 @@ impl ExtensionsState {
                     name: "rust-analyzer".to_string(),
                     publisher: "rust-lang".to_string(),
                     version: "v0.15.0".to_string(),
-                    description: "Rust language support with native zero-allocation LSP".to_string(),
+                    description: "Rust language support with native zero-allocation LSP"
+                        .to_string(),
                     downloads: "4.8M".to_string(),
                     rating: 4.9,
                     is_installed: true,
@@ -96,7 +97,8 @@ impl ExtensionsState {
                     name: "WGSL Shader Analyzer".to_string(),
                     publisher: "wgsl-tooling".to_string(),
                     version: "v1.0.4".to_string(),
-                    description: "WebGPU Shading Language syntax highlighting & validation".to_string(),
+                    description: "WebGPU Shading Language syntax highlighting & validation"
+                        .to_string(),
                     downloads: "450K".to_string(),
                     rating: 4.7,
                     is_installed: false,
@@ -108,7 +110,8 @@ impl ExtensionsState {
                     name: "GitLens Taim Supercharged".to_string(),
                     publisher: "gitkraken".to_string(),
                     version: "v15.2.0".to_string(),
-                    description: "Supercharge Git within Taim Studio with blame annotations".to_string(),
+                    description: "Supercharge Git within Taim Studio with blame annotations"
+                        .to_string(),
                     downloads: "3.5M".to_string(),
                     rating: 4.9,
                     is_installed: false,
@@ -165,7 +168,11 @@ impl ExtensionsState {
 
     /// Toggles enabled state of an installed extension.
     pub fn toggle_enabled(&mut self, id: usize) {
-        if let Some(ext) = self.extensions.iter_mut().find(|e| e.id == id && e.is_installed) {
+        if let Some(ext) = self
+            .extensions
+            .iter_mut()
+            .find(|e| e.id == id && e.is_installed)
+        {
             ext.is_enabled = !ext.is_enabled;
         }
     }

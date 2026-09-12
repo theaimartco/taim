@@ -17,9 +17,7 @@
 //! [`wgpu`]: https://github.com/gfx-rs/wgpu-rs
 //! [WebGPU API]: https://gpuweb.github.io/gpuweb/
 //! [`glyphon`]: https://github.com/grovesNL/glyphon
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
-)]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(missing_docs)]
 pub mod display;

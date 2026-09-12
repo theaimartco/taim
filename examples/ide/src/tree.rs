@@ -21,7 +21,12 @@ pub struct FileNode {
 
 impl FileNode {
     /// Creates a leaf file node.
-    pub fn file(id: usize, name: impl Into<String>, path: impl Into<String>, syntax: &'static str) -> Self {
+    pub fn file(
+        id: usize,
+        name: impl Into<String>,
+        path: impl Into<String>,
+        syntax: &'static str,
+    ) -> Self {
         Self {
             id,
             name: name.into(),
@@ -55,11 +60,7 @@ impl FileNode {
     /// Returns the decorative icon or glyph for this node.
     pub fn icon(&self) -> &'static str {
         if self.is_dir {
-            if self.is_expanded {
-                "▾"
-            } else {
-                "▸"
-            }
+            if self.is_expanded { "▾" } else { "▸" }
         } else {
             match self.syntax {
                 "rust" => "◈",
@@ -151,7 +152,12 @@ impl FileTree {
             "shaders",
             "shaders",
             true,
-            vec![FileNode::file(20, "compute_raster.wgsl", "shaders/compute_raster.wgsl", "c")],
+            vec![FileNode::file(
+                20,
+                "compute_raster.wgsl",
+                "shaders/compute_raster.wgsl",
+                "c",
+            )],
         );
 
         let tests = FileNode::dir(
@@ -159,7 +165,12 @@ impl FileTree {
             "tests",
             "tests",
             false,
-            vec![FileNode::file(30, "pipeline_test.rs", "tests/pipeline_test.rs", "rust")],
+            vec![FileNode::file(
+                30,
+                "pipeline_test.rs",
+                "tests/pipeline_test.rs",
+                "rust",
+            )],
         );
 
         let root = FileNode::dir(
@@ -239,10 +250,7 @@ impl FileTree {
                     entries.push(FileNode::dir(id, name, rel_path, is_expanded, children));
                 } else if file_type.is_file() {
                     let path_buf = entry.path();
-                    let ext = path_buf
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .unwrap_or("");
+                    let ext = path_buf.extension().and_then(|e| e.to_str()).unwrap_or("");
                     let syntax = match ext {
                         "rs" => "rust",
                         "toml" => "toml",

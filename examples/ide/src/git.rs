@@ -78,16 +78,18 @@ impl GitState {
             },
         ];
 
-        let staged = vec![
-            GitChange {
-                file_path: "src/document.rs".to_string(),
-                status: GitFileStatus::Modified,
-            },
-        ];
+        let staged = vec![GitChange {
+            file_path: "src/document.rs".to_string(),
+            status: GitFileStatus::Modified,
+        }];
 
         let mut state = Self {
             active_branch: "main".to_string(),
-            branches: vec!["main".to_string(), "feat/gpu-compute".to_string(), "fix/mem-bench".to_string()],
+            branches: vec![
+                "main".to_string(),
+                "feat/gpu-compute".to_string(),
+                "fix/mem-bench".to_string(),
+            ],
             staged_changes: staged,
             unstaged_changes: unstaged,
             commit_message: String::new(),
@@ -110,7 +112,11 @@ impl GitState {
 
     /// Stages an unstaged file.
     pub fn stage_file(&mut self, file_path: &str) {
-        if let Some(pos) = self.unstaged_changes.iter().position(|c| c.file_path == file_path) {
+        if let Some(pos) = self
+            .unstaged_changes
+            .iter()
+            .position(|c| c.file_path == file_path)
+        {
             let change = self.unstaged_changes.remove(pos);
             self.staged_changes.push(change);
         }
@@ -118,7 +124,11 @@ impl GitState {
 
     /// Unstages a staged file.
     pub fn unstage_file(&mut self, file_path: &str) {
-        if let Some(pos) = self.staged_changes.iter().position(|c| c.file_path == file_path) {
+        if let Some(pos) = self
+            .staged_changes
+            .iter()
+            .position(|c| c.file_path == file_path)
+        {
             let change = self.staged_changes.remove(pos);
             self.unstaged_changes.push(change);
         }
@@ -187,7 +197,8 @@ impl GitState {
                 kind: DiffLineKind::Addition,
                 old_line_num: None,
                 new_line_num: Some(2),
-                content: "+// Native GPU Compute Rasterizer (0.28ms frame, 120 FPS locked)".to_string(),
+                content: "+// Native GPU Compute Rasterizer (0.28ms frame, 120 FPS locked)"
+                    .to_string(),
             },
             DiffLine {
                 kind: DiffLineKind::Addition,

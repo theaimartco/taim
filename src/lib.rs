@@ -471,9 +471,7 @@
 //!
 //! Furthermore, functor methods like [`Task::map`], [`Element::map`], and [`Subscription::map`] make composition
 //! seamless.
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
-)]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 use taim_widget::renderer;
 use taim_winit as shell;
@@ -553,10 +551,10 @@ pub mod signal {
     pub use taim_signal::*;
 }
 
+pub use crate::core::SemanticsDriver;
 pub use crate::core::layout_solver;
 pub use crate::core::scene;
 pub use crate::core::scene::{NodeId, SceneArena, SceneNode};
-pub use crate::core::SemanticsDriver;
 
 #[cfg(feature = "signal")]
 pub mod component {

@@ -64,9 +64,13 @@ impl SemanticsDriver {
 
     /// Searches the semantic tree for the first node matching `label` (case-insensitive).
     pub fn find_by_name(&self, label: &str) -> Option<&Node> {
-        self.root_node.as_ref().and_then(|root| Self::find_in_subtree(root, |n| {
-            n.name.as_ref().is_some_and(|name| name.eq_ignore_ascii_case(label))
-        }))
+        self.root_node.as_ref().and_then(|root| {
+            Self::find_in_subtree(root, |n| {
+                n.name
+                    .as_ref()
+                    .is_some_and(|name| name.eq_ignore_ascii_case(label))
+            })
+        })
     }
 
     /// Finds all nodes matching a specific semantic [`Role`].
@@ -106,8 +110,8 @@ impl SemanticsDriver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scene::{FlexDirection, NodeKind, SceneArena};
     use crate::Color;
+    use crate::scene::{FlexDirection, NodeKind, SceneArena};
 
     #[test]
     fn semantics_driver_inspects_and_queries_tree() {

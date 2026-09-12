@@ -26,10 +26,10 @@
 //!   reference machine; it is not something a unit test can honestly
 //!   assert, and this file does not pretend otherwise.
 
-use taim_profiler::collector::{Collector, Sampling};
-use taim_profiler::events::{Cause, Event, Label, Phase, Resource};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
+use taim_profiler::collector::{Collector, Sampling};
+use taim_profiler::events::{Cause, Event, Label, Phase, Resource};
 
 fn telemetry(at: u64) -> Event {
     Event::CacheHit {

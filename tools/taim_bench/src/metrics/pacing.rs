@@ -18,8 +18,8 @@
 //! cadence/jitter/missed-frame numbers for free from the same feedback
 //! stream `runtime::frame_scheduler::Scheduler` already consumes.
 
-use taim_core::frame;
 use std::time::Duration;
+use taim_core::frame;
 
 /// One frame's contribution to a pacing measurement: when it was
 /// presented (if at all), what it was expected to hit, and how many

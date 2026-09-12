@@ -1,12 +1,10 @@
 //! Asynchronous tasks for GUI programming, inspired by Elm.
 //!
 //! ![The foundations of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/foundations.png?raw=true)
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
-)]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-pub use taim_core as core;
 pub use futures;
+pub use taim_core as core;
 
 mod maybe;
 mod runtime;

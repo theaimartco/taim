@@ -38,9 +38,7 @@
 //! assert_eq!(spans[0].1.scope(), Scope::Keyword);
 //! assert_eq!(spans.last().unwrap().1.scope(), Scope::Comment);
 //! ```
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
-)]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 pub mod syntax;
 pub mod theme;
 

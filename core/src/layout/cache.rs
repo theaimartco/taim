@@ -19,8 +19,7 @@
 //! sets are actually in rotation, not to how many measurements have ever
 //! happened.
 use crate::layout::{Limits, LimitsKey, Node};
-
-use std::collections::VecDeque;
+use smallvec::SmallVec;
 
 /// A caller-supplied fingerprint of everything about a node's *content*
 /// that would invalidate a cached measurement even under unchanged
@@ -94,8 +93,8 @@ struct Entry {
 #[derive(Debug, Clone)]
 pub struct Cache {
     capacity: usize,
-    // Most-recently-used entry is at the back.
-    entries: VecDeque<Entry>,
+    // Most-recently-used entry is at the back. Inline capacity of 4 avoids heap allocations.
+    entries: SmallVec<[Entry; 4]>,
 }
 
 impl Cache {
@@ -111,7 +110,7 @@ impl Cache {
 
         Self {
             capacity,
-            entries: VecDeque::with_capacity(capacity),
+            entries: SmallVec::with_capacity(capacity),
         }
     }
 
@@ -124,7 +123,7 @@ impl Cache {
     pub fn disabled() -> Self {
         Self {
             capacity: 0,
-            entries: VecDeque::new(),
+            entries: SmallVec::new(),
         }
     }
 
@@ -178,10 +177,10 @@ impl Cache {
         };
 
         if let Some(position) = self.entries.iter().position(|entry| entry.key == key) {
-            let entry = self.entries.remove(position).unwrap();
+            let entry = self.entries.remove(position);
             let node = entry.node.clone();
 
-            self.entries.push_back(entry);
+            self.entries.push(entry);
 
             return node;
         }
@@ -189,10 +188,10 @@ impl Cache {
         let node = compute();
 
         if self.entries.len() >= self.capacity {
-            let _ = self.entries.pop_front();
+            let _ = self.entries.remove(0);
         }
 
-        self.entries.push_back(Entry {
+        self.entries.push(Entry {
             key,
             node: node.clone(),
         });

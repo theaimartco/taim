@@ -8,8 +8,8 @@
 //! add a few compound, multi-window-shaped scenarios its own module
 //! tests do not.
 
-use taim_runtime::frame_scheduler::{FEEDBACK_TIMEOUT, Scheduler};
 use std::time::{Duration, Instant};
+use taim_runtime::frame_scheduler::{FEEDBACK_TIMEOUT, Scheduler};
 
 fn epoch() -> Instant {
     static EPOCH: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();

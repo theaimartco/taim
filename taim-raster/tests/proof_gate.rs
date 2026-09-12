@@ -5,8 +5,8 @@
 //! sub-1-KB delta uploads.
 
 use taim_raster::{
-    bin_segments, reference_coverage, CurveFlatteningPolicy, DrawObject, Encoder, MaterialId,
-    ObjectVelocity, Rect, SceneEdit, TileGrid,
+    CurveFlatteningPolicy, DrawObject, Encoder, MaterialId, ObjectVelocity, Rect, SceneEdit,
+    TileGrid, bin_segments, reference_coverage,
 };
 
 /// Computes the exact signed distance from `[px, py]` to a rounded rectangle.
@@ -212,8 +212,14 @@ fn five_thousand_overlapping_rounded_rectangles_proof_gate() {
 
     assert_eq!(draw_upload_bytes, 16);
     assert_eq!(vel_upload_bytes, 16);
-    assert!(draw_upload_bytes < 1024, "draw upload must be strictly under 1 KB");
-    assert!(vel_upload_bytes < 1024, "velocity upload must be strictly under 1 KB");
+    assert!(
+        draw_upload_bytes < 1024,
+        "draw upload must be strictly under 1 KB"
+    );
+    assert!(
+        vel_upload_bytes < 1024,
+        "velocity upload must be strictly under 1 KB"
+    );
 
     // Apply delta edits in place
     scene.apply_edit(&update_draw);

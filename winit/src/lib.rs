@@ -14,16 +14,14 @@
 //! [`taim_runtime`]: https://github.com/theaimartco/taim/tree/master/runtime
 //! [`winit`]: https://github.com/rust-windowing/winit
 //! [`conversion`]: crate::conversion
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
-)]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-pub use taim_debug as debug;
-pub use taim_program as program;
-pub use taim_runtime as runtime;
 pub use program::core;
 pub use program::graphics;
 pub use runtime::futures;
+pub use taim_debug as debug;
+pub use taim_program as program;
+pub use taim_runtime as runtime;
 pub use winit;
 
 pub mod clipboard;
@@ -1100,9 +1098,7 @@ async fn run_instance<P>(
                         // only way to tell "no window events are arriving
                         // at all" apart from "an event arrived but was
                         // ignored" without a debugger attached.
-                        log::trace!(
-                            "WindowEvent for id `{window_id:?}`: {window_event:?}"
-                        );
+                        log::trace!("WindowEvent for id `{window_id:?}`: {window_event:?}");
 
                         if !is_daemon
                             && matches!(window_event, winit::event::WindowEvent::Destroyed)

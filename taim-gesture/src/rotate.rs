@@ -200,9 +200,9 @@ impl Recognizer for Rotate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::f32::consts::PI;
     use taim_core::pointer::{DeviceKind, Metadata};
     use taim_core::time::{Duration, Instant};
-    use std::f32::consts::PI;
 
     fn epoch() -> Instant {
         static EPOCH: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();

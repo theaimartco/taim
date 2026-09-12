@@ -4,8 +4,8 @@
 //! spatial/waveguide displays, and physical millimeter units with viewing-distance
 //! angular normalization.
 
-use crate::transformation::Transformation;
 use crate::Pixels;
+use crate::transformation::Transformation;
 use glam::{Mat4, Vec3};
 use std::ops::{Add, Div, Mul, Sub};
 
@@ -274,14 +274,8 @@ mod tests {
     #[test]
     fn stereo_pair_offsets_left_and_right_eyes() {
         let ctx = PhysicalContext::default();
-        let (left, right) = Transform3D::stereo_pair(
-            Mm(64.0),
-            std::f32::consts::FRAC_PI_2,
-            1.0,
-            0.1,
-            100.0,
-            &ctx,
-        );
+        let (left, right) =
+            Transform3D::stereo_pair(Mm(64.0), std::f32::consts::FRAC_PI_2, 1.0, 0.1, 100.0, &ctx);
 
         assert_ne!(left, right);
         assert_ne!(left, Transform3D::IDENTITY);
