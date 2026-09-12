@@ -13,3 +13,7 @@ mod occlusion;
 
 #[path = "runtime/retained_replay_probe.rs"]
 mod retained_replay_probe;
+
+#[path = "runtime/phase3_inversion.rs"]
+mod phase3_inversion;
+

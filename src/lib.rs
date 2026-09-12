@@ -682,7 +682,10 @@ pub use error::Error;
 pub use event::Event;
 pub use executor::Executor;
 pub use font::Font;
-pub use program::Program;
+pub use program::{
+    App, AppConfig, AppContext, AppRunner, FrameRequest, Program, ProgramAdapter, RuntimeContext,
+    WindowContext,
+};
 pub use renderer::Renderer;
 pub use runtime::ReactiveUi;
 pub use task::Task;
@@ -744,4 +747,13 @@ where
     Renderer: program::Renderer + 'static,
 {
     application(State::default, update, view).run()
+}
+
+/// Runs a native TAIM [`App`].
+pub fn run_app<A: program::App + 'static>(app: A) -> Result
+where
+    A::Theme: theme::Base + 'static,
+    A::Message: message::MaybeDebug + message::MaybeClone,
+{
+    Ok(shell::run_app(app)?)
 }
