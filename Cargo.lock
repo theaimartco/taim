@@ -3863,6 +3863,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "taim-ide"
+version = "0.1.0"
+dependencies = [
+ "taim",
+ "taim-accessibility",
+ "taim-design",
+ "taim-highlighter",
+ "taim_core",
+ "taim_runtime",
+]
+
+[[package]]
 name = "taim-motion"
 version = "0.15.0-dev"
 dependencies = [

@@ -1,0 +1,28 @@
+[package]
+name = "taim-ide"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+taim.workspace = true
+taim.features = [
+    "wgpu",
+    "tiny-skia",
+    "crisp",
+    "hinting",
+    "thread-pool",
+    "linux-theme-detection",
+    "x11",
+    "wayland",
+    "fira-sans",
+    "advanced",
+    "highlighter",
+]
+taim-highlighter.workspace = true
+taim-design.workspace = true
+
+[dev-dependencies]
+taim_core.workspace = true
+taim_runtime.workspace = true
+taim-accessibility.workspace = true
