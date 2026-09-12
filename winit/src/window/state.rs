@@ -2,17 +2,17 @@ use crate::conversion;
 use crate::core::{Color, Size};
 use crate::core::{mouse, theme, window};
 use crate::graphics::Viewport;
-use crate::program::{self, Program};
+use crate::program::App;
 
 use winit::event::{Touch, WindowEvent};
 use winit::window::Window;
 
 use std::fmt::{Debug, Formatter};
 
-/// The state of the window of a [`Program`].
-pub struct State<P: Program>
+/// The state of the window of an [`App`].
+pub struct State<A: App>
 where
-    P::Theme: theme::Base,
+    A::Theme: theme::Base,
 {
     title: String,
     scale_factor: f32,
@@ -20,15 +20,15 @@ where
     surface_version: u64,
     cursor_position: Option<winit::dpi::PhysicalPosition<f64>>,
     modifiers: winit::keyboard::ModifiersState,
-    theme: Option<P::Theme>,
+    theme: Option<A::Theme>,
     theme_mode: theme::Mode,
-    default_theme: P::Theme,
+    default_theme: A::Theme,
     style: theme::Style,
 }
 
-impl<P: Program> Debug for State<P>
+impl<A: App> Debug for State<A>
 where
-    P::Theme: theme::Base,
+    A::Theme: theme::Base,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("window::State")
@@ -41,23 +41,24 @@ where
     }
 }
 
-impl<P: Program> State<P>
+impl<A: App> State<A>
 where
-    P::Theme: theme::Base,
+    A::Theme: theme::Base,
 {
-    /// Creates a new [`State`] for the provided [`Program`]'s `window`.
+    /// Creates a new [`State`] for the provided [`App`]'s `window`.
     pub fn new(
-        program: &program::Instance<P>,
+        runner: &crate::program::AppRunner<A>,
         window_id: window::Id,
         window: &Window,
         system_theme: theme::Mode,
     ) -> Self {
-        let title = program.title(window_id);
-        let scale_factor = program.scale_factor(window_id);
-        let theme = program.theme(window_id);
+        let win_ctx = crate::program::WindowContext::new(window_id, window.scale_factor() as f32);
+        let title = runner.title(&win_ctx);
+        let scale_factor = runner.scale_factor(&win_ctx);
+        let theme = runner.theme(&win_ctx);
         let theme_mode = theme.as_ref().map(theme::Base::mode).unwrap_or_default();
-        let default_theme = <P::Theme as theme::Base>::default(system_theme);
-        let style = program.style(theme.as_ref().unwrap_or(&default_theme));
+        let default_theme = <A::Theme as theme::Base>::default(system_theme);
+        let style = runner.style(theme.as_ref().unwrap_or(&default_theme));
 
         let viewport = {
             let physical_size = window.inner_size();
@@ -115,7 +116,7 @@ where
         self.modifiers
     }
 
-    pub fn theme(&self) -> &P::Theme {
+    pub fn theme(&self) -> &A::Theme {
         self.theme.as_ref().unwrap_or(&self.default_theme)
     }
 
@@ -131,7 +132,7 @@ where
         self.style.text_color
     }
 
-    pub fn update(&mut self, program: &program::Instance<P>, window: &Window, event: &WindowEvent) {
+    pub fn update(&mut self, runner: &crate::program::AppRunner<A>, window: &Window, event: &WindowEvent) {
         match event {
             WindowEvent::Resized(new_size) => {
                 let size = Size::new(new_size.width, new_size.height);
@@ -168,10 +169,10 @@ where
             }
             WindowEvent::ThemeChanged(theme) => {
                 self.default_theme =
-                    <P::Theme as theme::Base>::default(conversion::theme_mode(*theme));
+                    <A::Theme as theme::Base>::default(conversion::theme_mode(*theme));
 
                 if self.theme.is_none() {
-                    self.style = program.style(&self.default_theme);
+                    self.style = runner.style(&self.default_theme);
                     window.request_redraw();
                 }
             }
@@ -181,12 +182,14 @@ where
 
     pub fn synchronize(
         &mut self,
-        program: &program::Instance<P>,
+        runner: &crate::program::AppRunner<A>,
         window_id: window::Id,
         window: &Window,
     ) {
+        let win_ctx = crate::program::WindowContext::new(window_id, window.scale_factor() as f32);
+
         // Update window title
-        let new_title = program.title(window_id);
+        let new_title = runner.title(&win_ctx);
 
         if self.title != new_title {
             window.set_title(&new_title);
@@ -194,7 +197,7 @@ where
         }
 
         // Update scale factor
-        let new_scale_factor = program.scale_factor(window_id);
+        let new_scale_factor = runner.scale_factor(&win_ctx);
 
         if self.scale_factor != new_scale_factor {
             self.viewport = Viewport::with_physical_size(
@@ -206,8 +209,8 @@ where
         }
 
         // Update theme and appearance
-        self.theme = program.theme(window_id);
-        self.style = program.style(self.theme());
+        self.theme = runner.theme(&win_ctx);
+        self.style = runner.style(self.theme());
 
         let new_mode = self
             .theme
@@ -223,10 +226,10 @@ where
                 // Assume the old mode matches the system one
                 // We will be notified otherwise
                 if new_mode == theme::Mode::None {
-                    self.default_theme = <P::Theme as theme::Base>::default(self.theme_mode);
+                    self.default_theme = <A::Theme as theme::Base>::default(self.theme_mode);
 
                     if self.theme.is_none() {
-                        self.style = program.style(&self.default_theme);
+                        self.style = runner.style(&self.default_theme);
                     }
                 }
             }
