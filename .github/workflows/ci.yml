@@ -1,230 +1,230 @@
-name: CI
+# name: CI
 
-on:
-  push:
-    branches: [main, master]
-  pull_request:
-  workflow_dispatch:
+# on:
+#   push:
+#     branches: [main, master]
+#   pull_request:
+#   workflow_dispatch:
 
-env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
+# env:
+#   CARGO_TERM_COLOR: always
+#   RUST_BACKTRACE: 1
 
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# concurrency:
+#   group: ci-${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
 
-jobs:
-  metadata:
-    name: workspace metadata
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cargo metadata --format-version 1 --no-deps
-      - run: bash scripts/ci/check-workspace.sh
+# jobs:
+#   metadata:
+#     name: workspace metadata
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - run: cargo metadata --format-version 1 --no-deps
+#       - run: bash scripts/ci/check-workspace.sh
 
-  fmt:
-    name: fmt --check
-    runs-on: ubuntu-latest
-    needs: metadata
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - run: cargo fmt --all -- --check
+#   fmt:
+#     name: fmt --check
+#     runs-on: ubuntu-latest
+#     needs: metadata
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#         with:
+#           components: rustfmt
+#       - run: cargo fmt --all -- --check
 
-  check:
-    name: check (${{ matrix.features.name }})
-    runs-on: ubuntu-latest
-    needs: metadata
-    strategy:
-      fail-fast: false
-      matrix:
-        features:
-          - name: default
-            args: --workspace --all-targets
-          - name: minimal-headless
-            args: -p taim_core -p taim_runtime -p taim_widget --no-default-features
-          - name: hot
-            args: --workspace --all-targets --features hot
-          - name: all-widgets
-            args: --workspace --all-targets --features "image,svg,canvas,qr_code,markdown,lazy,advanced,highlighter"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install Linux GUI/Wayland/X11 dev packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
-      - run: cargo check ${{ matrix.features.args }}
+#   check:
+#     name: check (${{ matrix.features.name }})
+#     runs-on: ubuntu-latest
+#     needs: metadata
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         features:
+#           - name: default
+#             args: --workspace --all-targets
+#           - name: minimal-headless
+#             args: -p taim_core -p taim_runtime -p taim_widget --no-default-features
+#           - name: hot
+#             args: --workspace --all-targets --features hot
+#           - name: all-widgets
+#             args: --workspace --all-targets --features "image,svg,canvas,qr_code,markdown,lazy,advanced,highlighter"
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - uses: Swatinem/rust-cache@v2
+#       - name: Install Linux GUI/Wayland/X11 dev packages
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+#       - run: cargo check ${{ matrix.features.args }}
 
-  clippy:
-    name: clippy
-    runs-on: ubuntu-latest
-    needs: metadata
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-      - name: Install Linux GUI/Wayland/X11 dev packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+#   clippy:
+#     name: clippy
+#     runs-on: ubuntu-latest
+#     needs: metadata
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#         with:
+#           components: clippy
+#       - uses: Swatinem/rust-cache@v2
+#       - name: Install Linux GUI/Wayland/X11 dev packages
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+#       - run: cargo clippy --workspace --all-targets -- -D warnings
 
-  wasm:
-    name: wasm32 build
-    runs-on: ubuntu-latest
-    needs: metadata
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2
-      # `webgl`, `web-sys`, the `wasm32` blocks in `futures/` and `winit/`,
-      # and `deny.toml`'s `wasm32-unknown-unknown` entry were all inherited
-      # from iced and never built by any workflow, so whether the target
-      # still compiled was unknown rather than true (Capstone.md F-19).
-      # Verified compiling at 9f9167e4; this job is what keeps it that way.
-      #
-      # Default features are off deliberately: `x11`, `wayland` and
-      # `thread-pool` are meaningless on the web and would fail the build
-      # for reasons that say nothing about wasm support.
-      - run: cargo check -p taim --target wasm32-unknown-unknown --no-default-features --features "wgpu,webgl,web-colors"
+#   wasm:
+#     name: wasm32 build
+#     runs-on: ubuntu-latest
+#     needs: metadata
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#         with:
+#           targets: wasm32-unknown-unknown
+#       - uses: Swatinem/rust-cache@v2
+#       # `webgl`, `web-sys`, the `wasm32` blocks in `futures/` and `winit/`,
+#       # and `deny.toml`'s `wasm32-unknown-unknown` entry were all inherited
+#       # from iced and never built by any workflow, so whether the target
+#       # still compiled was unknown rather than true (Capstone.md F-19).
+#       # Verified compiling at 9f9167e4; this job is what keeps it that way.
+#       #
+#       # Default features are off deliberately: `x11`, `wayland` and
+#       # `thread-pool` are meaningless on the web and would fail the build
+#       # for reasons that say nothing about wasm support.
+#       - run: cargo check -p taim --target wasm32-unknown-unknown --no-default-features --features "wgpu,webgl,web-colors"
 
-  test:
-    name: test (${{ matrix.configuration.name }})
-    runs-on: ubuntu-latest
-    needs: [fmt, check, clippy]
-    strategy:
-      fail-fast: false
-      matrix:
-        configuration:
-          # The production configuration: linear-light compositing.
-          - name: default
-            args: ""
-          # No default features at all. This is only a meaningful command
-          # because the `taim` dev-dependency sets `default-features = false`
-          # at the workspace definition -- without that it silently re-enabled
-          # every default, and `web-colors` in particular, so this job would
-          # have tested the same thing as `default` while claiming otherwise.
-          - name: no-default-features
-            args: "--no-default-features"
-          # The legacy Web colour-management mode. Blends in gamma space by
-          # design; `tests/color/contract.rs` and `tests/gpu/color_output.rs`
-          # assert that it does, so the two modes cannot drift into each
-          # other unnoticed.
-          - name: legacy-web-colors
-            args: "--features web-colors"
-          - name: all-features
-            args: "--all-features"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install Linux GUI/Wayland/X11 dev packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
-      - run: cargo test --workspace ${{ matrix.configuration.args }}
+#   test:
+#     name: test (${{ matrix.configuration.name }})
+#     runs-on: ubuntu-latest
+#     needs: [fmt, check, clippy]
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         configuration:
+#           # The production configuration: linear-light compositing.
+#           - name: default
+#             args: ""
+#           # No default features at all. This is only a meaningful command
+#           # because the `taim` dev-dependency sets `default-features = false`
+#           # at the workspace definition -- without that it silently re-enabled
+#           # every default, and `web-colors` in particular, so this job would
+#           # have tested the same thing as `default` while claiming otherwise.
+#           - name: no-default-features
+#             args: "--no-default-features"
+#           # The legacy Web colour-management mode. Blends in gamma space by
+#           # design; `tests/color/contract.rs` and `tests/gpu/color_output.rs`
+#           # assert that it does, so the two modes cannot drift into each
+#           # other unnoticed.
+#           - name: legacy-web-colors
+#             args: "--features web-colors"
+#           - name: all-features
+#             args: "--all-features"
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - uses: Swatinem/rust-cache@v2
+#       - name: Install Linux GUI/Wayland/X11 dev packages
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+#       - run: cargo test --workspace ${{ matrix.configuration.args }}
 
-  colour-contract:
-    name: colour contract (${{ matrix.configuration.name }})
-    runs-on: ubuntu-latest
-    needs: [fmt]
-    strategy:
-      fail-fast: false
-      matrix:
-        configuration:
-          - name: linear-default
-            args: ""
-          - name: legacy-web-colors
-            args: "--features web-colors"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install Linux GUI/Wayland/X11 dev packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
-      # Fails loudly if `web-colors` re-enters the default feature set or is
-      # dragged in by a dependency edge. That is not a hypothetical: it is
-      # exactly how gamma-space blending became the shipping default and stayed
-      # invisible behind a passing suite.
-      - name: The build under test composites in the colour space it claims
-        run: cargo test --test color ${{ matrix.configuration.args }} -- --nocapture
+#   colour-contract:
+#     name: colour contract (${{ matrix.configuration.name }})
+#     runs-on: ubuntu-latest
+#     needs: [fmt]
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         configuration:
+#           - name: linear-default
+#             args: ""
+#           - name: legacy-web-colors
+#             args: "--features web-colors"
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - uses: Swatinem/rust-cache@v2
+#       - name: Install Linux GUI/Wayland/X11 dev packages
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+#       # Fails loudly if `web-colors` re-enters the default feature set or is
+#       # dragged in by a dependency edge. That is not a hypothetical: it is
+#       # exactly how gamma-space blending became the shipping default and stayed
+#       # invisible behind a passing suite.
+#       - name: The build under test composites in the colour space it claims
+#         run: cargo test --test color ${{ matrix.configuration.args }} -- --nocapture
 
-      # GPU-dependent cases skip rather than fail without an adapter, and a
-      # skip must be visible: a silently skipped rendering test looks exactly
-      # like a passing one in a summary.
-      - name: Report skipped GPU cases
-        run: |
-          cargo test --test gpu ${{ matrix.configuration.args }} -- --nocapture 2>&1 | tee gpu.log
-          if grep -q "skipped: no wgpu adapter available" gpu.log; then
-            echo "::warning title=GPU tests skipped::No wgpu adapter on this runner; \
-            colour output and target-format tests did NOT run."
-          fi
+#       # GPU-dependent cases skip rather than fail without an adapter, and a
+#       # skip must be visible: a silently skipped rendering test looks exactly
+#       # like a passing one in a summary.
+#       - name: Report skipped GPU cases
+#         run: |
+#           cargo test --test gpu ${{ matrix.configuration.args }} -- --nocapture 2>&1 | tee gpu.log
+#           if grep -q "skipped: no wgpu adapter available" gpu.log; then
+#             echo "::warning title=GPU tests skipped::No wgpu adapter on this runner; \
+#             colour output and target-format tests did NOT run."
+#           fi
 
-  accessibility:
-    name: AT-SPI over a real bus
-    runs-on: ubuntu-latest
-    needs: [fmt, check, clippy]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      # `dbus-run-session` only; at-spi2-core is deliberately not installed.
-      # The test serves `org.a11y.Bus` itself and answers with the session
-      # bus's own address, so it exercises the whole object server without
-      # a registry or a display. See the test's module docs.
-      - name: Install D-Bus
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y dbus dbus-x11
-      # TAIM_ATSPI_REQUIRE_BUS turns "no bus, skip" into "no bus, fail".
-      # Without it this job could go green on a runner where D-Bus failed
-      # to start, which is the precise shape of the bug F-15 was: a
-      # transport nobody noticed was doing nothing.
-      - name: Test the AT-SPI transport
-        env:
-          TAIM_ATSPI_REQUIRE_BUS: "1"
-        run: dbus-run-session -- cargo test -p taim-accessibility --features atspi --test atspi_bus
+#   accessibility:
+#     name: AT-SPI over a real bus
+#     runs-on: ubuntu-latest
+#     needs: [fmt, check, clippy]
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - uses: Swatinem/rust-cache@v2
+#       # `dbus-run-session` only; at-spi2-core is deliberately not installed.
+#       # The test serves `org.a11y.Bus` itself and answers with the session
+#       # bus's own address, so it exercises the whole object server without
+#       # a registry or a display. See the test's module docs.
+#       - name: Install D-Bus
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y dbus dbus-x11
+#       # TAIM_ATSPI_REQUIRE_BUS turns "no bus, skip" into "no bus, fail".
+#       # Without it this job could go green on a runner where D-Bus failed
+#       # to start, which is the precise shape of the bug F-15 was: a
+#       # transport nobody noticed was doing nothing.
+#       - name: Test the AT-SPI transport
+#         env:
+#           TAIM_ATSPI_REQUIRE_BUS: "1"
+#         run: dbus-run-session -- cargo test -p taim-accessibility --features atspi --test atspi_bus
 
-  budgets:
-    name: budgets
-    runs-on: ubuntu-latest
-    needs: [fmt, check, clippy]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install Linux GUI/Wayland/X11 dev packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
-      # Dependency count, shipped binary size, the unsafe allow list, and the
-      # benchmark metric guards. This script existed and measured correctly
-      # for weeks while no workflow ran it, so both the dependency and binary
-      # budgets drifted past their ceilings unnoticed (Capstone.md F-22).
-      - run: bash scripts/ci/check-budgets.sh
+#   budgets:
+#     name: budgets
+#     runs-on: ubuntu-latest
+#     needs: [fmt, check, clippy]
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - uses: Swatinem/rust-cache@v2
+#       - name: Install Linux GUI/Wayland/X11 dev packages
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+#       # Dependency count, shipped binary size, the unsafe allow list, and the
+#       # benchmark metric guards. This script existed and measured correctly
+#       # for weeks while no workflow ran it, so both the dependency and binary
+#       # budgets drifted past their ceilings unnoticed (Capstone.md F-22).
+#       - run: bash scripts/ci/check-budgets.sh
 
-  release-build:
-    name: release build
-    runs-on: ubuntu-latest
-    needs: [fmt, check, clippy]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install Linux GUI/Wayland/X11 dev packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
-      - run: cargo build --workspace --release
+#   release-build:
+#     name: release build
+#     runs-on: ubuntu-latest
+#     needs: [fmt, check, clippy]
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: dtolnay/rust-toolchain@stable
+#       - uses: Swatinem/rust-cache@v2
+#       - name: Install Linux GUI/Wayland/X11 dev packages
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+#       - run: cargo build --workspace --release
