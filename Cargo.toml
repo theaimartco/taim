@@ -208,6 +208,10 @@ name = "cpu"
 harness = false
 required-features = ["canvas"]
 
+[[bench]]
+name = "phase3_production"
+harness = false
+
 [profile.dev]
 opt-level = 0
 debug = 0
