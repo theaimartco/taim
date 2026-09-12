@@ -76,26 +76,47 @@ struct TaskSlotHeader {
     ready_queue: Arc<Mutex<Vec<u32>>>,
 }
 
-impl ArcWake for TaskSlotHeader {
+/// A generational waker proxy ensuring stale wakes on recycled slots are safe NO-OPs.
+#[derive(Debug)]
+struct TaskWaker {
+    header: Arc<TaskSlotHeader>,
+    generation: u32,
+}
+
+impl ArcWake for TaskWaker {
     fn wake_by_ref(arc_self: &Arc<Self>) {
-        if arc_self.cancelled.load(Ordering::Acquire) {
+        // Generational check: if slot was recycled, generation will not match!
+        if arc_self.header.generation.load(Ordering::Acquire) != arc_self.generation {
             return;
         }
 
-        let mut current = arc_self.wake_state.load(Ordering::Acquire);
+        if arc_self.header.cancelled.load(Ordering::Acquire) {
+            return;
+        }
+
+        let mut current = arc_self.header.wake_state.load(Ordering::Acquire);
         loop {
+            // Re-verify generation in loop to prevent race during slot recycling
+            if arc_self.header.generation.load(Ordering::Acquire) != arc_self.generation {
+                return;
+            }
+
             match WakeState::from(current) {
                 WakeState::Idle => {
                     // Transition Idle -> Queued and push to ready queue
-                    match arc_self.wake_state.compare_exchange_weak(
+                    match arc_self.header.wake_state.compare_exchange_weak(
                         WakeState::Idle as u8,
                         WakeState::Queued as u8,
                         Ordering::AcqRel,
                         Ordering::Acquire,
                     ) {
                         Ok(_) => {
-                            let mut queue = arc_self.ready_queue.lock().unwrap();
-                            queue.push(arc_self.slot);
+                            if arc_self.header.generation.load(Ordering::Acquire)
+                                == arc_self.generation
+                            {
+                                let mut queue = arc_self.header.ready_queue.lock().unwrap();
+                                queue.push(arc_self.header.slot);
+                            }
                             break;
                         }
                         Err(actual) => current = actual,
@@ -103,7 +124,7 @@ impl ArcWake for TaskSlotHeader {
                 }
                 WakeState::Polling => {
                     // Woken while currently running: mark WokenWhilePolling without pushing to queue yet
-                    match arc_self.wake_state.compare_exchange_weak(
+                    match arc_self.header.wake_state.compare_exchange_weak(
                         WakeState::Polling as u8,
                         WakeState::WokenWhilePolling as u8,
                         Ordering::AcqRel,
@@ -127,6 +148,8 @@ impl ArcWake for TaskSlotHeader {
 }
 
 /// Token allowing lock-free O(1) cancellation of a task without global scans.
+///
+/// Guaranteed to be generationally safe: calling `cancel()` on a recycled slot is a safe NO-OP.
 #[derive(Debug, Clone)]
 pub struct CancelToken {
     task_id: TaskId,
@@ -135,15 +158,29 @@ pub struct CancelToken {
 
 impl CancelToken {
     /// Cancels the task in O(1) time.
+    ///
+    /// If the task has already finished and its slot was recycled for a newer task,
+    /// this operation is an immediate safe NO-OP.
     pub fn cancel(&self) {
+        if self.header.generation.load(Ordering::Acquire) != self.task_id.generation {
+            return;
+        }
         self.header.cancelled.store(true, Ordering::Release);
-        self.header
+        let prev = self
+            .header
             .wake_state
-            .store(WakeState::Cancelled as u8, Ordering::Release);
+            .swap(WakeState::Cancelled as u8, Ordering::AcqRel);
+        if prev != WakeState::Queued as u8 && prev != WakeState::Cancelled as u8 {
+            let mut queue = self.header.ready_queue.lock().unwrap();
+            queue.push(self.header.slot);
+        }
     }
 
     /// Returns `true` if this token has been cancelled.
     pub fn is_cancelled(&self) -> bool {
+        if self.header.generation.load(Ordering::Acquire) != self.task_id.generation {
+            return false;
+        }
         self.header.cancelled.load(Ordering::Acquire)
     }
 
@@ -156,11 +193,13 @@ impl CancelToken {
 /// A slot holding an active task future.
 struct Slot {
     header: Arc<TaskSlotHeader>,
+    waker: Option<futures::task::Waker>,
     future: Option<BoxFuture<()>>,
 }
 
 /// A specialized, high-performance GUI task scheduler.
 ///
+/// Uses an atomic wake-state machine with a mutex-backed ready queue.
 /// Ensures 100 wake() calls before poll produce exactly 1 ready-queue entry,
 /// drops cancelled tasks in O(1) time, and performs zero scheduling work when idle.
 pub struct TaskScheduler {
@@ -195,6 +234,17 @@ impl TaskScheduler {
         self.active_count == 0
     }
 
+    /// Returns `true` if the task identified by [`TaskId`] is currently active and valid.
+    pub fn is_valid(&self, id: TaskId) -> bool {
+        if let Some(slot) = self.slots.get(id.slot as usize) {
+            slot.header.generation.load(Ordering::Acquire) == id.generation
+                && slot.future.is_some()
+                && !slot.header.cancelled.load(Ordering::Acquire)
+        } else {
+            false
+        }
+    }
+
     /// Returns the current subscription epoch.
     pub fn epoch(&self) -> SubscriptionEpoch {
         self.epoch
@@ -213,16 +263,20 @@ impl TaskScheduler {
 
         if let Some(slot_idx) = self.free_slots.pop() {
             let slot = &mut self.slots[slot_idx as usize];
-            let generation = slot
-                .header
-                .generation
-                .fetch_add(1, Ordering::AcqRel)
-                .wrapping_add(1);
+            let current = slot.header.generation.load(Ordering::Acquire);
+            let generation = if current == u32::MAX { 1 } else { current + 1 };
+            slot.header.generation.store(generation, Ordering::Release);
             slot.header.cancelled.store(false, Ordering::Release);
             slot.header
                 .wake_state
                 .store(WakeState::Queued as u8, Ordering::Release);
             slot.future = Some(future);
+
+            let task_waker = Arc::new(TaskWaker {
+                header: Arc::clone(&slot.header),
+                generation,
+            });
+            slot.waker = Some(futures::task::waker(task_waker));
 
             // Queue slot initially for first poll
             self.ready_queue.lock().unwrap().push(slot_idx);
@@ -257,8 +311,14 @@ impl TaskScheduler {
                 header: Arc::clone(&header),
             };
 
+            let task_waker = Arc::new(TaskWaker {
+                header: Arc::clone(&header),
+                generation: 1,
+            });
+
             self.slots.push(Slot {
                 header,
+                waker: Some(futures::task::waker(task_waker)),
                 future: Some(future),
             });
 
@@ -288,6 +348,7 @@ impl TaskScheduler {
             // Check if cancelled
             if slot.header.cancelled.load(Ordering::Acquire) {
                 slot.future = None;
+                slot.waker = None;
                 slot.header
                     .wake_state
                     .store(WakeState::Cancelled as u8, Ordering::Release);
@@ -303,8 +364,8 @@ impl TaskScheduler {
             slot.header
                 .wake_state
                 .store(WakeState::Polling as u8, Ordering::Release);
-            let waker = futures::task::waker(Arc::clone(&slot.header));
-            let mut cx = Context::from_waker(&waker);
+            let waker = slot.waker.as_ref().unwrap();
+            let mut cx = Context::from_waker(waker);
 
             polled_count += 1;
 
@@ -314,6 +375,7 @@ impl TaskScheduler {
                         .wake_state
                         .store(WakeState::Finished as u8, Ordering::Release);
                     slot.future = None;
+                    slot.waker = None;
                     self.free_slots.push(slot_idx);
                     self.active_count = self.active_count.saturating_sub(1);
                 }
@@ -446,5 +508,151 @@ mod tests {
             poll_duration,
             poll_duration / 1000
         );
+    }
+
+    #[test]
+    fn test_stale_cancel_does_not_cancel_reused_slot() {
+        let mut scheduler = TaskScheduler::new();
+
+        // 1. Spawn Task A in slot 0, gen 1
+        let (id_a, token_a) = scheduler.spawn(Box::pin(std::future::ready(())));
+        assert_eq!(id_a.slot, 0);
+        assert_eq!(id_a.generation, 1);
+
+        // 2. Poll Task A to completion -> slot 0 is recycled into free_slots
+        let polled = scheduler.poll_ready();
+        assert_eq!(polled, 1);
+        assert_eq!(scheduler.active_tasks(), 0);
+
+        // 3. Spawn Task B -> must reuse slot 0 with generation 2
+        let executed_b = Arc::new(AtomicBool::new(false));
+        let exec_b_clone = Arc::clone(&executed_b);
+        let (id_b, token_b) = scheduler.spawn(Box::pin(async move {
+            exec_b_clone.store(true, Ordering::SeqCst);
+        }));
+        assert_eq!(id_b.slot, 0);
+        assert_eq!(id_b.generation, 2);
+        assert_eq!(scheduler.active_tasks(), 1);
+
+        // 4. Stale Task A CancelToken calls cancel()!
+        token_a.cancel();
+
+        // Must NOT cancel Task B!
+        assert!(!token_b.is_cancelled());
+        assert!(scheduler.is_valid(id_b));
+
+        // 5. Poll Task B -> must execute to completion!
+        let polled = scheduler.poll_ready();
+        assert_eq!(polled, 1);
+        assert!(executed_b.load(Ordering::SeqCst));
+        assert_eq!(scheduler.active_tasks(), 0);
+    }
+
+    #[test]
+    fn test_stale_waker_does_not_wake_reused_slot() {
+        let mut scheduler = TaskScheduler::new();
+
+        let captured_waker = Arc::new(Mutex::new(None));
+        let cap_waker_clone = Arc::clone(&captured_waker);
+
+        // 1. Spawn Task A which captures its waker and yields pending once
+        let poll_count = Arc::new(AtomicUsize::new(0));
+        let pc_clone = Arc::clone(&poll_count);
+        let (id_a, token_a) = scheduler.spawn(Box::pin(std::future::poll_fn(move |cx| {
+            let count = pc_clone.fetch_add(1, Ordering::SeqCst);
+            if count == 0 {
+                *cap_waker_clone.lock().unwrap() = Some(cx.waker().clone());
+                Poll::Pending
+            } else {
+                Poll::Ready(())
+            }
+        })));
+        assert_eq!(id_a.slot, 0);
+        assert_eq!(id_a.generation, 1);
+
+        // Poll Task A -> saves waker
+        assert_eq!(scheduler.poll_ready(), 1);
+        assert_eq!(poll_count.load(Ordering::SeqCst), 1);
+        assert!(captured_waker.lock().unwrap().is_some());
+
+        // Now cancel Task A and clean it up
+        token_a.cancel();
+        assert_eq!(scheduler.poll_ready(), 0);
+        assert_eq!(scheduler.active_tasks(), 0);
+
+        // Slot 0 is now free. Spawn Task B at slot 0 (gen 2)
+        let (id_b, _token_b) = scheduler.spawn(Box::pin(std::future::pending()));
+        assert_eq!(id_b.slot, 0);
+        assert_eq!(id_b.generation, 2);
+
+        // Empty the ready queue so Task B is not queued
+        {
+            let mut q = scheduler.ready_queue.lock().unwrap();
+            q.clear();
+        }
+
+        // 2. Fire the STALE waker from Task A!
+        let stale_waker = captured_waker.lock().unwrap().take().unwrap();
+        stale_waker.wake();
+
+        // Ready queue must still be EMPTY because generation mismatched!
+        {
+            let q = scheduler.ready_queue.lock().unwrap();
+            assert_eq!(
+                q.len(),
+                0,
+                "Stale waker must be a NO-OP and not enqueue reused slot"
+            );
+        }
+    }
+
+    #[test]
+    fn test_reused_slot_has_new_generation() {
+        let mut scheduler = TaskScheduler::new();
+
+        let (id1, _) = scheduler.spawn(Box::pin(std::future::ready(())));
+        assert_eq!(id1.slot, 0);
+        assert_eq!(id1.generation, 1);
+
+        assert_eq!(scheduler.poll_ready(), 1);
+        assert_eq!(scheduler.active_tasks(), 0);
+
+        let (id2, _) = scheduler.spawn(Box::pin(std::future::ready(())));
+        assert_eq!(id2.slot, 0);
+        assert_eq!(id2.generation, 2);
+    }
+
+    #[test]
+    fn test_stale_task_id_is_rejected() {
+        let mut scheduler = TaskScheduler::new();
+
+        let (id1, _) = scheduler.spawn(Box::pin(std::future::ready(())));
+        assert!(scheduler.is_valid(id1));
+
+        assert_eq!(scheduler.poll_ready(), 1);
+        // id1 is now stale (finished)
+        assert!(!scheduler.is_valid(id1));
+
+        let (id2, _) = scheduler.spawn(Box::pin(std::future::pending()));
+        assert!(scheduler.is_valid(id2));
+        // id1 has same slot (0) but wrong generation (1 vs 2) -> must be rejected
+        assert!(!scheduler.is_valid(id1));
+    }
+
+    #[test]
+    fn test_cancellation_is_idempotent() {
+        let mut scheduler = TaskScheduler::new();
+        let (id, token) = scheduler.spawn(Box::pin(std::future::pending()));
+
+        assert!(scheduler.is_valid(id));
+        assert!(!token.is_cancelled());
+
+        // Cancel multiple times
+        token.cancel();
+        token.cancel();
+        token.cancel();
+
+        assert!(token.is_cancelled());
+        assert!(!scheduler.is_valid(id));
     }
 }
