@@ -431,7 +431,10 @@ impl SceneArena {
             let points = [
                 [world_clip.x, world_clip.y],
                 [world_clip.x + world_clip.width, world_clip.y],
-                [world_clip.x + world_clip.width, world_clip.y + world_clip.height],
+                [
+                    world_clip.x + world_clip.width,
+                    world_clip.y + world_clip.height,
+                ],
                 [world_clip.x, world_clip.y + world_clip.height],
             ];
             let clip_path = encoder.push_path(&points, true)?;
@@ -442,7 +445,10 @@ impl SceneArena {
             let points = [
                 [world_rect.x, world_rect.y],
                 [world_rect.x + world_rect.width, world_rect.y],
-                [world_rect.x + world_rect.width, world_rect.y + world_rect.height],
+                [
+                    world_rect.x + world_rect.width,
+                    world_rect.y + world_rect.height,
+                ],
                 [world_rect.x, world_rect.y + world_rect.height],
             ];
             let mat_id = match &node.kind {
@@ -570,8 +576,20 @@ mod tests {
         assert_eq!(arena.dirty_nodes.len(), 0);
 
         arena.mark_dirty(child, DirtyFlags::LAYOUT);
-        assert!(arena.get(child).unwrap().dirty.intersects(DirtyFlags::LAYOUT));
-        assert!(arena.get(root).unwrap().dirty.intersects(DirtyFlags::LAYOUT));
+        assert!(
+            arena
+                .get(child)
+                .unwrap()
+                .dirty
+                .intersects(DirtyFlags::LAYOUT)
+        );
+        assert!(
+            arena
+                .get(root)
+                .unwrap()
+                .dirty
+                .intersects(DirtyFlags::LAYOUT)
+        );
     }
 
     #[test]
@@ -595,7 +613,9 @@ mod tests {
         }
         arena.update_world_transforms();
 
-        let raster = arena.encode_to_raster().expect("raster encoding must succeed");
+        let raster = arena
+            .encode_to_raster()
+            .expect("raster encoding must succeed");
 
         assert_eq!(raster.draws().len(), 1);
         assert_eq!(raster.paths().len(), 1);

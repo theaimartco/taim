@@ -31,8 +31,8 @@
 //! [`Counters`]: crate::diagnostics::Counters
 
 use crate::core::damage;
-use crate::core::widget::{Id, Tree};
 use crate::core::widget::tree::DirtyFlags;
+use crate::core::widget::{Id, Tree};
 use crate::diagnostics::{self, Counters};
 
 /// Marks `root`, every node along `path` (a sequence of child indices
@@ -275,7 +275,10 @@ impl RepaintTracker {
 
     /// Answers "Why did this repaint?" for a specific widget.
     pub fn why_did_it_repaint(&self, id: &Id) -> Option<&RepaintCausality> {
-        self.entries.iter().rev().find(|c| c.widget_id.as_ref() == Some(id))
+        self.entries
+            .iter()
+            .rev()
+            .find(|c| c.widget_id.as_ref() == Some(id))
     }
 
     /// Returns all recorded causality entries for the current frame.
@@ -532,7 +535,9 @@ mod repaint_tracker_tests {
             description: "Signal 'user_avatar_url' mutated".into(),
         });
 
-        let causality = tracker.why_did_it_repaint(&target_id).expect("should find causality");
+        let causality = tracker
+            .why_did_it_repaint(&target_id)
+            .expect("should find causality");
         assert_eq!(causality.dirty_flags, DirtyFlags::PAINT);
         assert_eq!(
             causality.reason,

@@ -83,7 +83,9 @@ impl ActivityBarState {
     /// Returns badge count for a specific view, if any.
     pub fn badge_for(&self, view: SidebarView) -> Option<usize> {
         match view {
-            SidebarView::SourceControl if self.git_changes_badge > 0 => Some(self.git_changes_badge),
+            SidebarView::SourceControl if self.git_changes_badge > 0 => {
+                Some(self.git_changes_badge)
+            }
             SidebarView::Debug if self.diagnostics_badge > 0 => Some(self.diagnostics_badge),
             SidebarView::Extensions if self.extensions_badge > 0 => Some(self.extensions_badge),
             _ => None,

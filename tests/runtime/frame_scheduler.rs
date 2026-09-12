@@ -12,8 +12,8 @@
 //! point of taking every timestamp as an explicit parameter rather than
 //! reading a live clock.
 
-use taim_runtime::frame_scheduler::Scheduler;
 use std::time::{Duration, Instant};
+use taim_runtime::frame_scheduler::Scheduler;
 
 fn epoch() -> Instant {
     // A single, fixed instant shared by every test in this file (not a

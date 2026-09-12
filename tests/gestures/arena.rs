@@ -94,9 +94,9 @@ fn a_long_press_resolves_via_tick_with_no_new_pointer_event() {
 
 #[test]
 fn every_losing_entrant_is_cancelled_exactly_once() {
-    use taim_gesture::recognizer::{Disposition, Recognizer, Verdict};
     use std::cell::Cell;
     use std::rc::Rc;
+    use taim_gesture::recognizer::{Disposition, Recognizer, Verdict};
 
     struct CountingLoser {
         verdicts_received: Rc<Cell<u32>>,

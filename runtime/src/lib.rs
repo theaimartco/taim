@@ -6,9 +6,7 @@
 //!
 //! [`taim_core`]: https://github.com/theaimartco/taim/tree/main/core
 
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg"
-)]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 pub mod backend;
 pub mod clipboard;

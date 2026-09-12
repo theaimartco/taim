@@ -20,8 +20,8 @@ all-features = true
 [features]
 default = ["wgpu/default"]
 geometry = ["taim_graphics/geometry", "lyon"]
-image = ["taim_graphics/image", "guillotiere", "dep:image"]
-svg = ["taim_graphics/svg", "resvg", "guillotiere"]
+image = ["taim_graphics/image", "dep:image"]
+svg = ["taim_graphics/svg", "resvg"]
 svg-text = ["svg", "resvg/text", "resvg/system-fonts", "resvg/memmap-fonts"]
 svg-raster-images = ["svg", "resvg/raster-images"]
 web-colors = ["taim_graphics/web-colors"]
@@ -46,9 +46,6 @@ wgpu.workspace = true
 
 lyon.workspace = true
 lyon.optional = true
-
-guillotiere.workspace = true
-guillotiere.optional = true
 
 resvg.workspace = true
 resvg.optional = true

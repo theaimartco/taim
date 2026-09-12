@@ -18,6 +18,7 @@
 //! anywhere) and drive it end to end through the semantic tree alone, to
 //! test future.md's Pillar X gate.
 
+use taim::advanced::text as advanced_text;
 use taim::animation::MotionPolicy;
 use taim::theme::palette;
 use taim::widget::bottom_nav_bar::Item as NavItem;
@@ -32,7 +33,6 @@ use taim::widget::{
     scrollable, search_bar, segmented_control, skeleton, slider, snackbar, stack, stepper, tabs,
     text, text_input, time_picker, toggler, tooltip,
 };
-use taim::advanced::text as advanced_text;
 use taim::{Center, Color, Element, Fill, Task, Theme};
 
 /// Everything a [`Showcase`] view needs from its renderer.
@@ -50,10 +50,14 @@ pub trait Renderer: advanced_text::Renderer<Font = taim::Font> + 'static {}
 impl<R> Renderer for R where R: advanced_text::Renderer<Font = taim::Font> + 'static {}
 
 pub fn main() -> taim::Result {
-    taim::application(Showcase::new, Showcase::update, Showcase::view::<taim::Renderer>)
-        .title("Taim — Showcase")
-        .theme(Showcase::theme)
-        .run()
+    taim::application(
+        Showcase::new,
+        Showcase::update,
+        Showcase::view::<taim::Renderer>,
+    )
+    .title("Taim — Showcase")
+    .theme(Showcase::theme)
+    .run()
 }
 
 /// The showcase's sections, which double as the bottom bar's

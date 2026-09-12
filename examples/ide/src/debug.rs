@@ -176,7 +176,9 @@ impl DebugState {
     /// Steps over current line.
     pub fn step_over(&mut self) {
         if self.status == DebugStatus::Paused {
-            let Some(frame) = self.call_stack.first_mut() else { return };
+            let Some(frame) = self.call_stack.first_mut() else {
+                return;
+            };
             frame.line += 1;
         }
     }
@@ -188,7 +190,11 @@ impl DebugState {
 
     /// Toggles a breakpoint at file and line.
     pub fn toggle_breakpoint(&mut self, file: &str, line: usize) {
-        if let Some(bp) = self.breakpoints.iter_mut().find(|b| b.file == file && b.line == line) {
+        if let Some(bp) = self
+            .breakpoints
+            .iter_mut()
+            .find(|b| b.file == file && b.line == line)
+        {
             bp.enabled = !bp.enabled;
         } else {
             let id = self.next_bp_id;

@@ -198,7 +198,8 @@ impl TerminalState {
             LogEntry {
                 time: "19:20:01".to_string(),
                 level: LogLevel::Info,
-                message: "Taim Studio v0.15.0-dev initialized [backend: wgpu compute-raster]".to_string(),
+                message: "Taim Studio v0.15.0-dev initialized [backend: wgpu compute-raster]"
+                    .to_string(),
             },
             LogEntry {
                 time: "19:20:02".to_string(),
@@ -229,12 +230,14 @@ impl TerminalState {
             LogEntry {
                 time: "19:20:00".to_string(),
                 level: LogLevel::Info,
-                message: "[rust-analyzer] Indexing workspace: 1,420 crates analyzed in 0.42s".to_string(),
+                message: "[rust-analyzer] Indexing workspace: 1,420 crates analyzed in 0.42s"
+                    .to_string(),
             },
             LogEntry {
                 time: "19:20:01".to_string(),
                 level: LogLevel::Success,
-                message: "[rust-analyzer] Language server ready. Zero-delay type hints active.".to_string(),
+                message: "[rust-analyzer] Language server ready. Zero-delay type hints active."
+                    .to_string(),
             },
         ];
 

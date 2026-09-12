@@ -6,11 +6,11 @@
 #[cfg(feature = "raster")]
 use crate::core::Rectangle;
 #[cfg(feature = "raster")]
+use bytemuck::{Pod, Zeroable};
+#[cfg(feature = "raster")]
 use taim_raster::shader;
 #[cfg(feature = "raster")]
 use taim_raster::{Clip, TileGrid};
-#[cfg(feature = "raster")]
-use bytemuck::{Pod, Zeroable};
 
 #[cfg(feature = "raster")]
 #[repr(C)]
@@ -90,51 +90,52 @@ impl ComputeRasterizer {
     /// Creates a new [`ComputeRasterizer`] compiled for `device`.
     pub fn new(device: &wgpu::Device) -> Self {
         // Create Path Coarse Bind Group Layout
-        let path_coarse_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("taim_raster::path_coarse layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+        let path_coarse_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("taim_raster::path_coarse layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-            ],
-        });
+                ],
+            });
 
         // Create Coarse Bind Group Layout
         let coarse_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -255,19 +256,21 @@ impl ComputeRasterizer {
             label: Some("taim_raster::path_coarse module"),
             source: wgpu::ShaderSource::Wgsl(shader::PATH_COARSE.into()),
         });
-        let path_coarse_pipe_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("taim_raster::path_coarse pipeline layout"),
-            bind_group_layouts: &[Some(&path_coarse_layout)],
-            immediate_size: 0,
-        });
-        let path_coarse_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("taim_raster::path_coarse pipeline"),
-            layout: Some(&path_coarse_pipe_layout),
-            module: &path_coarse_mod,
-            entry_point: Some("main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            cache: None,
-        });
+        let path_coarse_pipe_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("taim_raster::path_coarse pipeline layout"),
+                bind_group_layouts: &[Some(&path_coarse_layout)],
+                immediate_size: 0,
+            });
+        let path_coarse_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("taim_raster::path_coarse pipeline"),
+                layout: Some(&path_coarse_pipe_layout),
+                module: &path_coarse_mod,
+                entry_point: Some("main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                cache: None,
+            });
 
         let coarse_mod = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("taim_raster::coarse module"),
@@ -367,7 +370,11 @@ impl ComputeRasterizer {
             segment_count: scene.segments().len() as u32,
             max_segments_per_tile: MAX_SEGMENTS_PER_TILE,
         };
-        queue.write_buffer(&self.path_coarse_config_buf, 0, bytemuck::bytes_of(&path_coarse_config));
+        queue.write_buffer(
+            &self.path_coarse_config_buf,
+            0,
+            bytemuck::bytes_of(&path_coarse_config),
+        );
 
         let damage_rect = damage.unwrap_or(Rectangle {
             x: 0.0,
@@ -385,7 +392,11 @@ impl ComputeRasterizer {
             damage_max_y: damage_rect.y + damage_rect.height,
             max_commands_per_tile: MAX_COMMANDS_PER_TILE,
         };
-        queue.write_buffer(&self.coarse_config_buf, 0, bytemuck::bytes_of(&coarse_config));
+        queue.write_buffer(
+            &self.coarse_config_buf,
+            0,
+            bytemuck::bytes_of(&coarse_config),
+        );
 
         let fine_config = FineConfig {
             width,

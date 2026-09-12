@@ -25,10 +25,10 @@
 use std::collections::hash_map::Entry as MapEntry;
 use std::sync::{Arc, Mutex};
 
+use rustc_hash::FxHashMap;
 use taim_core::semantics::{Actions, Role, State};
 use taim_core::widget::Id;
 use taim_core::{Rectangle, SmolStr};
-use rustc_hash::FxHashMap;
 
 use crate::node::Entry;
 use crate::tree::Change;

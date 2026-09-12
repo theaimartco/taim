@@ -110,4 +110,3 @@ mod tests {
         assert_eq!(clamped.value, 1.0);
     }
 }
-

@@ -7,7 +7,9 @@
 //! State changes via [`taim_signal::Signal`] invalidate only affected node properties
 //! with O(1) dirty-flag flips, achieving zero heap allocations during steady-state frames.
 
-use crate::core::scene::{CrossAxisAlignment, FlexDirection, NodeDimension, NodeId, NodeKind, SceneArena};
+use crate::core::scene::{
+    CrossAxisAlignment, FlexDirection, NodeDimension, NodeId, NodeKind, SceneArena,
+};
 use crate::core::{Color, Point, Rectangle, Size};
 use taim_signal::{Readable, Signal, Subscription};
 
@@ -208,7 +210,10 @@ impl ReactiveVirtualList {
 
         if let Some(node) = mount.arena().get_mut(container_id) {
             node.height = NodeDimension::Exact(self.viewport_height);
-            node.clip_bounds = Some(Rectangle::new(Point::ORIGIN, Size::new(10000.0, self.viewport_height)));
+            node.clip_bounds = Some(Rectangle::new(
+                Point::ORIGIN,
+                Size::new(10000.0, self.viewport_height),
+            ));
         }
 
         container_id
@@ -236,7 +241,9 @@ mod tests {
         };
 
         let text_child = mount.arena().get(first_child).unwrap();
-        assert!(matches!(&text_child.kind, NodeKind::Text { content, .. } if content == "Click Me"));
+        assert!(
+            matches!(&text_child.kind, NodeKind::Text { content, .. } if content == "Click Me")
+        );
     }
 
     #[test]

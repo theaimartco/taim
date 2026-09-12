@@ -327,7 +327,10 @@ fn swapping_materials_bumps_the_theme_revision() {
 
     // But an identical set must not: a revision bump invalidates caches,
     // and doing that for a no-op change is a per-frame cost for nothing.
-    assert_eq!(flat.with_materials(MaterialTokens::FLAT).revision(), flat.revision());
+    assert_eq!(
+        flat.with_materials(MaterialTokens::FLAT).revision(),
+        flat.revision()
+    );
 }
 
 #[test]

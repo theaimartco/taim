@@ -206,7 +206,8 @@ mod tests {
     #[test]
     fn emits_syntactically_valid_rust_code() {
         let theme = Theme::new(Scheme::Light);
-        let source = TokenCompiler::emit_rust_source("LIGHT_PALETTE", &theme, LuminanceTokens::STANDARD);
+        let source =
+            TokenCompiler::emit_rust_source("LIGHT_PALETTE", &theme, LuminanceTokens::STANDARD);
 
         assert!(source.contains("pub const LIGHT_PALETTE: CompiledPalette = CompiledPalette {"));
         assert!(source.contains("scheme: Scheme::Light"));

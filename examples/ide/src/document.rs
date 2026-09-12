@@ -22,7 +22,13 @@ pub struct Document {
 
 impl Document {
     /// Creates a new document with the provided initial text.
-    pub fn new(id: usize, path: impl Into<String>, name: impl Into<String>, syntax: impl Into<String>, text: &str) -> Self {
+    pub fn new(
+        id: usize,
+        path: impl Into<String>,
+        name: impl Into<String>,
+        syntax: impl Into<String>,
+        text: &str,
+    ) -> Self {
         Self {
             id,
             path: path.into(),
@@ -55,10 +61,7 @@ impl Document {
 
     /// Performs an editing action on the document content.
     pub fn perform(&mut self, action: text_editor::Action) {
-        let is_edit = matches!(
-            action,
-            text_editor::Action::Edit(_)
-        );
+        let is_edit = matches!(action, text_editor::Action::Edit(_));
         self.content.perform(action);
         if is_edit {
             self.is_dirty = true;
@@ -205,7 +208,13 @@ Welcome to **Taim Studio**, the zero-rebuild desktop IDE powered by Taim!
         let documents = vec![
             Document::new(10, "src/main.rs", "main.rs", "rust", main_rs),
             Document::new(1, "Cargo.toml", "Cargo.toml", "toml", cargo_toml),
-            Document::new(20, "shaders/compute_raster.wgsl", "compute_raster.wgsl", "c", shader_wgsl),
+            Document::new(
+                20,
+                "shaders/compute_raster.wgsl",
+                "compute_raster.wgsl",
+                "c",
+                shader_wgsl,
+            ),
             Document::new(2, "README.md", "README.md", "markdown", readme_md),
         ];
 
@@ -340,14 +349,19 @@ Welcome to **Taim Studio**, the zero-rebuild desktop IDE powered by Taim!
 
     /// Opens a file or focuses it if already open.
     pub fn open_or_focus(&mut self, id: usize, path: &str, name: &str, syntax: &str) {
-        if let Some(pos) = self.documents.iter().position(|doc| doc.id == id || doc.path == path) {
+        if let Some(pos) = self
+            .documents
+            .iter()
+            .position(|doc| doc.id == id || doc.path == path)
+        {
             self.active_tab = pos;
             return;
         }
 
         // Content generator for additional files
         let initial_text = match path {
-            "src/raster.rs" => r#"//! Tiled compute rasterizer with G-buffer deferred shading.
+            "src/raster.rs" => {
+                r#"//! Tiled compute rasterizer with G-buffer deferred shading.
 pub struct Tile {
     pub x: u32,
     pub y: u32,
@@ -364,24 +378,31 @@ impl Rasterizer {
         Self { width: w, height: h }
     }
 }
-"#,
-            "src/scene.rs" => r#"//! Retained scene tree with cache-friendly NodeId allocation.
+"#
+            }
+            "src/scene.rs" => {
+                r#"//! Retained scene tree with cache-friendly NodeId allocation.
 pub struct SceneArena {
     pub count: usize,
 }
-"#,
-            "tests/pipeline_test.rs" => r#"#[test]
+"#
+            }
+            "tests/pipeline_test.rs" => {
+                r#"#[test]
 fn test_compute_pipeline() {
     assert_eq!(1 + 1, 2);
 }
-"#,
-            "config.json" => r#"{
+"#
+            }
+            "config.json" => {
+                r#"{
     "app": "Taim Studio",
     "version": "0.15.0",
     "gpu": "wgpu-compute",
     "renderer": "compute-raster"
 }
-"#,
+"#
+            }
             _ => "// New document\n",
         };
 

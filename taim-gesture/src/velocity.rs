@@ -127,7 +127,9 @@ impl Estimator {
 
             for sample in self.samples.iter() {
                 // Negative time offset into the past
-                let elapsed = t_new.saturating_duration_since(sample.timestamp).as_secs_f32();
+                let elapsed = t_new
+                    .saturating_duration_since(sample.timestamp)
+                    .as_secs_f32();
                 let u = -elapsed;
                 let w = 0.5 * u * u;
                 let dx = sample.position.x - newest.position.x;
@@ -327,4 +329,3 @@ mod tests {
         assert!((p.y - 30.0).abs() < 0.1);
     }
 }
-

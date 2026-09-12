@@ -17,8 +17,8 @@ use crate::hit_test;
 use crate::invalidation::Aggregator;
 use crate::pointer_router::{self, Routing};
 
-use taim_gesture::arena::Arena;
 use std::hash::{Hash, Hasher};
+use taim_gesture::arena::Arena;
 
 /// A set of interactive graphical elements with a specific [`Layout`].
 ///

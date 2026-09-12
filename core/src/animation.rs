@@ -1,11 +1,11 @@
 //! Animate your applications.
 use crate::time::{Duration, Instant};
 
+pub use lilt::{Easing, FloatRepresentable as Float, Interpolable};
 pub use taim_motion::{
     Effect as MotionEffect, Interpolate as MotionInterpolate, MotionPolicy, Spring, SpringConfig,
     Timestamp as MotionTimestamp,
 };
-pub use lilt::{Easing, FloatRepresentable as Float, Interpolable};
 
 /// An adapter from Taim's monotonic clock to Taim Motion's frame-clock API.
 ///

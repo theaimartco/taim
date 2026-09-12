@@ -116,4 +116,3 @@ mod tests {
         assert_eq!(ctrl.min_size(Density::Comfortable), Size::new(192.0, 48.0));
     }
 }
-

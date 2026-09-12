@@ -82,15 +82,13 @@ impl GlobalSearchState {
             FileSearchGroup {
                 file_path: "src/pipeline.rs".to_string(),
                 file_name: "pipeline.rs".to_string(),
-                hits: vec![
-                    SearchHit {
-                        file_path: "src/pipeline.rs".to_string(),
-                        line_number: 18,
-                        column: 5,
-                        line_content: "    pub fn create_render_pipeline() {".to_string(),
-                        match_length: 3,
-                    },
-                ],
+                hits: vec![SearchHit {
+                    file_path: "src/pipeline.rs".to_string(),
+                    line_number: 18,
+                    column: 5,
+                    line_content: "    pub fn create_render_pipeline() {".to_string(),
+                    match_length: 3,
+                }],
                 is_expanded: true,
             },
         ];

@@ -9,7 +9,6 @@ use taim::widget::{
 use taim::{Center, Element, Fill, Task};
 
 pub fn main() -> taim::Result {
-
     taim::application(Shell::new, Shell::update, Shell::view)
         .title("Taim — Mobile Shell")
         .run()

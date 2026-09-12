@@ -13,6 +13,8 @@
 //! `UserInterface::semantics` uses -- rather than a hand-rolled one, so
 //! what is tested here is what an application actually runs.
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use taim::advanced::Layout;
 use taim::advanced::widget::{self, Widget};
 use taim::{Element, Length, Rectangle, Size, Theme};
@@ -20,8 +22,6 @@ use taim_core::widget::tree::DirtyFlags;
 use taim_core::widget::visit::{self, Visit};
 use taim_renderer::Renderer;
 use taim_runtime::semantics;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn headless_renderer() -> Renderer {
     taim_futures::futures::executor::block_on(
