@@ -17,7 +17,7 @@ use crate::core::theme;
 use crate::core::time::Instant;
 use crate::core::{Color, InputMethod, Padding, Point, Rectangle, Size, Text, Vector};
 use crate::graphics::Compositor;
-use crate::program::{self, Program};
+use crate::program::{App, AppRunner};
 use crate::runtime::frame_scheduler::Scheduler;
 
 use winit::dpi::{LogicalPosition, LogicalSize};
@@ -26,21 +26,21 @@ use winit::monitor::MonitorHandle;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-pub struct Manager<P, C>
+pub struct Manager<A, C>
 where
-    P: Program,
-    C: Compositor<Renderer = P::Renderer>,
-    P::Theme: theme::Base,
+    A: App,
+    C: Compositor<Renderer = A::Renderer>,
+    A::Theme: theme::Base,
 {
     aliases: BTreeMap<winit::window::WindowId, Id>,
-    entries: BTreeMap<Id, Window<P, C>>,
+    entries: BTreeMap<Id, Window<A, C>>,
 }
 
-impl<P, C> Manager<P, C>
+impl<A, C> Manager<A, C>
 where
-    P: Program,
-    C: Compositor<Renderer = P::Renderer>,
-    P::Theme: theme::Base,
+    A: App,
+    C: Compositor<Renderer = A::Renderer>,
+    A::Theme: theme::Base,
 {
     pub fn new() -> Self {
         Self {
@@ -53,14 +53,14 @@ where
         &mut self,
         id: Id,
         window: Arc<winit::window::Window>,
-        program: &program::Instance<P>,
+        runner: &AppRunner<A>,
         compositor: &mut C,
-        proxy: Proxy<P::Message>,
+        proxy: Proxy<A::Message>,
         renderer_settings: renderer::Settings,
         exit_on_close_request: bool,
         system_theme: theme::Mode,
-    ) -> &mut Window<P, C> {
-        let state = State::new(program, id, &window, system_theme);
+    ) -> &mut Window<A, C> {
+        let state = State::new(runner, id, &window, system_theme);
         let surface_size = state.physical_size();
         let surface_version = state.surface_version();
         let surface =
@@ -143,43 +143,47 @@ where
             .min()
     }
 
-    pub fn first(&self) -> Option<&Window<P, C>> {
+    pub fn first(&self) -> Option<&Window<A, C>> {
         self.entries.first_key_value().map(|(_id, window)| window)
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Id, &mut Window<P, C>)> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Id, &mut Window<A, C>)> {
         self.entries.iter_mut().map(|(k, v)| (*k, v))
     }
 
-    pub fn get(&self, id: Id) -> Option<&Window<P, C>> {
+    pub fn get(&self, id: Id) -> Option<&Window<A, C>> {
         self.entries.get(&id)
     }
 
-    pub fn get_mut(&mut self, id: Id) -> Option<&mut Window<P, C>> {
+    pub fn get_mut(&mut self, id: Id) -> Option<&mut Window<A, C>> {
         self.entries.get_mut(&id)
     }
 
     pub fn get_mut_alias(
         &mut self,
         id: winit::window::WindowId,
-    ) -> Option<(Id, &mut Window<P, C>)> {
+    ) -> Option<(Id, &mut Window<A, C>)> {
         let id = self.aliases.get(&id).copied()?;
 
         Some((id, self.get_mut(id)?))
+    }
+
+    pub fn get_alias(&self, id: winit::window::WindowId) -> Option<Id> {
+        self.aliases.get(&id).copied()
     }
 
     pub fn last_monitor(&self) -> Option<MonitorHandle> {
         self.entries.values().last()?.raw.current_monitor()
     }
 
-    pub fn remove(&mut self, id: Id) -> Option<Window<P, C>> {
+    pub fn remove(&mut self, id: Id) -> Option<Window<A, C>> {
         let window = self.entries.remove(&id)?;
         let _ = self.aliases.remove(&window.raw.id());
 
         Some(window)
     }
 
-    pub fn replace_with(&mut self, mut f: impl FnMut(Window<P, C>) -> Window<P, C>) {
+    pub fn replace_with(&mut self, mut f: impl FnMut(Window<A, C>) -> Window<A, C>) {
         self.entries = std::mem::take(&mut self.entries)
             .into_iter()
             .map(|(id, window)| (id, f(window)))
@@ -187,31 +191,31 @@ where
     }
 }
 
-impl<P, C> Default for Manager<P, C>
+impl<A, C> Default for Manager<A, C>
 where
-    P: Program,
-    C: Compositor<Renderer = P::Renderer>,
-    P::Theme: theme::Base,
+    A: App,
+    C: Compositor<Renderer = A::Renderer>,
+    A::Theme: theme::Base,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-pub struct Window<P, C>
+pub struct Window<A, C>
 where
-    P: Program,
-    C: Compositor<Renderer = P::Renderer>,
-    P::Theme: theme::Base,
+    A: App,
+    C: Compositor<Renderer = A::Renderer>,
+    A::Theme: theme::Base,
 {
     pub raw: Arc<winit::window::Window>,
     pub waker: shell::Waker,
-    pub state: State<P>,
+    pub state: State<A>,
     pub exit_on_close_request: bool,
     pub mouse_interaction: mouse::Interaction,
     pub surface: C::Surface,
     pub surface_version: u64,
-    pub renderer: P::Renderer,
+    pub renderer: A::Renderer,
     pub redraw_at: Option<Instant>,
     pub hit_test_index: Option<crate::runtime::hit_test::Index>,
     /// This window's frame-production state machine (Phase 6):
@@ -234,15 +238,15 @@ where
     /// into a queue nothing reads (`Capstone.md` F-15).
     #[cfg(feature = "accessibility")]
     _accessibility_bridge: taim_accessibility::atspi::bridge::Bridge,
-    preedit: Option<Preedit<P::Renderer>>,
+    preedit: Option<Preedit<A::Renderer>>,
     ime_state: Option<(Rectangle, input_method::Purpose)>,
 }
 
-impl<P, C> Window<P, C>
+impl<A, C> Window<A, C>
 where
-    P: Program,
-    C: Compositor<Renderer = P::Renderer>,
-    P::Theme: theme::Base,
+    A: App,
+    C: Compositor<Renderer = A::Renderer>,
+    A::Theme: theme::Base,
 {
     pub fn position(&self) -> Option<Point> {
         self.raw

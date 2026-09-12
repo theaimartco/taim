@@ -292,7 +292,29 @@ impl FrameGate {
             .map(|(id, _)| *id)
     }
 
-    /// Returns `true` if all windows are clean and no animation is active.
+    /// Returns the earliest upcoming animation deadline across all tracked windows, if any.
+    pub fn next_wake_deadline(&self) -> Option<Instant> {
+        self.windows
+            .values()
+            .filter_map(|t| t.animation_deadline)
+            .min()
+    }
+
+    /// Returns `true` if any window has immediate dirty work or an animation deadline due now.
+    pub fn has_immediate_work(&self) -> bool {
+        let now = Instant::now();
+        self.windows.values().any(|t| {
+            (!t.is_occluded && !t.dirty_flags.is_empty())
+                || t.animation_deadline.is_some_and(|deadline| now >= deadline)
+        })
+    }
+
+    /// Returns `true` if the engine has no immediate work requiring execution this frame.
+    pub fn is_idle_now(&self) -> bool {
+        !self.has_immediate_work()
+    }
+
+    /// Returns `true` if all windows are clean and no future animation is scheduled.
     pub fn is_idle(&self) -> bool {
         self.windows.values().all(|t| {
             t.dirty_flags == DirtyFlags::CLEAN
@@ -440,5 +462,86 @@ mod tests {
             burst_duration,
             burst_duration / 10_000
         );
+    }
+
+    #[test]
+    fn test_frame_gate_controls_real_redraw_path() {
+        let mut gate = FrameGate::new();
+        let win = window::Id::unique();
+        gate.track_window(win, 1.0);
+        gate.on_frame_presented(win);
+
+        assert!(!gate.tracker(win).unwrap().should_render());
+
+        gate.invalidate(win, DirtyFlags::PAINT_DIRTY);
+        assert!(gate.tracker(win).unwrap().should_render());
+
+        gate.on_frame_presented(win);
+        assert!(!gate.tracker(win).unwrap().should_render());
+    }
+
+    #[test]
+    fn test_duplicate_redraws_result_in_one_render() {
+        let mut gate = FrameGate::new();
+        let win = window::Id::unique();
+        gate.track_window(win, 1.0);
+        gate.on_frame_presented(win);
+
+        for _ in 0..10 {
+            gate.invalidate(win, DirtyFlags::PAINT_DIRTY);
+        }
+
+        assert_eq!(gate.collapsed_redraws(), 9);
+        assert!(gate.tracker(win).unwrap().should_render());
+
+        gate.on_frame_presented(win);
+        assert_eq!(gate.tracker(win).unwrap().dirty_flags, DirtyFlags::CLEAN);
+        assert!(!gate.tracker(win).unwrap().should_render());
+    }
+
+    #[test]
+    fn test_clean_window_performs_no_render_work() {
+        let mut gate = FrameGate::new();
+        let win = window::Id::unique();
+        gate.track_window(win, 1.0);
+        gate.on_frame_presented(win);
+
+        assert_eq!(gate.tracker(win).unwrap().dirty_flags, DirtyFlags::CLEAN);
+        assert!(!gate.tracker(win).unwrap().should_render());
+        assert_eq!(gate.dirty_windows().count(), 0);
+    }
+
+    #[test]
+    fn test_occluded_window_skips_render() {
+        let mut gate = FrameGate::new();
+        let win = window::Id::unique();
+        gate.track_window(win, 1.0);
+        gate.on_frame_presented(win);
+
+        let _ = gate.handle_event(win, PlatformEvent::OcclusionChanged(true));
+        gate.invalidate(win, DirtyFlags::PAINT_DIRTY);
+
+        assert!(!gate.tracker(win).unwrap().should_render());
+        assert_eq!(gate.dirty_windows().count(), 0);
+
+        let _ = gate.handle_event(win, PlatformEvent::OcclusionChanged(false));
+        assert!(gate.tracker(win).unwrap().should_render());
+        assert_eq!(gate.dirty_windows().count(), 1);
+    }
+
+    #[test]
+    fn test_idle_runtime_has_zero_internal_frame_generation() {
+        let mut gate = FrameGate::new();
+        let win = window::Id::unique();
+        gate.track_window(win, 1.0);
+        gate.on_frame_presented(win);
+
+        let initial_generation = gate.tracker(win).unwrap().frame_generation;
+        assert!(gate.is_idle());
+        assert!(gate.is_idle_now());
+        assert!(!gate.has_immediate_work());
+        assert_eq!(gate.next_wake_deadline(), None);
+
+        assert_eq!(gate.tracker(win).unwrap().frame_generation, initial_generation);
     }
 }
