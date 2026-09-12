@@ -75,7 +75,7 @@ fn the_budget_the_renderer_uses_follows_the_tier() {
     // call site and every tier produced `Balanced`'s budget.
     needs_gpu!(renderer);
 
-    for tier in [Tier::Ultra, Tier::Balanced, Tier::Efficient, Tier::Recovery] {
+    for tier in Tier::ALL {
         renderer.set_quality(tier);
         blurred_frame(&mut renderer);
 
@@ -94,7 +94,7 @@ fn intermediates_stay_inside_the_budget() {
     // The property the pool exists for, asserted on the live path.
     needs_gpu!(renderer);
 
-    for tier in [Tier::Ultra, Tier::Balanced, Tier::Efficient, Tier::Recovery] {
+    for tier in Tier::ALL {
         renderer.set_quality(tier);
         blurred_frame(&mut renderer);
 

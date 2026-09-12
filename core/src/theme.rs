@@ -16,46 +16,8 @@ pub enum Theme {
     Light,
     /// The built-in dark variant.
     Dark,
-    /// The built-in Dracula variant.
-    Dracula,
-    /// The built-in Nord variant.
-    Nord,
-    /// The built-in Solarized Light variant.
-    SolarizedLight,
-    /// The built-in Solarized Dark variant.
-    SolarizedDark,
-    /// The built-in Gruvbox Light variant.
-    GruvboxLight,
-    /// The built-in Gruvbox Dark variant.
-    GruvboxDark,
-    /// The built-in Catppuccin Latte variant.
-    CatppuccinLatte,
-    /// The built-in Catppuccin Frappé variant.
-    CatppuccinFrappe,
-    /// The built-in Catppuccin Macchiato variant.
-    CatppuccinMacchiato,
-    /// The built-in Catppuccin Mocha variant.
-    CatppuccinMocha,
-    /// The built-in Tokyo Night variant.
-    TokyoNight,
-    /// The built-in Tokyo Night Storm variant.
-    TokyoNightStorm,
-    /// The built-in Tokyo Night Light variant.
-    TokyoNightLight,
-    /// The built-in Kanagawa Wave variant.
-    KanagawaWave,
-    /// The built-in Kanagawa Dragon variant.
-    KanagawaDragon,
-    /// The built-in Kanagawa Lotus variant.
-    KanagawaLotus,
-    /// The built-in Moonfly variant.
-    Moonfly,
-    /// The built-in Nightfly variant.
-    Nightfly,
-    /// The built-in Oxocarbon variant.
-    Oxocarbon,
-    /// The built-in Ferra variant:
-    Ferra,
+    /// The built-in high-contrast variant.
+    HighContrast,
     /// A [`Theme`] that uses a [`Custom`] palette.
     Custom(Arc<Custom>),
 }
@@ -65,26 +27,7 @@ impl Theme {
     pub const ALL: &'static [Self] = &[
         Self::Light,
         Self::Dark,
-        Self::Dracula,
-        Self::Nord,
-        Self::SolarizedLight,
-        Self::SolarizedDark,
-        Self::GruvboxLight,
-        Self::GruvboxDark,
-        Self::CatppuccinLatte,
-        Self::CatppuccinFrappe,
-        Self::CatppuccinMacchiato,
-        Self::CatppuccinMocha,
-        Self::TokyoNight,
-        Self::TokyoNightStorm,
-        Self::TokyoNightLight,
-        Self::KanagawaWave,
-        Self::KanagawaDragon,
-        Self::KanagawaLotus,
-        Self::Moonfly,
-        Self::Nightfly,
-        Self::Oxocarbon,
-        Self::Ferra,
+        Self::HighContrast,
     ];
 
     /// Creates a new custom [`Theme`] from the given [`Seed`](palette::Seed).
@@ -107,26 +50,7 @@ impl Theme {
         match self {
             Self::Light => &palette::LIGHT,
             Self::Dark => &palette::DARK,
-            Self::Dracula => &palette::DRACULA,
-            Self::Nord => &palette::NORD,
-            Self::SolarizedLight => &palette::SOLARIZED_LIGHT,
-            Self::SolarizedDark => &palette::SOLARIZED_DARK,
-            Self::GruvboxLight => &palette::GRUVBOX_LIGHT,
-            Self::GruvboxDark => &palette::GRUVBOX_DARK,
-            Self::CatppuccinLatte => &palette::CATPPUCCIN_LATTE,
-            Self::CatppuccinFrappe => &palette::CATPPUCCIN_FRAPPE,
-            Self::CatppuccinMacchiato => &palette::CATPPUCCIN_MACCHIATO,
-            Self::CatppuccinMocha => &palette::CATPPUCCIN_MOCHA,
-            Self::TokyoNight => &palette::TOKYO_NIGHT,
-            Self::TokyoNightStorm => &palette::TOKYO_NIGHT_STORM,
-            Self::TokyoNightLight => &palette::TOKYO_NIGHT_LIGHT,
-            Self::KanagawaWave => &palette::KANAGAWA_WAVE,
-            Self::KanagawaDragon => &palette::KANAGAWA_DRAGON,
-            Self::KanagawaLotus => &palette::KANAGAWA_LOTUS,
-            Self::Moonfly => &palette::MOONFLY,
-            Self::Nightfly => &palette::NIGHTFLY,
-            Self::Oxocarbon => &palette::OXOCARBON,
-            Self::Ferra => &palette::FERRA,
+            Self::HighContrast => &palette::HIGH_CONTRAST,
             Self::Custom(custom) => &custom.palette,
         }
     }
@@ -136,26 +60,7 @@ impl Theme {
         match self {
             Self::Light => palette::Seed::LIGHT,
             Self::Dark => palette::Seed::DARK,
-            Self::Dracula => palette::Seed::DRACULA,
-            Self::Nord => palette::Seed::NORD,
-            Self::SolarizedLight => palette::Seed::SOLARIZED_LIGHT,
-            Self::SolarizedDark => palette::Seed::SOLARIZED_DARK,
-            Self::GruvboxLight => palette::Seed::GRUVBOX_LIGHT,
-            Self::GruvboxDark => palette::Seed::GRUVBOX_DARK,
-            Self::CatppuccinLatte => palette::Seed::CATPPUCCIN_LATTE,
-            Self::CatppuccinFrappe => palette::Seed::CATPPUCCIN_FRAPPE,
-            Self::CatppuccinMacchiato => palette::Seed::CATPPUCCIN_MACCHIATO,
-            Self::CatppuccinMocha => palette::Seed::CATPPUCCIN_MOCHA,
-            Self::TokyoNight => palette::Seed::TOKYO_NIGHT,
-            Self::TokyoNightStorm => palette::Seed::TOKYO_NIGHT_STORM,
-            Self::TokyoNightLight => palette::Seed::TOKYO_NIGHT_LIGHT,
-            Self::KanagawaWave => palette::Seed::KANAGAWA_WAVE,
-            Self::KanagawaDragon => palette::Seed::KANAGAWA_DRAGON,
-            Self::KanagawaLotus => palette::Seed::KANAGAWA_LOTUS,
-            Self::Moonfly => palette::Seed::MOONFLY,
-            Self::Nightfly => palette::Seed::NIGHTFLY,
-            Self::Oxocarbon => palette::Seed::OXOCARBON,
-            Self::Ferra => palette::Seed::FERRA,
+            Self::HighContrast => palette::Seed::HIGH_CONTRAST,
             Self::Custom(custom) => custom.seed,
         }
     }
@@ -304,26 +209,7 @@ impl Base for Theme {
         match self {
             Self::Light => "Light",
             Self::Dark => "Dark",
-            Self::Dracula => "Dracula",
-            Self::Nord => "Nord",
-            Self::SolarizedLight => "Solarized Light",
-            Self::SolarizedDark => "Solarized Dark",
-            Self::GruvboxLight => "Gruvbox Light",
-            Self::GruvboxDark => "Gruvbox Dark",
-            Self::CatppuccinLatte => "Catppuccin Latte",
-            Self::CatppuccinFrappe => "Catppuccin Frappé",
-            Self::CatppuccinMacchiato => "Catppuccin Macchiato",
-            Self::CatppuccinMocha => "Catppuccin Mocha",
-            Self::TokyoNight => "Tokyo Night",
-            Self::TokyoNightStorm => "Tokyo Night Storm",
-            Self::TokyoNightLight => "Tokyo Night Light",
-            Self::KanagawaWave => "Kanagawa Wave",
-            Self::KanagawaDragon => "Kanagawa Dragon",
-            Self::KanagawaLotus => "Kanagawa Lotus",
-            Self::Moonfly => "Moonfly",
-            Self::Nightfly => "Nightfly",
-            Self::Oxocarbon => "Oxocarbon",
-            Self::Ferra => "Ferra",
+            Self::HighContrast => "High Contrast",
             Self::Custom(custom) => &custom.name,
         }
     }

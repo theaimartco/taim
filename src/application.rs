@@ -635,3 +635,88 @@ where
         (self)(state).into()
     }
 }
+
+/// Creates a retained reactive application.
+///
+/// Unlike legacy virtual-tree applications that re-execute `view(&self)` on every update,
+/// a reactive application mounts its hierarchy once into a [`SceneArena`](crate::scene::SceneArena).
+/// State updates occur via [`Signal`](crate::Signal), triggering fine-grained dirty flags
+/// that only re-layout and re-render the affected nodes with zero steady-state heap allocations.
+///
+/// # Example
+/// ```no_run,standalone_crate
+/// use taim::scene::{FlexDirection, NodeKind};
+/// use taim::Color;
+///
+/// pub fn main() {
+///     let (state, mut ui) = taim::reactive_app(
+///         || taim::Signal::new(0),
+///         |_count, arena| {
+///             arena.alloc(NodeKind::Text {
+///                 content: "Reactive Taim App".into(),
+///                 size: 20.0,
+///                 color: Color::WHITE,
+///             })
+///         },
+///     )
+///     .build_ui();
+///
+///     ui.layout(taim::Size::new(800.0, 600.0));
+/// }
+/// ```
+pub fn reactive_app<State, Boot, Mount>(
+    boot: Boot,
+    mount: Mount,
+) -> ReactiveApplication<State, Boot, Mount>
+where
+    State: 'static,
+    Boot: FnOnce() -> State,
+    Mount: Fn(&State, &mut crate::scene::SceneArena) -> crate::scene::NodeId + 'static,
+{
+    ReactiveApplication {
+        boot,
+        mount,
+        settings: Settings::default(),
+        window: window::Settings::default(),
+        _state: std::marker::PhantomData,
+    }
+}
+
+/// A configured reactive application ready for execution.
+#[derive(Debug)]
+pub struct ReactiveApplication<State, Boot, Mount> {
+    boot: Boot,
+    mount: Mount,
+    settings: Settings,
+    window: window::Settings,
+    _state: std::marker::PhantomData<State>,
+}
+
+impl<State, Boot, Mount> ReactiveApplication<State, Boot, Mount>
+where
+    State: 'static,
+    Boot: FnOnce() -> State,
+    Mount: Fn(&State, &mut crate::scene::SceneArena) -> crate::scene::NodeId + 'static,
+{
+    /// Sets the [`window::Settings`] of the application.
+    pub fn window(mut self, window: window::Settings) -> Self {
+        self.window = window;
+        self
+    }
+
+    /// Sets the [`Settings`] of the application.
+    pub fn settings(mut self, settings: Settings) -> Self {
+        self.settings = settings;
+        self
+    }
+
+    /// Builds a [`ReactiveUi`](crate::runtime::ReactiveUi) hosting this application.
+    pub fn build_ui(self) -> (State, crate::runtime::ReactiveUi) {
+        let state = (self.boot)();
+        let mut arena = crate::scene::SceneArena::new();
+        let root = (self.mount)(&state, &mut arena);
+        arena.set_root(root);
+        (state, crate::runtime::ReactiveUi::new(arena))
+    }
+}
+

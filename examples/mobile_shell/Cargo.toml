@@ -27,10 +27,3 @@ taim.features = [
     "x11",
     "wayland",
 ]
-
-# Diagnostic only: the workspace logs through the `log` facade everywhere
-# (see `Cargo.toml`'s `[workspace.dependencies]`) but nothing in the tree
-# installs a subscriber, so `RUST_LOG=...` has never produced output from
-# any binary. This example is the one used to diagnose the H0 measurement
-# stall (see `future.md`, Ceiling 8), so it gets the minimal subscriber.
-env_logger = "0.11"

@@ -1,4 +1,5 @@
 //! Taim's renderer-neutral design system.
+pub mod compiler;
 pub mod components;
 pub mod icon;
 pub mod platform;

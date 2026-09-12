@@ -183,6 +183,7 @@ impl Tree {
             *self = Self::new(new.borrow());
         }
 
+        self.dirty.insert(DirtyFlags::SEMANTICS);
         new.borrow_mut().diff(self);
     }
 

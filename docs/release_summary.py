@@ -48,8 +48,8 @@ def get_authors(prs):
     return sorted(authors, key=str.casefold)
 
 def main():
-    repo = 'iced-rs/iced'
-    milestone = '0.12'
+    repo = 'theaimartco/taim'
+    milestone = '0.15'
     token = os.environ['GITHUB_TOKEN']
 
     prs = get_merged_prs(repo, milestone, token)

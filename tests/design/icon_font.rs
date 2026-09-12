@@ -1,11 +1,8 @@
 //! The icon font must declare the family the renderers ask for.
 //!
-//! It did not. `graphics/fonts/Taim-Icons.ttf` declared `Iced-Icons` --
-//! inherited from the fork, renamed on disk but not inside the file -- while
-//! `wgpu/src/lib.rs` and `tiny_skia/src/lib.rs` both looked it up as
-//! `Font::new("Taim-Icons")`. Font lookup is by declared family name, so it
-//! matched nothing: every checkmark, dropdown arrow, and scrollbar arrow in
-//! the framework resolved to a missing glyph.
+//! `graphics/fonts/Taim-Icons.ttf` declares `Taim-Icons`, while
+//! `wgpu/src/lib.rs` and `tiny_skia/src/lib.rs` both look it up as
+//! `Font::new("Taim-Icons")`. Font lookup is by declared family name.
 //!
 //! Nothing caught it. The font loaded, the text pipeline ran, the widgets
 //! laid out at the right size, and 1,705 tests passed -- because not one of

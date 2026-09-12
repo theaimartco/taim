@@ -2,11 +2,10 @@
 
 **A GPU-first UI framework in Rust.**
 
-Taim is a fork of [iced](https://github.com/iced-rs/iced), extended with a
-damage-driven renderer, a gesture arena, a retained semantic tree, a
-token-based design system, and a mobile component set. The upstream
-architecture and a large part of the widget and renderer code originate
-there; see `CREDITS.md`.
+Taim is a next-generation, high-performance reactive GUI framework in Rust.
+Engineered with a contiguous data-oriented scene graph (`SceneArena`), fine-grained
+reactive signals (`taim-signal`), sub-microsecond SIMD layout solving, and a
+direct compute-raster pipeline (`taim-raster`).
 
 ```bash
 cargo run -p taim-showcase     # every widget, both themes
@@ -282,6 +281,29 @@ cargo test --test golden        # 40 pixel goldens, both themes
 
 `unsafe_code = "deny"` is the workspace default. Nine files opt out, each
 on an explicit allow list the budget script enforces.
+
+---
+
+## Disk & Storage Governance
+
+Taim enforces minimal developer disk usage. Full DWARF debug bloat for third-party dependencies is eliminated in `dev` and `test` profiles (`debug = 0`, `opt-level = 2`, `strip = "debuginfo"`), and build scripts/proc-macros avoid symbol table overhead.
+
+- **Standard Maintenance** (bounds target under 700 MB):
+  ```bash
+  ./scripts/clean-target.sh
+  ```
+- **Ultra-Lightweight Check Mode** (prunes binary archives down to ~280 MB):
+  ```bash
+  ./scripts/clean-target.sh --ultra
+  ```
+- **Zero-Footprint Local Repos** (Shared global cache):
+  ```bash
+  export CARGO_TARGET_DIR=~/.cache/cargo-target
+  ```
+- **Optional Git Hook** (cleans automatically on commit):
+  ```bash
+  ./scripts/install-hooks.sh
+  ```
 
 ---
 

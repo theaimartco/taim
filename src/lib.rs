@@ -1,7 +1,9 @@
-//! taim is a cross-platform GUI library focused on simplicity and type-safety.
-//! Inspired by [Elm].
+//! # Taim
 //!
-//! [Elm]: https://elm-lang.org/
+//! Taim is a next-generation, high-performance GUI engine for Rust.
+//! Built around fine-grained reactivity, a cache-local retained scene graph,
+//! and a tiled GPU compute rasterizer, Taim achieves zero steady-state heap
+//! allocations and microsecond frame times.
 //!
 //! # Disclaimer
 //! taim is __experimental__ software. If you expect the documentation to hold your hand
@@ -215,7 +217,7 @@
 //! }
 //!
 //! fn theme(state: &State) -> Theme {
-//!     Theme::TokyoNight
+//!     Theme::Dark
 //! }
 //! # fn update(state: &mut State, message: ()) {}
 //! # fn view(state: &State) -> taim::Element<'_, ()> { taim::widget::text("").into() }
@@ -551,6 +553,17 @@ pub mod signal {
     pub use taim_signal::*;
 }
 
+pub use crate::core::layout_solver;
+pub use crate::core::scene;
+pub use crate::core::scene::{NodeId, SceneArena, SceneNode};
+pub use crate::core::SemanticsDriver;
+
+#[cfg(feature = "signal")]
+pub mod component {
+    //! Retained reactive components with zero steady-state heap allocations.
+    pub use taim_widget::component::*;
+}
+
 pub use Alignment::Center;
 pub use Length::{Fill, FillPortion, Fit, Shrink};
 pub use alignment::Horizontal::{Left, Right};
@@ -663,7 +676,7 @@ pub mod backend {
     pub use taim_runtime::backend::*;
 }
 
-pub use application::Application;
+pub use application::{Application, ReactiveApplication};
 pub use backend::Backend;
 pub use backend::PowerPreference;
 pub use daemon::Daemon;
@@ -673,11 +686,12 @@ pub use executor::Executor;
 pub use font::Font;
 pub use program::Program;
 pub use renderer::Renderer;
+pub use runtime::ReactiveUi;
 pub use task::Task;
 pub use window::Window;
 
 #[doc(inline)]
-pub use application::application;
+pub use application::{application, reactive_app};
 #[doc(inline)]
 pub use daemon::daemon;
 

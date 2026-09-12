@@ -126,7 +126,7 @@ where
 
         trace.begin(diagnostics::Phase::Diff);
         state.diff(root.as_widget_mut());
-        state.mark_dirty(widget::tree::DirtyFlags::PAINT);
+        state.mark_dirty(widget::tree::DirtyFlags::PAINT | widget::tree::DirtyFlags::SEMANTICS);
         trace.end(diagnostics::Phase::Diff);
 
         trace.begin(diagnostics::Phase::Layout);

@@ -37,3 +37,6 @@ mod material_live;
 
 #[path = "gpu/material_backdrop.rs"]
 mod material_backdrop;
+
+#[path = "gpu/compute_rasterizer.rs"]
+mod compute_rasterizer;

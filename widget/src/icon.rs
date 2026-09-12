@@ -23,9 +23,7 @@ use crate::text::{self, Text};
 
 /// The font every [`Icon`] is drawn from.
 ///
-/// The family name here must match what `graphics/fonts/Taim-Icons.ttf`
-/// declares. It did not for some time -- the font said `Iced-Icons` while the
-/// renderers asked for `Taim-Icons`, so every glyph resolved to nothing.
+/// The family name here matches `graphics/fonts/Taim-Icons.ttf`.
 pub const FONT: Font = Font::new("Taim-Icons");
 
 /// One glyph in the icon font.

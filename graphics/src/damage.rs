@@ -187,6 +187,51 @@ impl DamageRegion {
         self.add_rect(new_bounds);
     }
 
+    /// Records predictive swept damage for content moving with a linear velocity vector over `dt_seconds`.
+    ///
+    /// Extends the damage area from `current_bounds` along the displacement vector
+    /// `(velocity[0] * dt, velocity[1] * dt)`, covering both current and next-frame bounds
+    /// into a single swept damage envelope.
+    pub fn add_swept_movement(
+        &mut self,
+        current_bounds: Rectangle,
+        velocity: [f32; 2],
+        dt_seconds: f32,
+    ) {
+        if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
+            self.add_rect(current_bounds);
+            return;
+        }
+
+        let dx = velocity[0] * dt_seconds;
+        let dy = velocity[1] * dt_seconds;
+        if !dx.is_finite() || !dy.is_finite() {
+            self.add_rect(current_bounds);
+            return;
+        }
+
+        let next_bounds = Rectangle {
+            x: current_bounds.x + dx,
+            y: current_bounds.y + dy,
+            width: current_bounds.width,
+            height: current_bounds.height,
+        };
+
+        let swept = current_bounds.union(&next_bounds);
+        self.add_rect(swept);
+    }
+
+    /// Records predictive damage using a [`taim_raster::ObjectVelocity`] kinematics descriptor.
+    #[cfg(feature = "raster")]
+    pub fn add_velocity_movement(
+        &mut self,
+        current_bounds: Rectangle,
+        velocity: taim_raster::ObjectVelocity,
+        dt_seconds: f32,
+    ) {
+        self.add_swept_movement(current_bounds, velocity.linear, dt_seconds);
+    }
+
     /// Expands all existing damage rects outward by the given `radius`,
     /// accounting for filter effects (blur, shadow) that sample pixels
     /// beyond their nominal bounds.
@@ -706,6 +751,66 @@ mod damage_region_tests {
         // 1x1 = 1.0 area, below MIN_RECT_AREA of 4.0
         region.add_rect(rect(0.0, 0.0, 1.0, 1.0));
         assert!(region.is_empty());
+    }
+
+    #[test]
+    fn predictive_swept_damage_expands_bounds_along_trajectory() {
+        let mut region = DamageRegion::empty();
+        let initial = rect(10.0, 10.0, 20.0, 20.0);
+        region.add_swept_movement(initial, [100.0, 50.0], 0.1);
+
+        assert_eq!(region.rect_count(), 1);
+        let swept = region.bounding_rect().unwrap();
+        assert_eq!(swept.x, 10.0);
+        assert_eq!(swept.y, 10.0);
+        assert_eq!(swept.width, 30.0);
+        assert_eq!(swept.height, 25.0);
+    }
+
+    #[test]
+    fn predictive_swept_damage_handles_negative_velocity() {
+        let mut region = DamageRegion::empty();
+        let initial = rect(50.0, 50.0, 20.0, 20.0);
+        region.add_swept_movement(initial, [-200.0, -100.0], 0.1);
+
+        assert_eq!(region.rect_count(), 1);
+        let swept = region.bounding_rect().unwrap();
+        assert_eq!(swept.x, 30.0);
+        assert_eq!(swept.y, 40.0);
+        assert_eq!(swept.width, 40.0);
+        assert_eq!(swept.height, 30.0);
+    }
+
+    #[test]
+    fn predictive_swept_damage_safe_under_zero_or_invalid_dt() {
+        let mut region = DamageRegion::empty();
+        let initial = rect(10.0, 10.0, 20.0, 20.0);
+        region.add_swept_movement(initial, [100.0, 50.0], 0.0);
+        assert_eq!(region.bounding_rect().unwrap(), initial);
+
+        let mut region2 = DamageRegion::empty();
+        region2.add_swept_movement(initial, [f32::NAN, 50.0], 0.1);
+        assert_eq!(region2.bounding_rect().unwrap(), initial);
+    }
+
+    #[cfg(feature = "raster")]
+    #[test]
+    fn predictive_velocity_movement_delegates_to_swept_bounds() {
+        let mut region = DamageRegion::empty();
+        let initial = rect(0.0, 0.0, 50.0, 50.0);
+        let velocity = taim_raster::ObjectVelocity {
+            linear: [100.0, 200.0],
+            angular: 0.0,
+            scale_rate: 0.0,
+        };
+        region.add_velocity_movement(initial, velocity, 0.5);
+
+        assert_eq!(region.rect_count(), 1);
+        let swept = region.bounding_rect().unwrap();
+        assert_eq!(swept.x, 0.0);
+        assert_eq!(swept.y, 0.0);
+        assert_eq!(swept.width, 100.0);
+        assert_eq!(swept.height, 150.0);
     }
 }
 

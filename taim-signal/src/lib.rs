@@ -63,6 +63,104 @@ struct Subscribers {
     callbacks: Mutex<BTreeMap<u64, Callback>>,
 }
 
+thread_local! {
+    static BATCH_DEPTH: RefCell<usize> = const { RefCell::new(0) };
+    static PENDING_NOTIFICATIONS: RefCell<Vec<(Callback, Revision)>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Executes a closure within a reactive batch. Notifications from signal changes
+/// occurring during the batch are deferred until the outermost batch completes,
+/// avoiding redundant intermediate computations.
+pub fn batch<R>(f: impl FnOnce() -> R) -> R {
+    BATCH_DEPTH.with(|d| *d.borrow_mut() += 1);
+    let result = f();
+    let should_flush = BATCH_DEPTH.with(|d| {
+        let mut depth = d.borrow_mut();
+        *depth -= 1;
+        *depth == 0
+    });
+    if should_flush {
+        let pending = PENDING_NOTIFICATIONS.with(|p| std::mem::take(&mut *p.borrow_mut()));
+        for (callback, rev) in pending {
+            callback(rev);
+        }
+    }
+    result
+}
+
+/// Fine-grained dirty flags for reactive scene graph invalidation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct DirtyFlags(pub u32);
+
+impl DirtyFlags {
+    /// No changes.
+    pub const NONE: Self = Self(0);
+    /// Layout constraints or geometry must be recomputed.
+    pub const LAYOUT: Self = Self(1 << 0);
+    /// Visual appearance or paint stream must be re-rendered.
+    pub const RENDER: Self = Self(1 << 1);
+    /// Local or world transform matrix changed.
+    pub const TRANSFORM: Self = Self(1 << 2);
+    /// Text content or font shaping changed.
+    pub const TEXT: Self = Self(1 << 3);
+    /// Accessibility / semantic tree changed.
+    pub const SEMANTICS: Self = Self(1 << 4);
+    /// Clip boundary changed.
+    pub const CLIP: Self = Self(1 << 5);
+    /// All subsystems invalidated.
+    pub const ALL: Self = Self(
+        Self::LAYOUT.0
+            | Self::RENDER.0
+            | Self::TRANSFORM.0
+            | Self::TEXT.0
+            | Self::SEMANTICS.0
+            | Self::CLIP.0,
+    );
+
+    /// Checks whether any of the flags in `other` are set.
+    pub const fn intersects(self, other: Self) -> bool {
+        (self.0 & other.0) != 0
+    }
+
+    /// Checks whether all of the flags in `other` are set.
+    pub const fn contains(self, other: Self) -> bool {
+        (self.0 & other.0) == other.0
+    }
+
+    /// Inserts the specified flags.
+    pub fn insert(&mut self, other: Self) {
+        self.0 |= other.0;
+    }
+
+    /// Removes the specified flags.
+    pub fn remove(&mut self, other: Self) {
+        self.0 &= !other.0;
+    }
+
+    /// Unions two flags together.
+    pub const fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+
+    /// Returns true if no flags are set.
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+}
+
+impl std::ops::BitOr for DirtyFlags {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self::Output {
+        self.union(rhs)
+    }
+}
+
+impl std::ops::BitOrAssign for DirtyFlags {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.insert(rhs);
+    }
+}
+
 impl Subscribers {
     fn new() -> Arc<Self> {
         Arc::new(Self {
@@ -94,8 +192,18 @@ impl Subscribers {
             .cloned()
             .collect::<Vec<_>>();
 
-        for callback in callbacks {
-            callback(revision);
+        let in_batch = BATCH_DEPTH.with(|d| *d.borrow() > 0);
+        if in_batch {
+            PENDING_NOTIFICATIONS.with(|p| {
+                let mut pending = p.borrow_mut();
+                for callback in callbacks {
+                    pending.push((callback, revision));
+                }
+            });
+        } else {
+            for callback in callbacks {
+                callback(revision);
+            }
         }
     }
 }
@@ -642,5 +750,60 @@ mod tests {
 
         assert_eq!(signal.get(), 4_000);
         assert_eq!(signal.revision().value(), 4_000);
+    }
+
+    #[test]
+    fn batch_coalesces_notifications_until_completion() {
+        let signal1 = Signal::new(10);
+        let signal2 = Signal::new(20);
+        let notify_count = Arc::new(AtomicU64::new(0));
+
+        let _sub1 = {
+            let count = Arc::clone(&notify_count);
+            signal1.subscribe(move |_| {
+                let _ = count.fetch_add(1, Ordering::Relaxed);
+            })
+        };
+        let _sub2 = {
+            let count = Arc::clone(&notify_count);
+            signal2.subscribe(move |_| {
+                let _ = count.fetch_add(1, Ordering::Relaxed);
+            })
+        };
+
+        batch(|| {
+            let _ = signal1.set(11);
+            let _ = signal2.set(21);
+            let _ = signal1.set(12);
+            assert_eq!(notify_count.load(Ordering::Relaxed), 0);
+        });
+
+        // Out of batch: notifications flushed
+        assert_eq!(notify_count.load(Ordering::Relaxed), 3);
+        assert_eq!(signal1.get(), 12);
+        assert_eq!(signal2.get(), 21);
+    }
+
+    #[test]
+    fn dirty_flags_operations() {
+        let mut flags = DirtyFlags::NONE;
+        assert!(flags.is_empty());
+
+        flags.insert(DirtyFlags::LAYOUT | DirtyFlags::RENDER);
+        assert!(flags.intersects(DirtyFlags::LAYOUT));
+        assert!(flags.intersects(DirtyFlags::RENDER));
+        assert!(!flags.intersects(DirtyFlags::SEMANTICS));
+
+        flags.remove(DirtyFlags::LAYOUT);
+        assert!(!flags.intersects(DirtyFlags::LAYOUT));
+        assert!(flags.intersects(DirtyFlags::RENDER));
+
+        let all = DirtyFlags::ALL;
+        assert!(all.contains(DirtyFlags::LAYOUT));
+        assert!(all.contains(DirtyFlags::RENDER));
+        assert!(all.contains(DirtyFlags::TRANSFORM));
+        assert!(all.contains(DirtyFlags::TEXT));
+        assert!(all.contains(DirtyFlags::SEMANTICS));
+        assert!(all.contains(DirtyFlags::CLIP));
     }
 }

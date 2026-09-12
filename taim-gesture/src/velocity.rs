@@ -101,6 +101,89 @@ impl Estimator {
             displacement.y / seconds,
         ))
     }
+
+    /// Predicts the pointer's future position after `delta` time using kinematic trajectory extrapolation
+    /// (closed-form curvature fitting over recent history with deterministic linear fallback, Pillars VI & XII).
+    pub fn predict_future_position(&self, delta: Duration) -> Option<Point> {
+        let newest = self.samples.back()?;
+        let dt = delta.as_secs_f32();
+        if dt <= 0.0 {
+            return Some(newest.position);
+        }
+
+        let vel = self.estimate()?;
+
+        // When 3 or more samples are available, perform a least-squares quadratic fit
+        // x(t) = x0 + vx * t + 0.5 * ax * t^2 relative to t = 0 (newest sample).
+        if self.samples.len() >= 3 {
+            let t_new = newest.timestamp;
+            let mut sum_u2 = 0.0f32;
+            let mut sum_w2 = 0.0f32;
+            let mut sum_uw = 0.0f32;
+            let mut sum_ux = 0.0f32;
+            let mut sum_wx = 0.0f32;
+            let mut sum_uy = 0.0f32;
+            let mut sum_wy = 0.0f32;
+
+            for sample in self.samples.iter() {
+                // Negative time offset into the past
+                let elapsed = t_new.saturating_duration_since(sample.timestamp).as_secs_f32();
+                let u = -elapsed;
+                let w = 0.5 * u * u;
+                let dx = sample.position.x - newest.position.x;
+                let dy = sample.position.y - newest.position.y;
+
+                sum_u2 += u * u;
+                sum_w2 += w * w;
+                sum_uw += u * w;
+                sum_ux += u * dx;
+                sum_wx += w * dx;
+                sum_uy += u * dy;
+                sum_wy += w * dy;
+            }
+
+            let det = sum_u2 * sum_w2 - sum_uw * sum_uw;
+            if det > 1e-9 {
+                let vx_fit = (sum_ux * sum_w2 - sum_wx * sum_uw) / det;
+                let ax_fit = (sum_u2 * sum_wx - sum_uw * sum_ux) / det;
+                let vy_fit = (sum_uy * sum_w2 - sum_wy * sum_uw) / det;
+                let ay_fit = (sum_u2 * sum_wy - sum_uw * sum_uy) / det;
+
+                // Physical acceleration bounds on touchscreen glass (max 20,000 px/s^2)
+                let ax = ax_fit.clamp(-20000.0, 20000.0);
+                let ay = ay_fit.clamp(-20000.0, 20000.0);
+
+                // Blend fitted velocity with bulk velocity estimate to reject sensor jitter
+                let vx = 0.7 * vx_fit + 0.3 * vel.x;
+                let vy = 0.7 * vy_fit + 0.3 * vel.y;
+
+                return Some(Point::new(
+                    newest.position.x + vx * dt + 0.5 * ax * dt * dt,
+                    newest.position.y + vy * dt + 0.5 * ay * dt * dt,
+                ));
+            }
+        }
+
+        // Deterministic linear fallback
+        Some(Point::new(
+            newest.position.x + vel.x * dt,
+            newest.position.y + vel.y * dt,
+        ))
+    }
+
+    /// Extrapolates a multi-step speculative trajectory spline forward in time for predictive presentation.
+    pub fn predict_trajectory(&self, horizon: Duration, steps: usize) -> Vec<Point> {
+        if steps == 0 {
+            return Vec::new();
+        }
+        let total_secs = horizon.as_secs_f32();
+        let step_dt = total_secs / steps as f32;
+        (1..=steps)
+            .filter_map(|i| {
+                self.predict_future_position(Duration::from_secs_f32(step_dt * i as f32))
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -194,4 +277,54 @@ mod tests {
 
         assert_eq!(velocity, Vector::new(0.0, 0.0));
     }
+
+    #[test]
+    fn predict_future_position_speculatively_extrapolates_trajectory() {
+        let mut estimator = Estimator::new();
+        // Moving at 1000 px/sec along X
+        estimator.push(Point::new(0.0, 0.0), t(0));
+        estimator.push(Point::new(10.0, 0.0), t(10));
+        estimator.push(Point::new(20.0, 0.0), t(20));
+
+        // Predict 16ms ahead (1 frame at 60Hz)
+        let predicted = estimator.predict_future_position(Duration::from_millis(16));
+        assert!(predicted.is_some());
+        let pos = predicted.unwrap();
+        // Should be around x = 20.0 + (1000 * 0.016) = 36.0
+        assert!((pos.x - 36.0).abs() < 2.0);
+        assert_eq!(pos.y, 0.0);
+    }
+
+    #[test]
+    fn predict_trajectory_emits_ordered_steps_along_motion_arc() {
+        let mut estimator = Estimator::new();
+        estimator.push(Point::new(0.0, 0.0), t(0));
+        estimator.push(Point::new(10.0, 5.0), t(10));
+        estimator.push(Point::new(25.0, 15.0), t(20));
+
+        let trajectory = estimator.predict_trajectory(Duration::from_millis(30), 3);
+        assert_eq!(trajectory.len(), 3);
+        // Each step must advance progressively forward in X and Y
+        assert!(trajectory[0].x > 25.0);
+        assert!(trajectory[1].x > trajectory[0].x);
+        assert!(trajectory[2].x > trajectory[1].x);
+        assert!(trajectory[0].y > 15.0);
+        assert!(trajectory[1].y > trajectory[0].y);
+        assert!(trajectory[2].y > trajectory[1].y);
+    }
+
+    #[test]
+    fn predict_future_position_falls_back_cleanly_on_few_samples() {
+        let mut estimator = Estimator::new();
+        estimator.push(Point::new(10.0, 10.0), t(0));
+        estimator.push(Point::new(20.0, 20.0), t(10));
+
+        let predicted = estimator.predict_future_position(Duration::from_millis(10));
+        assert!(predicted.is_some());
+        let p = predicted.unwrap();
+        // 1000 px/sec -> 10px forward
+        assert!((p.x - 30.0).abs() < 0.1);
+        assert!((p.y - 30.0).abs() < 0.1);
+    }
 }
+

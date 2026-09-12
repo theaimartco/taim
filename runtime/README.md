@@ -12,7 +12,7 @@
 [`druid`]: https://github.com/xi-editor/druid
 [`raw-window-handle`]: https://github.com/rust-windowing/raw-window-handle
 
-__Iced moves fast and the `master` branch can contain breaking changes!__ If
+__Taim moves fast and the `main` branch can contain breaking changes!__ If
 you want to learn about a specific release, check out [the release list].
 
 [the release list]: https://github.com/theaimartco/taim/releases

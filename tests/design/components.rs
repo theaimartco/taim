@@ -173,6 +173,39 @@ fn every_component() -> Vec<(&'static str, Box<dyn ComponentSpec>)> {
                 system_gestures_reserved: true,
             }),
         ),
+        (
+            "glass_card",
+            Box::new(glass_card::GlassCard {
+                interactive: true,
+                selected: false,
+                thickness_mm: 4.0,
+                roughness: 0.15,
+                transmission: 0.85,
+                ior: 1.52,
+            }),
+        ),
+        (
+            "segmented_control",
+            Box::new(segmented_control::SegmentedControl {
+                segments: 3,
+                selected_index: 0,
+                interactive: true,
+            }),
+        ),
+        (
+            "gauge",
+            Box::new(gauge::Gauge {
+                value: 0.75,
+                interactive: true,
+            }),
+        ),
+        (
+            "shimmer",
+            Box::new(shimmer::Shimmer {
+                active: true,
+                phase: 0.25,
+            }),
+        ),
     ]
 }
 
@@ -1091,7 +1124,7 @@ fn only_known_containers_are_exempt_from_the_touch_target_policy() {
     // without ever accepting input.
     assert_eq!(
         exempt,
-        ["app_bar", "progress", "tooltip", "window_chrome"],
+        ["app_bar", "progress", "tooltip", "window_chrome", "shimmer"],
         "the set of components exempt from the touch-target policy changed; \
          a container may join it deliberately, but a control appearing here \
          means it stopped declaring actions"

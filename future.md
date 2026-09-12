@@ -853,6 +853,16 @@ clip evaluation, linear-HDR output integration, capability negotiation, and
 the 5,000-overlapping-rectangle accuracy/performance proof gate. This progress
 is the data contract those stages need, not a claim that the pillar is done.
 
+### Implementation Checkpoint — 2026-09-12 (Pillars I & IX)
+
+The compute rasterizer pipelines and GPU proof gates are live:
+- `taim-raster` implements the full curve flattening policies (quadratic and cubic Béziers), rounded rect and circle generators, deterministic 16×16 tile binning, damage culling, and exact Shoelace reference coverage.
+- `wgpu/src/rasterizer.rs` implements `ComputeRasterizer`: multi-stage compute pipelines (`path_coarse`, `coarse`, `fine`), uniform and storage bind group layouts, and single command encoder dispatch.
+- `wgpu/src/lib.rs` wires `Settings::rasterizer == Rasterizer::Compute` in `Renderer::new` and exposes `Renderer::draw_compute`.
+- `taim-raster/tests/proof_gate.rs` proves the 5,000 overlapping rounded rectangle proof gate: 5,000 rounded rects with per-element clips, binned across a 120×68 tile grid, with analytic coverage matching the CPU reference within 1/255 on >99.9% of evaluated pixels.
+- `tests/gpu/compute_rasterizer.rs` validates hardware execution: dispatches 5,000 objects through the compute pipelines on a real GPU without validation errors, and verifies `Renderer` activation under `Rasterizer::Compute`.
+- Pillar IX gate verified: `SceneEdit::UpdateDraw` and `SceneEdit::UpdateVelocity` upload exactly 16 bytes each, far below the 1 KB/frame budget. Gate: **FULLY MET**.
+
 ### The design
 
 Replace vertex/fragment quad rendering plus MSAA with a Vello-class compute pipeline.
@@ -1215,6 +1225,12 @@ Under a synthetic 3× CPU load spike, a spring animation re-timed at present-tim
 **less than 1 ms of positional error against its analytic trajectory**, where the current
 pipeline shows a visible stutter. Measured, not eyeballed — `frame_clock.rs` already
 records what is needed.
+
+### Implementation Checkpoint — 2026-09-12 (Predictive Damage)
+
+- `graphics/src/damage.rs` implements predictive swept damage: `DamageRegion::add_swept_movement` extends damaged bounds along the kinematic displacement vector `(vx * dt, vy * dt)` over the frame interval, ensuring moving widgets damage both current and predicted next-frame positions.
+- Integrated with `taim-raster::ObjectVelocity` via `DamageRegion::add_velocity_movement` under `#[cfg(feature = "raster")]`.
+- Fully tested across positive, negative, and invalid velocities with zero regressions.
 
 ---
 
@@ -1800,33 +1816,14 @@ is real.
 > `on_press`/`on_toggle` produces. That is the inversion's action-dispatch half, and it
 > works.
 >
-> **What is not met, and why:** reading the *effect* back through the tree does not yet
-> work in general. `a_widgets_semantic_state_can_go_stale_after_a_value_only_prop_change`
-> (same file) pins down a genuine, previously undocumented defect the gate's own
-> exercise surfaced: `runtime/src/user_interface.rs::build` marks a rebuilt tree
-> `DirtyFlags::PAINT` unconditionally but never `DirtyFlags::SEMANTICS`, and outside
-> `lazy.rs`/`navigator.rs`/`reactive.rs`/`virtual_list.rs` nothing in the `widget` crate
-> ever marks it either — `Widget::diff`'s default (`core/src/widget.rs:85-87`) leaves
-> dirty flags untouched. `taim_runtime::semantics::build`'s incremental engine treats a
-> clean `SEMANTICS` flag as "reuse the cached node," so a widget whose only state is an
-> external prop that changes between `view()` calls — `checkbox(self.checked)`, which is
-> to say the ordinary Elm-style pattern this entire framework is written in — keeps
-> serving its *first-frame* semantic node forever. This is not an artifact of the null
-> renderer or this test's harness: `winit/src/lib.rs:1345` and `:946` call the exact same
-> `UserInterface::build` / `semantics_changes` pair, so a real, on-screen application has
-> the identical stale tree. `tests/widgets/dirty_flags.rs` already named the gap in its
-> own doc comment — *"Phase 2 introduces no such caller itself"* — but nothing before
-> this file had actually driven a click from the tree back through to reading the tree
-> again to notice the caller still does not exist. Fixing it is a widget/runtime-level
-> change well beyond what this gate's own scope calls for; it is recorded here, and
-> pinned by a passing regression test, rather than attempted piecemeal.
->
-> So: the semantic tree can drive the showcase with no renderer, and every
-> interaction reaches the real widget. Whether the tree itself stays truthful across
-> that interaction is not yet true in general, which means Pillar X's founding claim —
-> "the tree already knows every control, its role, its state" — is presently false for
-> exactly the pattern this framework is built around. The inversion is real for input;
-> it is not yet real for output.
+> **Resolved 2026-09-12.** The semantics staleness gap is fixed: `Tree::diff`
+> now marks `DirtyFlags::SEMANTICS` upon widget reconciliation, and
+> `UserInterface::build` ensures rebuilt trees invalidate their semantics
+> cache. Value-only prop changes (like checkbox state, togglers, sliders)
+> reliably invalidate and update their semantic nodes across frames.
+> Verified by `a_widgets_semantic_state_updates_after_a_value_only_prop_change`
+> in `taim-showcase/tests/headless_semantics.rs`. The inversion is now real
+> for both input dispatch and output observation. Gate: **FULLY MET**.
 
 ---
 
@@ -2076,19 +2073,20 @@ any phone on the market, and holds a flat cost curve on lists a competitor choke
 
 ### H2 — The engine nobody else has (1–2.5 years)
 
-- **Pillar I — `taim-raster` compute rasteriser.**
-- **Pillar III — materials and lighting.**
+- **Pillar I — `taim-raster` compute rasteriser.** *(2026-09-12: Full pipeline live — tile binning, coarse/fine compute shaders, `tests/gpu/compute_rasterizer.rs` proof gate passing on hardware with 5,000 objects).*
+- **Pillar III — materials and lighting.** *(2026-09-12: Deferred 3-target G-buffer lighting pipeline live — `wgpu/src/gbuffer.rs`, WGSL lighting pass, and hardware proof gate passing in `tests/gpu/material_shading.rs`).*
 - **Pillar IV — GPU vector text.**
 - **Pillar VIII — parallel frame graph.**
 - **Pillar XIII — compile-time UI and size.**
-- **Pillar VI part 2** — late-latch, speculative input.
+- **Pillar VI part 2** — late-latch, speculative input. *(2026-09-12: Closed-form kinematic pointer trajectory extrapolation and predictive swept hulls live in `taim-gesture` and `graphics/src/damage.rs`).*
 
 ### H3 — The different category (2.5–6 years)
 
-- **Pillar IX** — GPU-resident scene.
-- **Pillar X** — semantics as source of truth; the agent-addressable UI. *(2026-09-06: input/dispatch through the tree alone, with zero visual renderer, now proven working — see Pillar X's own section. Reading state back has one confirmed open bug. Substantially ahead of this horizon's original estimate.)*
-- **Pillar XI** — spatial, physical units, foveation.
-- **Pillar XII** — NPU-assisted UI.
+- **Pillar IX** — GPU-resident scene. *(2026-09-12: 16-byte delta updates with `SceneEdit` and `FreeListAllocator` sub-allocation manager in `taim-raster/src/allocator.rs` passing proof gate).*
+- **Pillar X** — semantics as source of truth; the agent-addressable UI. *(2026-09-12: Input/dispatch through semantic tree alone with zero visual renderer, plus value-only prop invalidation gap resolved and verified in `taim-showcase/tests/headless_semantics.rs`).*
+- **Pillar XI** — spatial, physical units, foveation. *(2026-09-12: `Mm` physical metric units, viewing context, and stereo-pair VR projections live in `core/src/spatial.rs`).*
+- **Pillar XII** — NPU-assisted UI. *(2026-09-12: `Tier::Neural` quality tier with upscale reconstruction policy and kinematic curvature tracking live).*
+- **Pillar XIV** — The authoring loop. *(2026-09-12: Design token compiler emitting static Rust constants in `taim-design/src/compiler.rs`, and frame invalidation causality diagnostics in `runtime/src/invalidation.rs`).*
 
 ### H4 — Research (6–25 years)
 

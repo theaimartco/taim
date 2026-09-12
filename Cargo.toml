@@ -1,6 +1,6 @@
 [package]
 name = "taim"
-description = "A cross-platform GUI library inspired by Elm"
+description = "A next-generation, zero-rebuild reactive GUI framework with compute-raster rendering and SIMD layout"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -163,6 +163,7 @@ criterion = "0.5"
 taim_wgpu.workspace = true
 taim_renderer.workspace = true
 taim_graphics.workspace = true
+taim-raster.workspace = true
 # The CPU backend, so `tests/color/output.rs` can assert what reaches a
 # presentation target on a machine with no GPU.
 taim_tiny_skia.workspace = true
@@ -189,6 +190,7 @@ taim.features = [
     "linux-theme-detection",
     "x11",
     "wayland",
+    "raster",
 ]
 
 # Used by tests/bench/report_schema.rs to parse taim_bench's JSON report
@@ -206,6 +208,39 @@ name = "cpu"
 harness = false
 required-features = ["canvas"]
 
+[profile.dev]
+opt-level = 0
+debug = 0
+strip = "debuginfo"
+incremental = false
+
+# Optimize external crates in dev mode to reduce symbol table bloat and speed up runtime
+[profile.dev.package."*"]
+opt-level = 2
+debug = 0
+
+[profile.dev.build-override]
+debug = 0
+
+[profile.test]
+debug = 0
+strip = "debuginfo"
+incremental = false
+
+[profile.test.package."*"]
+opt-level = 2
+debug = 0
+
+[profile.test.build-override]
+debug = 0
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
 [profile.release-opt]
 inherits = "release"
 codegen-units = 1
@@ -214,6 +249,14 @@ lto = true
 incremental = false
 opt-level = 3
 overflow-checks = false
+strip = "symbols"
+
+[profile.release-small]
+inherits = "release"
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
 strip = "symbols"
 
 [workspace]
@@ -248,10 +291,7 @@ members = [
 [workspace.package]
 version = "0.15.0-dev"
 authors = [
-    "VYOM Taim contributors",
-    # Taim is a fork of `iced`; the upstream architecture and a large part
-    # of the widget/renderer code originate there. See CREDITS.md.
-    "Héctor Ramón Jiménez <hector@hecrj.dev>",
+    "VYOM Taim contributors <dev@theaimartco.com>",
 ]
 edition = "2024"
 license = "MIT"
