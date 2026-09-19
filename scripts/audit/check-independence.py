@@ -153,7 +153,13 @@ def compute_confidence_score(match_type, head_token_count, base_token_count):
     return round(confidence, 3)
 
 def audit_workspace():
-    head_files = run_git(["ls-tree", "-r", "--name-only", "HEAD"]).strip().splitlines()
+    # Audit the tree the developer is actually changing, not only the last
+    # commit. `ls-tree HEAD` made newly authored TAIM files invisible and kept
+    # counting locally deleted inherited files until commit time, which could
+    # materially overstate Iced similarity during an active migration.
+    workspace_files = run_git(
+        ["ls-files", "--cached", "--others", "--exclude-standard"]
+    ).strip().splitlines()
     fork_files = set(run_git(["ls-tree", "-r", "--name-only", FORK_COMMIT]).strip().splitlines())
     rename_copy_map = get_git_rename_copy_map()
 
@@ -162,21 +168,21 @@ def audit_workspace():
     total_inherited_loc_raw = 0
     total_inherited_loc_token = 0
 
-    for f in head_files:
+    for f in workspace_files:
         if not f.endswith(RELEVANT_EXTENSIONS) and not f.startswith("assets/"):
             continue
         if f.startswith(".git") or f.startswith("target/"):
             continue
 
         file_path = os.path.join(REPO_DIR, f)
-        if os.path.isfile(file_path):
-            with open(file_path, "rb") as fh:
-                head_bytes = fh.read()
-        else:
-            head_bytes = get_git_bytes("HEAD", f)
-
-        if head_bytes is None:
+        # `git ls-files` also lists tracked paths deleted in the working tree.
+        # A deleted inherited file contributes zero shipping code and must not
+        # silently fall back to its committed contents.
+        if not os.path.isfile(file_path):
             continue
+
+        with open(file_path, "rb") as fh:
+            head_bytes = fh.read()
 
         head_loc = len(head_bytes.splitlines())
         total_taim_loc += head_loc

@@ -1,7 +1,7 @@
-use crate::core::Rectangle;
 use crate::core::mouse;
+use crate::core::{Event, Rectangle};
 use crate::renderer::wgpu::Primitive;
-use crate::shader::{self, Action};
+use crate::shader::Action;
 
 /// The state and logic of a [`Shader`] widget.
 ///
@@ -26,7 +26,7 @@ pub trait Program<Message> {
     fn update(
         &self,
         _state: &mut Self::State,
-        _event: &shader::Event,
+        _event: &Event,
         _bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Option<Action<Message>> {

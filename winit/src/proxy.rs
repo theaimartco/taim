@@ -1,20 +1,21 @@
-use crate::futures::futures::{
-    Future, Sink, StreamExt,
-    channel::mpsc,
-    select,
-    task::{Context, Poll},
-};
-use crate::graphics::shell;
+use crate::futures::futures::{Future, channel::mpsc};
 use crate::runtime::Action;
 use crate::runtime::window;
-use std::pin::Pin;
+use std::sync::Arc;
+
+mod flow;
+mod notifier;
+mod sink;
+
+use flow::Flow;
 
 /// An event loop proxy with backpressure that implements `Sink`.
 #[derive(Debug)]
 pub struct Proxy<T: 'static> {
     raw: winit::event_loop::EventLoopProxy<Action<T>>,
     sender: mpsc::Sender<Action<T>>,
-    notifier: mpsc::Sender<usize>,
+    notifier: mpsc::Sender<()>,
+    flow: Arc<Flow>,
 }
 
 impl<T: 'static> Clone for Proxy<T> {
@@ -23,52 +24,34 @@ impl<T: 'static> Clone for Proxy<T> {
             raw: self.raw.clone(),
             sender: self.sender.clone(),
             notifier: self.notifier.clone(),
+            flow: Arc::clone(&self.flow),
         }
     }
 }
 
 impl<T: 'static> Proxy<T> {
-    const MAX_SIZE: usize = 100;
+    const MAX_SIZE: usize = flow::EVENT_QUEUE_CAPACITY;
+    const TICK_WAKE: u8 = 1 << 0;
+    const REDRAW_WAKE: u8 = 1 << 1;
+    const RELAYOUT_WAKE: u8 = 1 << 2;
+    const RELOAD_WAKE: u8 = 1 << 3;
 
     /// Creates a new [`Proxy`] from an `EventLoopProxy`.
     pub fn new(
         raw: winit::event_loop::EventLoopProxy<Action<T>>,
     ) -> (Self, impl Future<Output = ()>) {
-        let (notifier, mut processed) = mpsc::channel(Self::MAX_SIZE);
-        let (sender, mut receiver) = mpsc::channel(Self::MAX_SIZE);
+        let (notifier, processed) = mpsc::channel(1);
+        let (sender, receiver) = mpsc::channel(Self::MAX_SIZE);
         let proxy = raw.clone();
-
-        let worker = async move {
-            let mut count = 0;
-
-            loop {
-                if count < Self::MAX_SIZE {
-                    select! {
-                        message = receiver.select_next_some() => {
-                            let _ = proxy.send_event(message);
-                            count += 1;
-                        }
-                        amount = processed.select_next_some() => {
-                            count = count.saturating_sub(amount);
-                        }
-                        complete => break,
-                    }
-                } else {
-                    select! {
-                        amount = processed.select_next_some() => {
-                            count = count.saturating_sub(amount);
-                        }
-                        complete => break,
-                    }
-                }
-            }
-        };
+        let flow = Arc::new(Flow::new());
+        let worker = flow::forward(proxy, receiver, processed, Arc::clone(&flow));
 
         (
             Self {
                 raw,
                 sender,
                 notifier,
+                flow,
             },
             worker,
         )
@@ -81,70 +64,64 @@ impl<T: 'static> Proxy<T> {
 
     /// Sends a value to the event loop.
     ///
-    /// Note: This skips the backpressure mechanism with an unbounded
-    /// channel. Use sparingly!
+    /// This is a direct event-loop wake; callers that produce streams should
+    /// prefer the [`Sink`] implementation so queue pressure propagates.
     pub fn send(&self, value: T) {
         self.send_action(Action::Output(value));
     }
 
     /// Sends an action to the event loop.
     ///
-    /// Note: This skips the backpressure mechanism with an unbounded
-    /// channel. Use sparingly!
+    /// High-frequency framework wake actions are coalesced while one matching
+    /// action is already queued in Winit.
     pub fn send_action(&self, action: Action<T>) {
-        let _ = self.raw.send_event(action);
+        match action {
+            Action::Tick => self.send_once(Action::Tick, Self::TICK_WAKE),
+            Action::Window(window::Action::RedrawAll) => {
+                self.send_once(Action::Window(window::Action::RedrawAll), Self::REDRAW_WAKE)
+            }
+            Action::Window(window::Action::RelayoutAll) => self.send_once(
+                Action::Window(window::Action::RelayoutAll),
+                Self::RELAYOUT_WAKE,
+            ),
+            Action::Reload => self.send_once(Action::Reload, Self::RELOAD_WAKE),
+            action => {
+                let _ = self.raw.send_event(action);
+            }
+        }
+    }
+
+    /// Releases the coalescing bit for an action as dispatch begins.
+    pub fn acknowledge(&self, action: &Action<T>) {
+        let wake = match action {
+            Action::Tick => Self::TICK_WAKE,
+            Action::Window(window::Action::RedrawAll) => Self::REDRAW_WAKE,
+            Action::Window(window::Action::RelayoutAll) => Self::RELAYOUT_WAKE,
+            Action::Reload => Self::RELOAD_WAKE,
+            _ => return,
+        };
+
+        self.flow.acknowledge(wake);
     }
 
     /// Frees an amount of slots for additional messages to be queued in
     /// this [`Proxy`].
     pub fn free_slots(&mut self, amount: usize) {
-        let _ = self.notifier.start_send(amount);
-    }
-}
-
-impl<T: 'static> Sink<Action<T>> for Proxy<T> {
-    type Error = mpsc::SendError;
-
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.sender.poll_ready(cx)
-    }
-
-    fn start_send(mut self: Pin<&mut Self>, action: Action<T>) -> Result<(), Self::Error> {
-        self.sender.start_send(action)
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self.sender.poll_ready(cx) {
-            Poll::Ready(Err(ref e)) if e.is_disconnected() => {
-                // If the receiver disconnected, we consider the sink to be flushed.
-                Poll::Ready(Ok(()))
-            }
-            x => x,
+        if amount == 0 {
+            return;
         }
+
+        self.flow.release(amount);
+        let _ = self.notifier.try_send(());
     }
 
-    fn poll_close(
-        mut self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
-        self.sender.disconnect();
-        Poll::Ready(Ok(()))
-    }
-}
+    fn send_once(&self, action: Action<T>, wake: u8) {
+        if !self.flow.claim_wake(wake) {
+            return;
+        }
 
-impl<T> shell::Notifier for Proxy<T>
-where
-    T: Send,
-{
-    fn tick(&self) {
-        self.send_action(Action::Tick);
-    }
-
-    fn request_redraw(&self) {
-        self.send_action(Action::Window(window::Action::RedrawAll));
-    }
-
-    fn invalidate_layout(&self) {
-        self.send_action(Action::Window(window::Action::RelayoutAll));
+        if self.raw.send_event(action).is_err() {
+            self.flow.acknowledge(wake);
+        }
     }
 }

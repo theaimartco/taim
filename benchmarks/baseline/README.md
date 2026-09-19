@@ -7,6 +7,11 @@ All 13 were captured on **2026-08-23** on `dev-workstation-01`, from a clean
 worktree at commit `5e2d7896dbe4`, with the `profiling` feature on so
 allocation counting is live.
 
+These files use report schema v1. That schema omitted UI build/diff/layout
+from headline frame time. Current `taim_bench` uses v2 and deliberately
+refuses v1 comparisons. Keep the files as historical evidence, not as a
+current performance baseline; recapture on the named device from a clean tree.
+
 ## What was wrong with the previous set
 
 The reports checked in before that date recorded `environment.os = "macos"`

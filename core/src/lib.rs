@@ -3,100 +3,73 @@
 //! This library holds basic types that can be reused and re-exported in
 //! different runtime implementations.
 //!
-//! ![The foundations of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/foundations.png?raw=true)
+//! ![The foundations of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/foundations.svg?raw=true)
 //!
 //! [Taim]: https://github.com/theaimartco/taim
 #![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
-pub mod alignment;
-pub mod animation;
-pub mod backend;
-pub mod border;
-pub mod cache;
-pub mod clipboard;
-pub mod color;
-pub mod damage;
-pub mod event;
-pub mod font;
-pub mod frame;
-pub mod gradient;
-pub mod image;
-pub mod input_method;
-pub mod keyboard;
-pub mod layout;
-pub mod layout_solver;
-pub mod length;
-pub mod material;
-pub mod mouse;
-pub mod overlay;
-pub mod padding;
-pub mod pointer;
-pub mod renderer;
-pub mod scene;
-pub mod security;
-pub mod semantics;
-pub mod semantics_driver;
-pub mod shell;
-pub mod spatial;
-pub mod svg;
-pub mod text;
-pub mod theme;
-pub mod time;
-pub mod touch;
-pub mod widget;
-pub mod window;
+macro_rules! modules {
+    (public: $($public:ident),+; private: $($private:ident),+ $(;)?) => {
+        $(pub mod $public;)+
+        $(mod $private;)+
+    };
+}
 
-mod angle;
-mod background;
-mod content_fit;
-mod element;
-mod pixels;
-mod point;
-mod rectangle;
-mod rotation;
-mod settings;
-mod shadow;
-mod size;
-mod transformation;
-mod vector;
+macro_rules! exports {
+    ($($module:ident::$item:ident),+ $(,)?) => { $(pub use $module::$item;)+ };
+}
 
-pub use alignment::Alignment;
+modules!(
+    public:
+        alignment, animation, backend, border, cache, clipboard, color, damage, event, font,
+        frame, gradient, image, input_method, keyboard, layout, layout_solver, length, material,
+        mouse, overlay, padding, pointer, renderer, scene, security, semantics, semantics_driver,
+        shell, spatial, svg, text, theme, time, touch, widget, window;
+    private:
+        angle, background, content_fit, element, pixels, point, rectangle, rotation, settings,
+        shadow, size, transformation, vector;
+);
+
+exports!(
+    alignment::Alignment,
+    animation::Animation,
+    backend::Backend,
+    background::Background,
+    border::Border,
+    clipboard::Clipboard,
+    color::Color,
+    content_fit::ContentFit,
+    element::Element,
+    event::Event,
+    font::Font,
+    gradient::Gradient,
+    image::Image,
+    input_method::InputMethod,
+    layout::Layout,
+    length::Length,
+    overlay::Overlay,
+    padding::Padding,
+    pixels::Pixels,
+    point::Point,
+    rectangle::Rectangle,
+    renderer::Renderer,
+    rotation::Rotation,
+    settings::Settings,
+    shadow::Shadow,
+    shell::Shell,
+    size::Size,
+    svg::Svg,
+    text::Text,
+    theme::Theme,
+    transformation::Transformation,
+    vector::Vector,
+    widget::Widget,
+    window::Window,
+);
+
 pub use angle::{Degrees, Radians};
-pub use animation::Animation;
-pub use backend::Backend;
-pub use background::Background;
-pub use border::Border;
-pub use clipboard::Clipboard;
-pub use color::Color;
-pub use content_fit::ContentFit;
-pub use element::Element;
-pub use event::Event;
-pub use font::Font;
-pub use gradient::Gradient;
-pub use image::Image;
-pub use input_method::InputMethod;
-pub use layout::Layout;
-pub use length::Length;
-pub use overlay::Overlay;
-pub use padding::Padding;
-pub use pixels::Pixels;
-pub use point::Point;
-pub use rectangle::Rectangle;
-pub use renderer::Renderer;
-pub use rotation::Rotation;
 pub use scene::{NodeId, SceneArena, SceneNode};
 pub use semantics_driver::SemanticsDriver;
-pub use settings::Settings;
-pub use shadow::Shadow;
-pub use shell::Shell;
-pub use size::Size;
 pub use spatial::{Mm, PhysicalContext, Transform3D};
-pub use svg::Svg;
-pub use text::Text;
-pub use theme::Theme;
-pub use transformation::Transformation;
-pub use vector::Vector;
-pub use widget::Widget;
-pub use window::Window;
 
 pub use bytes::Bytes;
 pub use smol_str::SmolStr;

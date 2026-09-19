@@ -1,0 +1,23 @@
+[package]
+name = "taim_text_gpu"
+description = "TAIM's bounded, allocation-conscious GPU glyph engine"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+categories.workspace = true
+keywords.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+taim_atlas.workspace = true
+
+bytemuck.workspace = true
+cosmic-text.workspace = true
+rustc-hash.workspace = true
+wgpu.workspace = true

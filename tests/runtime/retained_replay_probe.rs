@@ -284,7 +284,17 @@ fn a_reactive_subtree_rebuilds_only_when_its_signal_changes() {
 
 #[test]
 fn a_signal_wakes_and_updates_a_live_interface_without_rebuilding_the_root() {
+    check_live_signal(false);
+}
+
+#[test]
+fn batched_writes_wake_and_update_a_live_interface_once() {
+    check_live_signal(true);
+}
+
+fn check_live_signal(batched: bool) {
     let signal = taim::Signal::new(0_u32);
+    let built_value = Arc::new(AtomicUsize::new(0));
     let builds = Arc::new(AtomicUsize::new(0));
     let layouts = Arc::new(AtomicUsize::new(0));
     let paints = Arc::new(AtomicUsize::new(0));
@@ -292,10 +302,12 @@ fn a_signal_wakes_and_updates_a_live_interface_without_rebuilding_the_root() {
     let routed_source = Arc::new(Mutex::new(None));
 
     let element: Element<'static, (), Theme, Renderer> = {
+        let built_value = Arc::clone(&built_value);
         let builds = Arc::clone(&builds);
         let layouts = Arc::clone(&layouts);
         let paints = Arc::clone(&paints);
-        taim::widget::reactive(signal.clone(), move |_value| {
+        taim::widget::reactive(signal.clone(), move |value| {
+            built_value.store(value as usize, Ordering::Relaxed);
             let _ = builds.fetch_add(1, Ordering::Relaxed);
             Element::new(LayoutProbe {
                 layouts: Arc::clone(&layouts),
@@ -338,7 +350,16 @@ fn a_signal_wakes_and_updates_a_live_interface_without_rebuilding_the_root() {
         &mut messages,
     );
 
-    assert!(signal.set(1));
+    if batched {
+        taim::signal::batch(|| {
+            assert!(signal.set(1));
+            assert!(signal.set(2));
+            assert!(signal.set(3));
+            assert_eq!(wakes.load(Ordering::Relaxed), 0);
+        });
+    } else {
+        assert!(signal.set(1));
+    }
     assert_eq!(wakes.load(Ordering::Relaxed), 1);
     let source = routed_source
         .lock()
@@ -368,6 +389,10 @@ fn a_signal_wakes_and_updates_a_live_interface_without_rebuilding_the_root() {
         mouse::Cursor::Unavailable,
     );
 
+    assert_eq!(
+        built_value.load(Ordering::Relaxed),
+        if batched { 3 } else { 1 }
+    );
     assert_eq!(builds.load(Ordering::Relaxed), 2);
     assert_eq!(layouts.load(Ordering::Relaxed), 2);
     assert_eq!(paints.load(Ordering::Relaxed), 2);

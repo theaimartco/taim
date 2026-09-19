@@ -6,6 +6,8 @@ use crate::renderer;
 use crate::widget;
 use crate::{Event, Layout, Shell, Size};
 
+const MAX_OVERLAY_DEPTH: usize = 64;
+
 /// An overlay container that displays nested overlays
 pub struct Nested<'a, Message, Theme, Renderer> {
     overlay: overlay::Element<'a, Message, Theme, Renderer>,
@@ -28,6 +30,7 @@ where
             element: &mut overlay::Element<'_, Message, Theme, Renderer>,
             renderer: &Renderer,
             bounds: Size,
+            depth: usize,
         ) -> layout::Node
         where
             Renderer: renderer::Renderer,
@@ -35,19 +38,19 @@ where
             let overlay = element.as_overlay_mut();
             let node = overlay.layout(renderer, bounds);
 
-            let nested_node = overlay
-                .overlay(Layout::new(&node), renderer)
+            let nested_node = (depth < MAX_OVERLAY_DEPTH)
+                .then(|| overlay.overlay(Layout::new(&node), renderer))
+                .flatten()
                 .as_mut()
-                .map(|nested| recurse(nested, renderer, bounds));
+                .map(|nested| recurse(nested, renderer, bounds, depth + 1));
 
-            if let Some(nested_node) = nested_node {
-                layout::Node::with_children(node.size(), vec![node, nested_node])
-            } else {
-                layout::Node::with_children(node.size(), vec![node])
-            }
+            let mut chain = Vec::with_capacity(1 + usize::from(nested_node.is_some()));
+            chain.push(node);
+            chain.extend(nested_node);
+            layout::Node::with_children(chain[0].size(), chain)
         }
 
-        recurse(&mut self.overlay, renderer, bounds)
+        recurse(&mut self.overlay, renderer, bounds, 0)
     }
 
     /// Draws the [`Nested`] overlay using the associated `Renderer`.
@@ -66,26 +69,28 @@ where
             theme: &Theme,
             style: &renderer::Style,
             cursor: mouse::Cursor,
+            depth: usize,
         ) where
             Renderer: renderer::Renderer,
         {
-            let mut layouts = layout.children();
-
-            if let Some(layout) = layouts.next() {
-                let nested_layout = layouts.next();
+            if let Some((layout, nested_layout)) = split_layout(layout) {
                 let overlay = element.as_overlay_mut();
 
                 let is_over = cursor
                     .position()
                     .zip(nested_layout)
                     .and_then(|(cursor_position, nested_layout)| {
-                        overlay.overlay(layout, renderer).map(|nested| {
-                            nested.as_overlay().mouse_interaction(
-                                nested_layout.children().next().unwrap(),
-                                mouse::Cursor::Available(cursor_position),
-                                renderer,
-                            ) != mouse::Interaction::None
-                        })
+                        (depth < MAX_OVERLAY_DEPTH)
+                            .then(|| overlay.overlay(layout, renderer))
+                            .flatten()
+                            .zip(nested_layout.children().next())
+                            .map(|(nested, nested_layout)| {
+                                nested.as_overlay().mouse_interaction(
+                                    nested_layout,
+                                    mouse::Cursor::Available(cursor_position),
+                                    renderer,
+                                ) != mouse::Interaction::None
+                            })
                     })
                     .unwrap_or_default();
 
@@ -103,15 +108,25 @@ where
                     );
                 });
 
-                if let Some((mut nested, nested_layout)) =
-                    overlay.overlay(layout, renderer).zip(nested_layout)
+                if let Some((mut nested, nested_layout)) = (depth < MAX_OVERLAY_DEPTH)
+                    .then(|| overlay.overlay(layout, renderer))
+                    .flatten()
+                    .zip(nested_layout)
                 {
-                    recurse(&mut nested, nested_layout, renderer, theme, style, cursor);
+                    recurse(
+                        &mut nested,
+                        nested_layout,
+                        renderer,
+                        theme,
+                        style,
+                        cursor,
+                        depth + 1,
+                    );
                 }
             }
         }
 
-        recurse(&mut self.overlay, layout, renderer, theme, style, cursor);
+        recurse(&mut self.overlay, layout, renderer, theme, style, cursor, 0);
     }
 
     /// Applies a [`widget::Operation`] to the [`Nested`] overlay.
@@ -142,12 +157,11 @@ where
             layout: Layout<'_>,
             renderer: &Renderer,
             found: &mut Vec<crate::semantics::Node>,
+            depth: usize,
         ) where
             Renderer: renderer::Renderer,
         {
-            let mut layouts = layout.children();
-
-            let Some(layout) = layouts.next() else {
+            let Some((layout, nested_layout)) = split_layout(layout) else {
                 return;
             };
 
@@ -157,15 +171,17 @@ where
                 found.push(node);
             }
 
-            if let Some((mut nested, nested_layout)) =
-                overlay.overlay(layout, renderer).zip(layouts.next())
+            if let Some((mut nested, nested_layout)) = (depth < MAX_OVERLAY_DEPTH)
+                .then(|| overlay.overlay(layout, renderer))
+                .flatten()
+                .zip(nested_layout)
             {
-                recurse(&mut nested, nested_layout, renderer, found);
+                recurse(&mut nested, nested_layout, renderer, found, depth + 1);
             }
         }
 
-        let mut found = Vec::new();
-        recurse(&mut self.overlay, layout, renderer, &mut found);
+        let mut found = Vec::with_capacity(4);
+        recurse(&mut self.overlay, layout, renderer, &mut found, 0);
         found
     }
 
@@ -181,25 +197,26 @@ where
             layout: Layout<'_>,
             renderer: &Renderer,
             operation: &mut dyn widget::Operation,
+            depth: usize,
         ) where
             Renderer: renderer::Renderer,
         {
-            let mut layouts = layout.children();
-
-            if let Some(layout) = layouts.next() {
+            if let Some((layout, nested_layout)) = split_layout(layout) {
                 let overlay = element.as_overlay_mut();
 
                 overlay.operate(layout, renderer, operation);
 
-                if let Some((mut nested, nested_layout)) =
-                    overlay.overlay(layout, renderer).zip(layouts.next())
+                if let Some((mut nested, nested_layout)) = (depth < MAX_OVERLAY_DEPTH)
+                    .then(|| overlay.overlay(layout, renderer))
+                    .flatten()
+                    .zip(nested_layout)
                 {
-                    recurse(&mut nested, nested_layout, renderer, operation);
+                    recurse(&mut nested, nested_layout, renderer, operation, depth + 1);
                 }
             }
         }
 
-        recurse(&mut self.overlay, layout, renderer, operation);
+        recurse(&mut self.overlay, layout, renderer, operation, 0);
     }
 
     /// Processes a runtime [`Event`].
@@ -218,19 +235,29 @@ where
             cursor: mouse::Cursor,
             renderer: &Renderer,
             shell: &mut Shell<'_, Message>,
+            depth: usize,
         ) -> bool
         where
             Renderer: renderer::Renderer,
         {
-            let mut layouts = layout.children();
-
-            if let Some(layout) = layouts.next() {
+            if let Some((layout, nested_layout)) = split_layout(layout) {
                 let overlay = element.as_overlay_mut();
 
                 let nested_is_over = if let Some((mut nested, nested_layout)) =
-                    overlay.overlay(layout, renderer).zip(layouts.next())
+                    (depth < MAX_OVERLAY_DEPTH)
+                        .then(|| overlay.overlay(layout, renderer))
+                        .flatten()
+                        .zip(nested_layout)
                 {
-                    recurse(&mut nested, nested_layout, event, cursor, renderer, shell)
+                    recurse(
+                        &mut nested,
+                        nested_layout,
+                        event,
+                        cursor,
+                        renderer,
+                        shell,
+                        depth + 1,
+                    )
                 } else {
                     false
                 };
@@ -269,7 +296,7 @@ where
             }
         }
 
-        let _ = recurse(&mut self.overlay, layout, event, cursor, renderer, shell);
+        let _ = recurse(&mut self.overlay, layout, event, cursor, renderer, shell, 0);
     }
 
     /// Returns the current [`mouse::Interaction`] of the [`Nested`] overlay.
@@ -284,28 +311,35 @@ where
             layout: Layout<'_>,
             cursor: mouse::Cursor,
             renderer: &Renderer,
+            depth: usize,
         ) -> Option<mouse::Interaction>
         where
             Renderer: renderer::Renderer,
         {
-            let mut layouts = layout.children();
-
-            let layout = layouts.next()?;
+            let (layout, nested_layout) = split_layout(layout)?;
             let overlay = element.as_overlay_mut();
             let interaction = overlay.mouse_interaction(layout, cursor, renderer);
 
             Some(
-                overlay
-                    .overlay(layout, renderer)
-                    .zip(layouts.next())
+                (depth < MAX_OVERLAY_DEPTH)
+                    .then(|| overlay.overlay(layout, renderer))
+                    .flatten()
+                    .zip(nested_layout)
                     .and_then(|(mut overlay, layout)| {
-                        recurse(&mut overlay, layout, cursor, renderer)
+                        recurse(&mut overlay, layout, cursor, renderer, depth + 1)
                     })
                     .unwrap_or_default()
                     .max(interaction),
             )
         }
 
-        recurse(&mut self.overlay, layout, cursor, renderer).unwrap_or_default()
+        recurse(&mut self.overlay, layout, cursor, renderer, 0).unwrap_or_default()
     }
+}
+
+#[inline]
+fn split_layout(layout: Layout<'_>) -> Option<(Layout<'_>, Option<Layout<'_>>)> {
+    let mut children = layout.children();
+    let current = children.next()?;
+    Some((current, children.next()))
 }

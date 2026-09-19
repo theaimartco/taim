@@ -67,6 +67,45 @@ where
     reconciled
 }
 
+/// Reconciles two parallel key/tree buffers directly into their next state.
+///
+/// This is the allocation-conscious form used by keyed containers. It keeps
+/// the existing `Vec` allocations, builds only the lookup table required for
+/// arbitrary reordering, and does not materialize temporary `(key, item)` or
+/// `(key, tree)` vectors.
+pub fn reconcile_parallel<K, T>(
+    keys: &mut Vec<K>,
+    trees: &mut Vec<Tree>,
+    next_keys: &[K],
+    next_items: &mut [T],
+    mut diff: impl FnMut(&mut Tree, &mut T),
+    mut new_state: impl FnMut(&T) -> Tree,
+) where
+    K: Hash + Eq + Clone,
+{
+    debug_assert_eq!(keys.len(), trees.len());
+    debug_assert_eq!(next_keys.len(), next_items.len());
+
+    let previous_len = keys.len().min(trees.len());
+    let mut previous = FxHashMap::with_capacity_and_hasher(previous_len, Default::default());
+
+    for (key, tree) in keys.drain(..).zip(trees.drain(..)) {
+        let _replaced = previous.insert(key, tree);
+    }
+
+    let next_len = next_keys.len().min(next_items.len());
+    keys.reserve(next_len);
+    trees.reserve(next_len);
+
+    for (key, item) in next_keys.iter().zip(next_items).take(next_len) {
+        let mut tree = previous.remove(key).unwrap_or_else(|| new_state(item));
+
+        diff(&mut tree, item);
+        keys.push(key.clone());
+        trees.push(tree);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

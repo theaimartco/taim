@@ -396,6 +396,13 @@ pub struct Batch {
 
     /// The quad order of the [`Layer`].
     order: Order,
+
+    /// Whether at least one quad samples the backdrop.
+    ///
+    /// This is maintained while recording so the display path can answer in
+    /// O(1) instead of rescanning every solid and gradient instance before
+    /// each layer is rendered.
+    transmits: bool,
 }
 
 /// The quad order of a [`Layer`]; stored as a tuple of the quad type & its count.
@@ -413,13 +420,7 @@ impl Batch {
     /// A backdrop capture costs a full-frame copy, so a batch of ordinary
     /// opaque quads -- which is nearly every batch -- must never trigger one.
     pub fn needs_backdrop(&self) -> bool {
-        self.solids
-            .iter()
-            .any(|solid| solid.quad.transmission > 0.0)
-            || self
-                .gradients
-                .iter()
-                .any(|gradient| gradient.quad.transmission > 0.0)
+        self.transmits
     }
 
     /// Returns the heap bytes reserved by this batch.
@@ -438,6 +439,8 @@ impl Batch {
     /// are read by the gradient shader, and brightening one is a change to
     /// that shader rather than to this call.
     pub fn add(&mut self, quad: Quad, background: &Background, luminance: f32) {
+        self.transmits |= quad.transmission > 0.0;
+
         let kind = match background {
             Background::Color(color) => {
                 self.solids.push(Solid {
@@ -462,7 +465,7 @@ impl Batch {
 
         match self.order.last_mut() {
             Some((last_kind, count)) if kind == *last_kind => {
-                *count += 1;
+                *count = count.saturating_add(1);
             }
             _ => {
                 self.order.push((kind, 1));
@@ -474,12 +477,31 @@ impl Batch {
         self.solids.clear();
         self.gradients.clear();
         self.order.clear();
+        self.transmits = false;
     }
 
     pub fn append(&mut self, batch: &mut Batch) {
+        self.transmits |= batch.transmits;
+        batch.transmits = false;
+
         self.solids.append(&mut batch.solids);
         self.gradients.append(&mut batch.gradients);
-        self.order.append(&mut batch.order);
+
+        // Preserve painter order while coalescing the only run pair that can
+        // become adjacent across the batch boundary. Draining keeps the
+        // source allocation reusable by the layer pool.
+        let mut incoming = batch.order.drain(..);
+
+        if let Some((kind, count)) = incoming.next() {
+            match self.order.last_mut() {
+                Some((last_kind, last_count)) if *last_kind == kind => {
+                    *last_count = last_count.saturating_add(count);
+                }
+                _ => self.order.push((kind, count)),
+            }
+
+            self.order.extend(incoming);
+        }
     }
 }
 
@@ -723,5 +745,42 @@ mod batching_tests {
         // Batch::add path this test module's other cases prove agrees
         // with batch::group.
         assert_incremental_order_matches_grouping(&[Kind::Solid, Kind::Gradient, Kind::Solid]);
+    }
+
+    #[test]
+    fn backdrop_need_is_constant_time_state_and_clear_resets_it() {
+        let mut transmitting = quad();
+        transmitting.transmission = 0.75;
+
+        let mut batch = Batch::default();
+        batch.add(transmitting, &Background::Color(Color::BLACK), 1.0);
+        assert!(batch.needs_backdrop());
+
+        batch.clear();
+        assert!(!batch.needs_backdrop());
+    }
+
+    #[test]
+    fn append_merges_the_boundary_run_without_reordering_instances() {
+        let mut first = Batch::default();
+        first.add(quad(), &Background::Color(Color::BLACK), 1.0);
+
+        let mut second = Batch::default();
+        second.add(quad(), &Background::Color(Color::WHITE), 1.0);
+        second.add(
+            quad(),
+            &Background::Gradient(crate::core::Gradient::Linear(
+                crate::core::gradient::Linear::new(0.0),
+            )),
+            1.0,
+        );
+
+        first.append(&mut second);
+
+        assert_eq!(first.order, vec![(Kind::Solid, 2), (Kind::Gradient, 1)]);
+        assert_eq!(first.solids.len(), 2);
+        assert_eq!(first.gradients.len(), 1);
+        assert!(second.is_empty());
+        assert!(second.order.is_empty());
     }
 }

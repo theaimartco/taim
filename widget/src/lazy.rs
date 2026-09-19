@@ -7,21 +7,18 @@ pub mod component;
 pub use component::Component;
 
 mod cache;
+mod implementation;
+mod overlay_runtime;
 
 use crate::core::Element;
-use crate::core::layout::{self, Layout};
-use crate::core::mouse;
+use crate::core::layout::Layout;
 use crate::core::overlay;
-use crate::core::renderer;
-use crate::core::widget::tree::{self, Tree};
-use crate::core::widget::visit;
-use crate::core::widget::{self, Widget};
-use crate::core::{self, Event, Length, Rectangle, Shell, Size, Vector};
+use crate::core::widget::tree::Tree;
+use crate::core::{self};
 
 use ouroboros::self_referencing;
-use rustc_hash::FxHasher;
 use std::cell::RefCell;
-use std::hash::{Hash, Hasher as H};
+use std::hash::Hash;
 use std::rc::Rc;
 
 /// A widget that only rebuilds its contents when necessary.
@@ -92,274 +89,21 @@ where
         Theme: 'static,
         Renderer: 'static,
     {
-        if self.element.borrow().is_none() {
-            let current = tree
-                .state
-                .downcast_ref::<Internal<Message, Theme, Renderer>>();
-            *self.element.borrow_mut() = Some(current.element.clone());
+        if self.element.borrow().is_some() {
+            return;
         }
+
+        let current = tree
+            .state
+            .downcast_ref::<Internal<Message, Theme, Renderer>>();
+        let _ = self.element.replace(Some(current.element.clone()));
     }
 }
 
 struct Internal<Message, Theme, Renderer> {
     element: Rc<RefCell<Option<Element<'static, Message, Theme, Renderer>>>>,
     hash: u64,
-}
-
-impl<'a, Message, Theme, Renderer, Dependency, View> Widget<Message, Theme, Renderer>
-    for Lazy<'a, Message, Theme, Renderer, Dependency, View>
-where
-    View: Into<Element<'static, Message, Theme, Renderer>> + 'static,
-    Dependency: Hash + 'a,
-    Message: 'static,
-    Theme: 'static,
-    Renderer: core::Renderer + 'static,
-{
-    fn tag(&self) -> tree::Tag {
-        struct Tag<T>(T);
-        tree::Tag::of::<Tag<View>>()
-    }
-
-    fn state(&self) -> tree::State {
-        let hash = {
-            let mut hasher = FxHasher::default();
-            self.dependency.hash(&mut hasher);
-
-            hasher.finish()
-        };
-
-        let element = Rc::new(RefCell::new(Some((self.view)(&self.dependency).into())));
-
-        (*self.element.borrow_mut()) = Some(element.clone());
-
-        tree::State::new(Internal { element, hash })
-    }
-
-    fn diff(&mut self, tree: &mut Tree) {
-        let new_hash = {
-            let mut hasher = FxHasher::default();
-            self.dependency.hash(&mut hasher);
-
-            hasher.finish()
-        };
-
-        let (element, changed) = {
-            let current = tree
-                .state
-                .downcast_mut::<Internal<Message, Theme, Renderer>>();
-            let changed = current.hash != new_hash;
-
-            if changed {
-                current.hash = new_hash;
-                let element = (self.view)(&self.dependency).into();
-                current.element = Rc::new(RefCell::new(Some(element)));
-            }
-
-            (current.element.clone(), changed)
-        };
-
-        if changed {
-            tree.mark_dirty(
-                tree::DirtyFlags::LAYOUT | tree::DirtyFlags::PAINT | tree::DirtyFlags::SEMANTICS,
-            );
-        }
-
-        (*self.element.borrow_mut()) = Some(element);
-
-        self.with_element_mut(|element| {
-            tree.diff_children(std::slice::from_mut(&mut element.as_widget_mut()));
-        });
-
-        if tree.dirty().contains(tree::DirtyFlags::LAYOUT) {
-            for child in &mut tree.children {
-                child.mark_dirty(tree::DirtyFlags::LAYOUT);
-            }
-        }
-    }
-
-    fn size(&self) -> Size<Length> {
-        self.with_element(|element| element.as_widget().size())
-    }
-
-    fn layout(
-        &mut self,
-        tree: &mut Tree,
-        renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        self.ensure_element(tree);
-        let node = self.with_element_mut(|element| {
-            tree.children[0].layout_with_cache(*limits, |child| {
-                element.as_widget_mut().layout(child, renderer, limits)
-            })
-        });
-        tree.clear_dirty(tree::DirtyFlags::LAYOUT);
-        node
-    }
-
-    fn visit_children(
-        &mut self,
-        tree: &mut Tree,
-        layout: Layout<'_>,
-        visit: &mut dyn FnMut(&mut dyn visit::Visit),
-    ) {
-        self.ensure_element(tree);
-        self.with_element_mut(|element| {
-            visit(&mut visit::Widgets::new(
-                element.as_widget_mut(),
-                &mut tree.children[0],
-                layout,
-            ));
-        });
-    }
-
-    fn operate(
-        &mut self,
-        tree: &mut Tree,
-        layout: Layout<'_>,
-        renderer: &Renderer,
-        operation: &mut dyn widget::Operation,
-    ) {
-        self.ensure_element(tree);
-        self.with_element_mut(|element| {
-            element
-                .as_widget_mut()
-                .operate(&mut tree.children[0], layout, renderer, operation);
-        });
-    }
-
-    fn update(
-        &mut self,
-        tree: &mut Tree,
-        event: &Event,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &Renderer,
-        shell: &mut Shell<'_, Message>,
-        viewport: &Rectangle,
-    ) {
-        self.ensure_element(tree);
-        self.with_element_mut(|element| {
-            element.as_widget_mut().update(
-                &mut tree.children[0],
-                event,
-                layout,
-                cursor,
-                renderer,
-                shell,
-                viewport,
-            );
-        });
-
-        if shell.is_layout_invalid().is_some() {
-            tree.children[0].mark_dirty(tree::DirtyFlags::LAYOUT);
-            tree.mark_dirty(tree::DirtyFlags::LAYOUT | tree::DirtyFlags::PAINT);
-        }
-
-        if shell.are_widgets_invalid() {
-            tree.children[0].mark_dirty(tree::DirtyFlags::all());
-            tree.mark_dirty(tree::DirtyFlags::all());
-        }
-
-        if shell.is_semantics_invalid() {
-            tree.children[0].mark_dirty(tree::DirtyFlags::SEMANTICS);
-            tree.mark_dirty(tree::DirtyFlags::SEMANTICS);
-        }
-    }
-
-    fn mouse_interaction(
-        &self,
-        tree: &Tree,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-        renderer: &Renderer,
-    ) -> mouse::Interaction {
-        self.ensure_element(tree);
-        self.with_element(|element| {
-            element.as_widget().mouse_interaction(
-                &tree.children[0],
-                layout,
-                cursor,
-                viewport,
-                renderer,
-            )
-        })
-    }
-
-    fn draw(
-        &self,
-        tree: &Tree,
-        renderer: &mut Renderer,
-        theme: &Theme,
-        style: &renderer::Style,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-    ) {
-        self.ensure_element(tree);
-        self.with_element(|element| {
-            let child = &tree.children[0];
-            let mut hasher = FxHasher::default();
-            child.id().hash(&mut hasher);
-            let key = hasher.finish();
-            let revision = child.revision().value();
-            let bounds = layout.bounds();
-
-            if !renderer.replay_retained_layer(key, revision, bounds) {
-                renderer.start_retained_layer(key, revision, bounds);
-                element
-                    .as_widget()
-                    .draw(child, renderer, theme, style, layout, cursor, viewport);
-                renderer.end_retained_layer();
-            }
-        });
-    }
-
-    fn overlay<'b>(
-        &'b mut self,
-        tree: &'b mut Tree,
-        layout: Layout<'b>,
-        renderer: &Renderer,
-        viewport: &Rectangle,
-        translation: Vector,
-    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
-        self.ensure_element(tree);
-        let overlay = InnerBuilder {
-            cell: self.element.borrow().as_ref().unwrap().clone(),
-            element: self
-                .element
-                .borrow()
-                .as_ref()
-                .unwrap()
-                .borrow_mut()
-                .take()
-                .unwrap(),
-            tree: &mut tree.children[0],
-            layout,
-            overlay_builder: |element, tree, layout| {
-                element
-                    .as_widget_mut()
-                    .overlay(tree, *layout, renderer, viewport, translation)
-                    .map(|overlay| RefCell::new(overlay::Nested::new(overlay)))
-            },
-        }
-        .build();
-
-        #[allow(clippy::redundant_closure_for_method_calls)]
-        if overlay.with_overlay(|overlay| overlay.is_some()) {
-            Some(overlay::Element::new(Box::new(Overlay(Some(overlay)))))
-        } else {
-            let heads = overlay.into_heads();
-
-            // - You may not like it, but this is what peak performance looks like
-            // - TODO: Get rid of ouroboros, for good
-            // - What?!
-            *self.element.borrow().as_ref().unwrap().borrow_mut() = Some(heads.element);
-
-            None
-        }
-    }
+    layer_key: Option<u64>,
 }
 
 #[self_referencing]
@@ -375,82 +119,6 @@ struct Inner<'a, Message: 'a, Theme: 'a, Renderer: 'a> {
 }
 
 struct Overlay<'a, Message, Theme, Renderer>(Option<Inner<'a, Message, Theme, Renderer>>);
-
-impl<Message, Theme, Renderer> Drop for Overlay<'_, Message, Theme, Renderer> {
-    fn drop(&mut self) {
-        let heads = self.0.take().unwrap().into_heads();
-        (*heads.cell.borrow_mut()) = Some(heads.element);
-    }
-}
-
-impl<Message, Theme, Renderer> Overlay<'_, Message, Theme, Renderer> {
-    fn with_overlay_maybe<T>(
-        &self,
-        f: impl FnOnce(&mut overlay::Nested<'_, Message, Theme, Renderer>) -> T,
-    ) -> Option<T> {
-        self.0
-            .as_ref()
-            .unwrap()
-            .with_overlay(|overlay| overlay.as_ref().map(|nested| (f)(&mut nested.borrow_mut())))
-    }
-
-    fn with_overlay_mut_maybe<T>(
-        &mut self,
-        f: impl FnOnce(&mut overlay::Nested<'_, Message, Theme, Renderer>) -> T,
-    ) -> Option<T> {
-        self.0
-            .as_mut()
-            .unwrap()
-            .with_overlay_mut(|overlay| overlay.as_mut().map(|nested| (f)(nested.get_mut())))
-    }
-}
-
-impl<Message, Theme, Renderer> overlay::Overlay<Message, Theme, Renderer>
-    for Overlay<'_, Message, Theme, Renderer>
-where
-    Renderer: core::Renderer,
-{
-    fn layout(&mut self, renderer: &Renderer, bounds: Size) -> layout::Node {
-        self.with_overlay_maybe(|overlay| overlay.layout(renderer, bounds))
-            .unwrap_or_default()
-    }
-
-    fn draw(
-        &self,
-        renderer: &mut Renderer,
-        theme: &Theme,
-        style: &renderer::Style,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-    ) {
-        let _ = self.with_overlay_maybe(|overlay| {
-            overlay.draw(renderer, theme, style, layout, cursor);
-        });
-    }
-
-    fn mouse_interaction(
-        &self,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &Renderer,
-    ) -> mouse::Interaction {
-        self.with_overlay_maybe(|overlay| overlay.mouse_interaction(layout, cursor, renderer))
-            .unwrap_or_default()
-    }
-
-    fn update(
-        &mut self,
-        event: &Event,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &Renderer,
-        shell: &mut Shell<'_, Message>,
-    ) {
-        let _ = self.with_overlay_mut_maybe(|overlay| {
-            overlay.update(event, layout, cursor, renderer, shell);
-        });
-    }
-}
 
 impl<'a, Message, Theme, Renderer, Dependency, View>
     From<Lazy<'a, Message, Theme, Renderer, Dependency, View>>

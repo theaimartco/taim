@@ -30,122 +30,76 @@ pub trait Scrollable {
 /// Produces an [`Operation`] that snaps the widget with the given [`Id`] to
 /// the provided `percentage`.
 pub fn snap_to<T>(target: Id, offset: RelativeOffset<Option<f32>>) -> impl Operation<T> {
-    struct SnapTo {
-        target: Id,
-        offset: RelativeOffset<Option<f32>>,
-    }
-
-    impl<T> Operation<T> for SnapTo {
-        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>)) {
-            operate(self);
-        }
-
-        fn scrollable(
-            &mut self,
-            id: Option<&Id>,
-            _bounds: Rectangle,
-            _content_bounds: Rectangle,
-            _translation: Vector,
-            state: &mut dyn Scrollable,
-        ) {
-            if Some(&self.target) == id {
-                state.snap_to(self.offset);
-            }
-        }
-    }
-
-    SnapTo { target, offset }
+    TargetScroll::new(target, ScrollCommand::Snap(offset))
 }
 
 /// Produces an [`Operation`] that scrolls the widget with the given [`Id`] to
 /// the provided [`AbsoluteOffset`].
 pub fn scroll_to<T>(target: Id, offset: AbsoluteOffset<Option<f32>>) -> impl Operation<T> {
-    struct ScrollTo {
-        target: Id,
-        offset: AbsoluteOffset<Option<f32>>,
-    }
-
-    impl<T> Operation<T> for ScrollTo {
-        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>)) {
-            operate(self);
-        }
-
-        fn scrollable(
-            &mut self,
-            id: Option<&Id>,
-            _bounds: Rectangle,
-            _content_bounds: Rectangle,
-            _translation: Vector,
-            state: &mut dyn Scrollable,
-        ) {
-            if Some(&self.target) == id {
-                state.scroll_to(self.offset);
-            }
-        }
-    }
-
-    ScrollTo { target, offset }
+    TargetScroll::new(target, ScrollCommand::To(offset))
 }
 
 /// Produces an [`Operation`] that scrolls the widget with the given [`Id`] by
 /// the provided [`AbsoluteOffset`].
 pub fn scroll_by<T>(target: Id, offset: AbsoluteOffset) -> impl Operation<T> {
-    struct ScrollBy {
-        target: Id,
-        offset: AbsoluteOffset,
-    }
-
-    impl<T> Operation<T> for ScrollBy {
-        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>)) {
-            operate(self);
-        }
-
-        fn scrollable(
-            &mut self,
-            id: Option<&Id>,
-            bounds: Rectangle,
-            content_bounds: Rectangle,
-            _translation: Vector,
-            state: &mut dyn Scrollable,
-        ) {
-            if Some(&self.target) == id {
-                state.scroll_by(self.offset, bounds, content_bounds);
-            }
-        }
-    }
-
-    ScrollBy { target, offset }
+    TargetScroll::new(target, ScrollCommand::By(offset))
 }
 
 /// Produces an [`Operation`] that shifts the scroll position of the
 /// widget with the given [`Id`] by `delta`, without treating it as a
 /// user-initiated scroll (see [`Scrollable::adjust_offset`]).
 pub fn adjust_offset<T>(target: Id, delta: Vector) -> impl Operation<T> {
-    struct AdjustOffset {
-        target: Id,
-        delta: Vector,
+    TargetScroll::new(target, ScrollCommand::Adjust(delta))
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ScrollCommand {
+    Snap(RelativeOffset<Option<f32>>),
+    To(AbsoluteOffset<Option<f32>>),
+    By(AbsoluteOffset),
+    Adjust(Vector),
+}
+
+/// One compact traversal implementation for every targeted scroll mutation.
+/// This keeps one virtual-dispatch shape in the instruction cache while still
+/// applying to every matching custom ID, preserving the public contract.
+struct TargetScroll {
+    target: Id,
+    command: ScrollCommand,
+}
+
+impl TargetScroll {
+    fn new(target: Id, command: ScrollCommand) -> Self {
+        Self { target, command }
+    }
+}
+
+impl<T> Operation<T> for TargetScroll {
+    fn traverse(&mut self, visit: &mut dyn FnMut(&mut dyn Operation<T>)) {
+        visit(self);
     }
 
-    impl<T> Operation<T> for AdjustOffset {
-        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>)) {
-            operate(self);
+    fn scrollable(
+        &mut self,
+        id: Option<&Id>,
+        bounds: Rectangle,
+        content_bounds: Rectangle,
+        _translation: Vector,
+        state: &mut dyn Scrollable,
+    ) {
+        if id != Some(&self.target) {
+            return;
         }
 
-        fn scrollable(
-            &mut self,
-            id: Option<&Id>,
-            bounds: Rectangle,
-            content_bounds: Rectangle,
-            _translation: Vector,
-            state: &mut dyn Scrollable,
-        ) {
-            if Some(&self.target) == id {
-                state.adjust_offset(self.delta, bounds, content_bounds);
+        match self.command {
+            ScrollCommand::Snap(offset) => state.snap_to(offset),
+            ScrollCommand::To(offset) => state.scroll_to(offset),
+            ScrollCommand::By(offset) => state.scroll_by(offset, bounds, content_bounds),
+            ScrollCommand::Adjust(delta) => {
+                state.adjust_offset(delta, bounds, content_bounds);
             }
         }
     }
-
-    AdjustOffset { target, delta }
 }
 
 /// The amount of absolute offset in each direction of a [`Scrollable`].

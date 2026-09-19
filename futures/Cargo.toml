@@ -25,6 +25,7 @@ taim_core.workspace = true
 futures.workspace = true
 log.workspace = true
 rustc-hash.workspace = true
+smallvec.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 smol.workspace = true

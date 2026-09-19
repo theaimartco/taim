@@ -109,29 +109,58 @@ mod static_assertions {
 #[test]
 fn every_catalog_has_a_theme_implementation() {
     use std::collections::BTreeSet;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
+
+    fn rust_sources(root: &Path) -> Vec<PathBuf> {
+        let mut pending = vec![root.to_path_buf()];
+        let mut sources = Vec::new();
+
+        while let Some(directory) = pending.pop() {
+            for entry in std::fs::read_dir(&directory).expect("widget source should be readable") {
+                let path = entry.expect("a readable directory entry").path();
+
+                if path.is_dir() {
+                    pending.push(path);
+                } else if path.extension().is_some_and(|extension| extension == "rs") {
+                    sources.push(path);
+                }
+            }
+        }
+
+        sources
+    }
+
+    fn public_catalog_module(widget_src: &Path, path: &Path) -> String {
+        let relative = path
+            .strip_prefix(widget_src)
+            .expect("catalogue source should live below widget/src");
+        let mut components = relative.components();
+        let first = components.next().expect("a catalogue module").as_os_str();
+
+        if first == "overlay" {
+            return path
+                .file_stem()
+                .expect("a named nested catalogue")
+                .to_string_lossy()
+                .into_owned();
+        }
+
+        Path::new(first)
+            .file_stem()
+            .expect("a named public catalogue")
+            .to_string_lossy()
+            .into_owned()
+    }
 
     let widget_src = Path::new(env!("CARGO_MANIFEST_DIR")).join("widget/src");
 
     let mut declared = BTreeSet::new();
 
-    for entry in std::fs::read_dir(&widget_src).expect("widget/src should be readable") {
-        let path = entry.expect("a readable directory entry").path();
-
-        if path.extension().is_none_or(|extension| extension != "rs") {
-            continue;
-        }
-
+    for path in rust_sources(&widget_src) {
         let source = std::fs::read_to_string(&path).expect("a readable widget module");
 
         if source.contains("pub trait Catalog") {
-            let module = path
-                .file_stem()
-                .expect("a named module")
-                .to_string_lossy()
-                .into_owned();
-
-            let _ = declared.insert(module);
+            let _ = declared.insert(public_catalog_module(&widget_src, &path));
         }
     }
 

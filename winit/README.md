@@ -9,7 +9,7 @@
 It exposes a renderer-agnostic `Application` trait that can be implemented and then run with a simple call. The use of this trait is optional. A `conversion` module is provided for users that decide to implement a custom event loop.
 
 <p align="center">
-  <img alt="The native target" src="../docs/graphs/native.png" width="80%">
+  <img alt="The native target" src="../docs/graphs/native.svg" width="80%">
 </p>
 
 [documentation]: https://docs.rs/taim_winit

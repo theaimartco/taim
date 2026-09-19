@@ -1,4 +1,5 @@
 //! Change internal widget state.
+use crate::core::Vector;
 use crate::core::widget::Id;
 use crate::core::widget::operation;
 use crate::task;
@@ -35,6 +36,16 @@ pub fn scroll_by<T>(id: impl Into<Id>, offset: AbsoluteOffset) -> Task<T> {
     task::effect(Action::widget(operation::scrollable::scroll_by(
         id.into(),
         offset,
+    )))
+}
+
+/// Applies a layout-driven scroll correction without firing a user-scroll
+/// callback. Virtualized lists use this when rows before the viewport change
+/// height, so the same content stays visually anchored.
+pub fn adjust_offset<T>(id: impl Into<Id>, delta: Vector) -> Task<T> {
+    task::effect(Action::widget(operation::scrollable::adjust_offset(
+        id.into(),
+        delta,
     )))
 }
 

@@ -64,6 +64,7 @@ fn a_typical_redraw_cycle_requests_submits_and_recovers_via_feedback() {
 
     // The deadline arrives; the event loop produces and submits a frame.
     assert!(scheduler.should_produce_frame(t(10)));
+    assert!(scheduler.begin_frame(t(10)));
     scheduler.submit(t(10));
 
     // While waiting on presentation feedback, no further frame should
@@ -78,16 +79,13 @@ fn a_typical_redraw_cycle_requests_submits_and_recovers_via_feedback() {
 #[test]
 fn an_animation_runs_for_several_ticks_then_stops_cleanly() {
     let mut scheduler = Scheduler::new();
+    scheduler.request_animation();
 
-    // A real animation subscription re-requests continuous redraws on
-    // every update, not just once (see `Shell::request_animation`'s own
-    // documentation): `feedback_received` returns to `Idle`, not back to
-    // `Animating`, specifically so a caller must keep affirming "yes,
-    // still animating" rather than being stuck animating forever from a
-    // single stale request.
+    // A continuous request stays live across presentation feedback until the
+    // UI explicitly reports that animation has stopped.
     for millis in [0, 16, 32, 48] {
-        scheduler.request_animation();
         assert!(scheduler.should_produce_frame(t(millis)));
+        assert!(scheduler.begin_frame(t(millis)));
         scheduler.submit(t(millis));
         scheduler.feedback_received();
     }
@@ -104,13 +102,9 @@ fn occlusion_interrupts_an_in_progress_animation_and_resuming_continues_it() {
 
     // A few ticks of animation happen normally.
     assert!(scheduler.should_produce_frame(t(0)));
+    assert!(scheduler.begin_frame(t(0)));
     scheduler.submit(t(0));
     scheduler.feedback_received();
-
-    // The animation subscription is still active at the moment
-    // occlusion happens (a real subscription re-requests on every
-    // update it processes, right up until it stops).
-    scheduler.request_animation();
 
     // The window becomes occluded mid-animation.
     scheduler.suspend();

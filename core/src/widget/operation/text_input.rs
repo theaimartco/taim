@@ -28,125 +28,69 @@ pub trait TextInput {
 /// Produces an [`Operation`] that moves the cursor of the widget with the given [`Id`] to the
 /// front.
 pub fn move_cursor_to_front<T>(target: Id) -> impl Operation<T> {
-    struct MoveCursor {
-        target: Id,
-    }
-
-    impl<T> Operation<T> for MoveCursor {
-        fn text_input(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn TextInput) {
-            match id {
-                Some(id) if id == &self.target => {
-                    state.move_cursor_to_front();
-                }
-                _ => {}
-            }
-        }
-
-        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>)) {
-            operate(self);
-        }
-    }
-
-    MoveCursor { target }
+    TargetEdit::new(target, Edit::MoveFront)
 }
 
 /// Produces an [`Operation`] that moves the cursor of the widget with the given [`Id`] to the
 /// end.
 pub fn move_cursor_to_end<T>(target: Id) -> impl Operation<T> {
-    struct MoveCursor {
-        target: Id,
-    }
-
-    impl<T> Operation<T> for MoveCursor {
-        fn text_input(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn TextInput) {
-            match id {
-                Some(id) if id == &self.target => {
-                    state.move_cursor_to_end();
-                }
-                _ => {}
-            }
-        }
-
-        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>)) {
-            operate(self);
-        }
-    }
-
-    MoveCursor { target }
+    TargetEdit::new(target, Edit::MoveEnd)
 }
 
 /// Produces an [`Operation`] that moves the cursor of the widget with the given [`Id`] to the
 /// provided position.
 pub fn move_cursor_to<T>(target: Id, position: usize) -> impl Operation<T> {
-    struct MoveCursor {
-        target: Id,
-        position: usize,
-    }
-
-    impl<T> Operation<T> for MoveCursor {
-        fn text_input(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn TextInput) {
-            match id {
-                Some(id) if id == &self.target => {
-                    state.move_cursor_to(self.position);
-                }
-                _ => {}
-            }
-        }
-
-        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>)) {
-            operate(self);
-        }
-    }
-
-    MoveCursor { target, position }
+    TargetEdit::new(target, Edit::MoveTo(position))
 }
 
 /// Produces an [`Operation`] that selects all the content of the widget with the given [`Id`].
 pub fn select_all<T>(target: Id) -> impl Operation<T> {
-    struct MoveCursor {
-        target: Id,
-    }
-
-    impl<T> Operation<T> for MoveCursor {
-        fn text_input(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn TextInput) {
-            match id {
-                Some(id) if id == &self.target => {
-                    state.select_all();
-                }
-                _ => {}
-            }
-        }
-
-        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>)) {
-            operate(self);
-        }
-    }
-
-    MoveCursor { target }
+    TargetEdit::new(target, Edit::SelectAll)
 }
 
 /// Produces an [`Operation`] that selects the given content range of the widget with the given [`Id`].
 pub fn select_range<T>(target: Id, start: usize, end: usize) -> impl Operation<T> {
-    struct SelectRange {
-        target: Id,
-        start: usize,
-        end: usize,
-    }
+    TargetEdit::new(target, Edit::SelectRange { start, end })
+}
 
-    impl<T> Operation<T> for SelectRange {
-        fn text_input(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn TextInput) {
-            match id {
-                Some(id) if id == &self.target => {
-                    state.select_range(self.start, self.end);
-                }
-                _ => {}
-            }
+#[derive(Clone, Copy)]
+enum Edit {
+    MoveFront,
+    MoveEnd,
+    MoveTo(usize),
+    SelectAll,
+    SelectRange { start: usize, end: usize },
+}
+
+/// Compact operation used by every programmatic text-field edit.
+/// A single dispatch body keeps command traversal small and predictable.
+struct TargetEdit {
+    target: Id,
+    edit: Edit,
+}
+
+impl TargetEdit {
+    fn new(target: Id, edit: Edit) -> Self {
+        Self { target, edit }
+    }
+}
+
+impl<T> Operation<T> for TargetEdit {
+    fn text_input(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn TextInput) {
+        if id != Some(&self.target) {
+            return;
         }
 
-        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>)) {
-            operate(self);
+        match self.edit {
+            Edit::MoveFront => state.move_cursor_to_front(),
+            Edit::MoveEnd => state.move_cursor_to_end(),
+            Edit::MoveTo(position) => state.move_cursor_to(position),
+            Edit::SelectAll => state.select_all(),
+            Edit::SelectRange { start, end } => state.select_range(start, end),
         }
     }
 
-    SelectRange { target, start, end }
+    fn traverse(&mut self, visit: &mut dyn FnMut(&mut dyn Operation<T>)) {
+        visit(self);
+    }
 }

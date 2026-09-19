@@ -85,7 +85,9 @@ where
     ///
     /// If any of the children have a [`Length::Fill`] strategy, you will need to
     /// call [`Row::width`] or [`Row::height`] accordingly.
-    pub fn from_vec(children: Vec<Element<'a, Message, Theme, Renderer>>) -> Self {
+    pub fn from_vec(mut children: Vec<Element<'a, Message, Theme, Renderer>>) -> Self {
+        children.retain(|child| !child.as_widget().is_void());
+
         Self {
             spacing: 0.0,
             padding: Padding::ZERO,
@@ -103,7 +105,7 @@ where
     /// method instead! While less flexible, it helps you keep spacing between
     /// elements consistent.
     pub fn spacing(mut self, amount: impl Into<Pixels>) -> Self {
-        self.spacing = amount.into().0;
+        self.spacing = finite_nonnegative(amount.into().0);
         self
     }
 
@@ -151,10 +153,19 @@ where
 
     /// Extends the [`Row`] with the given children.
     pub fn extend(
-        self,
+        mut self,
         children: impl IntoIterator<Item = Element<'a, Message, Theme, Renderer>>,
     ) -> Self {
-        children.into_iter().fold(self, Self::push)
+        let iterator = children.into_iter();
+        self.children.reserve(iterator.size_hint().0);
+
+        for child in iterator {
+            if !child.as_widget().is_void() {
+                self.children.push(child);
+            }
+        }
+
+        self
     }
 
     /// Turns the [`Row`] into a [`Wrapping`] row.
@@ -242,6 +253,8 @@ where
             self.width.hash_stable(hasher);
             self.height.hash_stable(hasher);
             hasher.write_u32(self.spacing.to_bits());
+            hash_padding(self.padding, hasher);
+            hasher.write_u8(alignment_tag(self.align));
         });
 
         let state = tree.state.downcast_mut::<State>();
@@ -373,11 +386,12 @@ where
                 .iter()
                 .zip(&tree.children)
                 .zip(layout.children())
-                .filter(|(_, layout)| layout.bounds().intersects(viewport))
             {
-                child
-                    .as_widget()
-                    .draw(tree, renderer, theme, style, layout, cursor, viewport);
+                let widget = child.as_widget();
+
+                if widget.paint_bounds(tree, layout).intersects(viewport) {
+                    widget.draw(tree, renderer, theme, style, layout, cursor, viewport);
+                }
             }
         }
     }
@@ -428,7 +442,7 @@ pub struct Wrapping<'a, Message, Theme = crate::Theme, Renderer = crate::Rendere
 impl<Message, Theme, Renderer> Wrapping<'_, Message, Theme, Renderer> {
     /// Sets the vertical spacing _between_ lines.
     pub fn vertical_spacing(mut self, amount: impl Into<Pixels>) -> Self {
-        self.vertical_spacing = Some(amount.into().0);
+        self.vertical_spacing = Some(finite_nonnegative(amount.into().0));
         self
     }
 
@@ -476,7 +490,7 @@ where
         let vertical_spacing = self.vertical_spacing.unwrap_or(spacing);
         let max_width = limits.max().width;
 
-        let mut children: Vec<layout::Node> = Vec::new();
+        let mut children = Vec::with_capacity(self.row.children.len());
         let mut intrinsic_size = Size::ZERO;
         let mut row_start = 0;
         let mut row_height = 0.0;
@@ -651,5 +665,31 @@ where
 {
     fn from(row: Wrapping<'a, Message, Theme, Renderer>) -> Self {
         Self::new(row)
+    }
+}
+
+#[inline]
+fn finite_nonnegative(value: f32) -> f32 {
+    if value.is_finite() {
+        value.max(0.0)
+    } else {
+        0.0
+    }
+}
+
+#[inline]
+fn hash_padding(padding: Padding, hasher: &mut dyn std::hash::Hasher) {
+    hasher.write_u32(padding.top.to_bits());
+    hasher.write_u32(padding.right.to_bits());
+    hasher.write_u32(padding.bottom.to_bits());
+    hasher.write_u32(padding.left.to_bits());
+}
+
+#[inline]
+const fn alignment_tag(alignment: Alignment) -> u8 {
+    match alignment {
+        Alignment::Start => 0,
+        Alignment::Center => 1,
+        Alignment::End => 2,
     }
 }

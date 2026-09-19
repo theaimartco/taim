@@ -33,31 +33,19 @@ struct SolidVertexOutput {
 fn solid_vs_main(input: SolidVertexInput) -> SolidVertexOutput {
     var out: SolidVertexOutput;
 
-    var pos: vec2<f32> = (input.pos + min(input.shadow_offset, vec2<f32>(0.0, 0.0)) - input.shadow_blur_radius) * globals.scale;
-    var scale: vec2<f32> = (input.scale + vec2<f32>(abs(input.shadow_offset.x), abs(input.shadow_offset.y)) + input.shadow_blur_radius * 2.0) * globals.scale;
-
-    var pos_snap = vec2<f32>(0.0, 0.0);
-    var scale_snap = vec2<f32>(0.0, 0.0);
-
-    if bool(input.snap) {
-        pos_snap = round(pos + vec2(0.001, 0.001)) - pos;
-        scale_snap = round(pos + scale + vec2(0.001, 0.001)) - pos - pos_snap - scale;
-    }
+    let rect = taim_snap_rect(
+        (input.pos + min(input.shadow_offset, vec2<f32>(0.0)) - input.shadow_blur_radius) * globals.scale,
+        (input.scale + abs(input.shadow_offset) + input.shadow_blur_radius * 2.0) * globals.scale,
+        bool(input.snap),
+    );
 
     let border_radius = min(input.border_radius, vec4(min(input.scale.x, input.scale.y) / 2.0));
 
-    var transform: mat4x4<f32> = mat4x4<f32>(
-        vec4<f32>(scale.x + scale_snap.x + 1.0, 0.0, 0.0, 0.0),
-        vec4<f32>(0.0, scale.y + scale_snap.y + 1.0, 0.0, 0.0),
-        vec4<f32>(0.0, 0.0, 1.0, 0.0),
-        vec4<f32>(pos + pos_snap - vec2<f32>(0.5, 0.5), 0.0, 1.0)
-    );
-
-    out.position = globals.transform * transform * vec4<f32>(vertex_position(input.vertex_index), 0.0, 1.0);
+    out.position = taim_quad_vertex(rect, input.vertex_index);
     out.color = premultiply(input.color);
     out.border_color = premultiply(input.border_color);
-    out.pos = input.pos * globals.scale + pos_snap;
-    out.scale = input.scale * globals.scale + scale_snap;
+    out.pos = input.pos * globals.scale + rect.position_delta;
+    out.scale = input.scale * globals.scale + rect.size_delta;
     out.border_radius = border_radius * globals.scale;
     out.border_width = input.border_width * globals.scale;
     out.shadow_color = premultiply(input.shadow_color);
@@ -75,7 +63,7 @@ fn solid_fs_main(
 ) -> @location(0) vec4<f32> {
     var mixed_color: vec4<f32> = input.color;
 
-    let sdf_point = -(input.position.xy - input.pos - input.scale * 0.5) * 2.0;
+    let sdf_point = taim_quad_sdf_point(input.position.xy, input.pos, input.scale);
 
     var dist = rounded_box_sdf(
         sdf_point,
@@ -91,53 +79,57 @@ fn solid_fs_main(
         );
     }
 
-    var quad_alpha: f32 = clamp(0.5-dist, 0.0, 1.0);
+    let quad_alpha = taim_quad_coverage(dist);
 
-    // Material shading. `sdf_point` is scaled by -2 relative to screen space,
-    // so its gradient is negated to point outwards on screen.
-    let sdf_gradient = -rounded_box_gradient(sdf_point, input.scale, input.border_radius * 2.0);
-
-    // What the quad transmits is part of its own colour, not something
-    // composited over it -- the hardware's alpha blend against the
-    // destination is what shows content through a *translucent* quad, and
-    // that shows it undisplaced. This is the refracted version.
-    //
-    // Gated so an opaque quad -- nearly every quad -- costs one comparison
-    // and no texture read.
-    if input.transmission > 0.0 && has_backdrop() {
-        let behind = quad_transmission(
-            dist,
-            sdf_gradient,
-            input.material,
-            input.transmission,
-            input.position.xy
-        );
-
-        // `mixed_color` is premultiplied (see `premultiply` in the vertex
-        // stage), so the sampled backdrop is premultiplied by the same alpha
-        // before mixing. Mixing a straight colour into a premultiplied one
-        // brightens every translucent pane.
-        mixed_color = vec4<f32>(
-            blend_transmission(
-                mixed_color.rgb,
-                behind * mixed_color.a,
-                input.material,
-                input.transmission,
-                dist,
-                sdf_gradient
-            ),
-            mixed_color.a
-        );
+    if (quad_alpha <= 0.0 && input.shadow_color.a <= 0.0) {
+        return vec4<f32>(0.0);
     }
 
     var quad_color = mixed_color * quad_alpha;
+    var highlight = 0.0;
+    let refracts = input.transmission > 0.0 && has_backdrop();
 
-    let highlight = quad_specular(
-        dist,
-        sdf_gradient,
-        input.material,
-        globals.light.xyz
-    );
+    // The default material has IOR 1 and no transmission. Avoid calculating
+    // an analytic normal for this overwhelmingly common case.
+    if (refracts || input.material.z > 1.0) {
+        let sdf_gradient = -rounded_box_gradient(
+            sdf_point,
+            input.scale,
+            input.border_radius * 2.0
+        );
+
+        if (refracts) {
+            let behind = quad_transmission(
+                dist,
+                sdf_gradient,
+                input.material,
+                input.transmission,
+                input.position.xy
+            );
+
+            mixed_color = vec4<f32>(
+                blend_transmission(
+                    mixed_color.rgb,
+                    behind * mixed_color.a,
+                    input.material,
+                    input.transmission,
+                    dist,
+                    sdf_gradient
+                ),
+                mixed_color.a
+            );
+            quad_color = mixed_color * quad_alpha;
+        }
+
+        if (input.material.z > 1.0) {
+            highlight = quad_specular(
+                dist,
+                sdf_gradient,
+                input.material,
+                globals.light.xyz
+            );
+        }
+    }
 
     // Additive light, premultiplied by coverage to match `quad_color`. Alpha
     // is untouched: a highlight adds light, not opacity.

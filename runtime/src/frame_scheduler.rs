@@ -56,7 +56,7 @@
 
 use crate::core::time::{Duration, Instant};
 
-use std::collections::BTreeSet;
+use rustc_hash::FxHashSet;
 
 /// Stable identifier for a registered motion source.
 ///
@@ -82,7 +82,50 @@ pub const FEEDBACK_TIMEOUT: Duration = Duration::from_millis(200);
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scheduler {
     state: State,
-    active_motions: BTreeSet<MotionId>,
+    active_motions: FxHashSet<MotionId>,
+}
+
+/// Work queued while a submitted frame waits for presentation feedback.
+/// Kept inline in [`State`] so the steady animation path never allocates.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ResumeState {
+    Idle,
+    Requested { deadline: Instant },
+    Animating,
+}
+
+/// A non-recursive snapshot retained while frame production is suspended.
+/// Keeping this inline avoids a heap allocation on every minimize/occlusion
+/// transition.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum SuspendedState {
+    Idle,
+    Requested {
+        deadline: Instant,
+    },
+    Animating,
+    Submitted {
+        submitted_at: Instant,
+        resume_to: ResumeState,
+    },
+}
+
+impl SuspendedState {
+    #[inline]
+    fn restore(self) -> State {
+        match self {
+            Self::Idle => State::Idle,
+            Self::Requested { deadline } => State::Requested { deadline },
+            Self::Animating => State::Animating,
+            Self::Submitted {
+                submitted_at,
+                resume_to,
+            } => State::Submitted {
+                submitted_at,
+                resume_to,
+            },
+        }
+    }
 }
 
 /// The current state of a [`Scheduler`].
@@ -101,12 +144,15 @@ enum State {
     /// A frame's work has been submitted to the backend and the
     /// scheduler is waiting for presentation feedback (or
     /// [`FEEDBACK_TIMEOUT`]) before producing another.
-    Submitted { submitted_at: Instant },
+    Submitted {
+        submitted_at: Instant,
+        resume_to: ResumeState,
+    },
     /// The surface is fully occluded or the application is suspended;
     /// no frames are produced regardless of any pending request.
     /// Remembers what was pending so [`Scheduler::resume`] can restore
     /// it.
-    Suspended { resume_to: Box<State> },
+    Suspended { resume_to: SuspendedState },
 }
 
 impl Scheduler {
@@ -114,7 +160,7 @@ impl Scheduler {
     pub fn new() -> Self {
         Self {
             state: State::Idle,
-            active_motions: BTreeSet::new(),
+            active_motions: FxHashSet::default(),
         }
     }
 
@@ -125,32 +171,20 @@ impl Scheduler {
     /// (matching [`crate::core::window::RedrawRequest`]'s own
     /// `min`-based coalescing) -- multiple widgets asking for a redraw
     /// produces one frame at the earliest requested time, not one frame
-    /// per request. Requesting while [`State::Animating`] or
-    /// [`State::Submitted`] does not downgrade either state; an
-    /// in-progress continuous redraw loop or an already-submitted frame
-    /// already implies "a frame is coming."
+    /// per request. Animating already implies another frame; a request made
+    /// while submitted is retained for the first frame after feedback.
     pub fn request_redraw_at(&mut self, deadline: Instant) {
         match &mut self.state {
             State::Idle => self.state = State::Requested { deadline },
             State::Requested {
                 deadline: existing, ..
             } => *existing = (*existing).min(deadline),
-            State::Animating | State::Submitted { .. } => {}
-            State::Suspended { resume_to } => {
-                Self::request_redraw_at_boxed(resume_to, deadline);
+            State::Animating => {}
+            State::Submitted { resume_to, .. } => {
+                request_after_submit(resume_to, deadline);
             }
-        }
-    }
-
-    fn request_redraw_at_boxed(state: &mut State, deadline: Instant) {
-        match state {
-            State::Idle => *state = State::Requested { deadline },
-            State::Requested {
-                deadline: existing, ..
-            } => *existing = (*existing).min(deadline),
-            State::Animating | State::Submitted { .. } => {}
             State::Suspended { resume_to } => {
-                Self::request_redraw_at_boxed(resume_to, deadline);
+                request_while_suspended(resume_to, deadline);
             }
         }
     }
@@ -167,8 +201,9 @@ impl Scheduler {
     pub fn request_animation(&mut self) {
         match &mut self.state {
             State::Idle | State::Requested { .. } => self.state = State::Animating,
-            State::Animating | State::Submitted { .. } => {}
-            State::Suspended { resume_to } => **resume_to = State::Animating,
+            State::Animating => {}
+            State::Submitted { resume_to, .. } => *resume_to = ResumeState::Animating,
+            State::Suspended { resume_to } => request_animation_while_suspended(resume_to),
         }
     }
 
@@ -207,16 +242,7 @@ impl Scheduler {
             return;
         }
 
-        match &mut self.state {
-            State::Animating => self.state = State::Idle,
-            State::Suspended { resume_to } if matches!(**resume_to, State::Animating) => {
-                **resume_to = State::Idle;
-            }
-            State::Idle
-            | State::Requested { .. }
-            | State::Submitted { .. }
-            | State::Suspended { .. } => {}
-        }
+        stop_animation_in(&mut self.state);
     }
 
     /// Suspends frame production: the surface is fully occluded or the
@@ -229,10 +255,21 @@ impl Scheduler {
     pub fn suspend(&mut self) {
         if !matches!(self.state, State::Suspended { .. }) {
             let previous = std::mem::replace(&mut self.state, State::Idle);
-
-            self.state = State::Suspended {
-                resume_to: Box::new(previous),
+            let resume_to = match previous {
+                State::Idle => SuspendedState::Idle,
+                State::Requested { deadline } => SuspendedState::Requested { deadline },
+                State::Animating => SuspendedState::Animating,
+                State::Submitted {
+                    submitted_at,
+                    resume_to,
+                } => SuspendedState::Submitted {
+                    submitted_at,
+                    resume_to,
+                },
+                State::Suspended { .. } => unreachable!(),
             };
+
+            self.state = State::Suspended { resume_to };
         }
     }
 
@@ -242,8 +279,12 @@ impl Scheduler {
     ///
     /// A no-op if not currently suspended.
     pub fn resume(&mut self) {
-        if let State::Suspended { resume_to } = &self.state {
-            self.state = *resume_to.clone();
+        let state = std::mem::replace(&mut self.state, State::Idle);
+
+        if let State::Suspended { resume_to } = state {
+            self.state = resume_to.restore();
+        } else {
+            self.state = state;
         }
     }
 
@@ -263,16 +304,22 @@ impl Scheduler {
     /// surface in the first place; this guards against a caller that
     /// raced past a suspend event).
     pub fn submit(&mut self, now: Instant) {
-        if !self.is_suspended() {
-            self.state = State::Submitted { submitted_at: now };
-        }
+        let resume_to = match self.state {
+            State::Idle => ResumeState::Idle,
+            State::Requested { deadline } => ResumeState::Requested { deadline },
+            State::Animating => ResumeState::Animating,
+            State::Submitted { .. } | State::Suspended { .. } => return,
+        };
+
+        self.state = State::Submitted {
+            submitted_at: now,
+            resume_to,
+        };
     }
 
-    /// Reports that presentation feedback for the most recently
-    /// submitted frame has arrived. The scheduler returns to
-    /// [`State::Idle`] unless an explicitly registered motion remains
-    /// active, in which case it resumes [`State::Animating`] without
-    /// waiting out [`FEEDBACK_TIMEOUT`].
+    /// Reports that presentation feedback for the most recently submitted
+    /// frame has arrived. Work requested while the frame was being built is
+    /// restored without waiting out [`FEEDBACK_TIMEOUT`].
     ///
     /// A no-op if not currently [`State::Submitted`] (e.g. feedback
     /// arriving after a timeout already recovered the scheduler, or a
@@ -292,7 +339,7 @@ impl Scheduler {
     /// Call this once per event-loop iteration, before checking
     /// [`Scheduler::should_produce_frame`].
     pub fn tick(&mut self, now: Instant) {
-        if let State::Submitted { submitted_at } = self.state
+        if let State::Submitted { submitted_at, .. } = self.state
             && now.saturating_duration_since(submitted_at) >= FEEDBACK_TIMEOUT
         {
             self.resume_after_submission();
@@ -316,6 +363,30 @@ impl Scheduler {
         }
     }
 
+    /// Claims the frame that is ready at `now`.
+    ///
+    /// A due one-shot deadline is consumed before UI work starts, so redraws
+    /// requested by that UI work remain queued for the following frame instead
+    /// of being confused with the request that triggered the current one.
+    pub fn begin_frame(&mut self, now: Instant) -> bool {
+        match self.state {
+            State::Requested { deadline } if now >= deadline => {
+                self.state = State::Idle;
+                true
+            }
+            State::Animating => true,
+            State::Idle
+            | State::Requested { .. }
+            | State::Submitted { .. }
+            | State::Suspended { .. } => false,
+        }
+    }
+
+    /// Returns whether no visible frame work is pending.
+    pub fn is_idle(&self) -> bool {
+        matches!(self.state, State::Idle | State::Suspended { .. })
+    }
+
     /// Returns the deadline a caller's event loop should wait until
     /// before checking [`Scheduler::should_produce_frame`] again (e.g.
     /// to compute a `ControlFlow::WaitUntil` target), or `None` if no
@@ -331,21 +402,84 @@ impl Scheduler {
         match self.state {
             State::Idle | State::Animating => None,
             State::Requested { deadline } => Some(deadline),
-            State::Submitted { submitted_at } => Some(submitted_at + FEEDBACK_TIMEOUT),
+            State::Submitted { submitted_at, .. } => Some(submitted_at + FEEDBACK_TIMEOUT),
             State::Suspended { .. } => None,
         }
     }
 
-    /// Restores the appropriate state after presentation feedback. Explicitly
-    /// registered motion remains active across submit/feedback boundaries;
-    /// legacy one-shot `request_animation` callers retain their historical
-    /// behavior of re-requesting on the next widget update.
+    /// Restores work queued while the submitted frame was being built.
     fn resume_after_submission(&mut self) {
-        self.state = if self.active_motions.is_empty() {
-            State::Idle
-        } else {
-            State::Animating
+        let State::Submitted { resume_to, .. } = self.state else {
+            return;
         };
+
+        self.state = if !self.active_motions.is_empty() {
+            State::Animating
+        } else {
+            match resume_to {
+                ResumeState::Idle => State::Idle,
+                ResumeState::Requested { deadline } => State::Requested { deadline },
+                ResumeState::Animating => State::Animating,
+            }
+        };
+    }
+}
+
+#[inline]
+fn request_after_submit(resume_to: &mut ResumeState, deadline: Instant) {
+    match resume_to {
+        ResumeState::Idle => *resume_to = ResumeState::Requested { deadline },
+        ResumeState::Requested { deadline: existing } => *existing = (*existing).min(deadline),
+        ResumeState::Animating => {}
+    }
+}
+
+#[inline]
+fn request_while_suspended(state: &mut SuspendedState, deadline: Instant) {
+    match state {
+        SuspendedState::Idle => *state = SuspendedState::Requested { deadline },
+        SuspendedState::Requested { deadline: existing } => *existing = (*existing).min(deadline),
+        SuspendedState::Animating => {}
+        SuspendedState::Submitted { resume_to, .. } => {
+            request_after_submit(resume_to, deadline);
+        }
+    }
+}
+
+#[inline]
+fn request_animation_while_suspended(state: &mut SuspendedState) {
+    match state {
+        SuspendedState::Idle | SuspendedState::Requested { .. } => {
+            *state = SuspendedState::Animating;
+        }
+        SuspendedState::Animating => {}
+        SuspendedState::Submitted { resume_to, .. } => *resume_to = ResumeState::Animating,
+    }
+}
+
+fn stop_animation_in(state: &mut State) {
+    match state {
+        State::Animating => *state = State::Idle,
+        State::Submitted { resume_to, .. } if matches!(*resume_to, ResumeState::Animating) => {
+            *resume_to = ResumeState::Idle;
+        }
+        State::Suspended { resume_to } => stop_animation_while_suspended(resume_to),
+        State::Idle | State::Requested { .. } | State::Submitted { .. } => {}
+    }
+}
+
+#[inline]
+fn stop_animation_while_suspended(state: &mut SuspendedState) {
+    match state {
+        SuspendedState::Animating => *state = SuspendedState::Idle,
+        SuspendedState::Submitted { resume_to, .. }
+            if matches!(*resume_to, ResumeState::Animating) =>
+        {
+            *resume_to = ResumeState::Idle;
+        }
+        SuspendedState::Idle
+        | SuspendedState::Requested { .. }
+        | SuspendedState::Submitted { .. } => {}
     }
 }
 
@@ -430,19 +564,34 @@ mod tests {
     }
 
     #[test]
-    fn submitting_a_frame_blocks_further_production_until_feedback() {
+    fn submitting_a_frame_blocks_then_restores_continuous_animation() {
         let mut scheduler = Scheduler::new();
         scheduler.request_animation();
+        assert!(scheduler.begin_frame(t(0)));
         scheduler.submit(t(0));
 
         assert!(!scheduler.should_produce_frame(t(1)));
 
         scheduler.feedback_received();
 
-        // Feedback returns to Idle, not back to Animating: a caller
-        // that wants to keep animating must ask again (mirroring how a
-        // real animation subscription re-requests every tick).
-        assert!(!scheduler.should_produce_frame(t(2)));
+        assert!(scheduler.should_produce_frame(t(2)));
+
+        scheduler.stop_animating();
+        assert!(!scheduler.should_produce_frame(t(3)));
+    }
+
+    #[test]
+    fn a_redraw_requested_during_a_frame_survives_feedback() {
+        let mut scheduler = Scheduler::new();
+        scheduler.request_redraw_at(t(10));
+
+        assert!(scheduler.begin_frame(t(10)));
+        scheduler.request_redraw_at(t(20));
+        scheduler.submit(t(10));
+        scheduler.feedback_received();
+
+        assert!(!scheduler.should_produce_frame(t(19)));
+        assert!(scheduler.should_produce_frame(t(20)));
     }
 
     #[test]

@@ -123,3 +123,150 @@ impl Default for Settings {
         }
     }
 }
+
+impl Settings {
+    /// Sets the requested initial logical size.
+    pub fn with_size(mut self, size: Size) -> Self {
+        self.size = size;
+        self
+    }
+
+    /// Sets the minimum logical size constraint.
+    pub fn with_min_size(mut self, size: Option<Size>) -> Self {
+        self.min_size = size;
+        self
+    }
+
+    /// Sets the maximum logical size constraint.
+    pub fn with_max_size(mut self, size: Option<Size>) -> Self {
+        self.max_size = size;
+        self
+    }
+
+    /// Sets both logical size constraints in one pass.
+    pub fn with_size_limits(mut self, minimum: Option<Size>, maximum: Option<Size>) -> Self {
+        self.min_size = minimum;
+        self.max_size = maximum;
+        self
+    }
+
+    /// Sets the initial window position.
+    pub fn with_position(mut self, position: Position) -> Self {
+        self.position = position;
+        self
+    }
+
+    /// Sets initial visibility.
+    pub fn with_visibility(mut self, visible: bool) -> Self {
+        self.visible = visible;
+        self
+    }
+
+    /// Returns the effective initial size after normalization.
+    pub fn effective_size(&self) -> Size {
+        normalized_geometry(self.size, self.min_size, self.max_size).0
+    }
+
+    /// Normalizes geometry before it crosses into a platform window API.
+    ///
+    /// Non-finite/negative constraints are discarded, the maximum is raised
+    /// to the minimum when they conflict, and the initial size is clamped to
+    /// the resulting range. This keeps backend-specific APIs from receiving
+    /// NaN or impossible window geometry.
+    pub fn normalized(mut self) -> Self {
+        (self.size, self.min_size, self.max_size) =
+            normalized_geometry(self.size, self.min_size, self.max_size);
+        self
+    }
+}
+
+fn normalized_geometry(
+    requested: Size,
+    minimum: Option<Size>,
+    maximum: Option<Size>,
+) -> (Size, Option<Size>, Option<Size>) {
+    const DEFAULT: Size = Size::new(1024.0, 768.0);
+
+    let minimum = minimum.filter(|size| valid_constraint(*size, false));
+    let mut maximum = maximum.filter(|size| valid_constraint(*size, true));
+
+    if let (Some(minimum), Some(maximum)) = (minimum, &mut maximum) {
+        maximum.width = maximum.width.max(minimum.width);
+        maximum.height = maximum.height.max(minimum.height);
+    }
+
+    let mut size = Size::new(
+        positive_or(requested.width, DEFAULT.width),
+        positive_or(requested.height, DEFAULT.height),
+    );
+    if let Some(minimum) = minimum {
+        size.width = size.width.max(minimum.width);
+        size.height = size.height.max(minimum.height);
+    }
+    if let Some(maximum) = maximum {
+        size.width = size.width.min(maximum.width);
+        size.height = size.height.min(maximum.height);
+    }
+
+    (size, minimum, maximum)
+}
+
+fn valid_constraint(size: Size, strict: bool) -> bool {
+    let lower_bound = if strict { f32::MIN_POSITIVE } else { 0.0 };
+    size.width.is_finite()
+        && size.height.is_finite()
+        && size.width >= lower_bound
+        && size.height >= lower_bound
+}
+
+fn positive_or(value: f32, fallback: f32) -> f32 {
+    if value.is_finite() && value > 0.0 {
+        value
+    } else {
+        fallback
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Settings;
+    use crate::Size;
+
+    #[test]
+    fn normalization_rejects_invalid_geometry_and_resolves_conflicts() {
+        let settings = Settings {
+            size: Size::new(f32::NAN, -1.0),
+            min_size: Some(Size::new(800.0, 600.0)),
+            max_size: Some(Size::new(640.0, 480.0)),
+            ..Settings::default()
+        }
+        .normalized();
+
+        assert_eq!(settings.size, Size::new(800.0, 600.0));
+        assert_eq!(settings.max_size, Some(Size::new(800.0, 600.0)));
+    }
+
+    #[test]
+    fn effective_size_does_not_require_copying_the_icon() {
+        let settings = Settings {
+            size: Size::new(640.0, 480.0),
+            max_size: Some(Size::new(320.0, 240.0)),
+            ..Settings::default()
+        };
+
+        assert_eq!(settings.effective_size(), Size::new(320.0, 240.0));
+        assert_eq!(settings.normalized().size, Size::new(320.0, 240.0));
+    }
+
+    #[test]
+    fn zero_maximum_cannot_collapse_the_window() {
+        let settings = Settings {
+            max_size: Some(Size::new(0.0, 100.0)),
+            ..Settings::default()
+        }
+        .normalized();
+
+        assert_eq!(settings.max_size, None);
+        assert_eq!(settings.size, Size::new(1024.0, 768.0));
+    }
+}

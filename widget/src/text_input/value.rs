@@ -20,10 +20,12 @@ use unicode_segmentation::UnicodeSegmentation;
 /// formatting.
 ///
 /// [`TextInput`]: super::TextInput
-// TODO: Reduce allocations, cache results (?)
 #[derive(Clone)]
 pub struct Value {
-    graphemes: Vec<String>,
+    text: String,
+    /// UTF-8 byte offsets for every grapheme plus the terminal text length.
+    /// Keeping one contiguous buffer avoids a heap allocation per grapheme.
+    boundaries: Vec<usize>,
 }
 
 impl std::fmt::Debug for Value {
@@ -43,11 +45,10 @@ impl std::fmt::Debug for Value {
 impl Value {
     /// Creates a new [`Value`] from a string slice.
     pub fn new(string: &str) -> Self {
-        let graphemes = UnicodeSegmentation::graphemes(string, true)
-            .map(String::from)
-            .collect();
+        let text = string.to_owned();
+        let boundaries = Self::boundaries(&text);
 
-        Self { graphemes }
+        Self { text, boundaries }
     }
 
     /// Returns whether the [`Value`] is empty or not.
@@ -59,96 +60,154 @@ impl Value {
 
     /// Returns the total amount of graphemes in the [`Value`].
     pub fn len(&self) -> usize {
-        self.graphemes.len()
+        self.boundaries.len().saturating_sub(1)
     }
 
     /// Returns the position of the previous start of a word from the given
     /// grapheme `index`.
     pub fn previous_start_of_word(&self, index: usize) -> usize {
-        let previous_string = &self.graphemes[..index.min(self.graphemes.len())].concat();
+        let byte = self.byte_index(index);
+        let previous = &self.text[..byte];
 
-        UnicodeSegmentation::split_word_bound_indices(previous_string as &str)
+        UnicodeSegmentation::split_word_bound_indices(previous)
             .rfind(|(_, word)| !word.trim_start().is_empty())
-            .map(|(i, previous_word)| {
-                index
-                    - UnicodeSegmentation::graphemes(previous_word, true).count()
-                    - UnicodeSegmentation::graphemes(
-                        &previous_string[i + previous_word.len()..] as &str,
-                        true,
-                    )
-                    .count()
-            })
+            .map(|(byte, _word)| self.grapheme_at_byte(byte))
             .unwrap_or(0)
     }
 
     /// Returns the position of the next end of a word from the given grapheme
     /// `index`.
     pub fn next_end_of_word(&self, index: usize) -> usize {
-        let next_string = &self.graphemes[index.min(self.graphemes.len())..].concat();
+        let byte = self.byte_index(index);
+        let following = &self.text[byte..];
 
-        UnicodeSegmentation::split_word_bound_indices(next_string as &str)
+        UnicodeSegmentation::split_word_bound_indices(following)
             .find(|(_, word)| !word.trim_start().is_empty())
-            .map(|(i, next_word)| {
-                index
-                    + UnicodeSegmentation::graphemes(next_word, true).count()
-                    + UnicodeSegmentation::graphemes(&next_string[..i] as &str, true).count()
-            })
+            .map(|(offset, word)| self.grapheme_at_byte(byte + offset + word.len()))
             .unwrap_or(self.len())
     }
 
     /// Returns a new [`Value`] containing the graphemes from `start` until the
     /// given `end`.
     pub fn select(&self, start: usize, end: usize) -> Self {
-        let graphemes = self.graphemes[start.min(self.len())..end.min(self.len())].to_vec();
+        let start = self.byte_index(start);
+        let end = self.byte_index(end);
 
-        Self { graphemes }
+        Self::new(&self.text[start..end])
     }
 
     /// Returns a new [`Value`] containing the graphemes until the given
     /// `index`.
     pub fn until(&self, index: usize) -> Self {
-        let graphemes = self.graphemes[..index.min(self.len())].to_vec();
-
-        Self { graphemes }
+        Self::new(&self.text[..self.byte_index(index)])
     }
 
     /// Inserts a new `char` at the given grapheme `index`.
     pub fn insert(&mut self, index: usize, c: char) {
-        self.graphemes.insert(index, c.to_string());
-
-        self.graphemes = UnicodeSegmentation::graphemes(&self.to_string() as &str, true)
-            .map(String::from)
-            .collect();
+        self.text.insert(self.byte_index(index), c);
+        self.reindex();
     }
 
     /// Inserts a bunch of graphemes at the given grapheme `index`.
-    pub fn insert_many(&mut self, index: usize, mut value: Value) {
-        let _ = self
-            .graphemes
-            .splice(index..index, value.graphemes.drain(..));
+    pub fn insert_many(&mut self, index: usize, value: Value) {
+        if value.text.is_empty() {
+            return;
+        }
+        self.text.insert_str(self.byte_index(index), &value.text);
+        self.reindex();
     }
 
     /// Removes the grapheme at the given `index`.
     pub fn remove(&mut self, index: usize) {
-        let _ = self.graphemes.remove(index);
+        let start = self.boundaries[index];
+        let end = self.boundaries[index + 1];
+        self.text.replace_range(start..end, "");
+        self.reindex();
     }
 
     /// Removes the graphemes from `start` to `end`.
     pub fn remove_many(&mut self, start: usize, end: usize) {
-        let _ = self.graphemes.splice(start..end, std::iter::empty());
+        if start == end {
+            return;
+        }
+        let start = self.boundaries[start];
+        let end = self.boundaries[end];
+        self.text.replace_range(start..end, "");
+        self.reindex();
     }
 
     /// Returns a new [`Value`] with all its graphemes replaced with the
     /// dot ('•') character.
     pub fn secure(&self) -> Self {
-        Self {
-            graphemes: std::iter::repeat_n(String::from("•"), self.graphemes.len()).collect(),
-        }
+        Self::new(&"•".repeat(self.len()))
+    }
+
+    pub(super) fn as_str(&self) -> &str {
+        &self.text
+    }
+
+    fn byte_index(&self, grapheme: usize) -> usize {
+        self.boundaries[grapheme.min(self.len())]
+    }
+
+    #[inline]
+    fn grapheme_at_byte(&self, byte: usize) -> usize {
+        self.boundaries
+            .partition_point(|&start| start <= byte)
+            .saturating_sub(1)
+    }
+
+    fn reindex(&mut self) {
+        // Keep the buffer across keystrokes. A text field usually changes a
+        // character at a time, so reallocation per edit costs more than the
+        // grapheme scan itself for short UI strings.
+        self.boundaries.clear();
+        self.boundaries.extend(
+            UnicodeSegmentation::grapheme_indices(self.text.as_str(), true)
+                .map(|(index, _)| index),
+        );
+        self.boundaries.push(self.text.len());
+    }
+
+    fn boundaries(text: &str) -> Vec<usize> {
+        let mut boundaries = UnicodeSegmentation::grapheme_indices(text, true)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+
+        boundaries.push(text.len());
+        boundaries
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Value;
+
+    #[test]
+    fn editing_reuses_boundary_storage_and_handles_combining_marks() {
+        let mut value = Value::new("ábc");
+        value.boundaries.reserve(16);
+        let capacity = value.boundaries.capacity();
+
+        value.insert(1, 'x');
+        assert_eq!(value.len(), 4);
+        value.remove_many(1, 3);
+        assert_eq!(value.as_str(), "ác");
+        assert_eq!(value.len(), 2);
+        assert_eq!(value.boundaries.capacity(), capacity);
+    }
+
+    #[test]
+    fn word_navigation_uses_existing_grapheme_index() {
+        let value = Value::new("é blue 🦀");
+        assert_eq!(value.previous_start_of_word(value.len()), 7);
+        assert_eq!(value.next_end_of_word(0), 1);
+        assert_eq!(value.next_end_of_word(2), 6);
     }
 }
 
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.graphemes.concat())
+        f.write_str(&self.text)
     }
 }

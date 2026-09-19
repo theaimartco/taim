@@ -46,6 +46,7 @@ const REQUIRED_FRAME_TIME_FIELDS: &[&str] = &[
     "p95",
     "p99",
     "missed_frame_rate",
+    "build_p95",
     "update_p95",
     "draw_p95",
     "present_p95",
@@ -100,8 +101,8 @@ fn report_has_every_required_top_level_field() {
 
     assert_has_fields(&report, REQUIRED_TOP_LEVEL_FIELDS, "report");
     assert_eq!(
-        report["schema_version"], 1,
-        "schema_version must be 1 until a breaking change bumps it"
+        report["schema_version"], 2,
+        "schema_version must be 2 until a breaking change bumps it"
     );
 }
 

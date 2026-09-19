@@ -76,7 +76,9 @@ where
     }
 
     /// Creates a [`Column`] from an already allocated [`Vec`].
-    pub fn from_vec(children: Vec<Element<'a, Message, Theme, Renderer>>) -> Self {
+    pub fn from_vec(mut children: Vec<Element<'a, Message, Theme, Renderer>>) -> Self {
+        children.retain(|child| !child.as_widget().is_void());
+
         Self {
             spacing: 0.0,
             padding: Padding::ZERO,
@@ -94,7 +96,7 @@ where
     /// method instead! While less flexible, it helps you keep spacing between
     /// elements consistent.
     pub fn spacing(mut self, amount: impl Into<Pixels>) -> Self {
-        self.spacing = amount.into().0;
+        self.spacing = finite_nonnegative(amount.into().0);
         self
     }
 
@@ -142,10 +144,19 @@ where
 
     /// Extends the [`Column`] with the given children.
     pub fn extend(
-        self,
+        mut self,
         children: impl IntoIterator<Item = Element<'a, Message, Theme, Renderer>>,
     ) -> Self {
-        children.into_iter().fold(self, Self::push)
+        let iterator = children.into_iter();
+        self.children.reserve(iterator.size_hint().0);
+
+        for child in iterator {
+            if !child.as_widget().is_void() {
+                self.children.push(child);
+            }
+        }
+
+        self
     }
 
     /// Turns the [`Column`] into a [`Wrapping`] column.
@@ -226,6 +237,8 @@ where
             self.width.hash_stable(hasher);
             self.height.hash_stable(hasher);
             hasher.write_u32(self.spacing.to_bits());
+            hash_padding(self.padding, hasher);
+            hasher.write_u8(alignment_tag(self.align));
         });
 
         let state = tree.state.downcast_mut::<State>();
@@ -351,11 +364,12 @@ where
                 .iter()
                 .zip(&tree.children)
                 .zip(layout.children())
-                .filter(|(_, layout)| layout.bounds().intersects(viewport))
             {
-                child
-                    .as_widget()
-                    .draw(tree, renderer, theme, style, layout, cursor, viewport);
+                let widget = child.as_widget();
+
+                if widget.paint_bounds(tree, layout).intersects(viewport) {
+                    widget.draw(tree, renderer, theme, style, layout, cursor, viewport);
+                }
             }
         }
     }
@@ -407,7 +421,7 @@ pub struct Wrapping<'a, Message, Theme = crate::Theme, Renderer = crate::Rendere
 impl<Message, Theme, Renderer> Wrapping<'_, Message, Theme, Renderer> {
     /// Sets the horizontal spacing _between_ columns.
     pub fn horizontal_spacing(mut self, amount: impl Into<Pixels>) -> Self {
-        self.horizontal_spacing = Some(amount.into().0);
+        self.horizontal_spacing = Some(finite_nonnegative(amount.into().0));
         self
     }
 
@@ -455,7 +469,7 @@ where
         let horizontal_spacing = self.horizontal_spacing.unwrap_or(spacing);
         let max_height = limits.max().height;
 
-        let mut children: Vec<layout::Node> = Vec::new();
+        let mut children = Vec::with_capacity(self.column.children.len());
         let mut intrinsic_size = Size::ZERO;
         let mut column_start = 0;
         let mut column_width = 0.0;
@@ -632,5 +646,31 @@ where
 {
     fn from(column: Wrapping<'a, Message, Theme, Renderer>) -> Self {
         Self::new(column)
+    }
+}
+
+#[inline]
+fn finite_nonnegative(value: f32) -> f32 {
+    if value.is_finite() {
+        value.max(0.0)
+    } else {
+        0.0
+    }
+}
+
+#[inline]
+fn hash_padding(padding: Padding, hasher: &mut dyn std::hash::Hasher) {
+    hasher.write_u32(padding.top.to_bits());
+    hasher.write_u32(padding.right.to_bits());
+    hasher.write_u32(padding.bottom.to_bits());
+    hasher.write_u32(padding.left.to_bits());
+}
+
+#[inline]
+const fn alignment_tag(alignment: Alignment) -> u8 {
+    match alignment {
+        Alignment::Start => 0,
+        Alignment::Center => 1,
+        Alignment::End => 2,
     }
 }

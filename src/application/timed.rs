@@ -4,9 +4,11 @@ use crate::program;
 use crate::theme;
 use crate::time::Instant;
 use crate::window;
-use crate::{Element, Program, Settings, Subscription, Task};
+use crate::{Program, Settings, Subscription, Task};
 
-use taim_debug as debug;
+mod adapter;
+
+use adapter::TimedAdapter;
 
 /// Creates an [`Application`] with an `update` function that also
 /// takes the [`Instant`] of each `Message`.
@@ -31,97 +33,8 @@ where
     Theme: theme::Base + 'static,
     Renderer: program::Renderer + 'static,
 {
-    use std::marker::PhantomData;
-
-    struct Instance<State, Message, Theme, Renderer, Boot, Update, Subscription, View> {
-        boot: Boot,
-        update: Update,
-        subscription: Subscription,
-        view: View,
-        _state: PhantomData<State>,
-        _message: PhantomData<Message>,
-        _theme: PhantomData<Theme>,
-        _renderer: PhantomData<Renderer>,
-    }
-
-    impl<State, Message, Theme, Renderer, Boot, Update, Subscription, View> Program
-        for Instance<State, Message, Theme, Renderer, Boot, Update, Subscription, View>
-    where
-        Message: Send + 'static,
-        Theme: theme::Base + 'static,
-        Renderer: program::Renderer + 'static,
-        Boot: self::BootFn<State, Message>,
-        Update: self::UpdateFn<State, Message>,
-        Subscription: Fn(&State) -> self::Subscription<Message>,
-        View: for<'a> self::ViewFn<'a, State, Message, Theme, Renderer>,
-    {
-        type State = State;
-        type Message = (Message, Instant);
-        type Theme = Theme;
-        type Renderer = Renderer;
-        type Executor = taim_futures::backend::default::Executor;
-
-        fn name() -> &'static str {
-            let name = std::any::type_name::<State>();
-
-            name.split("::").next().unwrap_or("a_cool_application")
-        }
-
-        fn settings(&self) -> Settings {
-            Settings::default()
-        }
-
-        fn window(&self) -> Option<taim_core::window::Settings> {
-            Some(window::Settings::default())
-        }
-
-        fn boot(&self) -> (State, Task<Self::Message>) {
-            let (state, task) = self.boot.boot();
-
-            (state, task.map(|message| (message, Instant::now())))
-        }
-
-        fn update(
-            &self,
-            state: &mut Self::State,
-            (message, now): Self::Message,
-        ) -> Task<Self::Message> {
-            debug::hot(move || {
-                self.update
-                    .update(state, message, now)
-                    .into()
-                    .map(|message| (message, Instant::now()))
-            })
-        }
-
-        fn view<'a>(
-            &self,
-            state: &'a Self::State,
-            _window: window::Id,
-        ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
-            debug::hot(|| {
-                self.view
-                    .view(state)
-                    .map(|message| (message, Instant::now()))
-            })
-        }
-
-        fn subscription(&self, state: &Self::State) -> self::Subscription<Self::Message> {
-            debug::hot(|| (self.subscription)(state).map(|message| (message, Instant::now())))
-        }
-    }
-
     Application {
-        raw: Instance {
-            boot,
-            update,
-            subscription,
-            view,
-            _state: PhantomData,
-            _message: PhantomData,
-            _theme: PhantomData,
-            _renderer: PhantomData,
-        },
+        raw: TimedAdapter::new(boot, update, subscription, view),
         settings: Settings::default(),
         window: window::Settings::default(),
         presets: Vec::new(),

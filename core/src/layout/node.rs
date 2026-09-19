@@ -1,13 +1,21 @@
 use crate::{Alignment, Padding, Point, Rectangle, Size, Transformation, Vector};
 
+/// Paint-only layout metadata kept away from the traversal-hot portion of a
+/// node. Most nodes are neither transformed nor clipped, so paying for both
+/// option payloads in every flex tree wastes cache lines.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct Effects {
+    transform: Option<Transformation>,
+    clip: Option<Rectangle>,
+}
+
 /// The bounds of an element and its children.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Node {
     bounds: Rectangle,
     children: Vec<Node>,
     baseline: Option<f32>,
-    transform: Option<Transformation>,
-    clip: Option<Rectangle>,
+    effects: Option<Box<Effects>>,
 }
 
 impl Node {
@@ -27,8 +35,7 @@ impl Node {
             },
             children,
             baseline: None,
-            transform: None,
-            clip: None,
+            effects: None,
         }
     }
 
@@ -82,13 +89,13 @@ impl Node {
     /// invalidated only by bounds changes does not also need to be
     /// invalidated by transform-only changes.
     pub fn transform(&self) -> Option<Transformation> {
-        self.transform
+        self.effects.as_deref().and_then(|effects| effects.transform)
     }
 
     /// Sets the [`Transformation`] applied to this [`Node`], in addition
     /// to its bounds.
     pub fn with_transform(mut self, transform: Transformation) -> Self {
-        self.transform = Some(transform);
+        self.effects_mut().transform = Some(transform);
         self
     }
 
@@ -96,12 +103,12 @@ impl Node {
     /// painting this [`Node`] and its children, if any -- in the same
     /// coordinate space as [`Node::bounds`].
     pub fn clip(&self) -> Option<Rectangle> {
-        self.clip
+        self.effects.as_deref().and_then(|effects| effects.clip)
     }
 
     /// Sets the clip [`Rectangle`] for this [`Node`].
     pub fn with_clip(mut self, clip: Rectangle) -> Self {
-        self.clip = Some(clip);
+        self.effects_mut().clip = Some(clip);
         self
     }
 
@@ -113,25 +120,8 @@ impl Node {
 
     /// Mutable reference version of [`Self::align`].
     pub fn align_mut(&mut self, align_x: Alignment, align_y: Alignment, space: Size) {
-        match align_x {
-            Alignment::Start => {}
-            Alignment::Center => {
-                self.bounds.x += (space.width - self.bounds.width) / 2.0;
-            }
-            Alignment::End => {
-                self.bounds.x += space.width - self.bounds.width;
-            }
-        }
-
-        match align_y {
-            Alignment::Start => {}
-            Alignment::Center => {
-                self.bounds.y += (space.height - self.bounds.height) / 2.0;
-            }
-            Alignment::End => {
-                self.bounds.y += space.height - self.bounds.height;
-            }
-        }
+        self.bounds.x += alignment_offset(align_x, space.width - self.bounds.width);
+        self.bounds.y += alignment_offset(align_y, space.height - self.bounds.height);
     }
 
     /// Moves the [`Node`] to the given position.
@@ -157,6 +147,21 @@ impl Node {
     /// Translates the [`Node`] by the given translation.
     pub fn translate_mut(&mut self, translation: impl Into<Vector>) {
         self.bounds += translation.into();
+    }
+
+    #[inline]
+    fn effects_mut(&mut self) -> &mut Effects {
+        self.effects
+            .get_or_insert_with(|| Box::new(Effects::default()))
+    }
+}
+
+#[inline]
+fn alignment_offset(alignment: Alignment, free_space: f32) -> f32 {
+    match alignment {
+        Alignment::Start => 0.0,
+        Alignment::Center => free_space * 0.5,
+        Alignment::End => free_space,
     }
 }
 
@@ -217,5 +222,33 @@ mod tests {
     #[test]
     fn default_node_matches_a_fresh_zero_sized_node() {
         assert_eq!(Node::default(), Node::new(Size::ZERO));
+    }
+
+    #[test]
+    fn ordinary_nodes_keep_paint_effect_storage_cold() {
+        let node = Node::new(Size::new(10.0, 20.0)).with_baseline(14.0);
+
+        assert!(node.effects.is_none());
+        assert!(std::mem::size_of::<Node>() <= 64);
+    }
+
+    #[test]
+    fn transform_and_clip_share_one_cold_allocation() {
+        let transform = Transformation::translate(2.0, 3.0);
+        let clip = Rectangle::new(Point::ORIGIN, Size::new(4.0, 5.0));
+        let node = Node::new(Size::new(10.0, 20.0))
+            .with_transform(transform)
+            .with_clip(clip);
+
+        assert_eq!(node.transform(), Some(transform));
+        assert_eq!(node.clip(), Some(clip));
+        assert!(node.effects.is_some());
+    }
+
+    #[test]
+    fn alignment_offsets_share_the_same_axis_policy() {
+        assert_eq!(alignment_offset(Alignment::Start, 8.0), 0.0);
+        assert_eq!(alignment_offset(Alignment::Center, 8.0), 4.0);
+        assert_eq!(alignment_offset(Alignment::End, 8.0), 8.0);
     }
 }

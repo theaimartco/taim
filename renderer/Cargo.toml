@@ -40,4 +40,3 @@ taim_wgpu.workspace = true
 taim_wgpu.optional = true
 
 log.workspace = true
-thiserror.workspace = true

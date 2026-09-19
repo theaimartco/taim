@@ -1,73 +1,25 @@
-//! A pin widget positions a widget at some fixed coordinates inside its boundaries.
-//!
-//! # Example
-//! ```no_run
-//! # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::core::Length::Fill; }
-//! # pub type State = ();
-//! # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
-//! use taim::widget::pin;
-//! use taim::Fill;
-//!
-//! enum Message {
-//!     // ...
-//! }
-//!
-//! fn view(state: &State) -> Element<'_, Message> {
-//!     pin("This text is displayed at coordinates (50, 50)!")
-//!         .x(50)
-//!         .y(50)
-//!         .into()
-//! }
-//! ```
-use crate::core::layout;
-use crate::core::mouse;
-use crate::core::overlay;
-use crate::core::renderer;
-use crate::core::semantics;
-use crate::core::widget;
-use crate::core::widget::visit;
-use crate::core::{
-    self, Element, Event, Layout, Length, Pixels, Point, Rectangle, Shell, Size, Vector, Widget,
-};
+//! Position one widget at explicit coordinates inside a parent region.
+mod implementation;
 
-/// A widget that positions its contents at some fixed coordinates inside of its boundaries.
-///
-/// By default, a [`Pin`] widget will try to fill its parent.
-///
-/// # Example
-/// ```no_run
-/// # mod taim { pub mod widget { pub use taim_widget::*; } pub use taim_widget::core::Length::Fill; }
-/// # pub type State = ();
-/// # pub type Element<'a, Message> = taim_widget::core::Element<'a, Message, taim_widget::Theme, taim_widget::Renderer>;
-/// use taim::widget::pin;
-/// use taim::Fill;
-///
-/// enum Message {
-///     // ...
-/// }
-///
-/// fn view(state: &State) -> Element<'_, Message> {
-///     pin("This text is displayed at coordinates (50, 50)!")
-///         .x(50)
-///         .y(50)
-///         .into()
-/// }
-/// ```
+use crate::core;
+use crate::core::{Element, Length, Pixels, Point};
+
+/// A transparent positioning wrapper.
 pub struct Pin<'a, Message, Theme = crate::Theme, Renderer = crate::Renderer>
 where
     Renderer: core::Renderer,
 {
-    content: Element<'a, Message, Theme, Renderer>,
-    width: Length,
-    height: Length,
-    position: Point,
+    pub(super) content: Element<'a, Message, Theme, Renderer>,
+    pub(super) width: Length,
+    pub(super) height: Length,
+    pub(super) position: Point,
 }
 
 impl<'a, Message, Theme, Renderer> Pin<'a, Message, Theme, Renderer>
 where
     Renderer: core::Renderer,
 {
-    /// Creates a [`Pin`] widget with the given content.
+    /// Creates a full-size pin containing one widget.
     pub fn new(content: impl Into<Element<'a, Message, Theme, Renderer>>) -> Self {
         Self {
             content: content.into(),
@@ -77,224 +29,39 @@ where
         }
     }
 
-    /// Sets the width of the [`Pin`].
+    /// Sets parent width behavior.
     pub fn width(mut self, width: impl Into<Length>) -> Self {
         self.width = width.into();
         self
     }
 
-    /// Sets the height of the [`Pin`].
+    /// Sets parent height behavior.
     pub fn height(mut self, height: impl Into<Length>) -> Self {
         self.height = height.into();
         self
     }
 
-    /// Sets the position of the [`Pin`]; where the pinned widget will be displayed.
+    /// Sets finite child coordinates; invalid axes fall back to zero.
     pub fn position(mut self, position: impl Into<Point>) -> Self {
-        self.position = position.into();
+        let position = position.into();
+        self.position = Point::new(finite(position.x), finite(position.y));
         self
     }
 
-    /// Sets the X coordinate of the [`Pin`].
+    /// Sets the child X coordinate.
     pub fn x(mut self, x: impl Into<Pixels>) -> Self {
-        self.position.x = x.into().0;
+        self.position.x = finite(x.into().0);
         self
     }
 
-    /// Sets the Y coordinate of the [`Pin`].
+    /// Sets the child Y coordinate.
     pub fn y(mut self, y: impl Into<Pixels>) -> Self {
-        self.position.y = y.into().0;
+        self.position.y = finite(y.into().0);
         self
     }
 }
 
-impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
-    for Pin<'_, Message, Theme, Renderer>
-where
-    Renderer: core::Renderer,
-{
-    fn tag(&self) -> widget::tree::Tag {
-        self.content.as_widget().tag()
-    }
-
-    fn state(&self) -> widget::tree::State {
-        self.content.as_widget().state()
-    }
-
-    fn diff(&mut self, tree: &mut widget::Tree) {
-        self.content.as_widget_mut().diff(tree);
-    }
-
-    fn size(&self) -> Size<Length> {
-        Size {
-            width: self.width,
-            height: self.height,
-        }
-    }
-
-    fn layout(
-        &mut self,
-        tree: &mut widget::Tree,
-        renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        let limits = limits.width(self.width).height(self.height);
-
-        let available = limits.max() - Size::new(self.position.x, self.position.y);
-
-        let node = self
-            .content
-            .as_widget_mut()
-            .layout(tree, renderer, &layout::Limits::new(Size::ZERO, available))
-            .move_to(self.position);
-
-        let size = limits.resolve(self.width, self.height, node.size());
-        layout::Node::with_children(size, vec![node])
-    }
-
-    /// Delegates to the content, rather than reporting a node of its own
-    /// and visiting the content as a child.
-    ///
-    /// This [`Pin`] is transparent in the widget tree -- its `tag`,
-    /// `state` and `diff` all defer to the content, so the two share a
-    /// single [`Tree`], and therefore a single
-    /// `Tree::semantics_with_cache` slot. Reporting separately would have
-    /// this wrapper's `None` cached into that shared slot and the dirty
-    /// flag cleared, so the content's own lookup would return the cached
-    /// `None` and the content would vanish from the semantic tree
-    /// entirely.
-    fn semantics(&self, tree: &widget::Tree, layout: Layout<'_>) -> Option<semantics::Node> {
-        self.content
-            .as_widget()
-            .semantics(tree, layout.children().next().unwrap())
-    }
-
-    /// Delegates to the content, rather than reporting a node of its own
-    /// and visiting the content as a child.
-    ///
-    /// This [`Pin`] is transparent in the widget tree -- its `tag`,
-    /// `state` and `diff` all defer to the content, so the two share a
-    /// single [`Tree`], and therefore a single
-    /// `Tree::semantics_with_cache` slot. Reporting separately would have
-    /// this wrapper's `None` cached into that shared slot and the dirty
-    /// flag cleared, so the content's own lookup would return the cached
-    /// `None` and the content would vanish from the semantic tree
-    /// entirely.
-    fn visit_children(
-        &mut self,
-        tree: &mut widget::Tree,
-        layout: Layout<'_>,
-        visit: &mut dyn FnMut(&mut dyn visit::Visit),
-    ) {
-        self.content
-            .as_widget_mut()
-            .visit_children(tree, layout.children().next().unwrap(), visit);
-    }
-
-    fn operate(
-        &mut self,
-        tree: &mut widget::Tree,
-        layout: Layout<'_>,
-        renderer: &Renderer,
-        operation: &mut dyn widget::Operation,
-    ) {
-        self.content.as_widget_mut().operate(
-            tree,
-            layout.children().next().unwrap(),
-            renderer,
-            operation,
-        );
-    }
-
-    fn update(
-        &mut self,
-        tree: &mut widget::Tree,
-        event: &Event,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &Renderer,
-        shell: &mut Shell<'_, Message>,
-        viewport: &Rectangle,
-    ) {
-        self.content.as_widget_mut().update(
-            tree,
-            event,
-            layout.children().next().unwrap(),
-            cursor,
-            renderer,
-            shell,
-            viewport,
-        );
-    }
-
-    fn mouse_interaction(
-        &self,
-        tree: &widget::Tree,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-        renderer: &Renderer,
-    ) -> mouse::Interaction {
-        self.content.as_widget().mouse_interaction(
-            tree,
-            layout.children().next().unwrap(),
-            cursor,
-            viewport,
-            renderer,
-        )
-    }
-
-    fn draw(
-        &self,
-        tree: &widget::Tree,
-        renderer: &mut Renderer,
-        theme: &Theme,
-        style: &renderer::Style,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-    ) {
-        let bounds = layout.bounds();
-
-        if let Some(clipped_viewport) = bounds.intersection(viewport) {
-            self.content.as_widget().draw(
-                tree,
-                renderer,
-                theme,
-                style,
-                layout.children().next().unwrap(),
-                cursor,
-                &clipped_viewport,
-            );
-        }
-    }
-
-    fn overlay<'b>(
-        &'b mut self,
-        tree: &'b mut widget::Tree,
-        layout: Layout<'b>,
-        renderer: &Renderer,
-        viewport: &Rectangle,
-        translation: Vector,
-    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
-        self.content.as_widget_mut().overlay(
-            tree,
-            layout.children().next().unwrap(),
-            renderer,
-            viewport,
-            translation,
-        )
-    }
-}
-
-impl<'a, Message, Theme, Renderer> From<Pin<'a, Message, Theme, Renderer>>
-    for Element<'a, Message, Theme, Renderer>
-where
-    Message: 'a,
-    Theme: 'a,
-    Renderer: core::Renderer + 'a,
-{
-    fn from(pin: Pin<'a, Message, Theme, Renderer>) -> Element<'a, Message, Theme, Renderer> {
-        Element::new(pin)
-    }
+#[inline]
+fn finite(value: f32) -> f32 {
+    if value.is_finite() { value } else { 0.0 }
 }

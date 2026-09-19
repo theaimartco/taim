@@ -4,7 +4,8 @@ use crate::text_input::Value;
 /// The cursor of a text input.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Cursor {
-    state: State,
+    anchor: usize,
+    head: usize,
 }
 
 /// The state of a [`Cursor`].
@@ -24,26 +25,23 @@ pub enum State {
 
 impl Default for Cursor {
     fn default() -> Self {
-        Cursor {
-            state: State::Index(0),
-        }
+        Self { anchor: 0, head: 0 }
     }
 }
 
 impl Cursor {
     /// Returns the [`State`] of the [`Cursor`].
     pub fn state(&self, value: &Value) -> State {
-        match self.state {
-            State::Index(index) => State::Index(index.min(value.len())),
-            State::Selection { start, end } => {
-                let start = start.min(value.len());
-                let end = end.min(value.len());
+        let length = value.len();
+        let anchor = self.anchor.min(length);
+        let head = self.head.min(length);
 
-                if start == end {
-                    State::Index(start)
-                } else {
-                    State::Selection { start, end }
-                }
+        if anchor == head {
+            State::Index(head)
+        } else {
+            State::Selection {
+                start: anchor,
+                end: head,
             }
         }
     }
@@ -59,7 +57,8 @@ impl Cursor {
     }
 
     pub(crate) fn move_to(&mut self, position: usize) {
-        self.state = State::Index(position);
+        self.anchor = position;
+        self.head = position;
     }
 
     pub(crate) fn move_right(&mut self, value: &Value) {
@@ -92,11 +91,8 @@ impl Cursor {
     }
 
     pub(crate) fn select_range(&mut self, start: usize, end: usize) {
-        if start == end {
-            self.state = State::Index(start);
-        } else {
-            self.state = State::Selection { start, end };
-        }
+        self.anchor = start;
+        self.head = end;
     }
 
     pub(crate) fn select_left(&mut self, value: &Value) {
@@ -150,21 +146,11 @@ impl Cursor {
     }
 
     pub(crate) fn start(&self, value: &Value) -> usize {
-        let start = match self.state {
-            State::Index(index) => index,
-            State::Selection { start, .. } => start,
-        };
-
-        start.min(value.len())
+        self.anchor.min(value.len())
     }
 
     pub(crate) fn end(&self, value: &Value) -> usize {
-        let end = match self.state {
-            State::Index(index) => index,
-            State::Selection { end, .. } => end,
-        };
-
-        end.min(value.len())
+        self.head.min(value.len())
     }
 
     fn left(&self, value: &Value) -> usize {
@@ -179,5 +165,28 @@ impl Cursor {
             State::Index(index) => index,
             State::Selection { start, end } => start.max(end),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retained_cursor_is_two_machine_words() {
+        assert_eq!(
+            std::mem::size_of::<Cursor>(),
+            2 * std::mem::size_of::<usize>()
+        );
+    }
+
+    #[test]
+    fn selection_direction_and_clamping_are_preserved() {
+        let value = Value::new("abc");
+        let mut cursor = Cursor::default();
+        cursor.select_range(9, 1);
+
+        assert_eq!(cursor.state(&value), State::Selection { start: 3, end: 1 });
+        assert_eq!(cursor.selection(&value), Some((1, 3)));
     }
 }

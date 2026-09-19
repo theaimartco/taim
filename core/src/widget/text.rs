@@ -1,68 +1,29 @@
-//! Text widgets display information through writing.
-//!
-//! # Example
-//! ```no_run
-//! # mod taim { pub mod widget { pub fn text<T>(t: T) -> taim_core::widget::Text<'static, taim_core::Theme, ()> { unimplemented!() } }
-//! #            pub use taim_core::color; }
-//! # pub type State = ();
-//! # pub type Element<'a, Message> = taim_core::Element<'a, Message, taim_core::Theme, ()>;
-//! use taim::widget::text;
-//! use taim::color;
-//!
-//! enum Message {
-//!     // ...
-//! }
-//!
-//! fn view(state: &State) -> Element<'_, Message> {
-//!     text("Hello, this is taim!")
-//!         .size(20)
-//!         .color(color!(0x0000ff))
-//!         .into()
-//! }
-//! ```
+//! Plain text widget model, formatting, measurement, and drawing.
+mod implementation;
+mod style;
+
+pub use implementation::{draw, layout};
+pub use style::{
+    Catalog, Style, StyleFn, base, danger, default, primary, secondary, success, warning,
+};
+
 use crate::alignment;
-use crate::layout;
-use crate::mouse;
-use crate::renderer;
-use crate::semantics;
 use crate::text;
-use crate::text::paragraph::{self, Paragraph};
-use crate::widget::tree::{self, Tree};
-use crate::{Color, Element, Layout, Length, Pixels, Rectangle, Size, Theme, Widget};
+use crate::text::paragraph;
+use crate::{Color, Length, Pixels};
 
 pub use text::{Alignment, Ellipsis, LineHeight, Shaping, Wrapping};
 
-/// A bunch of text.
-///
-/// # Example
-/// ```no_run
-/// # mod taim { pub mod widget { pub fn text<T>(t: T) -> taim_core::widget::Text<'static, taim_core::Theme, ()> { unimplemented!() } }
-/// #            pub use taim_core::color; }
-/// # pub type State = ();
-/// # pub type Element<'a, Message> = taim_core::Element<'a, Message, taim_core::Theme, ()>;
-/// use taim::widget::text;
-/// use taim::color;
-///
-/// enum Message {
-///     // ...
-/// }
-///
-/// fn view(state: &State) -> Element<'_, Message> {
-///     text("Hello, this is taim!")
-///         .size(20)
-///         .color(color!(0x0000ff))
-///         .into()
-/// }
-/// ```
+/// A plain text widget backed by a borrowed or owned fragment.
 #[must_use]
 pub struct Text<'a, Theme, Renderer>
 where
     Theme: Catalog,
     Renderer: text::Renderer,
 {
-    fragment: text::Fragment<'a>,
-    format: Format<Renderer::Font>,
-    class: Theme::Class<'a>,
+    pub(super) fragment: text::Fragment<'a>,
+    pub(super) format: Format<Renderer::Font>,
+    pub(super) class: Theme::Class<'a>,
 }
 
 impl<'a, Theme, Renderer> Text<'a, Theme, Renderer>
@@ -70,92 +31,110 @@ where
     Theme: Catalog,
     Renderer: text::Renderer,
 {
-    /// Create a new fragment of [`Text`] with the given contents.
+    /// Creates a text widget without allocating borrowed fragments.
     pub fn new(fragment: impl text::IntoFragment<'a>) -> Self {
-        Text {
+        Self {
             fragment: fragment.into_fragment(),
             format: Format::default(),
             class: Theme::default(),
         }
     }
 
-    /// Sets the size of the [`Text`].
-    pub fn size(mut self, size: impl Into<Pixels>) -> Self {
-        self.format.size = Some(size.into());
+    /// Returns the text content without cloning an owned fragment.
+    pub fn content(&self) -> &str {
+        self.fragment.as_ref()
+    }
+
+    /// Returns whether the text fragment contains no bytes.
+    pub fn is_empty(&self) -> bool {
+        self.fragment.is_empty()
+    }
+
+    /// Returns the complete shaping and layout format.
+    pub const fn format(&self) -> &Format<Renderer::Font> {
+        &self.format
+    }
+
+    /// Replaces the complete shaping and layout format.
+    pub fn with_format(mut self, format: Format<Renderer::Font>) -> Self {
+        self.format = format;
         self
     }
 
-    /// Sets the [`LineHeight`] of the [`Text`].
+    /// Sets a nonnegative text size.
+    pub fn size(mut self, size: impl Into<Pixels>) -> Self {
+        let size = size.into().0;
+        self.format.size = Some(Pixels(if size.is_finite() { size.max(0.0) } else { 0.0 }));
+        self
+    }
+
+    /// Sets line height.
     pub fn line_height(mut self, line_height: impl Into<LineHeight>) -> Self {
         self.format.line_height = line_height.into();
         self
     }
 
-    /// Sets the [`Font`] of the [`Text`].
-    ///
-    /// [`Font`]: crate::text::Renderer::Font
+    /// Sets font.
     pub fn font(mut self, font: impl Into<Renderer::Font>) -> Self {
         self.format.font = Some(font.into());
         self
     }
 
-    /// Sets the [`Font`] of the [`Text`], if `Some`.
-    ///
-    /// [`Font`]: crate::text::Renderer::Font
+    /// Sets optional font.
     pub fn font_maybe(mut self, font: Option<impl Into<Renderer::Font>>) -> Self {
         self.format.font = font.map(Into::into);
         self
     }
 
-    /// Sets the width of the [`Text`] boundaries.
+    /// Sets width behavior.
     pub fn width(mut self, width: impl Into<Length>) -> Self {
         self.format.width = width.into();
         self
     }
 
-    /// Sets the height of the [`Text`] boundaries.
+    /// Sets height behavior.
     pub fn height(mut self, height: impl Into<Length>) -> Self {
         self.format.height = height.into();
         self
     }
 
-    /// Centers the [`Text`], both horizontally and vertically.
+    /// Centers text on both axes.
     pub fn center(self) -> Self {
         self.align_x(alignment::Horizontal::Center)
             .align_y(alignment::Vertical::Center)
     }
 
-    /// Sets the [`alignment::Horizontal`] of the [`Text`].
+    /// Sets horizontal alignment.
     pub fn align_x(mut self, alignment: impl Into<text::Alignment>) -> Self {
         self.format.align_x = alignment.into();
         self
     }
 
-    /// Sets the [`alignment::Vertical`] of the [`Text`].
+    /// Sets vertical alignment.
     pub fn align_y(mut self, alignment: impl Into<alignment::Vertical>) -> Self {
         self.format.align_y = alignment.into();
         self
     }
 
-    /// Sets the [`Shaping`] strategy of the [`Text`].
+    /// Sets shaping strategy.
     pub fn shaping(mut self, shaping: Shaping) -> Self {
         self.format.shaping = shaping;
         self
     }
 
-    /// Sets the [`Wrapping`] strategy of the [`Text`].
+    /// Sets wrapping strategy.
     pub fn wrapping(mut self, wrapping: Wrapping) -> Self {
         self.format.wrapping = wrapping;
         self
     }
 
-    /// Sets the [`Ellipsis`] strategy of the [`Text`].
+    /// Sets ellipsis strategy.
     pub fn ellipsis(mut self, ellipsis: Ellipsis) -> Self {
         self.format.ellipsis = ellipsis;
         self
     }
 
-    /// Sets the style of the [`Text`].
+    /// Sets a dynamic style.
     pub fn style(mut self, style: impl Fn(&Theme) -> Style + 'a) -> Self
     where
         Theme::Class<'a>: From<StyleFn<'a, Theme>>,
@@ -164,7 +143,7 @@ where
         self
     }
 
-    /// Sets the [`Color`] of the [`Text`].
+    /// Sets an explicit color.
     pub fn color(self, color: impl Into<Color>) -> Self
     where
         Theme::Class<'a>: From<StyleFn<'a, Theme>>,
@@ -172,17 +151,16 @@ where
         self.color_maybe(Some(color))
     }
 
-    /// Sets the [`Color`] of the [`Text`], if `Some`.
+    /// Sets an optional explicit color.
     pub fn color_maybe(self, color: Option<impl Into<Color>>) -> Self
     where
         Theme::Class<'a>: From<StyleFn<'a, Theme>>,
     {
         let color = color.map(Into::into);
-
-        self.style(move |_theme| Style { color })
+        self.style(move |_| Style { color })
     }
 
-    /// Sets the style class of the [`Text`].
+    /// Sets a theme class.
     #[cfg(feature = "advanced")]
     pub fn class(mut self, class: impl Into<Theme::Class<'a>>) -> Self {
         self.class = class.into();
@@ -190,104 +168,10 @@ where
     }
 }
 
-/// The internal state of a [`Text`] widget.
+/// Retained paragraph state.
 pub type State<P> = paragraph::Plain<P>;
 
-impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer> for Text<'_, Theme, Renderer>
-where
-    Theme: Catalog,
-    Renderer: text::Renderer,
-{
-    fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<State<Renderer::Paragraph>>()
-    }
-
-    fn state(&self) -> tree::State {
-        tree::State::new(paragraph::Plain::<Renderer::Paragraph>::default())
-    }
-
-    fn size(&self) -> Size<Length> {
-        Size {
-            width: self.format.width,
-            height: self.format.height,
-        }
-    }
-
-    fn semantics(&self, tree: &Tree, layout: Layout<'_>) -> Option<semantics::Node> {
-        // Without this, every label and paragraph in an application is
-        // invisible to assistive technology: a screen reader would hear
-        // the controls and none of the prose between them.
-        //
-        // Empty text is not reported. It is laid out and drawn (as
-        // nothing), and announcing "" would be noise -- the common case
-        // is a placeholder or a spacer built out of `text("")`.
-        if self.fragment.is_empty() {
-            return None;
-        }
-
-        Some(
-            semantics::Node::new(
-                tree.id().clone(),
-                layout.bounds(),
-                semantics::Role::StaticText,
-            )
-            .with_name(self.fragment.as_ref()),
-        )
-    }
-
-    fn layout(
-        &mut self,
-        tree: &mut Tree,
-        renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        layout(
-            tree.state.downcast_mut::<State<Renderer::Paragraph>>(),
-            renderer,
-            limits,
-            &self.fragment,
-            self.format,
-        )
-    }
-
-    fn draw(
-        &self,
-        tree: &Tree,
-        renderer: &mut Renderer,
-        theme: &Theme,
-        defaults: &renderer::Style,
-        layout: Layout<'_>,
-        _cursor_position: mouse::Cursor,
-        viewport: &Rectangle,
-    ) {
-        let state = tree.state.downcast_ref::<State<Renderer::Paragraph>>();
-        let style = theme.style(&self.class);
-
-        draw(
-            renderer,
-            defaults,
-            layout.bounds(),
-            state.raw(),
-            style,
-            viewport,
-        );
-    }
-
-    fn operate(
-        &mut self,
-        _tree: &mut Tree,
-        layout: Layout<'_>,
-        _renderer: &Renderer,
-        operation: &mut dyn super::Operation,
-    ) {
-        operation.text(None, layout.bounds(), &self.fragment);
-    }
-}
-
-/// The format of some [`Text`].
-///
-/// Check out the methods of the [`Text`] widget
-/// to learn more about each field.
+/// Text layout and shaping configuration.
 #[derive(Debug, Clone, Copy)]
 #[allow(missing_docs)]
 pub struct Format<Font> {
@@ -306,11 +190,11 @@ pub struct Format<Font> {
 impl<Font> Default for Format<Font> {
     fn default() -> Self {
         Self {
-            size: None,
-            line_height: LineHeight::default(),
-            font: None,
             width: Length::Shrink,
             height: Length::Shrink,
+            size: None,
+            font: None,
+            line_height: LineHeight::default(),
             align_x: text::Alignment::Default,
             align_y: alignment::Vertical::Top,
             shaping: Shaping::default(),
@@ -320,178 +204,16 @@ impl<Font> Default for Format<Font> {
     }
 }
 
-/// Produces the [`layout::Node`] of a [`Text`] widget.
-pub fn layout<Renderer>(
-    paragraph: &mut paragraph::Plain<Renderer::Paragraph>,
-    renderer: &Renderer,
-    limits: &layout::Limits,
-    content: &str,
-    format: Format<Renderer::Font>,
-) -> layout::Node
-where
-    Renderer: text::Renderer,
-{
-    layout::sized(limits, format.width, format.height, |limits| {
-        let bounds = limits.max();
-
-        let size = format.size.unwrap_or_else(|| renderer.default_size());
-        let font = format.font.unwrap_or_else(|| renderer.default_font());
-
-        let _ = paragraph.update(text::Text {
-            content,
-            bounds,
-            size,
-            line_height: format.line_height,
-            font,
-            align_x: format.align_x,
-            align_y: format.align_y,
-            shaping: format.shaping,
-            wrapping: format.wrapping,
-            ellipsis: format.ellipsis,
-            hint_factor: renderer.scale_factor(),
-        });
-
-        paragraph.min_bounds()
-    })
-}
-
-/// Draws text using the same logic as the [`Text`] widget.
-pub fn draw<Renderer>(
-    renderer: &mut Renderer,
-    style: &renderer::Style,
-    bounds: Rectangle,
-    paragraph: &Renderer::Paragraph,
-    appearance: Style,
-    viewport: &Rectangle,
-) where
-    Renderer: text::Renderer,
-{
-    let anchor = bounds.anchor(
-        paragraph.min_bounds(),
-        paragraph.align_x(),
-        paragraph.align_y(),
-    );
-
-    renderer.fill_paragraph(
-        paragraph,
-        anchor,
-        appearance.color.unwrap_or(style.text_color),
-        *viewport,
-    );
-}
-
-impl<'a, Message, Theme, Renderer> From<Text<'a, Theme, Renderer>>
-    for Element<'a, Message, Theme, Renderer>
-where
-    Theme: Catalog + 'a,
-    Renderer: text::Renderer + 'a,
-{
-    fn from(text: Text<'a, Theme, Renderer>) -> Element<'a, Message, Theme, Renderer> {
-        Element::new(text)
-    }
-}
-
-impl<'a, Theme, Renderer> From<&'a str> for Text<'a, Theme, Renderer>
-where
-    Theme: Catalog + 'a,
-    Renderer: text::Renderer,
-{
-    fn from(content: &'a str) -> Self {
-        Self::new(content)
-    }
-}
-
-impl<'a, Message, Theme, Renderer> From<&'a str> for Element<'a, Message, Theme, Renderer>
-where
-    Theme: Catalog + 'a,
-    Renderer: text::Renderer + 'a,
-{
-    fn from(content: &'a str) -> Self {
-        Text::from(content).into()
-    }
-}
-
-/// The appearance of some text.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct Style {
-    /// The [`Color`] of the text.
-    ///
-    /// The default, `None`, means using the inherited color.
-    pub color: Option<Color>,
-}
-
-/// The theme catalog of a [`Text`].
-pub trait Catalog: Sized {
-    /// The item class of this [`Catalog`].
-    type Class<'a>;
-
-    /// The default class produced by this [`Catalog`].
-    fn default<'a>() -> Self::Class<'a>;
-
-    /// The [`Style`] of a class with the given status.
-    fn style(&self, item: &Self::Class<'_>) -> Style;
-}
-
-/// A styling function for a [`Text`].
-///
-/// This is just a boxed closure: `Fn(&Theme, Status) -> Style`.
-pub type StyleFn<'a, Theme> = Box<dyn Fn(&Theme) -> Style + 'a>;
-
-impl Catalog for Theme {
-    type Class<'a> = StyleFn<'a, Self>;
-
-    fn default<'a>() -> Self::Class<'a> {
-        Box::new(|_theme| Style::default())
+impl<Font> Format<Font> {
+    /// Sets both layout dimensions at once.
+    pub fn dimensions(mut self, width: impl Into<Length>, height: impl Into<Length>) -> Self {
+        self.width = width.into();
+        self.height = height.into();
+        self
     }
 
-    fn style(&self, class: &Self::Class<'_>) -> Style {
-        class(self)
-    }
-}
-
-/// The default text styling; color is inherited.
-pub fn default(_theme: &Theme) -> Style {
-    Style { color: None }
-}
-
-/// Text with the default base color.
-pub fn base(theme: &Theme) -> Style {
-    Style {
-        color: Some(theme.seed().text),
-    }
-}
-
-/// Text conveying some important information, like an action.
-pub fn primary(theme: &Theme) -> Style {
-    Style {
-        color: Some(theme.seed().primary),
-    }
-}
-
-/// Text conveying some secondary information, like a footnote.
-pub fn secondary(theme: &Theme) -> Style {
-    Style {
-        color: Some(theme.palette().secondary.base.color),
-    }
-}
-
-/// Text conveying some positive information, like a successful event.
-pub fn success(theme: &Theme) -> Style {
-    Style {
-        color: Some(theme.seed().success),
-    }
-}
-
-/// Text conveying some mildly negative information, like a warning.
-pub fn warning(theme: &Theme) -> Style {
-    Style {
-        color: Some(theme.seed().warning),
-    }
-}
-
-/// Text conveying some negative information, like an error.
-pub fn danger(theme: &Theme) -> Style {
-    Style {
-        color: Some(theme.seed().danger),
+    /// Returns whether the format requests neither wrapping nor ellipsis.
+    pub fn preserves_full_line(&self) -> bool {
+        self.wrapping == Wrapping::None && self.ellipsis == Ellipsis::None
     }
 }

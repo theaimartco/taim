@@ -35,16 +35,11 @@ struct GradientVertexOutput {
 fn gradient_vs_main(input: GradientVertexInput) -> GradientVertexOutput {
     var out: GradientVertexOutput;
 
-    var pos: vec2<f32> = input.position_and_scale.xy * globals.scale;
-    var scale: vec2<f32> = input.position_and_scale.zw * globals.scale;
-
-    var pos_snap = vec2<f32>(0.0, 0.0);
-    var scale_snap = vec2<f32>(0.0, 0.0);
-
-    if bool(input.snap) {
-        pos_snap = round(pos + vec2(0.001, 0.001)) - pos;
-        scale_snap = round(pos + scale + vec2(0.001, 0.001)) - pos - pos_snap - scale;
-    }
+    let rect = taim_snap_rect(
+        input.position_and_scale.xy * globals.scale,
+        input.position_and_scale.zw * globals.scale,
+        bool(input.snap),
+    );
 
     var min_border_radius = min(input.position_and_scale.z, input.position_and_scale.w) * 0.5;
     var border_radius: vec4<f32> = vec4<f32>(
@@ -54,21 +49,14 @@ fn gradient_vs_main(input: GradientVertexInput) -> GradientVertexOutput {
         min(input.border_radius.w, min_border_radius)
     );
 
-    var transform: mat4x4<f32> = mat4x4<f32>(
-        vec4<f32>(scale.x + scale_snap.x + 1.0, 0.0, 0.0, 0.0),
-        vec4<f32>(0.0, scale.y + scale_snap.y + 1.0, 0.0, 0.0),
-        vec4<f32>(0.0, 0.0, 1.0, 0.0),
-        vec4<f32>(pos + pos_snap - vec2<f32>(0.5, 0.5), 0.0, 1.0)
-    );
-
-    out.position = globals.transform * transform * vec4<f32>(vertex_position(input.vertex_index), 0.0, 1.0);
+    out.position = taim_quad_vertex(rect, input.vertex_index);
     out.colors_1 = input.colors_1;
     out.colors_2 = input.colors_2;
     out.colors_3 = input.colors_3;
     out.colors_4 = input.colors_4;
     out.offsets = input.offsets;
     out.direction = input.direction * globals.scale;
-    out.position_and_scale = vec4<f32>(pos + pos_snap, scale + scale_snap);
+    out.position_and_scale = vec4<f32>(rect.position, rect.size);
     out.border_color = premultiply(input.border_color);
     out.border_radius = border_radius * globals.scale;
     out.border_width = input.border_width * globals.scale;
@@ -78,61 +66,24 @@ fn gradient_vs_main(input: GradientVertexInput) -> GradientVertexOutput {
     return out;
 }
 
-fn random(coords: vec2<f32>) -> f32 {
-    return fract(sin(dot(coords, vec2(12.9898,78.233))) * 43758.5453);
-}
-
-/// Returns the current interpolated color with a max 8-stop gradient
-fn gradient(
-    raw_position: vec2<f32>,
-    direction: vec4<f32>,
-    colors: array<vec4<f32>, 8>,
-    offsets: array<f32, 8>,
-    last_index: i32
-) -> vec4<f32> {
-    let start = direction.xy;
-    let end = direction.zw;
-
-    let v1 = end - start;
-    let v2 = raw_position - start;
-    let unit = normalize(v1);
-    let coord_offset = dot(unit, v2) / length(v1);
-
-    //need to store these as a var to use dynamic indexing in a loop
-    //this is already added to wgsl spec but not in wgpu yet
-    var colors_arr = colors;
-    var offsets_arr = offsets;
-
-    var color: vec4<f32>;
-
-    let noise_granularity: f32 = 0.3/255.0;
-
-    for (var i: i32 = 0; i < last_index; i++) {
-        let curr_offset = offsets_arr[i];
-        let next_offset = offsets_arr[i+1];
-
-        if (coord_offset <= offsets_arr[0]) {
-            color = colors_arr[0];
-        }
-
-        if (curr_offset <= coord_offset && coord_offset <= next_offset) {
-            let from_ = colors_arr[i];
-            let to_ = colors_arr[i+1];
-            let factor = smoothstep(curr_offset, next_offset, coord_offset);
-
-            color = interpolate_color(from_, to_, factor);
-        }
-
-        if (coord_offset >= offsets_arr[last_index]) {
-            color = colors_arr[last_index];
-        }
-    }
-
-    return color + mix(-noise_granularity, noise_granularity, random(raw_position));
-}
-
 @fragment
 fn gradient_fs_main(input: GradientVertexOutput) -> @location(0) vec4<f32> {
+    let pos = input.position_and_scale.xy;
+    let scale = input.position_and_scale.zw;
+    let sdf_point = taim_quad_sdf_point(input.position.xy, pos, scale);
+    let dist = rounded_box_sdf(
+        sdf_point,
+        scale,
+        input.border_radius * 2.0
+    ) * 0.5;
+    let coverage = taim_quad_coverage(dist);
+
+    // Rounded corners and clipped edge pixels outside the quad need neither
+    // eight color decodes nor a gradient-stop search or backdrop read.
+    if (coverage <= 0.0) {
+        return vec4<f32>(0.0);
+    }
+
     let colors = array<vec4<f32>, 8>(
         unpack_color(input.colors_1.xy),
         unpack_color(input.colors_1.zw),
@@ -158,27 +109,7 @@ fn gradient_fs_main(input: GradientVertexOutput) -> @location(0) vec4<f32> {
         offsets_2.w,
     );
 
-    //TODO could just pass this in to the shader but is probably more performant to just check it here
-    var last_index = 7;
-    for (var i: i32 = 0; i <= 7; i++) {
-        if (offsets[i] > 1.0) {
-            last_index = i - 1;
-            break;
-        }
-    }
-
-    var mixed_color: vec4<f32> = gradient(input.position.xy, input.direction, colors, offsets, last_index);
-
-    let pos = input.position_and_scale.xy;
-    let scale = input.position_and_scale.zw;
-
-    let sdf_point = -(input.position.xy - pos - scale / 2.0) * 2.0;
-
-    var dist: f32 = rounded_box_sdf(
-        sdf_point,
-        scale,
-        input.border_radius * 2.0
-    ) / 2.0;
+    var mixed_color = taim_gradient_sample(input.position.xy, input.direction, colors, offsets);
 
     if (input.border_width > 0.0) {
         mixed_color = mix(
@@ -188,42 +119,46 @@ fn gradient_fs_main(input: GradientVertexOutput) -> @location(0) vec4<f32> {
         );
     }
 
-    let coverage = clamp(0.5 - dist, 0.0, 1.0);
+    var highlight = 0.0;
+    let refracts = input.transmission > 0.0 && has_backdrop();
 
-    // Material shading, identical to the solid pipeline: `sdf_point` is scaled
-    // by -2 relative to screen space, so its gradient is negated.
-    let sdf_gradient = -rounded_box_gradient(sdf_point, scale, input.border_radius * 2.0);
+    // The default material has IOR 1 and no transmission. Keep it on the
+    // cheapest path: only calculate the analytic normal when a fragment can
+    // actually use it for refraction or a specular response.
+    if (refracts || input.material.z > 1.0) {
+        let sdf_gradient = -rounded_box_gradient(sdf_point, scale, input.border_radius * 2.0);
 
-    // Refraction, on the same terms as the solid pipeline. See
-    // `quad/solid.wgsl` for why the backdrop is premultiplied before mixing.
-    if input.transmission > 0.0 && has_backdrop() {
-        let behind = quad_transmission(
-            dist,
-            sdf_gradient,
-            input.material,
-            input.transmission,
-            input.position.xy
-        );
-
-        mixed_color = vec4<f32>(
-            blend_transmission(
-                mixed_color.rgb,
-                behind * mixed_color.a,
+        if (refracts) {
+            let behind = quad_transmission(
+                dist,
+                sdf_gradient,
                 input.material,
                 input.transmission,
-                dist,
-                sdf_gradient
-            ),
-            mixed_color.a
-        );
-    }
+                input.position.xy
+            );
 
-    let highlight = quad_specular(
-        dist,
-        sdf_gradient,
-        input.material,
-        globals.light.xyz
-    );
+            mixed_color = vec4<f32>(
+                blend_transmission(
+                    mixed_color.rgb,
+                    behind * mixed_color.a,
+                    input.material,
+                    input.transmission,
+                    dist,
+                    sdf_gradient
+                ),
+                mixed_color.a
+            );
+        }
+
+        if (input.material.z > 1.0) {
+            highlight = quad_specular(
+                dist,
+                sdf_gradient,
+                input.material,
+                globals.light.xyz
+            );
+        }
+    }
 
     // Additive light, premultiplied by coverage. Alpha is untouched.
     return mixed_color * coverage + vec4<f32>(vec3<f32>(highlight * coverage), 0.0);

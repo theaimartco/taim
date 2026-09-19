@@ -1,6 +1,9 @@
 //! Access the clipboard.
-use std::path::PathBuf;
-use std::sync::Arc;
+mod model;
+
+#[cfg(feature = "image")]
+pub use model::Image;
+pub use model::{Content, Error, Event, Kind};
 
 /// A set of clipboard requests.
 #[derive(Debug, Clone)]
@@ -21,10 +24,27 @@ impl Clipboard {
         }
     }
 
+    /// Creates an empty request set with room for `reads` read requests.
+    pub fn with_read_capacity(reads: usize) -> Self {
+        Self {
+            reads: Vec::with_capacity(reads),
+            write: None,
+        }
+    }
+
+    /// Returns whether no clipboard work is queued.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.reads.is_empty() && self.write.is_none()
+    }
+
     /// Merges the current [`Clipboard`] requests with others.
     pub fn merge(&mut self, other: &mut Self) {
         self.reads.append(&mut other.reads);
-        self.write = other.write.take().or(self.write.take());
+
+        if let Some(write) = other.write.take() {
+            self.write = Some(write);
+        }
     }
 }
 
@@ -34,92 +54,36 @@ impl Default for Clipboard {
     }
 }
 
-/// A clipboard event.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Event {
-    /// The clipboard was read.
-    Read(Result<Arc<Content>, Error>),
+#[cfg(test)]
+mod tests {
+    use super::{Clipboard, Content, Kind};
 
-    /// The clipboard was written.
-    Written(Result<(), Error>),
-}
+    #[test]
+    fn merge_appends_reads_and_only_replaces_write_when_supplied() {
+        let mut current = Clipboard {
+            reads: vec![Kind::Text],
+            write: Some(Content::Text("old".into())),
+        };
+        let mut reads_only = Clipboard {
+            reads: vec![Kind::Html],
+            write: None,
+        };
 
-/// Some clipboard content.
-#[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
-#[non_exhaustive]
-pub enum Content {
-    Text(String),
-    Html(String),
-    #[cfg(feature = "image")]
-    Image(Image),
-    Files(Vec<PathBuf>),
-}
+        current.merge(&mut reads_only);
+        assert_eq!(current.reads, [Kind::Text, Kind::Html]);
+        assert_eq!(current.write, Some(Content::Text("old".into())));
+        assert!(reads_only.is_empty());
 
-impl From<String> for Content {
-    fn from(text: String) -> Self {
-        Self::Text(text)
+        let mut replacement = Clipboard {
+            reads: Vec::new(),
+            write: Some(Content::Text("new".into())),
+        };
+        current.merge(&mut replacement);
+        assert_eq!(current.write, Some(Content::Text("new".into())));
     }
-}
 
-#[cfg(feature = "image")]
-impl From<Image> for Content {
-    fn from(image: Image) -> Self {
-        Self::Image(image)
+    #[test]
+    fn capacity_constructor_starts_empty() {
+        assert!(Clipboard::with_read_capacity(8).is_empty());
     }
-}
-
-impl From<Vec<PathBuf>> for Content {
-    fn from(files: Vec<PathBuf>) -> Self {
-        Self::Files(files)
-    }
-}
-
-/// The kind of some clipboard [`Content`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(missing_docs)]
-#[non_exhaustive]
-pub enum Kind {
-    Text,
-    Html,
-    #[cfg(feature = "image")]
-    Image,
-    Files,
-}
-
-/// A clipboard image.
-#[cfg(feature = "image")]
-#[derive(Debug, Clone, PartialEq)]
-pub struct Image {
-    /// The pixels of the image in RGBA format.
-    pub rgba: crate::Bytes,
-
-    /// The physical [`Size`](crate::Size) of the image.
-    pub size: crate::Size<u32>,
-}
-
-/// A clipboard error.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Error {
-    /// The clipboard in the current environment is either not present or could not be accessed.
-    ClipboardUnavailable,
-
-    /// The native clipboard is not accessible due to being held by another party.
-    ClipboardOccupied,
-
-    /// The clipboard contents were not available in the requested format.
-    /// This could either be due to the clipboard being empty or the clipboard contents having
-    /// an incompatible format to the requested one
-    ContentNotAvailable,
-
-    /// The image or the text that was about the be transferred to/from the clipboard could not be
-    /// converted to the appropriate format.
-    ConversionFailure,
-
-    /// Any error that doesn't fit the other error types.
-    Unknown {
-        /// A description only meant to help the developer that should not be relied on as a
-        /// means to identify an error case during runtime.
-        description: Arc<String>,
-    },
 }

@@ -100,15 +100,19 @@ fn a_missed_feedback_deadline_and_a_pending_redraw_request_do_not_interfere() {
     let mut scheduler = Scheduler::new();
     scheduler.submit(t(0));
 
-    // Requesting a redraw while submitted is a no-op per `Scheduler`'s
-    // own contract (an in-flight submission already implies "a frame is
-    // coming"); once the timeout recovers the scheduler, a fresh
-    // request is needed.
+    // A redraw requested while submitted must survive a missing feedback
+    // callback. Otherwise input or animation work arriving during the GPU
+    // frame could be silently lost when timeout recovery returns to idle.
     scheduler.request_redraw_at(t(50));
     scheduler.tick(t(50));
     assert!(!scheduler.should_produce_frame(t(50)));
 
     scheduler.tick(t(250));
+    assert!(scheduler.should_produce_frame(t(250)));
+    assert!(scheduler.begin_frame(t(250)));
+
+    // Claiming the recovered frame consumes only that request. A later one
+    // remains independently scheduled at its own deadline.
     scheduler.request_redraw_at(t(300));
 
     assert!(!scheduler.should_produce_frame(t(299)));

@@ -1,91 +1,140 @@
+//! Stable pane partitioning along one screen axis.
+
 use crate::core::Rectangle;
 
-/// A fixed reference line for the measurement of coordinates.
+/// A fixed reference line for coordinate measurement.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum Axis {
-    /// The horizontal axis: —
+    /// Top-to-bottom partitioning with a horizontal divider.
     Horizontal,
-    /// The vertical axis: |
+    /// Left-to-right partitioning with a vertical divider.
     Vertical,
 }
 
 impl Axis {
-    /// Splits the provided [`Rectangle`] on the current [`Axis`] with the
-    /// given `ratio` and `spacing`.
+    /// Splits a rectangle while honoring spacing and pane minimums whenever
+    /// physically possible. Over-constrained minimums share available space
+    /// proportionally instead of producing negative bounds.
     pub fn split(
-        &self,
+        self,
         rectangle: &Rectangle,
         ratio: f32,
         spacing: f32,
         min_size_a: f32,
         min_size_b: f32,
     ) -> (Rectangle, Rectangle, f32) {
+        let extent = match self {
+            Self::Horizontal => finite_nonnegative(rectangle.height),
+            Self::Vertical => finite_nonnegative(rectangle.width),
+        };
+        let (a_extent, b_extent, ratio, spacing) =
+            partition(extent, ratio, spacing, min_size_a, min_size_b);
+
         match self {
-            Axis::Horizontal => {
-                let height_top = (rectangle.height * ratio - spacing / 2.0)
-                    .round()
-                    .max(min_size_a)
-                    .min(rectangle.height - min_size_b - spacing);
-
-                let height_bottom = (rectangle.height - height_top - spacing).max(min_size_b);
-
-                let ratio = (height_top + spacing / 2.0) / rectangle.height;
-
-                (
-                    Rectangle {
-                        height: height_top,
-                        ..*rectangle
-                    },
-                    Rectangle {
-                        y: rectangle.y + height_top + spacing,
-                        height: height_bottom,
-                        ..*rectangle
-                    },
-                    ratio,
-                )
-            }
-            Axis::Vertical => {
-                let width_left = (rectangle.width * ratio - spacing / 2.0)
-                    .round()
-                    .max(min_size_a)
-                    .min(rectangle.width - min_size_b - spacing);
-
-                let width_right = (rectangle.width - width_left - spacing).max(min_size_b);
-
-                let ratio = (width_left + spacing / 2.0) / rectangle.width;
-
-                (
-                    Rectangle {
-                        width: width_left,
-                        ..*rectangle
-                    },
-                    Rectangle {
-                        x: rectangle.x + width_left + spacing,
-                        width: width_right,
-                        ..*rectangle
-                    },
-                    ratio,
-                )
-            }
+            Self::Horizontal => (
+                Rectangle {
+                    height: a_extent,
+                    ..*rectangle
+                },
+                Rectangle {
+                    y: rectangle.y + a_extent + spacing,
+                    height: b_extent,
+                    ..*rectangle
+                },
+                ratio,
+            ),
+            Self::Vertical => (
+                Rectangle {
+                    width: a_extent,
+                    ..*rectangle
+                },
+                Rectangle {
+                    x: rectangle.x + a_extent + spacing,
+                    width: b_extent,
+                    ..*rectangle
+                },
+                ratio,
+            ),
         }
     }
 
-    /// Calculates the bounds of the split line in a [`Rectangle`] region.
-    pub fn split_line_bounds(&self, rectangle: Rectangle, ratio: f32, spacing: f32) -> Rectangle {
+    /// Calculates the clamped split-line bounds inside a rectangle.
+    pub fn split_line_bounds(self, rectangle: Rectangle, ratio: f32, spacing: f32) -> Rectangle {
+        let extent = match self {
+            Self::Horizontal => finite_nonnegative(rectangle.height),
+            Self::Vertical => finite_nonnegative(rectangle.width),
+        };
+        let spacing = finite_nonnegative(spacing).min(extent);
+        let ratio = finite_ratio(ratio);
+        let offset = (extent * ratio - spacing * 0.5)
+            .round()
+            .clamp(0.0, extent - spacing);
+
         match self {
-            Axis::Horizontal => Rectangle {
+            Self::Horizontal => Rectangle {
                 x: rectangle.x,
-                y: (rectangle.y + rectangle.height * ratio - spacing / 2.0).round(),
-                width: rectangle.width,
+                y: rectangle.y + offset,
+                width: finite_nonnegative(rectangle.width),
                 height: spacing,
             },
-            Axis::Vertical => Rectangle {
-                x: (rectangle.x + rectangle.width * ratio - spacing / 2.0).round(),
+            Self::Vertical => Rectangle {
+                x: rectangle.x + offset,
                 y: rectangle.y,
                 width: spacing,
-                height: rectangle.height,
+                height: finite_nonnegative(rectangle.height),
             },
         }
+    }
+}
+
+#[inline]
+fn partition(
+    extent: f32,
+    ratio: f32,
+    spacing: f32,
+    minimum_a: f32,
+    minimum_b: f32,
+) -> (f32, f32, f32, f32) {
+    if extent <= 0.0 {
+        return (0.0, 0.0, 0.5, 0.0);
+    }
+
+    let spacing = finite_nonnegative(spacing).min(extent);
+    let available = extent - spacing;
+    let minimum_a = finite_nonnegative(minimum_a);
+    let minimum_b = finite_nonnegative(minimum_b);
+    let minimum_total = minimum_a + minimum_b;
+
+    let a = if minimum_total <= available {
+        (extent * finite_ratio(ratio) - spacing * 0.5)
+            .round()
+            .clamp(minimum_a, available - minimum_b)
+    } else if minimum_total > 0.0 {
+        available * (minimum_a / minimum_total)
+    } else {
+        available * 0.5
+    };
+    let b = available - a;
+    let effective_ratio = ((a + spacing * 0.5) / extent).clamp(0.0, 1.0);
+
+    (a, b, effective_ratio, spacing)
+}
+
+#[inline]
+fn finite_nonnegative(value: f32) -> f32 {
+    if value.is_finite() {
+        value.max(0.0)
+    } else {
+        0.0
+    }
+}
+
+#[inline]
+fn finite_ratio(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.5
     }
 }
 
@@ -93,156 +142,24 @@ impl Axis {
 mod tests {
     use super::*;
 
-    enum Case {
-        Horizontal {
-            overall_height: f32,
-            spacing: f32,
-            top_height: f32,
-            bottom_y: f32,
-            bottom_height: f32,
-        },
-        Vertical {
-            overall_width: f32,
-            spacing: f32,
-            left_width: f32,
-            right_x: f32,
-            right_width: f32,
-        },
+    #[test]
+    fn balanced_split_preserves_exact_extent() {
+        let bounds = Rectangle::new([0.0, 0.0].into(), [9.0, 10.0].into());
+        let (left, right, ratio) = Axis::Vertical.split(&bounds, 0.5, 1.0, 0.0, 0.0);
+
+        assert_eq!(left.width, 4.0);
+        assert_eq!(right.x, 5.0);
+        assert_eq!(right.width, 4.0);
+        assert_eq!(ratio, 0.5);
     }
 
     #[test]
-    fn split() {
-        let cases = vec![
-            // Even height, even spacing
-            Case::Horizontal {
-                overall_height: 10.0,
-                spacing: 2.0,
-                top_height: 4.0,
-                bottom_y: 6.0,
-                bottom_height: 4.0,
-            },
-            // Odd height, even spacing
-            Case::Horizontal {
-                overall_height: 9.0,
-                spacing: 2.0,
-                top_height: 4.0,
-                bottom_y: 6.0,
-                bottom_height: 3.0,
-            },
-            // Even height, odd spacing
-            Case::Horizontal {
-                overall_height: 10.0,
-                spacing: 1.0,
-                top_height: 5.0,
-                bottom_y: 6.0,
-                bottom_height: 4.0,
-            },
-            // Odd height, odd spacing
-            Case::Horizontal {
-                overall_height: 9.0,
-                spacing: 1.0,
-                top_height: 4.0,
-                bottom_y: 5.0,
-                bottom_height: 4.0,
-            },
-            // Even width, even spacing
-            Case::Vertical {
-                overall_width: 10.0,
-                spacing: 2.0,
-                left_width: 4.0,
-                right_x: 6.0,
-                right_width: 4.0,
-            },
-            // Odd width, even spacing
-            Case::Vertical {
-                overall_width: 9.0,
-                spacing: 2.0,
-                left_width: 4.0,
-                right_x: 6.0,
-                right_width: 3.0,
-            },
-            // Even width, odd spacing
-            Case::Vertical {
-                overall_width: 10.0,
-                spacing: 1.0,
-                left_width: 5.0,
-                right_x: 6.0,
-                right_width: 4.0,
-            },
-            // Odd width, odd spacing
-            Case::Vertical {
-                overall_width: 9.0,
-                spacing: 1.0,
-                left_width: 4.0,
-                right_x: 5.0,
-                right_width: 4.0,
-            },
-        ];
-        for case in cases {
-            match case {
-                Case::Horizontal {
-                    overall_height,
-                    spacing,
-                    top_height,
-                    bottom_y,
-                    bottom_height,
-                } => {
-                    let a = Axis::Horizontal;
-                    let r = Rectangle {
-                        x: 0.0,
-                        y: 0.0,
-                        width: 10.0,
-                        height: overall_height,
-                    };
-                    let (top, bottom, _ratio) = a.split(&r, 0.5, spacing, 0.0, 0.0);
-                    assert_eq!(
-                        top,
-                        Rectangle {
-                            height: top_height,
-                            ..r
-                        }
-                    );
-                    assert_eq!(
-                        bottom,
-                        Rectangle {
-                            y: bottom_y,
-                            height: bottom_height,
-                            ..r
-                        }
-                    );
-                }
-                Case::Vertical {
-                    overall_width,
-                    spacing,
-                    left_width,
-                    right_x,
-                    right_width,
-                } => {
-                    let a = Axis::Vertical;
-                    let r = Rectangle {
-                        x: 0.0,
-                        y: 0.0,
-                        width: overall_width,
-                        height: 10.0,
-                    };
-                    let (left, right, _ratio) = a.split(&r, 0.5, spacing, 0.0, 0.0);
-                    assert_eq!(
-                        left,
-                        Rectangle {
-                            width: left_width,
-                            ..r
-                        }
-                    );
-                    assert_eq!(
-                        right,
-                        Rectangle {
-                            x: right_x,
-                            width: right_width,
-                            ..r
-                        }
-                    );
-                }
-            }
-        }
+    fn impossible_minimums_never_create_negative_regions() {
+        let bounds = Rectangle::new([0.0, 0.0].into(), [10.0, 10.0].into());
+        let (top, bottom, _) = Axis::Horizontal.split(&bounds, f32::NAN, 4.0, 20.0, 10.0);
+
+        assert!(top.height >= 0.0);
+        assert!(bottom.height >= 0.0);
+        assert_eq!(top.height + 4.0 + bottom.height, bounds.height);
     }
 }

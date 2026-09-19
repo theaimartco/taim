@@ -1,206 +1,27 @@
+mod manager;
+mod preedit;
 mod state;
 
+pub use manager::Manager;
+
+use preedit::Preedit;
 use state::State;
 
 pub use crate::core::window::{Event, Id, RedrawRequest, Settings};
 
-use crate::Proxy;
 use crate::conversion;
-use crate::core;
-use crate::core::alignment;
 use crate::core::input_method;
 use crate::core::mouse;
-use crate::core::renderer;
 use crate::core::shell;
-use crate::core::text;
 use crate::core::theme;
 use crate::core::time::Instant;
-use crate::core::{Color, InputMethod, Padding, Point, Rectangle, Size, Text, Vector};
+use crate::core::{InputMethod, Point, Rectangle};
 use crate::graphics::Compositor;
-use crate::program::{App, AppRunner};
+use crate::program::App;
 use crate::runtime::frame_scheduler::Scheduler;
 
-use winit::dpi::{LogicalPosition, LogicalSize};
-use winit::monitor::MonitorHandle;
-
-use std::collections::BTreeMap;
 use std::sync::Arc;
-
-pub struct Manager<A, C>
-where
-    A: App,
-    C: Compositor<Renderer = A::Renderer>,
-    A::Theme: theme::Base,
-{
-    aliases: BTreeMap<winit::window::WindowId, Id>,
-    entries: BTreeMap<Id, Window<A, C>>,
-}
-
-impl<A, C> Manager<A, C>
-where
-    A: App,
-    C: Compositor<Renderer = A::Renderer>,
-    A::Theme: theme::Base,
-{
-    pub fn new() -> Self {
-        Self {
-            aliases: BTreeMap::new(),
-            entries: BTreeMap::new(),
-        }
-    }
-
-    pub fn insert(
-        &mut self,
-        id: Id,
-        window: Arc<winit::window::Window>,
-        runner: &AppRunner<A>,
-        compositor: &mut C,
-        proxy: Proxy<A::Message>,
-        renderer_settings: renderer::Settings,
-        exit_on_close_request: bool,
-        system_theme: theme::Mode,
-    ) -> &mut Window<A, C> {
-        let state = State::new(runner, id, &window, system_theme);
-        let surface_size = state.physical_size();
-        let surface_version = state.surface_version();
-        let surface =
-            compositor.create_surface(window.clone(), surface_size.width, surface_size.height);
-        let renderer = compositor.create_renderer(renderer_settings);
-
-        let waker = shell::Waker::new_tagged(move |reactive| {
-            proxy.send_action(taim_runtime::Action::Event {
-                window: id,
-                event: reactive.map_or(core::Event::Waken, core::Event::Reactive),
-            });
-        });
-
-        // Built before the entry so the bridge can borrow the session's
-        // adapter, and so the window's title can be read before `window` is
-        // moved in.
-        let accessibility =
-            taim_accessibility::Session::new(taim_accessibility::atspi::adapter::Adapter::new());
-
-        #[cfg(feature = "accessibility")]
-        let accessibility_bridge = taim_accessibility::atspi::bridge::Bridge::spawn(
-            accessibility.adapter().store().clone(),
-            accessibility.adapter().events().clone(),
-            window.title(),
-        );
-
-        let _ = self.aliases.insert(window.id(), id);
-
-        let _ = self.entries.insert(
-            id,
-            Window {
-                raw: window,
-                waker,
-                state,
-                exit_on_close_request,
-                surface,
-                surface_version,
-                renderer,
-                mouse_interaction: mouse::Interaction::None,
-                redraw_at: None,
-                hit_test_index: None,
-                scheduler: Scheduler::new(),
-                accessibility,
-                #[cfg(feature = "accessibility")]
-                _accessibility_bridge: accessibility_bridge,
-                preedit: None,
-                ime_state: None,
-            },
-        );
-
-        self.entries
-            .get_mut(&id)
-            .expect("Get window that was just inserted")
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
-    }
-
-    pub fn is_idle(&self) -> bool {
-        self.entries
-            .values()
-            .all(|window| window.redraw_at.is_none())
-    }
-
-    /// Returns the earliest instant any non-suspended window's
-    /// [`Scheduler`] wants to be woken up at, or `None` if no window has
-    /// a deadline pending (nothing to redraw, or every window with a
-    /// pending request is currently suspended/occluded).
-    ///
-    /// A suspended window's [`Scheduler::deadline`] is always `None`
-    /// (see its own documentation), so an occluded window with a
-    /// pending redraw request correctly stops contributing to this
-    /// computation -- the event loop does not wake up early just to
-    /// discover, again, that the surface is still occluded.
-    pub fn redraw_at(&self) -> Option<Instant> {
-        self.entries
-            .values()
-            .filter_map(|window| window.scheduler.deadline())
-            .min()
-    }
-
-    pub fn first(&self) -> Option<&Window<A, C>> {
-        self.entries.first_key_value().map(|(_id, window)| window)
-    }
-
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Id, &mut Window<A, C>)> {
-        self.entries.iter_mut().map(|(k, v)| (*k, v))
-    }
-
-    pub fn get(&self, id: Id) -> Option<&Window<A, C>> {
-        self.entries.get(&id)
-    }
-
-    pub fn get_mut(&mut self, id: Id) -> Option<&mut Window<A, C>> {
-        self.entries.get_mut(&id)
-    }
-
-    pub fn get_mut_alias(
-        &mut self,
-        id: winit::window::WindowId,
-    ) -> Option<(Id, &mut Window<A, C>)> {
-        let id = self.aliases.get(&id).copied()?;
-
-        Some((id, self.get_mut(id)?))
-    }
-
-    pub fn get_alias(&self, id: winit::window::WindowId) -> Option<Id> {
-        self.aliases.get(&id).copied()
-    }
-
-    pub fn last_monitor(&self) -> Option<MonitorHandle> {
-        self.entries.values().last()?.raw.current_monitor()
-    }
-
-    pub fn remove(&mut self, id: Id) -> Option<Window<A, C>> {
-        let window = self.entries.remove(&id)?;
-        let _ = self.aliases.remove(&window.raw.id());
-
-        Some(window)
-    }
-
-    pub fn replace_with(&mut self, mut f: impl FnMut(Window<A, C>) -> Window<A, C>) {
-        self.entries = std::mem::take(&mut self.entries)
-            .into_iter()
-            .map(|(id, window)| (id, f(window)))
-            .collect();
-    }
-}
-
-impl<A, C> Default for Manager<A, C>
-where
-    A: App,
-    C: Compositor<Renderer = A::Renderer>,
-    A::Theme: theme::Base,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
+use winit::dpi::{LogicalPosition, LogicalSize};
 
 pub struct Window<A, C>
 where
@@ -216,16 +37,17 @@ where
     pub surface: C::Surface,
     pub surface_version: u64,
     pub renderer: A::Renderer,
-    pub redraw_at: Option<Instant>,
     pub hit_test_index: Option<crate::runtime::hit_test::Index>,
     /// This window's frame-production state machine (Phase 6):
     /// [`WindowEvent::Occluded`] and presentation feedback flow through
-    /// it, and [`Window::redraw_at`]/`ControlFlow` computation defers to
+    /// it, and `ControlFlow` computation defers to
     /// [`Scheduler::should_produce_frame`]/[`Scheduler::deadline`]
     /// rather than acting on raw redraw requests directly.
     ///
     /// [`WindowEvent::Occluded`]: winit::event::WindowEvent::Occluded
     pub scheduler: Scheduler,
+    is_occluded: bool,
+    is_zero_sized: bool,
     /// Retained accessibility session for this window. The in-memory AT-SPI
     /// adapter is updated on the UI thread; platform bus delivery can drain
     /// its bounded event queue without blocking rendering.
@@ -264,13 +86,29 @@ where
             RedrawRequest::NextFrame => {
                 self.scheduler.request_redraw_at(Instant::now());
                 self.raw.request_redraw();
-                self.redraw_at = None;
             }
             RedrawRequest::At(at) => {
                 self.scheduler.request_redraw_at(at);
-                self.redraw_at = Some(at);
             }
             RedrawRequest::Wait => {}
+        }
+    }
+
+    pub fn set_occluded(&mut self, is_occluded: bool) {
+        self.is_occluded = is_occluded;
+        self.synchronize_suspension();
+    }
+
+    pub fn set_zero_sized(&mut self, is_zero_sized: bool) {
+        self.is_zero_sized = is_zero_sized;
+        self.synchronize_suspension();
+    }
+
+    fn synchronize_suspension(&mut self) {
+        if self.is_occluded || self.is_zero_sized {
+            self.scheduler.suspend();
+        } else {
+            self.scheduler.resume();
         }
     }
 
@@ -358,143 +196,5 @@ where
         }
 
         self.preedit = None;
-    }
-}
-
-struct Preedit<Renderer>
-where
-    Renderer: text::Renderer,
-{
-    position: Point,
-    content: Renderer::Paragraph,
-    spans: Vec<text::Span<'static, (), Renderer::Font>>,
-}
-
-impl<Renderer> Preedit<Renderer>
-where
-    Renderer: text::Renderer,
-{
-    fn new() -> Self {
-        Self {
-            position: Point::ORIGIN,
-            spans: Vec::new(),
-            content: Renderer::Paragraph::default(),
-        }
-    }
-
-    fn update(
-        &mut self,
-        cursor: Rectangle,
-        preedit: &input_method::Preedit,
-        background: Color,
-        renderer: &Renderer,
-    ) {
-        self.position = cursor.position() + Vector::new(0.0, cursor.height);
-
-        let background = Color {
-            a: 1.0,
-            ..background
-        };
-
-        let spans = match &preedit.selection {
-            Some(selection) => {
-                vec![
-                    text::Span::new(&preedit.content[..selection.start]),
-                    text::Span::new(if selection.start == selection.end {
-                        "\u{200A}"
-                    } else {
-                        &preedit.content[selection.start..selection.end]
-                    })
-                    .color(background),
-                    text::Span::new(&preedit.content[selection.end..]),
-                ]
-            }
-            _ => vec![text::Span::new(&preedit.content)],
-        };
-
-        if spans != self.spans.as_slice() {
-            use text::Paragraph as _;
-
-            self.content = Renderer::Paragraph::with_spans(Text {
-                content: &spans,
-                bounds: Size::INFINITE,
-                size: preedit.text_size.unwrap_or_else(|| renderer.default_size()),
-                line_height: text::LineHeight::default(),
-                font: renderer.default_font(),
-                align_x: text::Alignment::Default,
-                align_y: alignment::Vertical::Top,
-                shaping: text::Shaping::Advanced,
-                wrapping: text::Wrapping::None,
-                ellipsis: text::Ellipsis::None,
-                hint_factor: renderer.scale_factor(),
-            });
-
-            self.spans.clear();
-            self.spans
-                .extend(spans.into_iter().map(text::Span::to_static));
-        }
-    }
-
-    fn draw(&self, renderer: &mut Renderer, color: Color, background: Color, viewport: &Rectangle) {
-        use text::Paragraph as _;
-
-        if self.content.min_width() < 1.0 {
-            return;
-        }
-
-        let mut bounds = Rectangle::new(
-            self.position - Vector::new(0.0, self.content.min_height()),
-            self.content.min_bounds(),
-        );
-
-        bounds.x = bounds
-            .x
-            .max(viewport.x)
-            .min(viewport.x + viewport.width - bounds.width);
-
-        bounds.y = bounds
-            .y
-            .max(viewport.y)
-            .min(viewport.y + viewport.height - bounds.height);
-
-        renderer.with_layer(bounds, |renderer| {
-            let background = Color {
-                a: 1.0,
-                ..background
-            };
-
-            renderer.fill_quad(
-                renderer::Quad {
-                    bounds,
-                    ..Default::default()
-                },
-                background,
-            );
-
-            renderer.fill_paragraph(&self.content, bounds.position(), color, bounds);
-
-            const UNDERLINE: f32 = 2.0;
-
-            renderer.fill_quad(
-                renderer::Quad {
-                    bounds: bounds.shrink(Padding {
-                        top: bounds.height - UNDERLINE,
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                },
-                color,
-            );
-
-            for span_bounds in self.content.span_bounds(1) {
-                renderer.fill_quad(
-                    renderer::Quad {
-                        bounds: span_bounds + (bounds.position() - Point::ORIGIN),
-                        ..Default::default()
-                    },
-                    color,
-                );
-            }
-        });
     }
 }

@@ -147,17 +147,18 @@ impl std::str::FromStr for RefreshRate {
 
 /// The cache state a scene should be exercised in.
 ///
-/// Cold and warm runs are expected to diverge once Phase 4/5 introduce
-/// retained layers and persistent GPU resources; Phase 1 records both
-/// labels now so later phases have a stable place to report the split
-/// without changing the report schema.
+/// Every measured run begins with a fresh `UserInterface` cache, then retains
+/// that cache across its 180 frames. `Warm` performs process-level warm-up
+/// before measurement; `Cold` skips it. Neither mode guarantees a cold GPU
+/// cache for every frame or measures renderer initialization, so reports must
+/// not be presented as per-frame cold/warm GPU comparisons.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CacheState {
-    /// Every measured run starts from an empty cache (new renderer, new
-    /// `UserInterface`, no warm glyph/image/layer caches).
+    /// Skip process-level warm-up; each run still starts with an empty UI
+    /// cache, while the renderer is shared across runs.
     Cold,
-    /// The cache is warmed up before measured runs begin (default).
+    /// Warm process-level renderer/font caches before measured runs (default).
     Warm,
 }
 

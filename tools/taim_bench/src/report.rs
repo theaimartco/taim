@@ -15,8 +15,9 @@ use std::time::Duration;
 
 /// The current report schema version. Bump this and update
 /// `tests/bench/report_schema.rs` whenever a field is removed, renamed,
-/// or changes meaning (adding an optional field does not require a bump).
-pub const SCHEMA_VERSION: u32 = 1;
+/// required, or changes meaning. Version 2 includes UI build/diff/layout
+/// in headline frame time; version 1 baselines are not comparable.
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// A complete, self-describing benchmark report for one scene run.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -187,6 +188,8 @@ pub struct RunSummary {
     /// regardless of what the compositor does with it afterward), just
     /// not the same measurement a real windowed run would produce.
     pub pacing: PacingSummary,
+    /// Allocations in measured UI build/update/draw intervals only. Scene
+    /// setup and headless screenshot readback are excluded.
     pub allocations: AllocationSnapshot,
     pub memory: MemorySnapshot,
 }
@@ -229,16 +232,24 @@ impl Report {
     /// Parses a report from JSON, checking the schema version matches
     /// what this build of `taim_bench` understands.
     pub fn from_json(json: &str) -> Result<Self, ReportError> {
-        let report: Self = serde_json::from_str(json)?;
+        #[derive(serde::Deserialize)]
+        struct Header {
+            schema_version: u32,
+        }
 
-        if report.schema_version != SCHEMA_VERSION {
+        // Parse the version first, so a valid older report produces the
+        // actionable version error instead of a missing-field error when
+        // the versioned body gained a required metric.
+        let header: Header = serde_json::from_str(json)?;
+
+        if header.schema_version != SCHEMA_VERSION {
             return Err(ReportError::SchemaMismatch {
-                found: report.schema_version,
+                found: header.schema_version,
                 expected: SCHEMA_VERSION,
             });
         }
 
-        Ok(report)
+        Ok(serde_json::from_str(json)?)
     }
 
     /// A short, human-readable summary suitable for terminal output.
@@ -249,13 +260,13 @@ impl Report {
             "scene: {scene} ({cache_state:?} cache, {hz} Hz gate)\n\
              renderer: {backend}\n\
              runs: {run_count} (frames/run: {frame_count})\n\
-             frame time  p50={p50:?}  p95={p95:?}  p99={p99:?}   (framework: update+draw)\n\
-             phases      update_p95={update_p95:?}  draw_p95={draw_p95:?}\n\
+             frame time  p50={p50:?}  p95={p95:?}  p99={p99:?}   (build+update+draw)\n\
+             phases      build_p95={build_p95:?}  update_p95={update_p95:?}  draw_p95={draw_p95:?}\n\
              missed frame rate: {missed:.3}%\n\
              latency     p50={lat_p50:?}  p95={lat_p95:?}\n\
              harness     readback_p95={present_p95:?}  (excluded from frame time)\n\
              rss: {rss}\n\
-             allocations: {allocations}",
+             UI allocations/run: {allocations}",
             scene = self.scene,
             cache_state = self.cache_state,
             hz = self.refresh_rate.as_hz(),
@@ -265,6 +276,7 @@ impl Report {
             p50 = m.frame_time.p50,
             p95 = m.frame_time.p95,
             p99 = m.frame_time.p99,
+            build_p95 = m.frame_time.build_p95,
             update_p95 = m.frame_time.update_p95,
             draw_p95 = m.frame_time.draw_p95,
             present_p95 = m.frame_time.present_p95,
@@ -282,8 +294,9 @@ impl Report {
             // allocations", which is the opposite of the truth.
             allocations = if self.environment.allocation_counting_active {
                 format!(
-                    "{} allocs, {} frees, {:.1} MiB allocated",
+                    "{} allocs ({:.1}/frame), {} frees, {:.1} MiB allocated",
                     m.allocations.allocations,
+                    m.allocations.allocations as f64 / m.frame_time.sample_count.max(1) as f64,
                     m.allocations.deallocations,
                     m.allocations.bytes_allocated as f64 / (1024.0 * 1024.0)
                 )
@@ -365,6 +378,7 @@ mod tests {
                 p95: Duration::from_millis(p95_millis),
                 p99: Duration::from_millis(p95_millis + 1),
                 missed_frame_rate: 0.0,
+                build_p95: Duration::from_millis(p95_millis / 4),
                 update_p95: Duration::from_millis(p95_millis / 2),
                 draw_p95: Duration::from_millis(p95_millis / 4),
                 present_p95: Duration::from_millis(p95_millis / 4),
@@ -415,6 +429,19 @@ mod tests {
         let result = Report::from_json(&json);
 
         assert!(matches!(result, Err(ReportError::SchemaMismatch { .. })));
+    }
+
+    #[test]
+    fn rejects_v1_before_deserializing_the_new_required_build_metric() {
+        let old = r#"{"schema_version":1,"scene":"idle_shell"}"#;
+
+        assert!(matches!(
+            Report::from_json(old),
+            Err(ReportError::SchemaMismatch {
+                found: 1,
+                expected: 2
+            })
+        ));
     }
 
     #[test]

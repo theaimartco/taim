@@ -1,5 +1,7 @@
 //! A widget to make animated views.
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::{Hash, Hasher};
+
+use rustc_hash::FxHasher;
 
 use crate::core::animation::{Animation, Float, Motion, MotionInterpolate};
 use crate::core::layout::{self, Layout};
@@ -28,7 +30,7 @@ pub trait Program: 'static {
 
 impl<I> Program for Animation<I>
 where
-    I: Float + Clone + Copy + PartialEq + 'static,
+    I: Float + Copy + PartialEq + 'static,
 {
     type Value = I;
 
@@ -429,7 +431,7 @@ struct Key(u64);
 
 impl Key {
     fn new(data: impl Hash) -> Self {
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = FxHasher::default();
         data.hash(&mut hasher);
         Self(hasher.finish())
     }

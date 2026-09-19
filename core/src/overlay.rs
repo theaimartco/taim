@@ -139,7 +139,8 @@ pub fn from_children<'a, Message, Theme, Renderer>(
 where
     Renderer: crate::Renderer,
 {
-    let children = children
+    collect(
+        children
         .iter_mut()
         .zip(&mut tree.children)
         .zip(layout.children())
@@ -147,8 +148,31 @@ where
             child
                 .as_widget_mut()
                 .overlay(state, layout, renderer, viewport, translation)
-        })
-        .collect::<Vec<_>>();
+        }),
+    )
+}
 
-    (!children.is_empty()).then(|| Group::with_children(children).overlay())
+/// Collapses a generated overlay sequence without introducing a group for the
+/// overwhelmingly common zero/one-child cases.
+pub(super) fn collect<'a, Message, Theme, Renderer>(
+    elements: impl IntoIterator<Item = Element<'a, Message, Theme, Renderer>>,
+) -> Option<Element<'a, Message, Theme, Renderer>>
+where
+    Message: 'a,
+    Theme: 'a,
+    Renderer: crate::Renderer + 'a,
+{
+    let mut elements = elements.into_iter();
+    let first = elements.next()?;
+    let Some(second) = elements.next() else {
+        return Some(first);
+    };
+
+    let (remaining, _) = elements.size_hint();
+    let mut children = Vec::with_capacity(remaining.saturating_add(2));
+    children.push(first);
+    children.push(second);
+    children.extend(elements);
+
+    Some(Group::with_children(children).overlay())
 }

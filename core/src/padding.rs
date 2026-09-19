@@ -1,4 +1,6 @@
 //! Space stuff around the perimeter.
+mod conversion;
+
 use crate::{Pixels, Size};
 
 /// An amount of space to pad for each side of a box
@@ -90,6 +92,7 @@ impl Padding {
 
     /// Create a [`Padding`] that is equal on all sides.
     pub const fn new(padding: f32) -> Padding {
+        let padding = valid(padding);
         Padding {
             top: padding,
             right: padding,
@@ -98,12 +101,32 @@ impl Padding {
         }
     }
 
+    /// Creates padding from horizontal and vertical axis values.
+    pub const fn axes(horizontal: f32, vertical: f32) -> Self {
+        Self {
+            top: valid(vertical),
+            right: valid(horizontal),
+            bottom: valid(vertical),
+            left: valid(horizontal),
+        }
+    }
+
+    /// Creates padding from clockwise side values, starting at the top.
+    pub const fn sides(top: f32, right: f32, bottom: f32, left: f32) -> Self {
+        Self {
+            top: valid(top),
+            right: valid(right),
+            bottom: valid(bottom),
+            left: valid(left),
+        }
+    }
+
     /// Sets the [`top`] of the [`Padding`].
     ///
     /// [`top`]: Self::top
     pub fn top(self, top: impl Into<Pixels>) -> Self {
         Self {
-            top: top.into().0,
+            top: valid(top.into().0),
             ..self
         }
     }
@@ -113,7 +136,7 @@ impl Padding {
     /// [`bottom`]: Self::bottom
     pub fn bottom(self, bottom: impl Into<Pixels>) -> Self {
         Self {
-            bottom: bottom.into().0,
+            bottom: valid(bottom.into().0),
             ..self
         }
     }
@@ -123,7 +146,7 @@ impl Padding {
     /// [`left`]: Self::left
     pub fn left(self, left: impl Into<Pixels>) -> Self {
         Self {
-            left: left.into().0,
+            left: valid(left.into().0),
             ..self
         }
     }
@@ -133,7 +156,7 @@ impl Padding {
     /// [`right`]: Self::right
     pub fn right(self, right: impl Into<Pixels>) -> Self {
         Self {
-            right: right.into().0,
+            right: valid(right.into().0),
             ..self
         }
     }
@@ -146,8 +169,8 @@ impl Padding {
         let horizontal = horizontal.into();
 
         Self {
-            left: horizontal.0,
-            right: horizontal.0,
+            left: valid(horizontal.0),
+            right: valid(horizontal.0),
             ..self
         }
     }
@@ -160,89 +183,152 @@ impl Padding {
         let vertical = vertical.into();
 
         Self {
-            top: vertical.0,
-            bottom: vertical.0,
+            top: valid(vertical.0),
+            bottom: valid(vertical.0),
             ..self
         }
     }
 
     /// Returns the total amount of horizontal [`Padding`].
-    pub fn x(self) -> f32 {
-        self.left + self.right
+    #[inline]
+    pub const fn x(self) -> f32 {
+        valid(self.left) + valid(self.right)
     }
 
     /// Returns the total amount of vertical [`Padding`].
-    pub fn y(self) -> f32 {
-        self.top + self.bottom
+    #[inline]
+    pub const fn y(self) -> f32 {
+        valid(self.top) + valid(self.bottom)
+    }
+
+    /// Returns a finite, non-negative copy safe for layout arithmetic.
+    #[inline]
+    pub const fn normalized(self) -> Self {
+        Self {
+            top: valid(self.top),
+            right: valid(self.right),
+            bottom: valid(self.bottom),
+            left: valid(self.left),
+        }
+    }
+
+    /// Returns whether all sides are zero after normalization.
+    #[inline]
+    pub fn is_zero(self) -> bool {
+        self.x() == 0.0 && self.y() == 0.0
+    }
+
+    /// Scales every side by a finite, non-negative factor.
+    pub fn scale(self, factor: f32) -> Self {
+        let factor = valid(factor);
+        Self::sides(
+            self.top * factor,
+            self.right * factor,
+            self.bottom * factor,
+            self.left * factor,
+        )
+    }
+
+    /// Interpolates each side toward `target` for layout animation.
+    pub fn lerp(self, target: Self, amount: f32) -> Self {
+        let amount = if amount.is_finite() {
+            amount.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let blend = |start: f32, end: f32| start + (end - start) * amount;
+        Self::sides(
+            blend(self.top, target.top),
+            blend(self.right, target.right),
+            blend(self.bottom, target.bottom),
+            blend(self.left, target.left),
+        )
     }
 
     /// Fits the [`Padding`] between the provided `inner` and `outer` [`Size`].
     pub fn fit(self, inner: Size, outer: Size) -> Self {
-        let available = (outer - inner).max(Size::ZERO);
-        let new_top = self.top.min(available.height);
-        let new_left = self.left.min(available.width);
+        let padding = self.normalized();
+        let available = Size::new(
+            available(outer.width - inner.width),
+            available(outer.height - inner.height),
+        );
+        let (left, right) = fit_axis(padding.left, padding.right, available.width);
+        let (top, bottom) = fit_axis(padding.top, padding.bottom, available.height);
 
         Padding {
-            top: new_top,
-            bottom: self.bottom.min(available.height - new_top),
-            left: new_left,
-            right: self.right.min(available.width - new_left),
+            top,
+            right,
+            bottom,
+            left,
         }
     }
 }
 
-impl From<u16> for Padding {
-    fn from(p: u16) -> Self {
-        Padding {
-            top: f32::from(p),
-            right: f32::from(p),
-            bottom: f32::from(p),
-            left: f32::from(p),
-        }
+#[inline]
+fn fit_axis(leading: f32, trailing: f32, available: f32) -> (f32, f32) {
+    let total = leading + trailing;
+    if total <= available || total == 0.0 {
+        (leading, trailing)
+    } else {
+        let scale = available / total;
+        (leading * scale, trailing * scale)
     }
 }
 
-impl From<[u16; 2]> for Padding {
-    fn from(p: [u16; 2]) -> Self {
-        Padding {
-            top: f32::from(p[0]),
-            right: f32::from(p[1]),
-            bottom: f32::from(p[0]),
-            left: f32::from(p[1]),
-        }
+#[inline]
+pub(super) const fn valid(value: f32) -> f32 {
+    if value >= 0.0 && value <= f32::MAX {
+        value
+    } else {
+        0.0
     }
 }
 
-impl From<f32> for Padding {
-    fn from(p: f32) -> Self {
-        Padding {
-            top: p,
-            right: p,
-            bottom: p,
-            left: p,
-        }
+/// Normalizes available layout space while preserving an unbounded axis.
+///
+/// Padding values themselves must be finite, but a layout limit may
+/// legitimately be positive infinity. Folding that infinity to zero would
+/// collapse padding around intrinsically-sized content.
+#[inline]
+const fn available(value: f32) -> f32 {
+    if value.is_nan() || value < 0.0 {
+        0.0
+    } else {
+        value
     }
 }
 
-impl From<[f32; 2]> for Padding {
-    fn from(p: [f32; 2]) -> Self {
-        Padding {
-            top: p[0],
-            right: p[1],
-            bottom: p[0],
-            left: p[1],
-        }
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl From<Padding> for Size {
-    fn from(padding: Padding) -> Self {
-        Self::new(padding.x(), padding.y())
-    }
-}
+    #[test]
+    fn fit_preserves_padding_on_unbounded_axes() {
+        let padding = Padding::new(5.0).fit(Size::ZERO, Size::INFINITE);
 
-impl From<Pixels> for Padding {
-    fn from(pixels: Pixels) -> Self {
-        Self::from(pixels.0)
+        assert_eq!(padding, Padding::new(5.0));
+    }
+
+    #[test]
+    fn fit_clamps_padding_to_finite_available_space() {
+        let padding = Padding::new(5.0).fit(Size::new(8.0, 9.0), Size::new(10.0, 10.0));
+
+        assert_eq!(
+            padding,
+            Padding {
+                top: 0.5,
+                right: 1.0,
+                bottom: 0.5,
+                left: 1.0,
+            }
+        );
+    }
+
+    #[test]
+    fn fit_preserves_asymmetric_side_ratio() {
+        let padding = Padding::sides(8.0, 2.0, 2.0, 6.0)
+            .fit(Size::ZERO, Size::new(4.0, 5.0));
+
+        assert_eq!(padding, Padding::sides(4.0, 1.0, 1.0, 3.0));
     }
 }

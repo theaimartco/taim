@@ -1,6 +1,6 @@
 use crate::conversion;
 use crate::core::{Color, Size};
-use crate::core::{mouse, theme, window};
+use crate::core::{keyboard, mouse, theme, window};
 use crate::graphics::Viewport;
 use crate::program::App;
 
@@ -19,7 +19,7 @@ where
     viewport: Viewport,
     surface_version: u64,
     cursor_position: Option<winit::dpi::PhysicalPosition<f64>>,
-    modifiers: winit::keyboard::ModifiersState,
+    modifiers: keyboard::Modifiers,
     theme: Option<A::Theme>,
     theme_mode: theme::Mode,
     default_theme: A::Theme,
@@ -54,7 +54,7 @@ where
     ) -> Self {
         let win_ctx = crate::program::WindowContext::new(window_id, window.scale_factor() as f32);
         let title = runner.title(&win_ctx);
-        let scale_factor = runner.scale_factor(&win_ctx);
+        let scale_factor = valid_application_scale(runner.scale_factor(&win_ctx));
         let theme = runner.theme(&win_ctx);
         let theme_mode = theme.as_ref().map(theme::Base::mode).unwrap_or_default();
         let default_theme = <A::Theme as theme::Base>::default(system_theme);
@@ -65,7 +65,7 @@ where
 
             Viewport::with_physical_size(
                 Size::new(physical_size.width, physical_size.height),
-                window.scale_factor() as f32 * scale_factor,
+                combined_scale(window.scale_factor(), scale_factor),
             )
         };
 
@@ -75,7 +75,7 @@ where
             viewport,
             surface_version: 0,
             cursor_position: None,
-            modifiers: winit::keyboard::ModifiersState::default(),
+            modifiers: keyboard::Modifiers::empty(),
             theme,
             theme_mode,
             default_theme,
@@ -112,7 +112,7 @@ where
             .unwrap_or(mouse::Cursor::Unavailable)
     }
 
-    pub fn modifiers(&self) -> winit::keyboard::ModifiersState {
+    pub fn modifiers(&self) -> keyboard::Modifiers {
         self.modifiers
     }
 
@@ -132,28 +132,31 @@ where
         self.style.text_color
     }
 
-    pub fn update(&mut self, runner: &crate::program::AppRunner<A>, window: &Window, event: &WindowEvent) {
+    pub fn update(
+        &mut self,
+        runner: &crate::program::AppRunner<A>,
+        window: &Window,
+        event: &WindowEvent,
+    ) {
         match event {
             WindowEvent::Resized(new_size) => {
                 let size = Size::new(new_size.width, new_size.height);
+                let scale = combined_scale(window.scale_factor(), self.scale_factor);
 
-                self.viewport = Viewport::with_physical_size(
-                    size,
-                    window.scale_factor() as f32 * self.scale_factor,
-                );
-                self.surface_version += 1;
+                if self.viewport.update(size, scale) {
+                    self.surface_version = self.surface_version.wrapping_add(1);
+                }
             }
             WindowEvent::ScaleFactorChanged {
                 scale_factor: new_scale_factor,
                 ..
             } => {
                 let size = self.viewport.physical_size();
+                let scale = combined_scale(*new_scale_factor, self.scale_factor);
 
-                self.viewport = Viewport::with_physical_size(
-                    size,
-                    *new_scale_factor as f32 * self.scale_factor,
-                );
-                self.surface_version += 1;
+                if self.viewport.update(size, scale) {
+                    self.surface_version = self.surface_version.wrapping_add(1);
+                }
             }
             WindowEvent::CursorMoved { position, .. }
             | WindowEvent::Touch(Touch {
@@ -165,7 +168,7 @@ where
                 self.cursor_position = None;
             }
             WindowEvent::ModifiersChanged(new_modifiers) => {
-                self.modifiers = new_modifiers.state();
+                self.modifiers = conversion::modifiers(new_modifiers.state());
             }
             WindowEvent::ThemeChanged(theme) => {
                 self.default_theme =
@@ -173,7 +176,6 @@ where
 
                 if self.theme.is_none() {
                     self.style = runner.style(&self.default_theme);
-                    window.request_redraw();
                 }
             }
             _ => {}
@@ -197,13 +199,15 @@ where
         }
 
         // Update scale factor
-        let new_scale_factor = runner.scale_factor(&win_ctx);
+        let new_scale_factor = valid_application_scale(runner.scale_factor(&win_ctx));
 
         if self.scale_factor != new_scale_factor {
-            self.viewport = Viewport::with_physical_size(
+            if self.viewport.update(
                 self.viewport.physical_size(),
-                window.scale_factor() as f32 * new_scale_factor,
-            );
+                combined_scale(window.scale_factor(), new_scale_factor),
+            ) {
+                self.surface_version = self.surface_version.wrapping_add(1);
+            }
 
             self.scale_factor = new_scale_factor;
         }
@@ -249,5 +253,25 @@ where
 
             self.theme_mode = new_mode;
         }
+    }
+}
+
+#[inline]
+fn valid_application_scale(scale: f32) -> f32 {
+    if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    }
+}
+
+#[inline]
+fn combined_scale(platform_scale: f64, application_scale: f32) -> f32 {
+    let scale = platform_scale as f32 * application_scale;
+
+    if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
     }
 }

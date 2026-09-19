@@ -329,8 +329,8 @@ impl DamageRegion {
         // Sort by distance from origin for spatial locality
         self.rects.sort_by(|a, b| {
             a.center()
-                .distance(Point::ORIGIN)
-                .total_cmp(&b.center().distance(Point::ORIGIN))
+                .distance_squared(Point::ORIGIN)
+                .total_cmp(&b.center().distance_squared(Point::ORIGIN))
         });
 
         // Greedy merge: walk through sorted rects and merge nearby ones
@@ -470,8 +470,8 @@ pub fn group(mut damage: Vec<Rectangle>, bounds: Rectangle) -> Vec<Rectangle> {
 
     damage.sort_by(|a, b| {
         a.center()
-            .distance(Point::ORIGIN)
-            .total_cmp(&b.center().distance(Point::ORIGIN))
+            .distance_squared(Point::ORIGIN)
+            .total_cmp(&b.center().distance_squared(Point::ORIGIN))
     });
 
     let mut output = Vec::new();

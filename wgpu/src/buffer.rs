@@ -1,16 +1,15 @@
 use std::marker::PhantomData;
-use std::num::NonZeroU64;
 use std::ops::RangeBounds;
 
-pub const MAX_WRITE_SIZE: usize = 100 * 1024;
+mod plan;
+mod upload;
 
-const MAX_WRITE_SIZE_U64: NonZeroU64 =
-    NonZeroU64::new(MAX_WRITE_SIZE as u64).expect("MAX_WRITE_SIZE must be non-zero");
+pub const MAX_WRITE_SIZE: usize = upload::CHUNK_BYTES;
 
 #[derive(Debug)]
 pub struct Buffer<T> {
     label: &'static str,
-    size: u64,
+    capacity: plan::Capacity,
     usage: wgpu::BufferUsages,
     pub(crate) raw: wgpu::Buffer,
     type_: PhantomData<T>,
@@ -23,18 +22,19 @@ impl<T: bytemuck::Pod> Buffer<T> {
         amount: usize,
         usage: wgpu::BufferUsages,
     ) -> Self {
-        let size = next_copy_size::<T>(amount);
+        let capacity = plan::Capacity::for_elements::<T>(device, amount, label)
+            .unwrap_or_else(|| plan::Capacity::minimum(device));
 
         let raw = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(label),
-            size,
+            size: capacity.bytes(),
             usage,
             mapped_at_creation: false,
         });
 
         Self {
             label,
-            size,
+            capacity,
             usage,
             raw,
             type_: PhantomData,
@@ -42,17 +42,19 @@ impl<T: bytemuck::Pod> Buffer<T> {
     }
 
     pub fn resize(&mut self, device: &wgpu::Device, new_count: usize) -> bool {
-        let new_size = next_copy_size::<T>(new_count);
+        let Some(next) = plan::Capacity::for_elements::<T>(device, new_count, self.label) else {
+            return false;
+        };
 
-        if self.size < new_size {
+        if self.capacity.bytes() < next.bytes() {
             self.raw = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(self.label),
-                size: new_size,
+                size: next.bytes(),
                 usage: self.usage,
                 mapped_at_creation: false,
             });
 
-            self.size = new_size;
+            self.capacity = next;
 
             true
         } else {
@@ -69,37 +71,46 @@ impl<T: bytemuck::Pod> Buffer<T> {
         contents: &[T],
     ) -> usize {
         let bytes: &[u8] = bytemuck::cast_slice(contents);
-        let mut bytes_written = 0;
 
-        // Split write into multiple chunks if necessary
-        while bytes_written + MAX_WRITE_SIZE < bytes.len() {
-            belt.write_buffer(
-                encoder,
-                &self.raw,
-                (offset + bytes_written) as u64,
-                MAX_WRITE_SIZE_U64,
-            )
-            .copy_from_slice(&bytes[bytes_written..bytes_written + MAX_WRITE_SIZE]);
-
-            bytes_written += MAX_WRITE_SIZE;
+        if bytes.is_empty() {
+            return 0;
         }
 
-        // There will always be some bytes left, since the previous
-        // loop guarantees `bytes_written < bytes.len()`
-        let bytes_left = ((bytes.len() - bytes_written) as u64)
-            .try_into()
-            .expect("non-empty write");
+        let Some(range) = self.capacity.checked_write(offset, bytes.len(), self.label) else {
+            return 0;
+        };
 
-        // Write them
-        belt.write_buffer(
-            encoder,
-            &self.raw,
-            (offset + bytes_written) as u64,
-            bytes_left,
-        )
-        .copy_from_slice(&bytes[bytes_written..]);
+        upload::slice(&self.raw, encoder, belt, range.start, bytes)
+    }
 
-        bytes.len()
+    /// Streams many disjoint typed slices into one contiguous GPU range.
+    ///
+    /// A mesh batch commonly owns one small `Vec` per shape. Mapping the
+    /// staging belt once per shape makes UI geometry submission syscall- and
+    /// allocator-heavy. This writer keeps the existing 100 KiB transfer cap,
+    /// but fills each mapped chunk from as many source slices as fit.
+    pub fn write_many<'a>(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        belt: &mut wgpu::util::StagingBelt,
+        offset: usize,
+        element_count: usize,
+        contents: impl IntoIterator<Item = &'a [T]>,
+    ) -> usize
+    where
+        T: 'a,
+    {
+        let Some(total_bytes) = std::mem::size_of::<T>().checked_mul(element_count) else {
+            return 0;
+        };
+        if total_bytes == 0 {
+            return 0;
+        }
+
+        let Some(range) = self.capacity.checked_write(offset, total_bytes, self.label) else {
+            return 0;
+        };
+        upload::scattered(&self.raw, encoder, belt, range.start, total_bytes, contents)
     }
 
     pub fn slice(&self, bounds: impl RangeBounds<wgpu::BufferAddress>) -> wgpu::BufferSlice<'_> {
@@ -107,16 +118,20 @@ impl<T: bytemuck::Pod> Buffer<T> {
     }
 
     pub fn range(&self, start: usize, end: usize) -> wgpu::BufferSlice<'_> {
-        self.slice(
-            start as u64 * std::mem::size_of::<T>() as u64
-                ..end as u64 * std::mem::size_of::<T>() as u64,
-        )
+        let bytes = self
+            .capacity
+            .element_range::<T>(start, end, self.label)
+            .unwrap_or(0..0);
+        self.slice(bytes)
     }
 }
 
-fn next_copy_size<T>(amount: usize) -> u64 {
-    let align_mask = wgpu::COPY_BUFFER_ALIGNMENT - 1;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    (((std::mem::size_of::<T>() * amount).next_power_of_two() as u64 + align_mask) & !align_mask)
-        .max(wgpu::COPY_BUFFER_ALIGNMENT)
+    #[test]
+    fn growth_is_geometric_aligned_and_never_zero() {
+        assert_eq!(MAX_WRITE_SIZE, 100 * 1024);
+    }
 }

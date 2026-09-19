@@ -1,3 +1,9 @@
+# Historical pre-migration snapshot
+
+This inventory records the repository before the current TAIM ownership pass.
+It is intentionally retained as evidence, not as a statement of current state;
+see `dependenciestaim.md` and the live independence audit for current numbers.
+
 Against the recorded iced fork commit 56b706fc, only one entire top-level folder is literally identical:
 - .cargo/
 These nested folders are also byte-for-byte identical:

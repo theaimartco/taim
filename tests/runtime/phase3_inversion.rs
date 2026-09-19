@@ -6,13 +6,13 @@
 
 use taim::window;
 use taim::{
-    App, AppContext, AppRunner, Element, FrameRequest, Program, ProgramAdapter,
-    Settings, Task, Theme, WindowContext,
+    App, AppContext, AppRunner, Element, FrameRequest, Program, ProgramAdapter, Settings, Task,
+    Theme, WindowContext,
 };
 use taim_winit::frame_gate::{DirtyFlags, FrameGate, PlatformEvent};
 
 use taim::advanced::widget::{Tree, Widget};
-use taim::advanced::{renderer, Layout};
+use taim::advanced::{Layout, renderer};
 use taim::{Length, Rectangle, Size};
 
 struct TestWidget;

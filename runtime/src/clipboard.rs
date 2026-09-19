@@ -29,21 +29,19 @@ pub enum Action {
     },
 }
 
+#[inline]
+fn request(kind: Kind) -> Task<Result<Content, Error>> {
+    task::oneshot(move |channel| crate::Action::Clipboard(Action::Read { kind, channel }))
+}
+
 /// Read the given [`Kind`] of [`Content`] from the clipboard.
 pub fn read(kind: Kind) -> Task<Result<Arc<Content>, Error>> {
-    task::oneshot(|channel| crate::Action::Clipboard(Action::Read { kind, channel }))
-        .map(|result| result.map(Arc::new))
+    request(kind).map(|result| result.map(Arc::new))
 }
 
 /// Read the current text contents of the clipboard.
 pub fn read_text() -> Task<Result<Arc<String>, Error>> {
-    task::oneshot(|channel| {
-        crate::Action::Clipboard(Action::Read {
-            kind: Kind::Text,
-            channel,
-        })
-    })
-    .map(|result| {
+    request(Kind::Text).map(|result| {
         let Ok(Content::Text(text)) = result else {
             return Err(Error::ContentNotAvailable);
         };
@@ -54,13 +52,7 @@ pub fn read_text() -> Task<Result<Arc<String>, Error>> {
 
 /// Read the current HTML contents of the clipboard.
 pub fn read_html() -> Task<Result<Arc<String>, Error>> {
-    task::oneshot(|channel| {
-        crate::Action::Clipboard(Action::Read {
-            kind: Kind::Html,
-            channel,
-        })
-    })
-    .map(|result| {
+    request(Kind::Html).map(|result| {
         let Ok(Content::Html(html)) = result else {
             return Err(Error::ContentNotAvailable);
         };
@@ -71,13 +63,7 @@ pub fn read_html() -> Task<Result<Arc<String>, Error>> {
 
 /// Read the current file paths of the clipboard.
 pub fn read_files() -> Task<Result<Arc<[PathBuf]>, Error>> {
-    task::oneshot(|channel| {
-        crate::Action::Clipboard(Action::Read {
-            kind: Kind::Files,
-            channel,
-        })
-    })
-    .map(|result| {
+    request(Kind::Files).map(|result| {
         let Ok(Content::Files(files)) = result else {
             return Err(Error::ContentNotAvailable);
         };
@@ -89,13 +75,7 @@ pub fn read_files() -> Task<Result<Arc<[PathBuf]>, Error>> {
 /// Read the current [`Image`](crate::core::clipboard::Image) of the clipboard.
 #[cfg(feature = "image")]
 pub fn read_image() -> Task<Result<crate::core::clipboard::Image, Error>> {
-    task::oneshot(|channel| {
-        crate::Action::Clipboard(Action::Read {
-            kind: Kind::Image,
-            channel,
-        })
-    })
-    .map(|result| {
+    request(Kind::Image).map(|result| {
         let Ok(Content::Image(image)) = result else {
             return Err(Error::ContentNotAvailable);
         };
