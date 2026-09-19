@@ -1,6 +1,6 @@
 //! Asynchronous tasks for GUI programming, inspired by Elm.
 //!
-//! ![The foundations of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/foundations.png?raw=true)
+//! ![The foundations of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/foundations.svg?raw=true)
 #![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 pub use futures;

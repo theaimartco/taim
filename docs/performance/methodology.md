@@ -25,7 +25,7 @@ starting line.
    one).
 3. **Same device.** Compare reports only where
    `report.environment.device` matches. `taim_bench --compare <path>`
-   enforces rules 1-3 automatically and refuses to compare otherwise.
+   enforces this automatically and refuses to compare otherwise.
 4. **Same build profile.** Compare `release`-profile reports only against
    other `release`-profile reports. `scripts/perf/run-baseline.sh` always
    builds `--release`.
@@ -51,6 +51,13 @@ starting line.
    laptop on battery power is not comparable to the same laptop plugged
    in, let alone to different hardware.
 
+`--compare` also checks report schema, refresh rate, cache mode, seed,
+viewport, scale factor, build profile, compiler, OS, and allocation
+instrumentation before evaluating P95. Git commit is intentionally allowed
+to differ because comparing code revisions is the point of a regression
+check. Device labels do not prove identical power state or GPU driver, so
+those still need operator control.
+
 ## What is measured, and what is not yet
 
 `phase.md`'s "Measurements required" list, and Phase 1's actual coverage:
@@ -58,9 +65,9 @@ starting line.
 | Required measurement | Status | Where |
 |---|---|---|
 | Cold start to first visible frame | **Not measured.** `taim_bench` never creates a real window; there is no "first visible frame" in a headless run. This belongs to Phase 14's platform-backend work, where a real compositor surface exists. | — |
-| CPU frame phases: diff, event, layout, semantics, paint prep, upload | **Partially measured.** `taim_runtime::UserInterface` does not yet split diff/event/layout into separately-timed phases (that split is Phase 3's job); `taim_bench` records `update` (diff+event+layout folded together) and `draw` (paint preparation) as they exist today. Semantics and upload have no timing hooks yet and are not fabricated. | `tools/taim_bench/src/metrics/frame_time.rs` |
+| CPU frame phases: diff, event, layout, semantics, paint prep, upload | **Partially measured.** `build` includes scene view reconstruction, tree diff, and layout; `update` includes event dispatch and any resulting relayout; `draw` includes paint preparation. Semantics and upload are not split into separate timings yet. | `tools/taim_bench/src/metrics/frame_time.rs` |
 | GPU duration and presentation time | **Approximated.** No real presentation feedback exists headlessly (Phase 6). `present` measures `Renderer::screenshot`'s readback time as a stand-in. | `tools/taim_bench/src/metrics/frame_time.rs` |
-| Allocations/frame, RSS, GPU bytes, draw calls, batch count, uploaded bytes | **Partially measured.** Allocation counting and RSS are implemented (opt-in via `--features profiling` for allocations; RSS via `/proc/self/status` on Linux only). GPU bytes/draw calls/batch count/uploaded bytes have no instrumentation hook in `taim_wgpu` yet; that is Phase 5's `wgpu/src/engine.rs` and `wgpu/src/layer.rs` work. | `tools/taim_bench/src/metrics/{allocations,memory}.rs` |
+| Allocations/frame, RSS, GPU bytes, draw calls, batch count, uploaded bytes | **Partially measured.** With `--features profiling`, allocation counters are sampled around UI build/update/draw only; scene setup and screenshot readback are excluded. The allocator is process-global, so concurrent background work can still contribute. RSS is available via `/proc/self/status` on Linux only. GPU bytes/draw calls/batch count/uploaded bytes are not yet exposed as separate counters. | `tools/taim_bench/src/metrics/{allocations,memory}.rs` |
 | Damage area/full-screen area, visited/laid-out/painted/cached nodes | **Not measured.** There is no damage tracking yet (Phase 4) and no per-node visit counters (Phase 2's `runtime/src/diagnostics.rs`). | — |
 | Event timestamp to submit, and to compositor presentation feedback | **Partially measured.** `metrics::latency` times "event dispatched to `UserInterface::update`" through "readback returned", which is the headless stand-in for "event to submit." There is no compositor, so there is no presentation-feedback leg yet. | `tools/taim_bench/src/metrics/latency.rs` |
 | Idle wake-ups and submissions | **Not measured.** There is no frame scheduler yet (Phase 6); a headless harness that calls `draw`/`screenshot` on every configured frame has no concept of "idle" to begin with. | — |
@@ -105,9 +112,10 @@ comparable at all.
   durations in a measured run and taking the value at
   `round((n - 1) * p)`, clamped to the last index. See `percentile` in
   `tools/taim_bench/src/metrics/frame_time.rs`.
-- The "missed frame rate" is the fraction of frames in a run whose total
-  CPU time (`update + draw + present`) exceeded the frame budget for the
-  configured `--refresh-rate` (`1/60`, `1/90`, or `1/120` second).
+- The "missed frame rate" is the fraction of frames in a run whose measured
+  CPU UI time (`build + update + draw`) exceeded the frame budget for the
+  configured `--refresh-rate` (`1/60`, `1/90`, or `1/120` second). Headless
+  screenshot/readback time is reported separately as harness overhead.
 - The reported "median run" is chosen by comparing each run's P95 (not
   by averaging runs together), so the reported numbers are always a real
   run's real samples, never a synthetic blend.
@@ -118,7 +126,7 @@ comparable at all.
 
 ## Report format
 
-Reports are versioned JSON (`schema_version`, currently `1`); see
+Reports are versioned JSON (`schema_version`, currently `2`); see
 `tests/bench/report_schema.rs` for the fields every report must contain
 and `tools/taim_bench/src/report.rs` for the authoritative shape. A
 schema version bump is required whenever an existing field is removed,
@@ -126,6 +134,13 @@ renamed, or changes meaning; adding a new required field is also treated
 as requiring a bump under this phase's policy, since
 `tests/bench/report_schema.rs` asserts an exact required-field list per
 version rather than "at least these fields."
+
+Version 2 includes view reconstruction, tree diff, and layout in headline
+frame time and adds `build_p95`. Version 1 reports excluded this real UI cost,
+so they are intentionally rejected by `--compare` and must not be used to
+claim a speedup. The existing checked-in baseline files remain historical
+records; regenerate them from a clean tree on a named device before making
+quantitative comparisons.
 
 ## Running a baseline
 

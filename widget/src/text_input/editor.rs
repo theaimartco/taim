@@ -11,7 +11,7 @@ impl<'a> Editor<'a> {
     }
 
     pub fn contents(&self) -> String {
-        self.value.to_string()
+        self.value.as_str().to_owned()
     }
 
     pub fn insert(&mut self, character: char) {

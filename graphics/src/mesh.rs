@@ -5,8 +5,9 @@ use crate::gradient;
 
 use bytemuck::{Pod, Zeroable};
 
-use std::sync::Arc;
-use std::sync::atomic::{self, AtomicU64};
+mod cache;
+
+pub use cache::{Cache, Id};
 
 /// A low-level primitive to render a mesh of triangles.
 #[derive(Debug, Clone, PartialEq)]
@@ -38,10 +39,61 @@ pub enum Mesh {
 impl Mesh {
     /// Returns the indices of the [`Mesh`].
     pub fn indices(&self) -> &[u32] {
-        match self {
-            Self::Solid { buffers, .. } => &buffers.indices,
-            Self::Gradient { buffers, .. } => &buffers.indices,
-        }
+        self.profile().indices
+    }
+
+    /// Returns the number of vertices owned by this mesh.
+    #[inline]
+    pub fn vertex_count(&self) -> usize {
+        self.profile().vertices
+    }
+
+    /// Returns whether this mesh cannot produce a triangle draw.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        !self.profile().drawable()
+    }
+
+    /// Returns the number of complete triangles referenced by this mesh.
+    #[inline]
+    pub fn triangle_count(&self) -> usize {
+        self.profile().indices.len() / 3
+    }
+
+    /// Returns the exact number of indices submitted by this mesh.
+    #[inline]
+    pub fn index_count(&self) -> usize {
+        self.profile().indices.len()
+    }
+
+    /// Returns the greatest referenced vertex, or `None` for an index-free mesh.
+    pub fn max_vertex_index(&self) -> Option<u32> {
+        self.profile().indices.iter().copied().max()
+    }
+
+    /// Returns how many leading vertices are reachable from the index buffer.
+    pub fn referenced_vertex_count(&self) -> usize {
+        self.max_vertex_index()
+            .and_then(|index| usize::try_from(index).ok())
+            .and_then(|index| index.checked_add(1))
+            .unwrap_or(0)
+    }
+
+    /// Returns whether the vertex buffer contains an unreachable suffix.
+    pub fn has_unused_vertices(&self) -> bool {
+        self.referenced_vertex_count() < self.vertex_count()
+    }
+
+    /// Validates triangle grouping and every referenced vertex index.
+    ///
+    /// Render submission can use this at trust boundaries before uploading
+    /// externally generated mesh data to the GPU.
+    pub fn is_well_formed(&self) -> bool {
+        let profile = self.profile();
+        profile.indices.len().is_multiple_of(3)
+            && self
+                .max_vertex_index()
+                .is_none_or(|index| (index as usize) < profile.vertices)
     }
 
     /// Returns the [`Transformation`] of the [`Mesh`].
@@ -71,6 +123,16 @@ impl Mesh {
 
     /// Multiplies every vertex alpha in this mesh.
     pub fn scale_alpha(mut self, factor: f32) -> Self {
+        let factor = if factor.is_finite() {
+            factor.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        if factor == 1.0 {
+            return self;
+        }
+
         match &mut self {
             Self::Solid { buffers, .. } => {
                 for vertex in &mut buffers.vertices {
@@ -85,6 +147,42 @@ impl Mesh {
         }
 
         self
+    }
+
+    #[inline]
+    fn profile(&self) -> Profile<'_> {
+        match self {
+            Self::Solid { buffers, .. } => Profile {
+                kind: Kind::Solid,
+                vertices: buffers.vertices.len(),
+                indices: &buffers.indices,
+            },
+            Self::Gradient { buffers, .. } => Profile {
+                kind: Kind::Gradient,
+                vertices: buffers.vertices.len(),
+                indices: &buffers.indices,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    Solid,
+    Gradient,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Profile<'a> {
+    kind: Kind,
+    vertices: usize,
+    indices: &'a [u32],
+}
+
+impl Profile<'_> {
+    #[inline]
+    fn drawable(self) -> bool {
+        self.vertices != 0 && self.indices.len() >= 3
     }
 }
 
@@ -143,87 +241,28 @@ pub struct AttributeCount {
 
 /// Returns the number of total vertices & total indices of all [`Mesh`]es.
 pub fn attribute_count_of(meshes: &[Mesh]) -> AttributeCount {
-    meshes
+    let mut total = AttributeCount::default();
+
+    for profile in meshes
         .iter()
-        .fold(AttributeCount::default(), |mut count, mesh| {
-            match mesh {
-                Mesh::Solid { buffers, .. } => {
-                    count.solids += 1;
-                    count.solid_vertices += buffers.vertices.len();
-                    count.indices += buffers.indices.len();
-                }
-                Mesh::Gradient { buffers, .. } => {
-                    count.gradients += 1;
-                    count.gradient_vertices += buffers.vertices.len();
-                    count.indices += buffers.indices.len();
-                }
+        .map(Mesh::profile)
+        .filter(|mesh| mesh.drawable())
+    {
+        total.indices = total.indices.saturating_add(profile.indices.len());
+
+        match profile.kind {
+            Kind::Solid => {
+                total.solids = total.solids.saturating_add(1);
+                total.solid_vertices = total.solid_vertices.saturating_add(profile.vertices);
             }
-
-            count
-        })
-}
-
-/// A cache of multiple meshes.
-#[derive(Debug, Clone)]
-pub struct Cache {
-    id: Id,
-    batch: Arc<[Mesh]>,
-    version: usize,
-}
-
-/// The unique id of a [`Cache`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Id(u64);
-
-impl Cache {
-    /// Creates a new [`Cache`] for the given meshes.
-    pub fn new(meshes: Arc<[Mesh]>) -> Self {
-        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
-
-        Self {
-            id: Id(NEXT_ID.fetch_add(1, atomic::Ordering::Relaxed)),
-            batch: meshes,
-            version: 0,
+            Kind::Gradient => {
+                total.gradients = total.gradients.saturating_add(1);
+                total.gradient_vertices = total.gradient_vertices.saturating_add(profile.vertices);
+            }
         }
     }
 
-    /// Returns the [`Id`] of the [`Cache`].
-    pub fn id(&self) -> Id {
-        self.id
-    }
-
-    /// Returns the current version of the [`Cache`].
-    pub fn version(&self) -> usize {
-        self.version
-    }
-
-    /// Returns the batch of meshes in the [`Cache`].
-    pub fn batch(&self) -> &Arc<[Mesh]> {
-        &self.batch
-    }
-
-    /// Returns true if the [`Cache`] is empty.
-    pub fn is_empty(&self) -> bool {
-        self.batch.is_empty()
-    }
-
-    /// Updates the [`Cache`] with the given meshes.
-    pub fn update(&mut self, meshes: Arc<[Mesh]>) {
-        self.batch = meshes;
-        self.version += 1;
-    }
-
-    /// Returns a transient cache with alpha-scaled copies of its meshes.
-    pub fn scale_alpha(&self, factor: f32) -> Self {
-        let batch = self
-            .batch
-            .iter()
-            .cloned()
-            .map(|mesh| mesh.scale_alpha(factor))
-            .collect::<Vec<_>>();
-
-        Self::new(Arc::from(batch))
-    }
+    total
 }
 
 /// A renderer capable of drawing a [`Mesh`].

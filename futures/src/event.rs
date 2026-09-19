@@ -1,89 +1,85 @@
-//! Listen to runtime events.
+//! Typed subscriptions over TAIM's normalized runtime event stream.
+
 use crate::MaybeSend;
 use crate::core::event::{self, Event};
 use crate::core::window;
 use crate::subscription::{self, Subscription};
 
-/// Returns a [`Subscription`] to all the ignored runtime events.
-///
-/// This subscription will notify your application of any [`Event`] that was
-/// not captured by any widget.
+/// Returns events that reached no widget.
 pub fn listen() -> Subscription<Event> {
-    listen_with(|event, status, _window| match status {
-        event::Status::Ignored => Some(event),
-        event::Status::Captured => None,
-    })
+    listen_with(unhandled)
 }
 
-/// Creates a [`Subscription`] that listens and filters all the runtime events
-/// with the provided function, producing messages accordingly.
+fn unhandled(event: Event, status: event::Status, _window: window::Id) -> Option<Event> {
+    (status == event::Status::Ignored).then_some(event)
+}
+
+/// Subscribes to non-redraw interactions and transforms them with `mapper`.
 ///
-/// This subscription will call the provided function for every [`Event`]
-/// handled by the runtime. If the function:
-///
-/// - Returns `None`, the [`Event`] will be discarded.
-/// - Returns `Some` message, the `Message` will be produced.
+/// System-theme and platform events have dedicated subscriptions, keeping
+/// regular input filters small and preventing accidental redraw feedback
+/// loops.
 pub fn listen_with<Message>(
-    f: fn(Event, event::Status, window::Id) -> Option<Message>,
+    mapper: fn(Event, event::Status, window::Id) -> Option<Message>,
 ) -> Subscription<Message>
 where
-    Message: 'static + MaybeSend,
+    Message: MaybeSend + 'static,
 {
-    #[derive(Hash)]
-    struct EventsWith;
-
-    subscription::filter_map((EventsWith, f), move |event| match event {
-        subscription::Event::Interaction {
-            event: Event::Window(window::Event::RedrawRequested(_)),
-            ..
-        }
-        | subscription::Event::SystemThemeChanged(_)
-        | subscription::Event::PlatformSpecific(_) => None,
-        subscription::Event::Interaction {
-            window,
-            event,
-            status,
-        } => f(event, status, window),
-    })
+    interaction_stream(InteractionMode::Application, mapper)
 }
 
-/// Creates a [`Subscription`] that produces a message for every runtime event,
-/// including the redraw request events.
+/// Subscribes to every interaction, including redraw notifications.
 ///
-/// **Warning:** This [`Subscription`], if unfiltered, may produce messages in
-/// an infinite loop.
+/// Returning a message for every redraw can create a permanent render loop;
+/// callers should filter aggressively.
 pub fn listen_raw<Message>(
-    f: fn(Event, event::Status, window::Id) -> Option<Message>,
+    mapper: fn(Event, event::Status, window::Id) -> Option<Message>,
 ) -> Subscription<Message>
 where
-    Message: 'static + MaybeSend,
+    Message: MaybeSend + 'static,
 {
-    #[derive(Hash)]
-    struct RawEvents;
+    interaction_stream(InteractionMode::Raw, mapper)
+}
 
-    subscription::filter_map((RawEvents, f), move |event| match event {
-        subscription::Event::Interaction {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum InteractionMode {
+    Application,
+    Raw,
+}
+
+fn interaction_stream<Message>(
+    mode: InteractionMode,
+    mapper: fn(Event, event::Status, window::Id) -> Option<Message>,
+) -> Subscription<Message>
+where
+    Message: MaybeSend + 'static,
+{
+    subscription::filter_map((mode, mapper), move |incoming| {
+        let subscription::Event::Interaction {
             window,
             event,
             status,
-        } => f(event, status, window),
-        subscription::Event::SystemThemeChanged(_) | subscription::Event::PlatformSpecific(_) => {
-            None
+        } = incoming
+        else {
+            return None;
+        };
+
+        if mode == InteractionMode::Application
+            && matches!(event, Event::Window(window::Event::RedrawRequested(_)))
+        {
+            return None;
         }
+
+        mapper(event, status, window)
     })
 }
 
-/// Creates a [`Subscription`] that notifies of custom application URL
-/// received from the system.
-///
-/// _**Note:** Currently, it only triggers on macOS and the executable needs to be properly [bundled]!_
-///
-/// [bundled]: https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFBundles/BundleTypes/BundleTypes.html#//apple_ref/doc/uid/10000123i-CH101-SW19
+/// Subscribes to application URLs emitted by the active TAIM platform adapter.
 pub fn listen_url() -> Subscription<String> {
     #[derive(Hash)]
-    struct ListenUrl;
+    struct ApplicationUrl;
 
-    subscription::filter_map(ListenUrl, move |event| match event {
+    subscription::filter_map(ApplicationUrl, |incoming| match incoming {
         subscription::Event::PlatformSpecific(subscription::PlatformSpecific::MacOS(
             subscription::MacOS::ReceivedUrl(url),
         )) => Some(url),

@@ -1,14 +1,11 @@
-use crate::layout;
-use crate::mouse;
 use crate::overlay;
-use crate::renderer;
-use crate::widget;
-use crate::{Event, Layout, Overlay, Shell, Size};
+
+mod implementation;
 
 /// An [`Overlay`] container that displays multiple overlay [`overlay::Element`]
 /// children.
 pub struct Group<'a, Message, Theme, Renderer> {
-    children: Vec<overlay::Element<'a, Message, Theme, Renderer>>,
+    pub(super) children: Vec<overlay::Element<'a, Message, Theme, Renderer>>,
 }
 
 impl<'a, Message, Theme, Renderer> Group<'a, Message, Theme, Renderer>
@@ -26,14 +23,25 @@ where
     pub fn with_children(
         mut children: Vec<overlay::Element<'a, Message, Theme, Renderer>>,
     ) -> Self {
-        use std::cmp;
-
-        children.sort_unstable_by(|a, b| {
-            a.as_overlay()
+        // Overlay groups are commonly assembled in render order already.
+        // Detect that linear-time fast path and only pay O(n log n) when the
+        // caller actually supplied an inversion. `total_cmp` also gives NaN
+        // indices a stable, deterministic side of the order.
+        let inverted = children.windows(2).any(|pair| {
+            pair[0]
+                .as_overlay()
                 .index()
-                .partial_cmp(&b.as_overlay().index())
-                .unwrap_or(cmp::Ordering::Equal)
+                .total_cmp(&pair[1].as_overlay().index())
+                .is_gt()
         });
+
+        if inverted {
+            children.sort_unstable_by(|left, right| {
+                left.as_overlay()
+                    .index()
+                    .total_cmp(&right.as_overlay().index())
+            });
+        }
 
         Group { children }
     }
@@ -52,108 +60,6 @@ where
 {
     fn default() -> Self {
         Self::with_children(Vec::new())
-    }
-}
-
-impl<Message, Theme, Renderer> Overlay<Message, Theme, Renderer>
-    for Group<'_, Message, Theme, Renderer>
-where
-    Renderer: crate::Renderer,
-{
-    fn layout(&mut self, renderer: &Renderer, bounds: Size) -> layout::Node {
-        layout::Node::with_children(
-            bounds,
-            self.children
-                .iter_mut()
-                .map(|child| child.as_overlay_mut().layout(renderer, bounds))
-                .collect(),
-        )
-    }
-
-    fn update(
-        &mut self,
-        event: &Event,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &Renderer,
-        shell: &mut Shell<'_, Message>,
-    ) {
-        for (child, layout) in self.children.iter_mut().zip(layout.children()) {
-            child
-                .as_overlay_mut()
-                .update(event, layout, cursor, renderer, shell);
-        }
-    }
-
-    fn draw(
-        &self,
-        renderer: &mut Renderer,
-        theme: &Theme,
-        style: &renderer::Style,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-    ) {
-        for (child, layout) in self.children.iter().zip(layout.children()) {
-            child
-                .as_overlay()
-                .draw(renderer, theme, style, layout, cursor);
-        }
-    }
-
-    fn mouse_interaction(
-        &self,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &Renderer,
-    ) -> mouse::Interaction {
-        self.children
-            .iter()
-            .zip(layout.children())
-            .map(|(child, layout)| {
-                child
-                    .as_overlay()
-                    .mouse_interaction(layout, cursor, renderer)
-            })
-            .max()
-            .unwrap_or_default()
-    }
-
-    fn operate(
-        &mut self,
-        layout: Layout<'_>,
-        renderer: &Renderer,
-        operation: &mut dyn widget::Operation,
-    ) {
-        operation.traverse(&mut |operation| {
-            self.children
-                .iter_mut()
-                .zip(layout.children())
-                .for_each(|(child, layout)| {
-                    child.as_overlay_mut().operate(layout, renderer, operation);
-                });
-        });
-    }
-
-    fn overlay<'a>(
-        &'a mut self,
-        layout: Layout<'a>,
-        renderer: &Renderer,
-    ) -> Option<overlay::Element<'a, Message, Theme, Renderer>> {
-        let children = self
-            .children
-            .iter_mut()
-            .zip(layout.children())
-            .filter_map(|(child, layout)| child.as_overlay_mut().overlay(layout, renderer))
-            .collect::<Vec<_>>();
-
-        (!children.is_empty()).then(|| Group::with_children(children).overlay())
-    }
-
-    fn index(&self) -> f32 {
-        self.children
-            .first()
-            .map(|child| child.as_overlay().index())
-            .unwrap_or(1.0)
     }
 }
 

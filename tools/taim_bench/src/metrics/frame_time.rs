@@ -7,17 +7,17 @@ use std::time::Duration;
 ///
 /// These names match `phase.md`'s "measurements required" list: diff,
 /// event, layout, semantics, paint preparation, upload. Phase 1 only has
-/// direct access to `update` (which folds diff/event/layout together
-/// today, since `taim_runtime::UserInterface` does not yet split them --
-/// that split is Phase 3's job) and `draw`. Semantics and upload timings
+/// direct access to `build` (view reconstruction + diff + layout),
+/// `update` (event dispatch), and `draw`. Semantics and upload timings
 /// are recorded as zero until the phases that produce them exist, rather
 /// than inventing numbers; see `docs/performance/methodology.md`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FramePhases {
-    /// Time spent in `UserInterface::update` (diff + event dispatch +
-    /// layout, currently unseparated).
+    /// Time spent building the view and reconciling/laying out the UI.
+    pub build: Duration,
+    /// Time spent in `UserInterface::update` (event dispatch).
     pub update: Duration,
-    /// Time spent in `UserInterface::draw` (paint preparation).
+    /// Time spent in `UserInterface::draw` and returning its retained cache.
     pub draw: Duration,
     /// Time spent producing a readback (`Renderer::screenshot`).
     ///
@@ -37,15 +37,14 @@ pub struct FramePhases {
 }
 
 impl FramePhases {
-    /// Total CPU time the **framework** spent on this frame.
+    /// Total measured CPU time in the UI pipeline for this frame.
     ///
-    /// This is the number that belongs in a performance claim: the work
-    /// taim itself does to turn application state into a submitted
-    /// frame. It excludes [`FramePhases::present`], which measures the
+    /// It includes benchmark-scene view construction as well as TAIM's
+    /// diff/layout/update/draw. It excludes [`FramePhases::present`], which measures the
     /// harness's readback rather than anything a shipped application
     /// would pay for -- see that field's documentation.
     pub fn total(&self) -> Duration {
-        self.update + self.draw
+        self.build + self.update + self.draw
     }
 
     /// Time spent in harness-only work that no real application pays.
@@ -93,6 +92,7 @@ impl FrameTimeSamples {
             } else {
                 missed as f64 / totals.len() as f64
             },
+            build_p95: percentile_of(&self.frames, 0.95, |f| f.build),
             update_p95: percentile_of(&self.frames, 0.95, |f| f.update),
             draw_p95: percentile_of(&self.frames, 0.95, |f| f.draw),
             present_p95: percentile_of(&self.frames, 0.95, FramePhases::harness_overhead),
@@ -106,7 +106,7 @@ impl FrameTimeSamples {
 pub struct FrameTimeSummary {
     /// Number of frames the summary was computed over.
     pub sample_count: usize,
-    /// Median framework CPU frame time (`update` + `draw`).
+    /// Median framework CPU frame time (`build` + `update` + `draw`).
     pub p50: Duration,
     /// 95th percentile framework CPU frame time (`update` + `draw`).
     pub p95: Duration,
@@ -115,7 +115,9 @@ pub struct FrameTimeSummary {
     /// Fraction of frames whose framework time exceeded the target frame
     /// budget (see [`crate::config::RefreshRate::frame_budget`]).
     pub missed_frame_rate: f64,
-    /// 95th percentile of the `update` phase alone.
+    /// 95th percentile of view construction, tree diff, and layout.
+    pub build_p95: Duration,
+    /// 95th percentile of event dispatch alone.
     pub update_p95: Duration,
     /// 95th percentile of the `draw` phase alone.
     pub draw_p95: Duration,
@@ -151,6 +153,7 @@ mod tests {
 
         for millis in 1..=100 {
             samples.push(FramePhases {
+                build: Duration::ZERO,
                 update: Duration::from_millis(millis),
                 draw: Duration::from_millis(1),
                 present: Duration::from_millis(1),
@@ -170,6 +173,7 @@ mod tests {
 
         for _ in 0..8 {
             samples.push(FramePhases {
+                build: Duration::ZERO,
                 update: Duration::from_millis(5),
                 draw: Duration::from_millis(1),
                 present: Duration::from_millis(1),
@@ -178,6 +182,7 @@ mod tests {
 
         for _ in 0..2 {
             samples.push(FramePhases {
+                build: Duration::ZERO,
                 update: Duration::from_millis(20),
                 draw: Duration::from_millis(1),
                 present: Duration::from_millis(1),
@@ -200,12 +205,13 @@ mod tests {
         // published performance number silently becomes a measurement of
         // the benchmark harness instead of the framework.
         let phases = FramePhases {
+            build: Duration::from_micros(3),
             update: Duration::from_micros(5),
             draw: Duration::from_micros(7),
             present: Duration::from_millis(2),
         };
 
-        assert_eq!(phases.total(), Duration::from_micros(12));
+        assert_eq!(phases.total(), Duration::from_micros(15));
         assert_eq!(phases.harness_overhead(), Duration::from_millis(2));
     }
 
@@ -219,11 +225,13 @@ mod tests {
 
         for _ in 0..64 {
             idle.push(FramePhases {
+                build: Duration::from_micros(1),
                 update: Duration::from_micros(1),
                 draw: Duration::from_micros(4),
                 present: Duration::from_millis(2),
             });
             busy.push(FramePhases {
+                build: Duration::from_micros(5),
                 update: Duration::from_micros(5),
                 draw: Duration::from_micros(7),
                 present: Duration::from_millis(2),
@@ -246,5 +254,21 @@ mod tests {
         assert_eq!(summary.sample_count, 0);
         assert_eq!(summary.p50, Duration::ZERO);
         assert_eq!(summary.missed_frame_rate, 0.0);
+    }
+
+    #[test]
+    fn build_cost_is_included_in_frame_budget_and_reported_separately() {
+        let mut samples = FrameTimeSamples::new();
+        samples.push(FramePhases {
+            build: Duration::from_millis(12),
+            update: Duration::from_millis(2),
+            draw: Duration::from_millis(2),
+            present: Duration::from_millis(20),
+        });
+
+        let summary = samples.summarize(Duration::from_millis(15));
+        assert_eq!(summary.p95, Duration::from_millis(16));
+        assert_eq!(summary.build_p95, Duration::from_millis(12));
+        assert_eq!(summary.missed_frame_rate, 1.0);
     }
 }

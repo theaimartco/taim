@@ -1,4 +1,10 @@
-//! Listen to external events in your application.
+//! Declarative, identity-stable streams for TAIM applications.
+//!
+//! Most subscriptions contain one recipe. TAIM keeps that recipe inline in
+//! the subscription value, avoiding the extra `Vec` allocation traditionally
+//! paid before the stream itself is even started.
+
+mod plan;
 mod tracker;
 
 pub use tracker::Tracker;
@@ -9,509 +15,238 @@ use crate::core::window;
 use crate::futures::Stream;
 use crate::{BoxStream, MaybeSend};
 
-use std::any::TypeId;
+use smallvec::SmallVec;
 use std::hash::Hash;
 
-/// A subscription event.
+/// An event delivered to subscription recipes by the application runtime.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
-    /// A user interacted with a user interface in a window.
+    /// A user interacted with a window.
     Interaction {
-        /// The window holding the interface of the interaction.
+        /// Window receiving the interaction.
         window: window::Id,
-        /// The [`Event`] describing the interaction.
-        ///
-        /// [`Event`]: event::Event
+        /// Normalized input or window event.
         event: event::Event,
-
-        /// The [`event::Status`] of the interaction.
+        /// Whether a widget consumed the event.
         status: event::Status,
     },
-
-    /// The system theme has changed.
+    /// The operating-system theme changed.
     SystemThemeChanged(theme::Mode),
-
-    /// A platform specific event.
+    /// An event emitted by a platform adapter.
     PlatformSpecific(PlatformSpecific),
 }
 
-/// A platform specific event
+/// Events whose payload is meaningful only on one platform family.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlatformSpecific {
-    /// A MacOS specific event
+    /// A macOS application event.
     MacOS(MacOS),
 }
 
-/// Describes an event specific to MacOS
+/// Events emitted by the TAIM macOS adapter.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MacOS {
-    /// Triggered when the app receives an URL from the system
-    ///
-    /// _**Note:** For this event to be triggered, the executable needs to be properly [bundled]!_
-    ///
-    /// [bundled]: https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFBundles/BundleTypes/BundleTypes.html#//apple_ref/doc/uid/10000123i-CH101-SW19
+    /// The operating system opened a URL with the application.
     ReceivedUrl(String),
 }
 
-/// A stream of runtime events.
-///
-/// It is the input of a [`Subscription`].
+/// Runtime-event input available to every [`Recipe`].
 pub type EventStream = BoxStream<Event>;
 
-/// The hasher used for identifying subscriptions.
+/// Stable, fast hasher used for recipe identities inside one process.
 pub type Hasher = rustc_hash::FxHasher;
 
-/// A request to listen to external events.
+type RecipeBox<T> = Box<dyn Recipe<Output = T>>;
+type RecipeStorage<T> = SmallVec<[RecipeBox<T>; 1]>;
+
+/// A declarative set of long-lived streams.
 ///
-/// Besides performing async actions on demand with `Task`, most
-/// applications also need to listen to external events passively.
-///
-/// A [`Subscription`] is normally provided to some runtime, like a `Task`,
-/// and it will generate events as long as the user keeps requesting it.
-///
-/// For instance, you can use a [`Subscription`] to listen to a `WebSocket`
-/// connection, keyboard presses, mouse events, time ticks, etc.
-///
-/// # The Lifetime of a [`Subscription`]
-/// Much like a [`Future`] or a [`Stream`], a [`Subscription`] does not produce any effects
-/// on its own. For a [`Subscription`] to run, it must be returned to the taim runtime—normally
-/// in the `subscription` function of an `application` or a `daemon`.
-///
-/// When a [`Subscription`] is provided to the runtime for the first time, the runtime will
-/// start running it asynchronously. Running a [`Subscription`] consists in building its underlying
-/// [`Stream`] and executing it in an async runtime.
-///
-/// Therefore, you can think of a [`Subscription`] as a "stream builder". It simply represents a way
-/// to build a certain [`Stream`] together with some way to _identify_ it.
-///
-/// Identification is important because when a specific [`Subscription`] stops being returned to the
-/// taim runtime, the runtime will kill its associated [`Stream`]. The runtime uses the identity of a
-/// [`Subscription`] to keep track of it.
-///
-/// This way, taim allows you to declaratively __subscribe__ to particular streams of data temporarily
-/// and whenever necessary.
-///
-/// ```
-/// # mod taim {
-/// #     pub mod time {
-/// #         pub use std::time::{Duration, Instant};
-/// #
-/// #         // Available as `taim::time::every` when the `tokio` or `smol`
-/// #         // feature is enabled; stubbed here so this example does not
-/// #         // depend on either being active.
-/// #         pub fn every(_duration: Duration) -> taim_futures::Subscription<Instant> {
-/// #             taim_futures::Subscription::none()
-/// #         }
-/// #     }
-/// #
-/// #     pub use taim_futures::Subscription;
-/// # }
-/// use taim::time::{self, Duration, Instant};
-/// use taim::Subscription;
-///
-/// struct State {
-///     timer_enabled: bool,
-/// }
-///
-/// fn subscription(state: &State) -> Subscription<Instant> {
-///     if state.timer_enabled {
-///         time::every(Duration::from_secs(1))
-///     } else {
-///         Subscription::none()
-///     }
-/// }
-/// ```
-///
-/// [`Future`]: std::future::Future
-#[must_use = "`Subscription` must be returned to the runtime to take effect; normally in your `subscription` function."]
+/// Returning the same recipe identity on a later application update keeps its
+/// existing stream alive. Omitting it cancels the stream. A single recipe is
+/// stored inline; batches spill into contiguous heap storage only when needed.
+#[must_use = "return the Subscription to the TAIM runtime for it to run"]
 pub struct Subscription<T> {
-    recipes: Vec<Box<dyn Recipe<Output = T>>>,
+    recipes: RecipeStorage<T>,
 }
 
 impl<T> Subscription<T> {
-    /// Returns an empty [`Subscription`] that will not produce any output.
+    /// Creates a subscription with no active streams and no allocation.
     pub fn none() -> Self {
         Self {
-            recipes: Vec::new(),
+            recipes: SmallVec::new(),
         }
     }
 
-    /// Returns a [`Subscription`] that will call the given function to create and
-    /// asynchronously run the given [`Stream`].
-    ///
-    /// # Creating an asynchronous worker with bidirectional communication
-    /// You can leverage this helper to create a [`Subscription`] that spawns
-    /// an asynchronous worker in the background and establish a channel of
-    /// communication with an `taim` application.
-    ///
-    /// You can achieve this by creating an `mpsc` channel inside the closure
-    /// and returning the `Sender` as a `Message` for the `Application`:
-    ///
-    /// ```
-    /// # mod taim {
-    /// #     pub use taim_futures::Subscription;   
-    /// #     pub use taim_futures::futures;
-    /// #     pub use taim_futures::stream;
-    /// # }
-    /// use taim::futures::channel::mpsc;
-    /// use taim::futures::sink::SinkExt;
-    /// use taim::futures::Stream;
-    /// use taim::stream;
-    /// use taim::Subscription;
-    ///
-    /// pub enum Event {
-    ///     Ready(mpsc::Sender<Input>),
-    ///     WorkFinished,
-    ///     // ...
-    /// }
-    ///
-    /// enum Input {
-    ///     DoSomeWork,
-    ///     // ...
-    /// }
-    ///
-    /// fn some_worker() -> impl Stream<Item = Event> {
-    ///     stream::channel(100, async |mut output| {
-    ///         // Create channel
-    ///         let (sender, mut receiver) = mpsc::channel(100);
-    ///
-    ///         // Send the sender back to the application
-    ///         output.send(Event::Ready(sender)).await;
-    ///
-    ///         loop {
-    ///             use taim_futures::futures::StreamExt;
-    ///
-    ///             // Read next input sent from `Application`
-    ///             let input = receiver.select_next_some().await;
-    ///
-    ///             match input {
-    ///                 Input::DoSomeWork => {
-    ///                     // Do some async work...
-    ///
-    ///                     // Finally, we can optionally produce a message to tell the
-    ///                     // `Application` the work is done
-    ///                     output.send(Event::WorkFinished).await;
-    ///                 }
-    ///             }
-    ///         }
-    ///     })
-    /// }
-    ///
-    /// fn subscription() -> Subscription<Event> {
-    ///     Subscription::run(some_worker)
-    /// }
-    /// ```
-    ///
-    /// Check out the [`websocket`] example, which showcases this pattern to maintain a `WebSocket`
-    /// connection open.
-    ///
-    /// [`websocket`]: https://github.com/theaimartco/taim/tree/master/examples/websocket
+    /// Builds a stream from a stateless function.
     pub fn run<S>(builder: fn() -> S) -> Self
     where
         S: Stream<Item = T> + MaybeSend + 'static,
         T: 'static,
     {
-        from_recipe(Runner {
-            data: builder,
-            spawn: |builder, _| builder(),
-        })
+        from_recipe(plan::Source::new(
+            builder,
+            |builder: &fn() -> S, _: EventStream| builder(),
+        ))
     }
 
-    /// Returns a [`Subscription`] that will create and asynchronously run the
-    /// given [`Stream`].
-    ///
-    /// Both the `data` and the function pointer will be used to uniquely identify
-    /// the [`Subscription`].
-    pub fn run_with<D, S>(data: D, builder: fn(&D) -> S) -> Self
+    /// Builds a stream whose stable identity includes `data` and `builder`.
+    pub fn run_with<Data, S>(data: Data, builder: fn(&Data) -> S) -> Self
     where
-        D: Hash + 'static,
+        Data: Hash + 'static,
         S: Stream<Item = T> + MaybeSend + 'static,
         T: 'static,
     {
-        from_recipe(Runner {
-            data: (data, builder),
-            spawn: |(data, builder), _| builder(data),
-        })
+        from_recipe(plan::Source::new(
+            (data, builder),
+            |source: &(Data, fn(&Data) -> S), _: EventStream| (source.1)(&source.0),
+        ))
     }
 
-    /// Batches all the provided subscriptions and returns the resulting
-    /// [`Subscription`].
-    pub fn batch(subscriptions: impl IntoIterator<Item = Subscription<T>>) -> Self {
-        Self {
-            recipes: subscriptions
-                .into_iter()
-                .flat_map(|subscription| subscription.recipes)
-                .collect(),
+    /// Flattens subscriptions into one contiguous recipe set.
+    pub fn batch(subscriptions: impl IntoIterator<Item = Self>) -> Self {
+        let mut recipes = RecipeStorage::new();
+
+        for subscription in subscriptions {
+            recipes.extend(subscription.recipes);
         }
+
+        Self { recipes }
     }
 
-    /// Adds a value to the [`Subscription`] context.
-    ///
-    /// The value will be part of the identity of a [`Subscription`].
-    pub fn with<A>(self, value: A) -> Subscription<(A, T)>
+    /// Adds a hashable context value to every recipe identity and output.
+    pub fn with<Context>(self, value: Context) -> Subscription<(Context, T)>
     where
         T: 'static,
-        A: std::hash::Hash + Clone + Send + Sync + 'static,
+        Context: Hash + Clone + Send + Sync + 'static,
     {
-        struct With<A, B> {
-            recipe: Box<dyn Recipe<Output = A>>,
-            value: B,
-        }
+        let recipes = self
+            .recipes
+            .into_iter()
+            .map(|recipe| {
+                Box::new(plan::With::new(recipe, value.clone())) as RecipeBox<(Context, T)>
+            })
+            .collect();
 
-        impl<A, B> Recipe for With<A, B>
-        where
-            A: 'static,
-            B: 'static + std::hash::Hash + Clone + Send + Sync,
-        {
-            type Output = (B, A);
-
-            fn hash(&self, state: &mut Hasher) {
-                std::any::TypeId::of::<B>().hash(state);
-                self.value.hash(state);
-                self.recipe.hash(state);
-            }
-
-            fn stream(self: Box<Self>, input: EventStream) -> BoxStream<Self::Output> {
-                use futures::StreamExt;
-
-                let value = self.value;
-
-                Box::pin(
-                    self.recipe
-                        .stream(input)
-                        .map(move |element| (value.clone(), element)),
-                )
-            }
-        }
-
-        Subscription {
-            recipes: self
-                .recipes
-                .into_iter()
-                .map(|recipe| {
-                    Box::new(With {
-                        recipe,
-                        value: value.clone(),
-                    }) as Box<dyn Recipe<Output = (A, T)>>
-                })
-                .collect(),
-        }
+        Subscription { recipes }
     }
 
-    /// Transforms the [`Subscription`] output with the given function.
+    /// Maps each stream output without changing stream lifetime.
     ///
-    /// The closure provided must be a non-capturing closure.
-    pub fn map<F, A>(self, f: F) -> Subscription<A>
+    /// `mapper` must not capture state. Use [`Self::with`] when state must be
+    /// included in the subscription identity.
+    pub fn map<Mapper, Output>(self, mapper: Mapper) -> Subscription<Output>
     where
         T: 'static,
-        F: Fn(T) -> A + MaybeSend + Clone + 'static,
-        A: 'static,
+        Mapper: Fn(T) -> Output + MaybeSend + Clone + 'static,
+        Output: 'static,
     {
-        const {
-            check_zero_sized::<F>();
-        }
+        assert_zero_sized::<Mapper>();
 
-        struct Map<A, B, F>
-        where
-            F: Fn(A) -> B + 'static,
-        {
-            recipe: Box<dyn Recipe<Output = A>>,
-            mapper: F,
-        }
+        let recipes = self
+            .recipes
+            .into_iter()
+            .map(|recipe| Box::new(plan::Map::new(recipe, mapper.clone())) as RecipeBox<Output>)
+            .collect();
 
-        impl<A, B, F> Recipe for Map<A, B, F>
-        where
-            A: 'static,
-            B: 'static,
-            F: Fn(A) -> B + 'static + MaybeSend,
-        {
-            type Output = B;
-
-            fn hash(&self, state: &mut Hasher) {
-                TypeId::of::<F>().hash(state);
-                self.recipe.hash(state);
-            }
-
-            fn stream(self: Box<Self>, input: EventStream) -> BoxStream<Self::Output> {
-                use futures::StreamExt;
-
-                Box::pin(self.recipe.stream(input).map(self.mapper))
-            }
-        }
-
-        Subscription {
-            recipes: self
-                .recipes
-                .into_iter()
-                .map(|recipe| {
-                    Box::new(Map {
-                        recipe,
-                        mapper: f.clone(),
-                    }) as Box<dyn Recipe<Output = A>>
-                })
-                .collect(),
-        }
+        Subscription { recipes }
     }
 
-    /// Transforms the [`Subscription`] output with the given function, yielding only
-    /// values only when the function returns `Some(A)`.
+    /// Maps outputs and discards values for which `mapper` returns `None`.
     ///
-    /// The closure provided must be a non-capturing closure.
-    pub fn filter_map<F, A>(mut self, f: F) -> Subscription<A>
+    /// `mapper` must not capture state. Use [`Self::with`] when state must be
+    /// included in the subscription identity.
+    pub fn filter_map<Mapper, Output>(self, mapper: Mapper) -> Subscription<Output>
     where
         T: MaybeSend + 'static,
-        F: Fn(T) -> Option<A> + MaybeSend + Clone + 'static,
-        A: MaybeSend + 'static,
+        Mapper: Fn(T) -> Option<Output> + MaybeSend + Clone + 'static,
+        Output: MaybeSend + 'static,
     {
-        const {
-            check_zero_sized::<F>();
-        }
+        assert_zero_sized::<Mapper>();
 
-        struct FilterMap<A, B, F>
-        where
-            F: Fn(A) -> Option<B> + 'static,
-        {
-            recipe: Box<dyn Recipe<Output = A>>,
-            mapper: F,
-        }
+        let recipes = self
+            .recipes
+            .into_iter()
+            .map(|recipe| {
+                Box::new(plan::FilterMap::new(recipe, mapper.clone())) as RecipeBox<Output>
+            })
+            .collect();
 
-        impl<A, B, F> Recipe for FilterMap<A, B, F>
-        where
-            A: 'static,
-            B: 'static + MaybeSend,
-            F: Fn(A) -> Option<B> + MaybeSend,
-        {
-            type Output = B;
-
-            fn hash(&self, state: &mut Hasher) {
-                TypeId::of::<F>().hash(state);
-                self.recipe.hash(state);
-            }
-
-            fn stream(self: Box<Self>, input: EventStream) -> BoxStream<Self::Output> {
-                use futures::StreamExt;
-                use futures::future;
-
-                let mapper = self.mapper;
-
-                Box::pin(
-                    self.recipe
-                        .stream(input)
-                        .filter_map(move |a| future::ready(mapper(a))),
-                )
-            }
-        }
-
-        Subscription {
-            recipes: self
-                .recipes
-                .drain(..)
-                .map(|recipe| {
-                    Box::new(FilterMap {
-                        recipe,
-                        mapper: f.clone(),
-                    }) as Box<dyn Recipe<Output = A>>
-                })
-                .collect(),
-        }
+        Subscription { recipes }
     }
 
-    /// Returns the amount of recipe units in this [`Subscription`].
+    /// Returns the number of independently tracked streams.
     pub fn units(&self) -> usize {
         self.recipes.len()
     }
 }
 
-/// Creates a [`Subscription`] from a [`Recipe`] describing it.
-pub fn from_recipe<T>(recipe: impl Recipe<Output = T> + 'static) -> Subscription<T> {
-    Subscription {
-        recipes: vec![Box::new(recipe)],
+impl<T> Default for Subscription<T> {
+    fn default() -> Self {
+        Self::none()
     }
-}
-
-/// Returns the different recipes of the [`Subscription`].
-pub fn into_recipes<T>(subscription: Subscription<T>) -> Vec<Box<dyn Recipe<Output = T>>> {
-    subscription.recipes
 }
 
 impl<T> std::fmt::Debug for Subscription<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Subscription").finish()
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Subscription")
+            .field("units", &self.units())
+            .finish()
     }
 }
 
-/// The description of a [`Subscription`].
-///
-/// A [`Recipe`] is the internal definition of a [`Subscription`]. It is used
-/// by runtimes to run and identify subscriptions. You can use it to create your
-/// own!
+/// Wraps one custom recipe in an inline subscription.
+pub fn from_recipe<T>(recipe: impl Recipe<Output = T> + 'static) -> Subscription<T> {
+    let recipe: RecipeBox<T> = Box::new(recipe);
+
+    Subscription {
+        recipes: SmallVec::from_buf([recipe]),
+    }
+}
+
+/// Consumes a subscription and yields its recipes without another allocation.
+pub fn into_recipes<T>(
+    subscription: Subscription<T>,
+) -> impl ExactSizeIterator<Item = RecipeBox<T>> {
+    subscription.recipes.into_iter()
+}
+
+/// Definition of a long-lived stream and its stable identity.
 pub trait Recipe {
-    /// The events that will be produced by a [`Subscription`] with this
-    /// [`Recipe`].
+    /// Values produced by the stream.
     type Output;
 
-    /// Hashes the [`Recipe`].
-    ///
-    /// This is used by runtimes to uniquely identify a [`Subscription`].
+    /// Adds every identity-bearing field to `state`.
     fn hash(&self, state: &mut Hasher);
 
-    /// Executes the [`Recipe`] and produces the stream of events of its
-    /// [`Subscription`].
+    /// Materializes the stream with access to runtime events.
     fn stream(self: Box<Self>, input: EventStream) -> BoxStream<Self::Output>;
 }
 
-/// Creates a [`Subscription`] from a hashable id and a filter function.
-pub fn filter_map<I, F, T>(id: I, f: F) -> Subscription<T>
+/// Creates an event-filtering subscription with a caller-defined identity.
+pub fn filter_map<Identity, Filter, Output>(
+    identity: Identity,
+    filter: Filter,
+) -> Subscription<Output>
 where
-    I: Hash + 'static,
-    F: Fn(Event) -> Option<T> + MaybeSend + 'static,
-    T: 'static + MaybeSend,
+    Identity: Hash + 'static,
+    Filter: Fn(Event) -> Option<Output> + MaybeSend + 'static,
+    Output: MaybeSend + 'static,
 {
-    from_recipe(Runner {
-        data: id,
-        spawn: |_, events| {
-            use futures::future;
-            use futures::stream::StreamExt;
+    from_recipe(plan::Source::new(
+        identity,
+        |_: &Identity, events: EventStream| {
+            use crate::futures::StreamExt;
+            use crate::futures::future;
 
-            events.filter_map(move |event| future::ready(f(event)))
+            events.filter_map(move |event| future::ready(filter(event)))
         },
-    })
+    ))
 }
 
-struct Runner<I, F, S, T>
-where
-    F: FnOnce(&I, EventStream) -> S,
-    S: Stream<Item = T>,
-{
-    data: I,
-    spawn: F,
-}
-
-impl<I, F, S, T> Recipe for Runner<I, F, S, T>
-where
-    I: Hash + 'static,
-    F: FnOnce(&I, EventStream) -> S,
-    S: Stream<Item = T> + MaybeSend + 'static,
-{
-    type Output = T;
-
-    fn hash(&self, state: &mut Hasher) {
-        std::any::TypeId::of::<I>().hash(state);
-        self.data.hash(state);
-    }
-
-    fn stream(self: Box<Self>, input: EventStream) -> BoxStream<Self::Output> {
-        crate::boxed_stream((self.spawn)(&self.data, input))
-    }
-}
-
-const fn check_zero_sized<T>() {
-    if std::mem::size_of::<T>() != 0 {
-        panic!(
-            "The Subscription closure provided is not non-capturing. \
-            Closures given to Subscription::map or filter_map cannot \
-            capture external variables. If you need to capture state, \
-            consider using Subscription::with."
-        );
-    }
+const fn assert_zero_sized<T>() {
+    assert!(
+        size_of::<T>() == 0,
+        "subscription mappers cannot capture state; attach identity-bearing state with Subscription::with"
+    );
 }

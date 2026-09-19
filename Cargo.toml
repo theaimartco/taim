@@ -266,6 +266,7 @@ strip = "symbols"
 [workspace]
 members = [
     "taim-accessibility",
+    "taim-atlas",
     "taim-design",
     "taim-gesture",
     "taim-highlighter",
@@ -275,6 +276,7 @@ members = [
     "taim-raster",
     "taim-signal",
     "taim-showcase",
+    "taim-text-gpu",
     "core",
     "debug",
     "examples/ide",
@@ -309,6 +311,7 @@ rust-version = "1.92"
 [workspace.dependencies]
 zbus = "5.17"
 taim-accessibility = { version = "0.15.0-dev", path = "taim-accessibility" }
+taim_atlas = { version = "0.15.0-dev", path = "taim-atlas" }
 taim-design = { version = "0.15.0-dev", path = "taim-design" }
 taim-gesture = { version = "0.15.0-dev", path = "taim-gesture" }
 taim-highlighter = { version = "0.15.0-dev", path = "taim-highlighter" }
@@ -317,6 +320,7 @@ taim-platform-vyom = { version = "0.15.0-dev", path = "taim-platform-vyom" }
 taim-profiler = { version = "0.15.0-dev", path = "taim-profiler" }
 taim-raster = { version = "0.15.0-dev", path = "taim-raster" }
 taim-signal = { version = "0.15.0-dev", path = "taim-signal" }
+taim_text_gpu = { version = "0.15.0-dev", path = "taim-text-gpu" }
 # `default-features = false` here rather than at the dev-dependency, because
 # Cargo forbids an inherited dependency from overriding it. See the
 # dev-dependencies section for why it matters.
@@ -340,10 +344,8 @@ bytemuck = { version = "1.0", features = ["derive"] }
 bytes = "1.6"
 cargo-hot = { version = "0.1", package = "cargo-hot-protocol" }
 cosmic-text = "0.19"
-cryoglyph = { git = "https://github.com/iced-rs/cryoglyph.git", rev = "53ba3e879539d19ed8162942126a977ec896cc3b" }
 futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 glam = "0.33.2"
-guillotiere = "0.6"
 half = "2.2"
 image = { version = "0.25", default-features = false }
 kamadak-exif = "0.6"
@@ -384,7 +386,7 @@ wasmtimer = "0.4.2"
 web-sys = "=0.3.85"
 web-time = "1.1"
 wgpu = { version = "29", default-features = false, features = ["std", "wgsl"] }
-winit = { git = "https://github.com/iced-rs/winit.git", rev = "05b8ff17a06562f0a10bb46e6eaacbe2a95cb5ed", default-features = false, features = ["rwh_06"] }
+winit = { version = "0.30.8", default-features = false, features = ["rwh_06"] }
 
 [workspace.lints.rust]
 rust_2018_idioms = { level = "deny", priority = -1 }

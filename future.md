@@ -1298,6 +1298,25 @@ non-engineer can verify with their own eyes.
 **Ceiling addressed:** 1. **Horizon:** H1. **Cost:** 4–6 months. **Largest measurable
 performance win available. Do this before Pillar I.**
 
+### Batching correctness — 2026-09-16
+
+Signal batching now invalidates memo dependencies immediately while deferring
+public subscribers. Reads inside a batch observe preceding writes; multiple
+writes coalesce to one delivery per live subscription with the latest queued
+revision. Dependency propagation finishes before callbacks, preventing a diamond
+from exposing a mixture of old and new branch values. Dropping a subscription
+cancels queued delivery, and unwinding restores batching state and delivers
+committed changes. Reentrant writes enqueue further callbacks without recursive
+dispatch. Batches remain thread-local and do not provide transactional snapshots
+across threads.
+
+Regression tests reproduced stale reads, diamond glitches, delivery after
+unsubscribe, and stuck notifications after a panic before the fix. Runtime
+coverage verifies three writes yield one tagged wake and one subtree update
+using the final value. This is correctness and notification coalescing work;
+it does not close the frame-cost gate below. See
+[the batching contract](docs/architecture/signal-batching.md).
+
 ### Progress — 2026-09-02
 
 The foundation and framework adoption are live:

@@ -1,15 +1,7 @@
 //! Keyed columns distribute content vertically while keeping continuity.
-use crate::core::layout;
-use crate::core::mouse;
-use crate::core::overlay;
-use crate::core::renderer;
-use crate::core::widget::Operation;
-use crate::core::widget::tree::{self, Tree};
-use crate::core::widget::visit;
-use crate::core::{
-    Alignment, Element, Event, Layout, Length, Padding, Pixels, Rectangle, Shell, Size, Vector,
-    Widget,
-};
+mod implementation;
+
+use crate::core::{Alignment, Element, Length, Padding, Pixels};
 
 /// A container that distributes its contents vertically while keeping continuity.
 ///
@@ -60,7 +52,31 @@ where
     ///
     /// If any of the children have a [`Length::Fill`] strategy, you will need to
     /// call [`Column::width`] or [`Column::height`] accordingly.
-    pub fn from_vecs(keys: Vec<Key>, children: Vec<Element<'a, Message, Theme, Renderer>>) -> Self {
+    pub fn from_vecs(
+        mut keys: Vec<Key>,
+        mut children: Vec<Element<'a, Message, Theme, Renderer>>,
+    ) -> Self {
+        let paired_len = keys.len().min(children.len());
+        keys.truncate(paired_len);
+        children.truncate(paired_len);
+
+        // Compact both parallel buffers in place so void widgets can never
+        // desynchronize identity from state.
+        let mut read = 0;
+        let mut write = 0;
+        children.retain(|child| {
+            let keep = !child.as_widget().is_void();
+
+            if keep {
+                keys[write] = keys[read];
+                write += 1;
+            }
+
+            read += 1;
+            keep
+        });
+        keys.truncate(write);
+
         Self {
             spacing: 0.0,
             padding: Padding::ZERO,
@@ -92,7 +108,12 @@ where
     /// method instead! While less flexible, it helps you keep spacing between
     /// elements consistent.
     pub fn spacing(mut self, amount: impl Into<Pixels>) -> Self {
-        self.spacing = amount.into().0;
+        let amount = amount.into().0;
+        self.spacing = if amount.is_finite() {
+            amount.max(0.0)
+        } else {
+            0.0
+        };
         self
     }
 
@@ -151,12 +172,22 @@ where
 
     /// Extends the [`Column`] with the given children.
     pub fn extend(
-        self,
+        mut self,
         children: impl IntoIterator<Item = (Key, Element<'a, Message, Theme, Renderer>)>,
     ) -> Self {
-        children
-            .into_iter()
-            .fold(self, |column, (key, child)| column.push(key, child))
+        let iterator = children.into_iter();
+        let additional = iterator.size_hint().0;
+        self.keys.reserve(additional);
+        self.children.reserve(additional);
+
+        for (key, child) in iterator {
+            if !child.as_widget().is_void() {
+                self.keys.push(key);
+                self.children.push(child);
+            }
+        }
+
+        self
     }
 }
 
@@ -167,244 +198,5 @@ where
 {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-struct State<Key>
-where
-    Key: Copy + Eq + std::hash::Hash,
-{
-    keys: Vec<Key>,
-}
-
-impl<Key, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
-    for Column<'_, Key, Message, Theme, Renderer>
-where
-    Renderer: crate::core::Renderer,
-    Key: Copy + Eq + std::hash::Hash + 'static,
-{
-    fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<State<Key>>()
-    }
-
-    fn state(&self) -> tree::State {
-        tree::State::new(State {
-            keys: self.keys.clone(),
-        })
-    }
-
-    fn diff(&mut self, tree: &mut Tree) {
-        let Tree {
-            state, children, ..
-        } = tree;
-
-        let state = state.downcast_mut::<State<Key>>();
-
-        // Pair each existing `Tree` with the key it was built from (the
-        // two are parallel vectors on `Tree`/`State`, since `Tree` itself
-        // has no notion of a key), reconcile by key -- see
-        // `taim_runtime::reconcile` for why this finds every surviving
-        // item regardless of reordering, unlike the previous
-        // boundary-only heuristic -- then split the result back into the
-        // parallel shape `Tree`/`State` require.
-        let current = state
-            .keys
-            .drain(..)
-            .zip(children.drain(..))
-            .collect::<Vec<_>>();
-
-        let mut new_items = self
-            .keys
-            .iter()
-            .copied()
-            .zip(self.children.iter_mut())
-            .collect::<Vec<_>>();
-
-        let reconciled = taim_runtime::reconcile::reconcile(
-            current,
-            &mut new_items,
-            |tree, child| child.as_widget_mut().diff(tree),
-            |child| Tree::new(child.as_widget()),
-        );
-
-        state.keys.reserve(reconciled.len());
-        children.reserve(reconciled.len());
-
-        for (key, tree) in reconciled {
-            state.keys.push(key);
-            children.push(tree);
-        }
-
-        if self.width.is_fit() || self.height.is_fit() {
-            for child in &self.children {
-                let size = child.as_widget().size();
-
-                self.width = self.width.cross(size.width);
-                self.height = self.height.stack(size.height);
-            }
-        }
-    }
-
-    fn size(&self) -> Size<Length> {
-        Size {
-            width: self.width,
-            height: self.height,
-        }
-    }
-
-    fn layout(
-        &mut self,
-        tree: &mut Tree,
-        renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        layout::flex::resolve(
-            layout::flex::Axis::Vertical,
-            renderer,
-            limits,
-            self.width,
-            self.height,
-            self.padding,
-            self.spacing,
-            self.align_items,
-            &mut self.children,
-            &mut tree.children,
-        )
-    }
-
-    fn visit_children(
-        &mut self,
-        tree: &mut Tree,
-        layout: Layout<'_>,
-        visit: &mut dyn FnMut(&mut dyn visit::Visit),
-    ) {
-        self.children
-            .iter_mut()
-            .zip(&mut tree.children)
-            .zip(layout.children())
-            .for_each(|((child, state), layout)| {
-                visit(&mut visit::Widgets::new(
-                    child.as_widget_mut(),
-                    state,
-                    layout,
-                ));
-            });
-    }
-
-    fn operate(
-        &mut self,
-        tree: &mut Tree,
-        layout: Layout<'_>,
-        renderer: &Renderer,
-        operation: &mut dyn Operation,
-    ) {
-        operation.container(None, layout.bounds());
-        operation.traverse(&mut |operation| {
-            self.children
-                .iter_mut()
-                .zip(&mut tree.children)
-                .zip(layout.children())
-                .for_each(|((child, state), layout)| {
-                    child
-                        .as_widget_mut()
-                        .operate(state, layout, renderer, operation);
-                });
-        });
-    }
-
-    fn update(
-        &mut self,
-        tree: &mut Tree,
-        event: &Event,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &Renderer,
-        shell: &mut Shell<'_, Message>,
-        viewport: &Rectangle,
-    ) {
-        for ((child, tree), layout) in self
-            .children
-            .iter_mut()
-            .zip(&mut tree.children)
-            .zip(layout.children())
-        {
-            child
-                .as_widget_mut()
-                .update(tree, event, layout, cursor, renderer, shell, viewport);
-        }
-    }
-
-    fn mouse_interaction(
-        &self,
-        tree: &Tree,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-        renderer: &Renderer,
-    ) -> mouse::Interaction {
-        self.children
-            .iter()
-            .zip(&tree.children)
-            .zip(layout.children())
-            .map(|((child, tree), layout)| {
-                child
-                    .as_widget()
-                    .mouse_interaction(tree, layout, cursor, viewport, renderer)
-            })
-            .max()
-            .unwrap_or_default()
-    }
-
-    fn draw(
-        &self,
-        tree: &Tree,
-        renderer: &mut Renderer,
-        theme: &Theme,
-        style: &renderer::Style,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-    ) {
-        for ((child, state), layout) in self
-            .children
-            .iter()
-            .zip(&tree.children)
-            .zip(layout.children())
-        {
-            child
-                .as_widget()
-                .draw(state, renderer, theme, style, layout, cursor, viewport);
-        }
-    }
-
-    fn overlay<'b>(
-        &'b mut self,
-        tree: &'b mut Tree,
-        layout: Layout<'b>,
-        renderer: &Renderer,
-        viewport: &Rectangle,
-        translation: Vector,
-    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
-        overlay::from_children(
-            &mut self.children,
-            tree,
-            layout,
-            renderer,
-            viewport,
-            translation,
-        )
-    }
-}
-
-impl<'a, Key, Message, Theme, Renderer> From<Column<'a, Key, Message, Theme, Renderer>>
-    for Element<'a, Message, Theme, Renderer>
-where
-    Key: Copy + Eq + std::hash::Hash + 'static,
-    Message: 'a,
-    Theme: 'a,
-    Renderer: crate::core::Renderer + 'a,
-{
-    fn from(column: Column<'a, Key, Message, Theme, Renderer>) -> Self {
-        Self::new(column)
     }
 }

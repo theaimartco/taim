@@ -1,96 +1,92 @@
+//! Parsed and rasterized SVG residency for TAIM.
+
 use crate::core::svg;
 use crate::core::{Color, Size};
 use crate::image::atlas::{self, Atlas};
 
-use resvg::tiny_skia;
-use resvg::usvg;
-use rustc_hash::{FxHashMap, FxHashSet};
+use resvg::{tiny_skia, usvg};
+use rustc_hash::FxHashMap;
 use std::fs;
 use std::panic;
 #[cfg(feature = "svg-text")]
 use std::sync::Arc;
 
-/// Entry in cache corresponding to an svg handle
+type ColorFilter = Option<[u8; 4]>;
+type RasterKey = (u64, u32, u32, ColorFilter);
+
 pub enum Svg {
-    /// Parsed svg
     Loaded(usvg::Tree),
-    /// Svg not found or failed to parse
     NotFound,
 }
 
 impl Svg {
-    /// Viewport width and height
     pub fn viewport_dimensions(&self) -> Size<u32> {
         match self {
-            Svg::Loaded(tree) => {
+            Self::Loaded(tree) => {
                 let size = tree.size();
-
                 Size::new(size.width() as u32, size.height() as u32)
             }
-            Svg::NotFound => Size::new(1, 1),
+            Self::NotFound => Size::new(1, 1),
         }
     }
 }
 
-/// Caches svg vector and raster data
-#[derive(Debug, Default)]
-pub struct Cache {
-    svgs: FxHashMap<u64, Svg>,
-    rasterized: FxHashMap<(u64, u32, u32, ColorFilter), atlas::Entry>,
-    svg_hits: FxHashSet<u64>,
-    rasterized_hits: FxHashSet<(u64, u32, u32, ColorFilter)>,
-    should_trim: bool,
-    #[cfg(feature = "svg-text")]
-    fontdb: Option<Arc<usvg::fontdb::Database>>,
+#[derive(Debug)]
+struct Seen<T> {
+    value: T,
+    frame: u64,
 }
 
-type ColorFilter = Option<[u8; 4]>;
+#[derive(Debug)]
+enum Rasterized {
+    Ready(atlas::Entry),
+    Deferred { retry_after: u64 },
+    Invalid,
+}
+
+/// Two-tier SVG cache: parsed trees and size/color-specific GPU rasters.
+#[derive(Debug)]
+pub struct Cache {
+    parsed: FxHashMap<u64, Seen<Svg>>,
+    rasters: FxHashMap<RasterKey, Seen<Rasterized>>,
+    frame: u64,
+    #[cfg(feature = "svg-text")]
+    font_database: Option<Arc<usvg::fontdb::Database>>,
+}
+
+impl Default for Cache {
+    fn default() -> Self {
+        Self {
+            parsed: FxHashMap::default(),
+            rasters: FxHashMap::default(),
+            frame: 1,
+            #[cfg(feature = "svg-text")]
+            font_database: None,
+        }
+    }
+}
 
 impl Cache {
-    /// Load svg
     pub fn load(&mut self, handle: &svg::Handle) -> &Svg {
-        if self.svgs.contains_key(&handle.id()) {
-            return self.svgs.get(&handle.id()).unwrap();
+        let id = handle.id();
+        if self.parsed.contains_key(&id) {
+            let cached = self.parsed.get_mut(&id).expect("checked SVG entry");
+            cached.frame = self.frame;
+            return &cached.value;
         }
 
-        // TODO: Reuse `cosmic-text` font database
-        #[cfg(feature = "svg-text")]
-        if self.fontdb.is_none() {
-            let mut fontdb = usvg::fontdb::Database::new();
-            fontdb.load_system_fonts();
-
-            self.fontdb = Some(Arc::new(fontdb));
-        }
-
-        let options = usvg::Options {
-            #[cfg(feature = "svg-text")]
-            fontdb: self
-                .fontdb
-                .as_ref()
-                .expect("fontdb must be initialized")
-                .clone(),
-            ..usvg::Options::default()
-        };
-
-        let svg = match handle.data() {
-            svg::Data::Path(path) => fs::read_to_string(path)
-                .ok()
-                .and_then(|contents| usvg::Tree::from_str(&contents, &options).ok())
-                .map(Svg::Loaded)
-                .unwrap_or(Svg::NotFound),
-            svg::Data::Bytes(bytes) => match usvg::Tree::from_data(bytes, &options) {
-                Ok(tree) => Svg::Loaded(tree),
-                Err(_) => Svg::NotFound,
+        let parsed = self.parse(handle);
+        let _ = self.parsed.insert(
+            id,
+            Seen {
+                value: parsed,
+                frame: self.frame,
             },
-        };
-
-        self.should_trim = true;
-
-        let _ = self.svgs.insert(handle.id(), svg);
-        self.svgs.get(&handle.id()).unwrap()
+        );
+        &self.parsed.get(&id).expect("inserted SVG entry").value
     }
 
-    /// Load svg and upload raster data
+    #[allow(clippy::too_many_arguments)]
     pub fn upload(
         &mut self,
         device: &wgpu::Device,
@@ -98,121 +94,173 @@ impl Cache {
         belt: &mut wgpu::util::StagingBelt,
         handle: &svg::Handle,
         color: Option<Color>,
-        size: Size<u32>,
+        requested_size: Size<u32>,
         atlas: &mut Atlas,
     ) -> Option<&atlas::Entry> {
+        let raster_size = raster_bucket(requested_size)?;
         let id = handle.id();
+        let key = (
+            id,
+            raster_size.width,
+            raster_size.height,
+            color.map(Color::into_rgba8),
+        );
 
-        let color = color.map(Color::into_rgba8);
-        let key = (id, size.width, size.height, color);
-
-        // TODO: Optimize!
-        // We currently rerasterize the SVG when its size changes. This is slow
-        // as heck. A GPU rasterizer like `pathfinder` may perform better.
-        // It would be cool to be able to smooth resize the `svg` example.
-        if self.rasterized.contains_key(&key) {
-            let _ = self.svg_hits.insert(id);
-            let _ = self.rasterized_hits.insert(key);
-
-            return self.rasterized.get(&key);
+        let retry_deferred = self.rasters.get(&key).is_some_and(|cached| {
+            matches!(
+                cached.value,
+                Rasterized::Deferred { retry_after } if self.frame >= retry_after
+            )
+        });
+        if retry_deferred {
+            let _ = self.rasters.remove(&key);
         }
 
-        match self.load(handle) {
-            Svg::Loaded(tree) => {
-                // TODO: Optimize!
-                // We currently rerasterize the SVG when its size changes. This is slow
-                // as heck. A GPU rasterizer like `pathfinder` may perform better.
-                // It would be cool to be able to smooth resize the `svg` example.
-                let mut img = tiny_skia::Pixmap::new(size.width, size.height)?;
-
-                let tree_size = tree.size().to_int_size();
-
-                let target_size = if size.width > size.height {
-                    tree_size.scale_to_height(size.height)
-                } else {
-                    tree_size.scale_to_width(size.width)
-                };
-
-                let transform = if let Some(target_size) = target_size {
-                    let tree_size = tree_size.to_size();
-                    let target_size = target_size.to_size();
-
-                    tiny_skia::Transform::from_scale(
-                        target_size.width() / tree_size.width(),
-                        target_size.height() / tree_size.height(),
-                    )
-                } else {
-                    tiny_skia::Transform::default()
-                };
-
-                // SVG rendering can panic on malformed or complex vectors.
-                // We catch panics to prevent crashes and continue gracefully.
-                let render = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                    resvg::render(tree, transform, &mut img.as_mut());
-                }));
-
-                if let Err(error) = render {
-                    log::warn!("SVG rendering for {handle:?} panicked: {error:?}");
-                }
-
-                let mut rgba = img.take();
-
-                if let Some(color) = color {
-                    rgba.chunks_exact_mut(4).for_each(|rgba| {
-                        if rgba[3] > 0 {
-                            rgba[0] = color[0];
-                            rgba[1] = color[1];
-                            rgba[2] = color[2];
-                        }
-                    });
-                }
-
-                let allocation =
-                    atlas.upload(device, encoder, belt, size.width, size.height, &rgba)?;
-
-                log::debug!("allocating {id} {}x{}", size.width, size.height);
-
-                let _ = self.svg_hits.insert(id);
-                let _ = self.rasterized_hits.insert(key);
-                let _ = self.rasterized.insert(key, allocation);
-                self.should_trim = true;
-
-                self.rasterized.get(&key)
+        if self.rasters.contains_key(&key) {
+            if let Some(parsed) = self.parsed.get_mut(&id) {
+                parsed.frame = self.frame;
             }
-            Svg::NotFound => None,
+            let cached = self.rasters.get_mut(&key).expect("checked SVG raster");
+            cached.frame = self.frame;
+            return match &cached.value {
+                Rasterized::Ready(entry) => Some(entry),
+                Rasterized::Deferred { .. } | Rasterized::Invalid => None,
+            };
+        }
+
+        let value = match self.rasterize(handle, raster_size, key.3) {
+            Some(pixels) => match atlas.upload(
+                device,
+                encoder,
+                belt,
+                raster_size.width,
+                raster_size.height,
+                &pixels,
+            ) {
+                Some(entry) => Rasterized::Ready(entry),
+                None => Rasterized::Deferred {
+                    retry_after: self.frame.wrapping_add(1).max(1),
+                },
+            },
+            None => Rasterized::Invalid,
+        };
+        let _ = self.rasters.insert(
+            key,
+            Seen {
+                value,
+                frame: self.frame,
+            },
+        );
+
+        match &self.rasters.get(&key).expect("inserted SVG raster").value {
+            Rasterized::Ready(entry) => Some(entry),
+            Rasterized::Deferred { .. } | Rasterized::Invalid => None,
         }
     }
 
-    /// Load svg and upload raster data
     pub fn trim(&mut self, atlas: &mut Atlas) {
-        if !self.should_trim {
-            return;
-        }
-
-        let svg_hits = &self.svg_hits;
-        let rasterized_hits = &self.rasterized_hits;
-
-        self.svgs.retain(|k, _| svg_hits.contains(k));
-        self.rasterized.retain(|k, entry| {
-            let retain = rasterized_hits.contains(k);
-
-            if !retain {
+        let frame = self.frame;
+        self.rasters.retain(|key, raster| {
+            if raster.frame == frame {
+                return true;
+            }
+            if let Rasterized::Ready(entry) = &raster.value {
                 atlas.remove(entry);
             }
-
-            retain
+            log::debug!("TAIM evicting SVG raster {key:?}");
+            false
         });
-        self.svg_hits.clear();
-        self.rasterized_hits.clear();
-        self.should_trim = false;
+        self.parsed.retain(|_, svg| svg.frame == frame);
+        self.frame = self.frame.wrapping_add(1).max(1);
+    }
+
+    fn parse(&mut self, handle: &svg::Handle) -> Svg {
+        #[cfg(feature = "svg-text")]
+        if self.font_database.is_none() {
+            let mut database = usvg::fontdb::Database::new();
+            database.load_system_fonts();
+            self.font_database = Some(Arc::new(database));
+        }
+
+        let options = usvg::Options {
+            #[cfg(feature = "svg-text")]
+            fontdb: Arc::clone(
+                self.font_database
+                    .as_ref()
+                    .expect("TAIM SVG font database initialized"),
+            ),
+            ..usvg::Options::default()
+        };
+        let tree = match handle.data() {
+            svg::Data::Path(path) => fs::read(path)
+                .ok()
+                .and_then(|bytes| usvg::Tree::from_data(&bytes, &options).ok()),
+            svg::Data::Bytes(bytes) => usvg::Tree::from_data(bytes, &options).ok(),
+        };
+        tree.map(Svg::Loaded).unwrap_or(Svg::NotFound)
+    }
+
+    fn rasterize(
+        &mut self,
+        handle: &svg::Handle,
+        size: Size<u32>,
+        color: ColorFilter,
+    ) -> Option<Vec<u8>> {
+        let tree = match self.load(handle) {
+            Svg::Loaded(tree) => tree,
+            Svg::NotFound => return None,
+        };
+        let mut pixmap = tiny_skia::Pixmap::new(size.width, size.height)?;
+        let source = tree.size();
+        let scale = (size.width as f32 / source.width())
+            .min(size.height as f32 / source.height())
+            .max(f32::EPSILON);
+        let transform = tiny_skia::Transform::from_scale(scale, scale);
+        let rendered = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            resvg::render(tree, transform, &mut pixmap.as_mut());
+        }));
+        if let Err(error) = rendered {
+            log::warn!("TAIM SVG rasterization failed for {handle:?}: {error:?}");
+            return None;
+        }
+
+        let mut pixels = pixmap.take();
+        if let Some(color) = color {
+            for pixel in pixels.chunks_exact_mut(4) {
+                if pixel[3] != 0 {
+                    pixel[0] = color[0];
+                    pixel[1] = color[1];
+                    pixel[2] = color[2];
+                }
+            }
+        }
+        Some(pixels)
     }
 }
 
+/// Quantizes only larger vectors, avoiding a full CPU reraster for every
+/// single-pixel resize tick while leaving icons pixel-exact.
+fn raster_bucket(size: Size<u32>) -> Option<Size<u32>> {
+    if size.width == 0 || size.height == 0 {
+        return None;
+    }
+    let longest = size.width.max(size.height);
+    let step = if longest <= 128 {
+        1
+    } else if longest <= 1024 {
+        4
+    } else {
+        8
+    };
+    let bucket = |value: u32| value.saturating_add(step - 1) / step * step;
+    Some(Size::new(bucket(size.width), bucket(size.height)))
+}
+
 impl std::fmt::Debug for Svg {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Svg::Loaded(_) => write!(f, "Svg::Loaded"),
-            Svg::NotFound => write!(f, "Svg::NotFound"),
-        }
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Loaded(_) => "Svg::Loaded",
+            Self::NotFound => "Svg::NotFound",
+        })
     }
 }

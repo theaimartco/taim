@@ -173,6 +173,15 @@ fn compare_against_saved_report(current: &Report, path: &str) -> Result<(), Stri
         ));
     }
 
+    if previous.refresh_rate != current.refresh_rate
+        || previous.cache_state != current.cache_state
+        || previous.seed != current.seed
+        || previous.viewport != current.viewport
+        || previous.scale_factor != current.scale_factor
+    {
+        return Err("cannot compare: scene configuration differs (refresh rate, cache state, seed, viewport, or scale factor)".to_owned());
+    }
+
     if previous.environment.renderer_backend != current.environment.renderer_backend {
         return Err(format!(
             "cannot compare: saved report used renderer '{}', current run used '{}' \
@@ -185,6 +194,18 @@ fn compare_against_saved_report(current: &Report, path: &str) -> Result<(), Stri
         return Err(
             "cannot compare: saved report and current run were labeled with different --device values \
              (do not compare results from unlike environments)"
+                .to_owned(),
+        );
+    }
+
+    if previous.environment.build_profile != current.environment.build_profile
+        || previous.environment.rustc_version != current.environment.rustc_version
+        || previous.environment.os != current.environment.os
+        || previous.environment.allocation_counting_active
+            != current.environment.allocation_counting_active
+    {
+        return Err(
+            "cannot compare: build profile, compiler, OS, or allocation instrumentation differs"
                 .to_owned(),
         );
     }
@@ -552,9 +573,18 @@ fn warm_up<S: Scene>(
     let deadline = Instant::now() + config.warm_up;
     let mut frame_index = 0_u64;
     let mut cache = user_interface::Cache::new();
+    let mut runtime_messages = Vec::new();
 
     while Instant::now() < deadline {
-        let _phases = drive_one_frame(scene, renderer, config, frame_index, &mut cache)?;
+        let _phases = drive_one_frame(
+            scene,
+            renderer,
+            config,
+            frame_index,
+            &mut cache,
+            &mut runtime_messages,
+            None,
+        )?;
         frame_index += 1;
     }
 
@@ -570,8 +600,8 @@ fn measure<S: Scene>(
     let mut latency_samples = Vec::new();
     let mut pacing_samples = pacing::PacingSamples::new();
     let mut cache = user_interface::Cache::new();
-
-    let allocations_before = allocations::snapshot();
+    let mut runtime_messages = Vec::new();
+    let mut framework_allocations = allocations::AllocationSnapshot::default();
 
     // A fixed number of frames per measured run, rather than a fixed
     // wall-clock duration, so the frame count (and therefore the input
@@ -585,8 +615,16 @@ fn measure<S: Scene>(
         let mut phases_for_pacing = None;
 
         let latency_sample = latency::measure(|| {
-            let phases = drive_one_frame(scene, renderer, config, frame_index, &mut cache)
-                .expect("frame drive should not fail during a measured run");
+            let phases = drive_one_frame(
+                scene,
+                renderer,
+                config,
+                frame_index,
+                &mut cache,
+                &mut runtime_messages,
+                Some(&mut framework_allocations),
+            )
+            .expect("frame drive should not fail during a measured run");
             phases_for_pacing = Some(phases);
             frame_samples.push(phases);
         });
@@ -614,13 +652,11 @@ fn measure<S: Scene>(
         latency_samples.push(latency_sample);
     }
 
-    let allocations_after = allocations::snapshot();
-
     Ok(RunSummary {
         frame_time: frame_samples.summarize(frame_budget),
         latency: latency::summarize(&latency_samples),
         pacing: pacing_samples.summarize(frame_budget),
-        allocations: allocations_after.since(&allocations_before),
+        allocations: framework_allocations,
         memory: memory::MemorySnapshot::capture(),
     })
 }
@@ -631,6 +667,8 @@ fn drive_one_frame<S: Scene>(
     config: &Config,
     frame_index: u64,
     cache: &mut user_interface::Cache,
+    runtime_messages: &mut Vec<S::Message>,
+    allocation_total: Option<&mut allocations::AllocationSnapshot>,
 ) -> Result<FramePhases, String> {
     let messages = scene.advance(frame_index);
     for message in messages {
@@ -638,9 +676,11 @@ fn drive_one_frame<S: Scene>(
     }
 
     let events = scene.input_events(frame_index);
-    let mut runtime_messages = Vec::new();
+    runtime_messages.clear();
+    let allocations_before_ui = allocation_total.as_ref().map(|_| allocations::snapshot());
 
-    let (update, draw, present) = {
+    let (build, update, draw, present) = {
+        let build_start = Instant::now();
         let view = scene.view();
         let mut ui = UserInterface::build(
             view,
@@ -648,6 +688,7 @@ fn drive_one_frame<S: Scene>(
             std::mem::take(cache),
             renderer,
         );
+        let build = build_start.elapsed();
 
         let window = window::Headless;
         let waker = taim_core::shell::Waker::noop();
@@ -662,7 +703,7 @@ fn drive_one_frame<S: Scene>(
             &events,
             mouse::Cursor::Unavailable,
             renderer,
-            &mut runtime_messages,
+            runtime_messages,
         );
 
         let update = update_start.elapsed();
@@ -676,7 +717,13 @@ fn drive_one_frame<S: Scene>(
             mouse::Cursor::Unavailable,
         );
 
+        *cache = ui.into_cache();
+
         let draw = draw_start.elapsed();
+
+        if let (Some(total), Some(before)) = (allocation_total, allocations_before_ui) {
+            total.accumulate(allocations::snapshot().since(&before));
+        }
 
         let present_start = Instant::now();
 
@@ -688,18 +735,17 @@ fn drive_one_frame<S: Scene>(
 
         let present = present_start.elapsed();
 
-        *cache = ui.into_cache();
-
-        (update, draw, present)
+        (build, update, draw, present)
     };
 
     // `ui` (and its borrow of `scene` through `view`) is dropped by now,
     // so messages produced by `UserInterface::update` can be applied.
-    for message in runtime_messages {
+    for message in runtime_messages.drain(..) {
         scene.update(message);
     }
 
     Ok(FramePhases {
+        build,
         update,
         draw,
         present,

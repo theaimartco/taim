@@ -47,6 +47,7 @@ taim-signal = { workspace = true, optional = true }
 num-traits.workspace = true
 log.workspace = true
 rustc-hash.workspace = true
+smallvec.workspace = true
 thiserror.workspace = true
 unicode-segmentation.workspace = true
 

@@ -70,55 +70,57 @@ impl ContentFit {
     ///
     /// The returned value is the recommended scaled size of the content.
     pub fn fit(&self, content: Size, bounds: Size) -> Size {
-        let content_ar = content.width / content.height;
-        let bounds_ar = bounds.width / bounds.height;
-
         match self {
-            Self::Contain => {
-                if bounds_ar > content_ar {
-                    Size {
-                        width: content.width * bounds.height / content.height,
-                        ..bounds
-                    }
-                } else {
-                    Size {
-                        height: content.height * bounds.width / content.width,
-                        ..bounds
-                    }
-                }
-            }
-            Self::Cover => {
-                if bounds_ar < content_ar {
-                    Size {
-                        width: content.width * bounds.height / content.height,
-                        ..bounds
-                    }
-                } else {
-                    Size {
-                        height: content.height * bounds.width / content.width,
-                        ..bounds
-                    }
-                }
-            }
             Self::Fill => bounds,
             Self::None => content,
-            Self::ScaleDown => {
-                if bounds_ar > content_ar && bounds.height < content.height {
-                    Size {
-                        width: content.width * bounds.height / content.height,
-                        ..bounds
-                    }
-                } else if bounds.width < content.width {
-                    Size {
-                        height: content.height * bounds.width / content.width,
-                        ..bounds
-                    }
-                } else {
-                    content
-                }
-            }
+            Self::Contain => scaled(content, fit_scale(content, bounds, Scale::Contain)),
+            Self::Cover => scaled(content, fit_scale(content, bounds, Scale::Cover)),
+            Self::ScaleDown => scaled(content, fit_scale(content, bounds, Scale::Contain).min(1.0)),
         }
     }
+}
+
+#[derive(Clone, Copy)]
+enum Scale {
+    Contain,
+    Cover,
+}
+
+#[inline]
+fn fit_scale(content: Size, bounds: Size, mode: Scale) -> f32 {
+    if !content.width.is_finite()
+        || !content.height.is_finite()
+        || content.width <= 0.0
+        || content.height <= 0.0
+    {
+        return 0.0;
+    }
+
+    let horizontal = axis_scale(bounds.width, content.width);
+    let vertical = axis_scale(bounds.height, content.height);
+
+    match (horizontal, vertical, mode) {
+        (Some(x), Some(y), Scale::Contain) => x.min(y),
+        (Some(x), Some(y), Scale::Cover) => x.max(y),
+        (Some(scale), None, _) | (None, Some(scale), _) => scale,
+        (None, None, _) => 1.0,
+    }
+}
+
+#[inline]
+fn axis_scale(limit: f32, intrinsic: f32) -> Option<f32> {
+    if limit.is_infinite() && limit.is_sign_positive() {
+        None
+    } else if limit.is_finite() {
+        Some((limit / intrinsic).max(0.0))
+    } else {
+        Some(0.0)
+    }
+}
+
+#[inline]
+fn scaled(content: Size, factor: f32) -> Size {
+    Size::new(content.width * factor, content.height * factor)
 }
 
 impl fmt::Display for ContentFit {
@@ -130,5 +132,45 @@ impl fmt::Display for ContentFit {
             ContentFit::None => "None",
             ContentFit::ScaleDown => "Scale Down",
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fit_modes_use_stable_axis_scales() {
+        let content = Size::new(200.0, 100.0);
+        let bounds = Size::new(100.0, 100.0);
+
+        assert_eq!(
+            ContentFit::Contain.fit(content, bounds),
+            Size::new(100.0, 50.0)
+        );
+        assert_eq!(
+            ContentFit::Cover.fit(content, bounds),
+            Size::new(200.0, 100.0)
+        );
+        assert_eq!(
+            ContentFit::ScaleDown.fit(content, bounds),
+            Size::new(100.0, 50.0)
+        );
+    }
+
+    #[test]
+    fn malformed_or_unbounded_geometry_never_produces_nan() {
+        assert_eq!(
+            ContentFit::Contain.fit(Size::ZERO, Size::INFINITE),
+            Size::ZERO
+        );
+        assert_eq!(
+            ContentFit::Contain.fit(Size::UNIT, Size::INFINITE),
+            Size::UNIT
+        );
+        assert_eq!(
+            ContentFit::Cover.fit(Size::UNIT, Size::new(f32::NAN, 20.0)),
+            Size::new(20.0, 20.0)
+        );
     }
 }

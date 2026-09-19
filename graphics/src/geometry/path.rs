@@ -25,9 +25,17 @@ impl Path {
     ///
     /// Use the [`Builder`] to configure your [`Path`].
     pub fn new(f: impl FnOnce(&mut Builder)) -> Self {
-        let mut builder = Builder::new();
+        Self::with_capacity(0, 0, f)
+    }
 
-        // TODO: Make it pure instead of side-effect-based (?)
+    /// Creates a path while reserving its expected storage up front.
+    pub fn with_capacity(
+        endpoints: usize,
+        control_points: usize,
+        f: impl FnOnce(&mut Builder),
+    ) -> Self {
+        let mut builder = Builder::with_capacity(endpoints, control_points);
+
         f(&mut builder);
 
         builder.build()
@@ -36,7 +44,7 @@ impl Path {
     /// Creates a new [`Path`] representing a line segment given its starting
     /// and end points.
     pub fn line(from: Point, to: Point) -> Self {
-        Self::new(|p| {
+        Self::with_capacity(2, 0, |p| {
             p.move_to(from);
             p.line_to(to);
         })
@@ -45,19 +53,19 @@ impl Path {
     /// Creates a new [`Path`] representing a rectangle given its top-left
     /// corner coordinate and its `Size`.
     pub fn rectangle(top_left: Point, size: Size) -> Self {
-        Self::new(|p| p.rectangle(top_left, size))
+        Self::with_capacity(4, 0, |p| p.rectangle(top_left, size))
     }
 
     /// Creates a new [`Path`] representing a rounded rectangle given its top-left
     /// corner coordinate, its [`Size`] and [`border::Radius`].
     pub fn rounded_rectangle(top_left: Point, size: Size, radius: border::Radius) -> Self {
-        Self::new(|p| p.rounded_rectangle(top_left, size, radius))
+        Self::with_capacity(12, 8, |p| p.rounded_rectangle(top_left, size, radius))
     }
 
     /// Creates a new [`Path`] representing a circle given its center
     /// coordinate and its radius.
     pub fn circle(center: Point, radius: f32) -> Self {
-        Self::new(|p| {
+        Self::with_capacity(10, 8, |p| {
             p.circle(center, radius);
             p.close();
         })

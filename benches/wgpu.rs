@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
-use criterion::{Bencher, Criterion, criterion_group, criterion_main};
+use criterion::{
+    Bencher, BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main,
+};
 
 use taim::alignment;
 use taim::mouse;
@@ -8,122 +10,164 @@ use taim::{Color, Element, Font, Length, Pixels, Point, Rectangle, Size, Theme};
 use taim_wgpu::Renderer;
 use taim_wgpu::wgpu;
 
-criterion_main!(benches);
-criterion_group!(benches, wgpu_benchmark);
+criterion_main!(taim_gpu_benches);
+criterion_group!(taim_gpu_benches, measure_gpu_frames);
 
-pub fn wgpu_benchmark(c: &mut Criterion) {
+const TARGET_PIXELS: Size<u32> = Size::new(3840, 2160);
+const TARGET_SCALE: f32 = 2.0;
+const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
+
+#[derive(Debug, Clone, Copy)]
+enum Scene {
+    Canvas,
+    Layers,
+    Text { advanced: bool },
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Workload {
+    label: &'static str,
+    items: usize,
+    scene: Scene,
+}
+
+const WORKLOADS: [Workload; 8] = [
+    Workload {
+        label: "canvas",
+        items: 10,
+        scene: Scene::Canvas,
+    },
+    Workload {
+        label: "canvas",
+        items: 1_000,
+        scene: Scene::Canvas,
+    },
+    Workload {
+        label: "layers",
+        items: 10,
+        scene: Scene::Layers,
+    },
+    Workload {
+        label: "layers",
+        items: 1_000,
+        scene: Scene::Layers,
+    },
+    Workload {
+        label: "basic_text",
+        items: 1_000,
+        scene: Scene::Text { advanced: false },
+    },
+    Workload {
+        label: "basic_text",
+        items: 100_000,
+        scene: Scene::Text { advanced: false },
+    },
+    Workload {
+        label: "advanced_text",
+        items: 1_000,
+        scene: Scene::Text { advanced: true },
+    },
+    Workload {
+        label: "advanced_text",
+        items: 100_000,
+        scene: Scene::Text { advanced: true },
+    },
+];
+
+pub fn measure_gpu_frames(criterion: &mut Criterion) {
+    let (adapter, device, queue) = gpu_device();
+    let mut group = criterion.benchmark_group("taim/wgpu/frame");
+
+    for workload in WORKLOADS {
+        let _ = group.throughput(Throughput::Elements(workload.items as u64));
+        let _ = group.bench_with_input(
+            BenchmarkId::new(workload.label, workload.items),
+            &workload,
+            |bencher, workload| {
+                render_workload(bencher, &adapter, &device, &queue, *workload);
+            },
+        );
+    }
+
+    group.finish();
+}
+
+fn gpu_device() -> (wgpu::Adapter, wgpu::Device, wgpu::Queue) {
     use taim_futures::futures::executor;
-    use taim_wgpu::wgpu;
 
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::all(),
         ..wgpu::InstanceDescriptor::new_without_display_handle()
     });
-
     let adapter = executor::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,
         compatible_surface: None,
         force_fallback_adapter: false,
     }))
-    .expect("request adapter");
-
+    .expect("TAIM benchmark requires a GPU adapter");
     let (device, queue) = executor::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-        label: None,
+        label: Some("taim-benchmark-device"),
         required_features: wgpu::Features::empty(),
         required_limits: wgpu::Limits::default(),
         memory_hints: wgpu::MemoryHints::MemoryUsage,
         trace: wgpu::Trace::Off,
         experimental_features: wgpu::ExperimentalFeatures::disabled(),
     }))
-    .expect("request device");
+    .expect("TAIM benchmark requires a WGPU device");
 
-    let _ = c
-        .bench_function("wgpu — canvas (light)", |b| {
-            benchmark(b, &adapter, &device, &queue, |_| scene(10));
-        })
-        .bench_function("wgpu — canvas (heavy)", |b| {
-            benchmark(b, &adapter, &device, &queue, |_| scene(1_000));
-        })
-        .bench_function("wgpu - layered text (light)", |b| {
-            benchmark(b, &adapter, &device, &queue, |_| layered_text(10));
-        })
-        .bench_function("wgpu - layered text (heavy)", |b| {
-            benchmark(b, &adapter, &device, &queue, |_| layered_text(1_000));
-        })
-        .bench_function("wgpu - dynamic text (light)", |b| {
-            benchmark(b, &adapter, &device, &queue, |i| dynamic_text(1_000, i));
-        })
-        .bench_function("wgpu - dynamic text (heavy)", |b| {
-            benchmark(b, &adapter, &device, &queue, |i| dynamic_text(100_000, i));
-        })
-        .bench_function("wgpu - advanced shaping (light)", |b| {
-            benchmark(b, &adapter, &device, &queue, |i| advanced_shaping(1_000, i));
-        })
-        .bench_function("wgpu - advanced shaping (heavy)", |b| {
-            benchmark(b, &adapter, &device, &queue, |i| {
-                advanced_shaping(100_000, i)
-            });
-        });
+    (adapter, device, queue)
 }
 
-fn benchmark<'a>(
+fn render_workload(
     bencher: &mut Bencher<'_>,
     adapter: &wgpu::Adapter,
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    view: impl Fn(usize) -> Element<'a, (), Theme, Renderer>,
+    workload: Workload,
 ) {
-    use taim_wgpu::graphics;
-    use taim_wgpu::graphics::{Antialiasing, Shell};
-    use taim_wgpu::wgpu;
+    use taim_wgpu::graphics::{self, Antialiasing, Shell};
     use taim_winit::core;
     use taim_winit::core::renderer;
     use taim_winit::runtime;
-
-    let format = wgpu::TextureFormat::Bgra8UnormSrgb;
 
     let engine = taim_wgpu::Engine::new(
         adapter,
         device.clone(),
         queue.clone(),
-        format,
+        TARGET_FORMAT,
         Some(Antialiasing::MSAAx4),
         Shell::headless(),
     );
-
     let mut renderer = Renderer::new(engine, renderer::Settings::default());
-
-    let viewport = graphics::Viewport::with_physical_size(Size::new(3840, 2160), 2.0);
-
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: None,
+    let viewport = graphics::Viewport::with_physical_size(TARGET_PIXELS, TARGET_SCALE);
+    let target = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("taim-benchmark-target"),
         size: wgpu::Extent3d {
-            width: 3840,
-            height: 2160,
+            width: TARGET_PIXELS.width,
+            height: TARGET_PIXELS.height,
             depth_or_array_layers: 1,
         },
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format,
+        format: TARGET_FORMAT,
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         view_formats: &[],
     });
-
-    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-    let mut i = 0;
-    let mut cache = Some(runtime::user_interface::Cache::default());
+    let target_view = target.create_view(&wgpu::TextureViewDescriptor::default());
+    let mut retained = Some(runtime::user_interface::Cache::default());
+    let mut frame_number = 0_usize;
 
     bencher.iter(|| {
-        let mut user_interface = runtime::UserInterface::build(
-            view(i),
+        let mut interface = runtime::UserInterface::build(
+            workload.view(frame_number),
             viewport.logical_size(),
-            cache.take().unwrap(),
+            retained
+                .take()
+                .expect("benchmark cache must be returned each frame"),
             &mut renderer,
         );
-
-        user_interface.draw(
+        interface.draw(
             &mut renderer,
             &Theme::Dark,
             &core::renderer::Style {
@@ -131,32 +175,37 @@ fn benchmark<'a>(
             },
             mouse::Cursor::Unavailable,
         );
+        retained = Some(interface.into_cache());
 
-        cache = Some(user_interface.into_cache());
-
-        let submission = renderer.present(
+        let submitted = renderer.present(
             Some(Color::BLACK),
-            format,
-            &texture_view,
-            &texture,
+            TARGET_FORMAT,
+            &target_view,
+            &target,
             &viewport,
         );
-
-        let _ = device.poll(wgpu::PollType::Wait {
-            submission_index: Some(submission),
+        let _ = black_box(device.poll(wgpu::PollType::Wait {
+            submission_index: Some(submitted),
             timeout: None,
-        });
-
-        i += 1;
+        }));
+        frame_number = frame_number.wrapping_add(1);
     });
 }
 
-fn scene<'a, Message: 'a>(n: usize) -> Element<'a, Message, Theme, Renderer> {
-    struct Scene {
-        n: usize,
+impl Workload {
+    fn view(self, frame: usize) -> Element<'static, (), Theme, Renderer> {
+        match self.scene {
+            Scene::Canvas => canvas_scene(self.items),
+            Scene::Layers => layered_text(self.items),
+            Scene::Text { advanced } => dynamic_text(self.items, frame, advanced),
+        }
     }
+}
 
-    impl<Message, Theme> canvas::Program<Message, Theme, Renderer> for Scene {
+fn canvas_scene(n: usize) -> Element<'static, (), Theme, Renderer> {
+    struct RectanglesAndLabels(usize);
+
+    impl canvas::Program<(), Theme, Renderer> for RectanglesAndLabels {
         type State = canvas::Cache<Renderer>;
 
         fn draw(
@@ -167,19 +216,16 @@ fn scene<'a, Message: 'a>(n: usize) -> Element<'a, Message, Theme, Renderer> {
             bounds: Rectangle,
             _cursor: mouse::Cursor,
         ) -> Vec<canvas::Geometry<Renderer>> {
-            vec![cache.draw(renderer, bounds.size(), |frame| {
-                for i in 0..self.n {
+            vec![cache.draw_keyed(renderer, bounds.size(), &self.0, |frame| {
+                for row in 0..self.0 {
                     frame.fill_rectangle(
-                        Point::new(0.0, i as f32),
+                        Point::new(0.0, row as f32),
                         Size::new(10.0, 10.0),
                         Color::WHITE,
                     );
-                }
-
-                for i in 0..self.n {
                     frame.fill_text(canvas::Text {
-                        content: i.to_string(),
-                        position: Point::new(0.0, i as f32),
+                        content: row.to_string(),
+                        position: Point::new(0.0, row as f32),
                         color: Color::BLACK,
                         size: Pixels::from(16),
                         line_height: text::LineHeight::default(),
@@ -196,48 +242,35 @@ fn scene<'a, Message: 'a>(n: usize) -> Element<'a, Message, Theme, Renderer> {
         }
     }
 
-    canvas(Scene { n })
+    canvas(RectanglesAndLabels(n))
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
 }
 
-fn layered_text<'a, Message: 'a>(n: usize) -> Element<'a, Message, Theme, Renderer> {
-    stack((0..n).map(|i| text!("I am paragraph {i}!").into()))
+fn layered_text(n: usize) -> Element<'static, (), Theme, Renderer> {
+    stack((0..n).map(|index| text(format!("TAIM layer {index}")).into()))
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
 }
 
-fn dynamic_text<'a, Message: 'a>(n: usize, i: usize) -> Element<'a, Message, Theme, Renderer> {
-    const LOREM_IPSUM: &str = include_str!("ipsum.txt");
+fn dynamic_text(
+    characters: usize,
+    frame: usize,
+    advanced: bool,
+) -> Element<'static, (), Theme, Renderer> {
+    const SAMPLE: &str = include_str!("ipsum.txt");
+    let mut content = String::with_capacity(characters.saturating_add(40));
+    content.extend(std::iter::repeat(SAMPLE.chars()).flatten().take(characters));
+    use std::fmt::Write as _;
+    let _ = write!(content, " · TAIM frame {frame} 😎");
 
-    scrollable(
-        text!(
-            "{}... Iteration {i}",
-            std::iter::repeat(LOREM_IPSUM.chars())
-                .flatten()
-                .take(n)
-                .collect::<String>(),
-        )
-        .size(10),
-    )
-    .into()
-}
+    let label = text(content).size(10).shaping(if advanced {
+        text::Shaping::Advanced
+    } else {
+        text::Shaping::Basic
+    });
 
-fn advanced_shaping<'a, Message: 'a>(n: usize, i: usize) -> Element<'a, Message, Theme, Renderer> {
-    const LOREM_IPSUM: &str = include_str!("ipsum.txt");
-
-    scrollable(
-        text!(
-            "{}... Iteration {i} 😎",
-            std::iter::repeat(LOREM_IPSUM.chars())
-                .flatten()
-                .take(n)
-                .collect::<String>(),
-        )
-        .shaping(text::Shaping::Advanced)
-        .size(10),
-    )
-    .into()
+    scrollable(label).into()
 }

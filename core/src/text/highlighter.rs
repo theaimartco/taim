@@ -43,7 +43,7 @@ pub trait Highlighter: 'static {
 }
 
 /// A highlighter that highlights nothing.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct PlainText;
 
 impl Highlighter for PlainText {
@@ -78,11 +78,70 @@ pub struct Format<Font> {
     pub font: Option<Font>,
 }
 
+impl<Font> Format<Font> {
+    /// Returns whether this highlight changes neither color nor font.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.color.is_none() && self.font.is_none()
+    }
+
+    /// Uses the non-empty fields of `top` over this format.
+    pub fn overlay(self, top: Self) -> Self {
+        Self {
+            color: top.color.or(self.color),
+            font: top.font.or(self.font),
+        }
+    }
+}
+
+/// Rejects a highlight range that cannot address complete UTF-8 characters.
+///
+/// Syntax highlighters generally report byte positions. Checking only the
+/// line length is insufficient for non-ASCII text: passing a mid-codepoint
+/// boundary to a text layout engine can crash an editor during rendering.
+#[inline]
+pub fn valid_range(line: &str, range: Range<usize>) -> Option<Range<usize>> {
+    (range.start < range.end
+        && range.end <= line.len()
+        && line.is_char_boundary(range.start)
+        && line.is_char_boundary(range.end))
+    .then_some(range)
+}
+
 impl<Font> Default for Format<Font> {
     fn default() -> Self {
         Self {
             color: None,
             font: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn range_validation_respects_utf8_boundaries() {
+        let line = "aéz";
+        assert_eq!(valid_range(line, 1..3), Some(1..3));
+        assert_eq!(valid_range(line, 1..2), None);
+        assert_eq!(valid_range(line, 4..5), None);
+        assert_eq!(valid_range(line, 2..2), None);
+    }
+
+    #[test]
+    fn overlay_keeps_base_attributes_when_top_is_absent() {
+        let base = Format {
+            color: Some(Color::BLACK),
+            font: Some(1_u8),
+        };
+        let top = Format {
+            color: Some(Color::WHITE),
+            font: None,
+        };
+
+        assert_eq!(base.overlay(top).color, Some(Color::WHITE));
+        assert_eq!(base.overlay(top).font, Some(1));
     }
 }

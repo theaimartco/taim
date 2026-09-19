@@ -60,12 +60,11 @@ third-party icon set is vendored, so there is no separate attribution
 requirement. `assets/icons/manifest.toml` records each icon's codepoint,
 grid, RTL mirroring, and licence.
 
-### Still iced's
+### TAIM-owned visual identity
 
-`docs/logo.svg`, `docs/logo-no-shadow.svg`, `widget/assets/iced-logo.svg`, and
-`docs/graphs/*.png` are **iced's**, inherited with the fork. Taim has no logo
-of its own; these are placeholders and must be replaced before any public
-release.
+`docs/logo.svg`, `docs/logo-no-shadow.svg`, and `docs/graphs/*.svg` are original
+TAIM vector assets. The inherited placeholder logo and raster architecture
+graphs have been removed.
 
 [Fira Sans]: https://mozilla.github.io/Fira/
 
@@ -84,7 +83,5 @@ Two dependencies deserve specific mention for the work they do here:
 
 ## Infrastructure
 
-`Cross.toml` currently cross-compiles using **iced's** published container
-images (`ghcr.io/iced-rs/aarch64`, `ghcr.io/iced-rs/armv7`). This is a build
-dependency on another project's infrastructure and should be replaced with
-Taim's own images before release.
+`Cross.toml` uses the neutral `cross-rs` target images. No Iced-owned container
+is part of TAIM's current build infrastructure.

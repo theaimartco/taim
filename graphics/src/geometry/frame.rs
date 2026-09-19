@@ -1,6 +1,14 @@
 //! Draw and generate geometry.
+mod backend;
+
+pub use backend::Backend;
+
 use crate::core::{Point, Radians, Rectangle, Size, Vector};
-use crate::geometry::{self, Fill, Image, Path, Stroke, Svg, Text};
+#[cfg(feature = "image")]
+use crate::geometry::Image;
+#[cfg(feature = "svg")]
+use crate::geometry::Svg;
+use crate::geometry::{self, Fill, Path, Stroke, Text};
 
 /// The region of a surface that can be used to draw geometry.
 pub struct Frame<Renderer>
@@ -8,6 +16,8 @@ where
     Renderer: geometry::Renderer,
 {
     raw: Renderer::Frame,
+    extent: Size,
+    transform_depth: usize,
 }
 
 impl<Renderer> Frame<Renderer>
@@ -26,27 +36,33 @@ where
     pub fn with_bounds(renderer: &Renderer, bounds: Rectangle) -> Self {
         Self {
             raw: renderer.new_frame(bounds),
+            extent: bounds.size(),
+            transform_depth: 0,
         }
     }
 
     /// Returns the width of the [`Frame`].
+    #[inline]
     pub fn width(&self) -> f32 {
-        self.raw.width()
+        self.extent.width
     }
 
     /// Returns the height of the [`Frame`].
+    #[inline]
     pub fn height(&self) -> f32 {
-        self.raw.height()
+        self.extent.height
     }
 
     /// Returns the dimensions of the [`Frame`].
+    #[inline]
     pub fn size(&self) -> Size {
-        self.raw.size()
+        self.extent
     }
 
     /// Returns the coordinate of the center of the [`Frame`].
+    #[inline]
     pub fn center(&self) -> Point {
-        self.raw.center()
+        Point::new(self.extent.width * 0.5, self.extent.height * 0.5)
     }
 
     /// Draws the given [`Path`] on the [`Frame`] by filling it with the
@@ -58,7 +74,9 @@ where
     /// Draws an axis-aligned rectangle given its top-left corner coordinate and
     /// its `Size` on the [`Frame`] by filling it with the provided style.
     pub fn fill_rectangle(&mut self, top_left: Point, size: Size, fill: impl Into<Fill>) {
-        self.raw.fill_rectangle(top_left, size, fill);
+        if is_drawable(top_left, size) {
+            self.raw.fill_rectangle(top_left, size, fill);
+        }
     }
 
     /// Draws the stroke of the given [`Path`] on the [`Frame`] with the
@@ -75,7 +93,9 @@ where
         size: Size,
         stroke: impl Into<Stroke<'a>>,
     ) {
-        self.raw.stroke_rectangle(top_left, size, stroke);
+        if is_drawable(top_left, size) {
+            self.raw.stroke_rectangle(top_left, size, stroke);
+        }
     }
 
     /// Draws the characters of the given [`Text`] on the [`Frame`], filling
@@ -91,13 +111,17 @@ where
     /// Draws the given [`Image`] on the [`Frame`] inside the given bounds.
     #[cfg(feature = "image")]
     pub fn draw_image(&mut self, bounds: Rectangle, image: impl Into<Image>) {
-        self.raw.draw_image(bounds, image);
+        if is_drawable(bounds.position(), bounds.size()) {
+            self.raw.draw_image(bounds, image);
+        }
     }
 
     /// Draws the given [`Svg`] on the [`Frame`] inside the given bounds.
     #[cfg(feature = "svg")]
     pub fn draw_svg(&mut self, bounds: Rectangle, svg: impl Into<Svg>) {
-        self.raw.draw_svg(bounds, svg);
+        if is_drawable(bounds.position(), bounds.size()) {
+            self.raw.draw_svg(bounds, svg);
+        }
     }
 
     /// Stores the current transform of the [`Frame`] and executes the given
@@ -116,13 +140,108 @@ where
         result
     }
 
+    /// Draws in a translated coordinate space and restores it afterwards.
+    pub fn with_translation<R>(
+        &mut self,
+        translation: Vector,
+        draw: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.with_transform(|frame| frame.translate(translation), draw)
+    }
+
+    /// Draws in a rotated coordinate space and restores it afterwards.
+    pub fn with_rotation<R>(
+        &mut self,
+        angle: impl Into<Radians>,
+        draw: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let angle = angle.into();
+        self.with_transform(|frame| frame.rotate(angle), draw)
+    }
+
+    /// Draws in a uniformly scaled coordinate space and restores it afterwards.
+    pub fn with_scale<R>(&mut self, scale: f32, draw: impl FnOnce(&mut Self) -> R) -> R {
+        self.with_transform(|frame| frame.scale(scale), draw)
+    }
+
+    /// Draws in a non-uniformly scaled coordinate space and restores it.
+    pub fn with_scale_nonuniform<R>(
+        &mut self,
+        scale: impl Into<Vector>,
+        draw: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let scale = scale.into();
+        self.with_transform(|frame| frame.scale_nonuniform(scale), draw)
+    }
+
+    /// Returns the number of saved transforms waiting to be restored.
+    pub fn transform_depth(&self) -> usize {
+        self.transform_depth
+    }
+
+    /// Draws in a coordinate space rotated around `origin` and restores it.
+    pub fn with_rotation_around<R>(
+        &mut self,
+        origin: Point,
+        angle: impl Into<Radians>,
+        draw: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let angle = angle.into();
+        self.with_transform(
+            |frame| {
+                frame.translate(Vector::new(origin.x, origin.y));
+                frame.rotate(angle);
+                frame.translate(Vector::new(-origin.x, -origin.y));
+            },
+            draw,
+        )
+    }
+
+    /// Draws in a coordinate space scaled around `origin` and restores it.
+    pub fn with_scale_around<R>(
+        &mut self,
+        origin: Point,
+        scale: impl Into<Vector>,
+        draw: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let scale = scale.into();
+        self.with_transform(
+            |frame| {
+                frame.translate(Vector::new(origin.x, origin.y));
+                frame.scale_nonuniform(scale);
+                frame.translate(Vector::new(-origin.x, -origin.y));
+            },
+            draw,
+        )
+    }
+
+    #[inline]
+    fn with_transform<R>(
+        &mut self,
+        apply: impl FnOnce(&mut Self),
+        draw: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.push_transform();
+        apply(self);
+        let output = draw(self);
+        self.pop_transform();
+        output
+    }
+
     /// Pushes the current transform in the transform stack.
     pub fn push_transform(&mut self) {
         self.raw.push_transform();
+        self.transform_depth = self.transform_depth.saturating_add(1);
     }
 
     /// Pops a transform from the transform stack and sets it as the current transform.
     pub fn pop_transform(&mut self) {
+        if self.transform_depth == 0 {
+            log::warn!("TAIM geometry transform underflow ignored");
+            return;
+        }
+
+        self.transform_depth -= 1;
         self.raw.pop_transform();
     }
 
@@ -150,6 +269,8 @@ where
     fn draft(&mut self, clip_bounds: Rectangle) -> Self {
         Self {
             raw: self.raw.draft(clip_bounds),
+            extent: clip_bounds.size(),
+            transform_depth: 0,
         }
     }
 
@@ -160,22 +281,34 @@ where
 
     /// Applies a translation to the current transform of the [`Frame`].
     pub fn translate(&mut self, translation: Vector) {
-        self.raw.translate(translation);
+        if translation != Vector::ZERO && translation.x.is_finite() && translation.y.is_finite() {
+            self.raw.translate(translation);
+        }
     }
 
     /// Applies a rotation in radians to the current transform of the [`Frame`].
     pub fn rotate(&mut self, angle: impl Into<Radians>) {
-        self.raw.rotate(angle);
+        let angle = angle.into();
+
+        if angle.0.is_finite() && angle.0 != 0.0 {
+            self.raw.rotate(angle);
+        }
     }
 
     /// Applies a uniform scaling to the current transform of the [`Frame`].
     pub fn scale(&mut self, scale: f32) {
-        self.raw.scale(scale);
+        if scale.is_finite() && scale != 1.0 {
+            self.raw.scale(scale);
+        }
     }
 
     /// Applies a non-uniform scaling to the current transform of the [`Frame`].
     pub fn scale_nonuniform(&mut self, scale: impl Into<Vector>) {
-        self.raw.scale_nonuniform(scale);
+        let scale = scale.into();
+
+        if scale.x.is_finite() && scale.y.is_finite() && (scale.x != 1.0 || scale.y != 1.0) {
+            self.raw.scale_nonuniform(scale);
+        }
     }
 
     /// Turns the [`Frame`] into its underlying geometry.
@@ -184,91 +317,12 @@ where
     }
 }
 
-/// The internal implementation of a [`Frame`].
-///
-/// Analogous to [`Frame`]. See [`Frame`] for the documentation
-/// of each method.
-#[allow(missing_docs)]
-pub trait Backend: Sized {
-    type Geometry;
-
-    fn width(&self) -> f32;
-    fn height(&self) -> f32;
-    fn size(&self) -> Size;
-    fn center(&self) -> Point;
-
-    fn push_transform(&mut self);
-    fn pop_transform(&mut self);
-
-    fn translate(&mut self, translation: Vector);
-    fn rotate(&mut self, angle: impl Into<Radians>);
-    fn scale(&mut self, scale: f32);
-    fn scale_nonuniform(&mut self, scale: impl Into<Vector>);
-
-    fn draft(&mut self, clip_bounds: Rectangle) -> Self;
-    fn paste(&mut self, frame: Self);
-
-    fn stroke<'a>(&mut self, path: &Path, stroke: impl Into<Stroke<'a>>);
-    fn stroke_rectangle<'a>(&mut self, top_left: Point, size: Size, stroke: impl Into<Stroke<'a>>);
-    fn stroke_text<'a>(&mut self, text: impl Into<Text>, stroke: impl Into<Stroke<'a>>);
-
-    fn fill(&mut self, path: &Path, fill: impl Into<Fill>);
-    fn fill_text(&mut self, text: impl Into<Text>);
-    fn fill_rectangle(&mut self, top_left: Point, size: Size, fill: impl Into<Fill>);
-
-    fn draw_image(&mut self, bounds: Rectangle, image: impl Into<Image>);
-    fn draw_svg(&mut self, bounds: Rectangle, svg: impl Into<Svg>);
-
-    fn into_geometry(self) -> Self::Geometry;
-}
-
-#[cfg(debug_assertions)]
-impl Backend for () {
-    type Geometry = ();
-
-    fn width(&self) -> f32 {
-        0.0
-    }
-
-    fn height(&self) -> f32 {
-        0.0
-    }
-
-    fn size(&self) -> Size {
-        Size::ZERO
-    }
-
-    fn center(&self) -> Point {
-        Point::ORIGIN
-    }
-
-    fn push_transform(&mut self) {}
-    fn pop_transform(&mut self) {}
-
-    fn translate(&mut self, _translation: Vector) {}
-    fn rotate(&mut self, _angle: impl Into<Radians>) {}
-    fn scale(&mut self, _scale: f32) {}
-    fn scale_nonuniform(&mut self, _scale: impl Into<Vector>) {}
-
-    fn draft(&mut self, _clip_bounds: Rectangle) -> Self {}
-    fn paste(&mut self, _frame: Self) {}
-
-    fn stroke<'a>(&mut self, _path: &Path, _stroke: impl Into<Stroke<'a>>) {}
-    fn stroke_rectangle<'a>(
-        &mut self,
-        _top_left: Point,
-        _size: Size,
-        _stroke: impl Into<Stroke<'a>>,
-    ) {
-    }
-    fn stroke_text<'a>(&mut self, _text: impl Into<Text>, _stroke: impl Into<Stroke<'a>>) {}
-
-    fn fill(&mut self, _path: &Path, _fill: impl Into<Fill>) {}
-    fn fill_text(&mut self, _text: impl Into<Text>) {}
-    fn fill_rectangle(&mut self, _top_left: Point, _size: Size, _fill: impl Into<Fill>) {}
-
-    fn draw_image(&mut self, _bounds: Rectangle, _image: impl Into<Image>) {}
-    fn draw_svg(&mut self, _bounds: Rectangle, _svg: impl Into<Svg>) {}
-
-    fn into_geometry(self) -> Self::Geometry {}
+#[inline]
+fn is_drawable(origin: Point, size: Size) -> bool {
+    origin.x.is_finite()
+        && origin.y.is_finite()
+        && size.width.is_finite()
+        && size.height.is_finite()
+        && size.width > 0.0
+        && size.height > 0.0
 }

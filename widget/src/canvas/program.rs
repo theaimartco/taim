@@ -1,8 +1,32 @@
 use crate::Action;
 use crate::canvas::mouse;
 use crate::canvas::{Event, Geometry};
-use crate::core::Rectangle;
+use crate::core::{Point, Rectangle};
 use crate::graphics::geometry;
+
+/// Borrowed input passed to context-based canvas updates.
+#[derive(Debug, Clone, Copy)]
+pub struct UpdateContext<'a> {
+    /// Runtime event being processed.
+    pub event: &'a Event,
+    /// Logical canvas bounds.
+    pub bounds: Rectangle,
+    /// Pointer position and availability.
+    pub cursor: mouse::Cursor,
+}
+
+/// Borrowed input passed to context-based canvas drawing.
+#[derive(Debug, Clone, Copy)]
+pub struct DrawContext<'a, Theme, Renderer> {
+    /// Geometry renderer used to create frames and caches.
+    pub renderer: &'a Renderer,
+    /// Active application theme.
+    pub theme: &'a Theme,
+    /// Logical canvas bounds.
+    pub bounds: Rectangle,
+    /// Pointer position and availability.
+    pub cursor: mouse::Cursor,
+}
 
 /// The state and logic of a [`Canvas`].
 ///
@@ -39,6 +63,15 @@ where
         None
     }
 
+    /// Context-based update entry point used by the TAIM canvas runtime.
+    fn update_with(
+        &self,
+        state: &mut Self::State,
+        context: UpdateContext<'_>,
+    ) -> Option<Action<Message>> {
+        self.update(state, context.event, context.bounds, context.cursor)
+    }
+
     /// Draws the state of the [`Program`], producing a bunch of [`Geometry`].
     ///
     /// [`Geometry`] can be easily generated with a [`Frame`] or stored in a
@@ -49,12 +82,48 @@ where
     /// [`Cache`]: crate::canvas::Cache
     fn draw(
         &self,
+        _state: &Self::State,
+        _renderer: &Renderer,
+        _theme: &Theme,
+        _bounds: Rectangle,
+        _cursor: mouse::Cursor,
+    ) -> Vec<Geometry<Renderer>> {
+        Vec::new()
+    }
+
+    /// Appends geometry to a caller-owned retained buffer.
+    ///
+    /// The default bridges existing [`Program::draw`] implementations. A
+    /// high-frequency canvas can override this method and push directly into
+    /// `output`, avoiding construction of a temporary `Vec` every frame.
+    fn draw_into(
+        &self,
         state: &Self::State,
         renderer: &Renderer,
         theme: &Theme,
         bounds: Rectangle,
         cursor: mouse::Cursor,
-    ) -> Vec<Geometry<Renderer>>;
+        output: &mut Vec<Geometry<Renderer>>,
+    ) {
+        output.extend(self.draw(state, renderer, theme, bounds, cursor));
+    }
+
+    /// Context-based retained drawing entry point used by the runtime.
+    fn render(
+        &self,
+        state: &Self::State,
+        context: DrawContext<'_, Theme, Renderer>,
+        output: &mut Vec<Geometry<Renderer>>,
+    ) {
+        self.draw_into(
+            state,
+            context.renderer,
+            context.theme,
+            context.bounds,
+            context.cursor,
+            output,
+        );
+    }
 
     /// Returns the current mouse interaction of the [`Program`].
     ///
@@ -69,6 +138,28 @@ where
         _cursor: mouse::Cursor,
     ) -> mouse::Interaction {
         mouse::Interaction::default()
+    }
+
+    /// Returns the region that can be changed by the next draw.
+    ///
+    /// Programs drawing shadows or content outside the canvas rectangle can
+    /// widen this region so damage-driven rendering remains correct.
+    fn paint_bounds(&self, _state: &Self::State, bounds: Rectangle) -> Rectangle {
+        bounds
+    }
+
+    /// Performs program-specific hit testing.
+    fn hit_test(&self, _state: &Self::State, bounds: Rectangle, point: Point) -> bool {
+        bounds.contains(point)
+    }
+
+    /// Describes this canvas to assistive technology.
+    fn semantics(
+        &self,
+        _state: &Self::State,
+        _bounds: Rectangle,
+    ) -> Option<crate::core::semantics::Node> {
+        None
     }
 }
 
@@ -89,6 +180,14 @@ where
         T::update(self, state, event, bounds, cursor)
     }
 
+    fn update_with(
+        &self,
+        state: &mut Self::State,
+        context: UpdateContext<'_>,
+    ) -> Option<Action<Message>> {
+        T::update_with(self, state, context)
+    }
+
     fn draw(
         &self,
         state: &Self::State,
@@ -100,6 +199,27 @@ where
         T::draw(self, state, renderer, theme, bounds, cursor)
     }
 
+    fn draw_into(
+        &self,
+        state: &Self::State,
+        renderer: &Renderer,
+        theme: &Theme,
+        bounds: Rectangle,
+        cursor: mouse::Cursor,
+        output: &mut Vec<Geometry<Renderer>>,
+    ) {
+        T::draw_into(self, state, renderer, theme, bounds, cursor, output);
+    }
+
+    fn render(
+        &self,
+        state: &Self::State,
+        context: DrawContext<'_, Theme, Renderer>,
+        output: &mut Vec<Geometry<Renderer>>,
+    ) {
+        T::render(self, state, context, output);
+    }
+
     fn mouse_interaction(
         &self,
         state: &Self::State,
@@ -107,5 +227,21 @@ where
         cursor: mouse::Cursor,
     ) -> mouse::Interaction {
         T::mouse_interaction(self, state, bounds, cursor)
+    }
+
+    fn paint_bounds(&self, state: &Self::State, bounds: Rectangle) -> Rectangle {
+        T::paint_bounds(self, state, bounds)
+    }
+
+    fn hit_test(&self, state: &Self::State, bounds: Rectangle, point: Point) -> bool {
+        T::hit_test(self, state, bounds, point)
+    }
+
+    fn semantics(
+        &self,
+        state: &Self::State,
+        bounds: Rectangle,
+    ) -> Option<crate::core::semantics::Node> {
+        T::semantics(self, state, bounds)
     }
 }

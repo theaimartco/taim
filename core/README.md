@@ -9,7 +9,7 @@
 This crate is meant to be a starting point for an Taim runtime.
 
 <p align="center">
-  <img alt="The foundations" src="../docs/graphs/foundations.png" width="50%">
+  <img alt="The foundations" src="../docs/graphs/foundations.svg" width="50%">
 </p>
 
 [documentation]: https://docs.rs/taim_core

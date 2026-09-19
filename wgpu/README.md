@@ -9,7 +9,7 @@
 [`wgpu`] supports most modern graphics backends: Vulkan, Metal, DX12, OpenGL, and WebGPU.
 
 <p align="center">
-  <img alt="The native target" src="../docs/graphs/native.png" width="80%">
+  <img alt="The native target" src="../docs/graphs/native.svg" width="80%">
 </p>
 
 [documentation]: https://docs.rs/taim_wgpu

@@ -1,277 +1,262 @@
+//! Lightweight instrumentation hooks for TAIM applications.
 pub use taim_core as core;
 pub use taim_futures as futures;
 
 use crate::core::theme::palette;
 use crate::core::window;
 use crate::futures::Subscription;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-pub use internal::Span;
+static ENABLED: AtomicBool = AtomicBool::new(false);
 
+/// Application information exposed to an attached debugger.
 #[derive(Debug, Clone, Copy)]
 pub struct Metadata {
+    /// Static application name.
     pub name: &'static str,
+    /// Initial semantic theme seed.
     pub theme: Option<palette::Seed>,
+    /// Whether the application supports message replay.
     pub can_time_travel: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
+/// Render primitive category used in instrumentation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Primitive {
+    /// Rectangle or rounded rectangle.
     Quad,
+    /// Indexed triangle mesh.
     Triangle,
+    /// Application-authored shader.
     Shader,
+    /// Raster or vector image.
     Image,
+    /// Shaped text run.
     Text,
 }
 
-#[derive(Debug, Clone, Copy)]
+/// Command emitted by a debugger transport.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
-    RewindTo { message: usize },
+    /// Replay application state through the indexed message.
+    RewindTo {
+        /// Zero-based message index.
+        message: usize,
+    },
+    /// Leave replay and resume live input.
     GoLive,
 }
 
+/// RAII-compatible instrumentation span.
+///
+/// The built-in implementation is intentionally zero-allocation. A future
+/// transport can consume these hooks without changing runtime call sites.
+#[derive(Debug, Clone, Copy, Default)]
+#[must_use = "finish or drop the span after the measured work"]
+pub struct Span;
+
+impl Span {
+    #[inline]
+    fn current() -> Self {
+        Self
+    }
+
+    /// Completes the span explicitly.
+    #[inline]
+    pub fn finish(self) {}
+
+    /// Returns whether this span was created while instrumentation was active.
+    #[inline]
+    pub fn is_active(self) -> bool {
+        let _ = self;
+        is_enabled()
+    }
+}
+
+/// Enables instrumentation hooks.
+#[inline]
 pub fn enable() {
-    internal::enable();
+    ENABLED.store(true, Ordering::Relaxed);
 }
 
+/// Disables instrumentation hooks.
+#[inline]
 pub fn disable() {
-    internal::disable();
+    ENABLED.store(false, Ordering::Relaxed);
 }
 
+/// Returns whether instrumentation is enabled.
+#[inline]
+pub fn is_enabled() -> bool {
+    ENABLED.load(Ordering::Relaxed)
+}
+
+/// Initializes debug and hot-reload state.
 pub fn init(metadata: Metadata) {
-    internal::init(metadata);
-    hot::init();
+    let _ = metadata;
+    hot_reload::init();
 }
 
+/// Requests debugger shutdown, returning whether a transport handled it.
 pub fn quit() -> bool {
-    internal::quit()
+    false
 }
 
-pub fn theme_changed(f: impl FnOnce() -> Option<palette::Seed>) {
-    internal::theme_changed(f);
+/// Lazily reports a theme change when instrumentation is active.
+pub fn theme_changed(_theme: impl FnOnce() -> Option<palette::Seed>) {}
+
+/// Reports the number of newly spawned tasks.
+#[inline]
+pub fn tasks_spawned(_amount: usize) {}
+
+/// Reports the number of tracked subscriptions.
+#[inline]
+pub fn subscriptions_tracked(_amount: usize) {}
+
+/// Lazily reports rendered layers without evaluating the count when disabled.
+pub fn layers_rendered(_amount: impl FnOnce() -> usize) {}
+
+#[inline]
+fn stage() -> Span {
+    Span::current()
 }
 
-pub fn tasks_spawned(amount: usize) {
-    internal::tasks_spawned(amount);
-}
-
-pub fn subscriptions_tracked(amount: usize) {
-    internal::subscriptions_tracked(amount);
-}
-
-pub fn layers_rendered(amount: impl FnOnce() -> usize) {
-    internal::layers_rendered(amount);
-}
-
+/// Begins boot instrumentation.
 pub fn boot() -> Span {
-    internal::boot()
+    stage()
 }
 
-pub fn update(message: &impl std::fmt::Debug) -> Span {
-    internal::update(message)
+/// Begins update instrumentation.
+pub fn update(_message: &impl std::fmt::Debug) -> Span {
+    stage()
 }
 
-pub fn view(window: window::Id) -> Span {
-    internal::view(window)
+/// Begins view construction instrumentation.
+pub fn view(_window: window::Id) -> Span {
+    stage()
 }
 
-pub fn layout(window: window::Id) -> Span {
-    internal::layout(window)
+/// Begins layout instrumentation.
+pub fn layout(_window: window::Id) -> Span {
+    stage()
 }
 
-pub fn interact(window: window::Id) -> Span {
-    internal::interact(window)
+/// Begins interaction instrumentation.
+pub fn interact(_window: window::Id) -> Span {
+    stage()
 }
 
-pub fn draw(window: window::Id) -> Span {
-    internal::draw(window)
+/// Begins draw-list instrumentation.
+pub fn draw(_window: window::Id) -> Span {
+    stage()
 }
 
-pub fn prepare(primitive: Primitive) -> Span {
-    internal::prepare(primitive)
+/// Begins primitive preparation instrumentation.
+pub fn prepare(_primitive: Primitive) -> Span {
+    stage()
 }
 
-pub fn render(primitive: Primitive) -> Span {
-    internal::render(primitive)
+/// Begins primitive rendering instrumentation.
+pub fn render(_primitive: Primitive) -> Span {
+    stage()
 }
 
-pub fn present(window: window::Id) -> Span {
-    internal::present(window)
+/// Begins presentation instrumentation.
+pub fn present(_window: window::Id) -> Span {
+    stage()
 }
 
+/// Begins a named custom span.
 pub fn time(name: impl Into<String>) -> Span {
-    internal::time(name)
+    let _ = name;
+    stage()
 }
 
-pub fn time_with<T>(name: impl Into<String>, f: impl FnOnce() -> T) -> T {
+/// Executes a closure inside a named custom span.
+pub fn time_with<T>(name: impl Into<String>, work: impl FnOnce() -> T) -> T {
     let span = time(name);
-    let result = f();
+    let output = work();
     span.finish();
-
-    result
+    output
 }
 
+/// Returns the debugger command subscription.
 pub fn commands() -> Subscription<Command> {
-    internal::commands()
+    Subscription::none()
 }
 
-pub fn hot<O>(f: impl FnOnce() -> O) -> O {
-    hot::call(f)
+/// Runs a closure through the active hot-reload adapter.
+pub fn hot<O>(work: impl FnOnce() -> O) -> O {
+    hot_reload::call(work)
 }
 
-pub fn on_hotpatch(f: impl Fn() + Send + Sync + 'static) {
-    hot::on_hotpatch(f)
+/// Registers a callback for successful hot patches.
+pub fn on_hotpatch(callback: impl Fn() + Send + Sync + 'static) {
+    hot_reload::on_hotpatch(callback);
 }
 
+/// Returns whether a registered hot function needs rebuilding.
 pub fn is_stale() -> bool {
-    hot::is_stale()
-}
-
-mod internal {
-    use crate::core::theme::palette;
-    use crate::core::window;
-    use crate::futures::Subscription;
-    use crate::{Command, Metadata, Primitive};
-
-    pub fn enable() {}
-    pub fn disable() {}
-
-    pub fn init(_metadata: Metadata) {}
-
-    pub fn quit() -> bool {
-        false
-    }
-
-    pub fn theme_changed(_f: impl FnOnce() -> Option<palette::Seed>) {}
-
-    pub fn tasks_spawned(_amount: usize) {}
-
-    pub fn subscriptions_tracked(_amount: usize) {}
-
-    pub fn layers_rendered(_amount: impl FnOnce() -> usize) {}
-
-    pub fn boot() -> Span {
-        Span
-    }
-
-    pub fn update(_message: &impl std::fmt::Debug) -> Span {
-        Span
-    }
-
-    pub fn view(_window: window::Id) -> Span {
-        Span
-    }
-
-    pub fn layout(_window: window::Id) -> Span {
-        Span
-    }
-
-    pub fn interact(_window: window::Id) -> Span {
-        Span
-    }
-
-    pub fn draw(_window: window::Id) -> Span {
-        Span
-    }
-
-    pub fn prepare(_primitive: Primitive) -> Span {
-        Span
-    }
-
-    pub fn render(_primitive: Primitive) -> Span {
-        Span
-    }
-
-    pub fn present(_window: window::Id) -> Span {
-        Span
-    }
-
-    pub fn time(_name: impl Into<String>) -> Span {
-        Span
-    }
-
-    pub fn commands() -> Subscription<Command> {
-        Subscription::none()
-    }
-
-    #[derive(Debug)]
-    pub struct Span;
-
-    impl Span {
-        pub fn finish(self) {}
-    }
+    hot_reload::is_stale()
 }
 
 #[cfg(all(feature = "hot", not(target_arch = "wasm32")))]
-mod hot {
+mod hot_reload {
     use std::collections::BTreeSet;
-    use std::sync::atomic::{self, AtomicBool};
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex, OnceLock};
 
-    static IS_STALE: AtomicBool = AtomicBool::new(false);
-
-    static HOT_FUNCTIONS_PENDING: Mutex<BTreeSet<u64>> = Mutex::new(BTreeSet::new());
-
-    static HOT_FUNCTIONS: OnceLock<BTreeSet<u64>> = OnceLock::new();
+    static STALE: AtomicBool = AtomicBool::new(false);
+    static PENDING: Mutex<BTreeSet<u64>> = Mutex::new(BTreeSet::new());
+    static REGISTERED: OnceLock<BTreeSet<u64>> = OnceLock::new();
 
     pub fn init() {
         cargo_hot::connect();
-
         cargo_hot::subsecond::register_handler(Arc::new(|| {
-            if HOT_FUNCTIONS.get().is_none() {
-                HOT_FUNCTIONS
-                    .set(std::mem::take(
-                        &mut HOT_FUNCTIONS_PENDING.lock().expect("Lock hot functions"),
-                    ))
-                    .expect("Set hot functions");
+            if REGISTERED.get().is_none() {
+                let functions = std::mem::take(&mut *PENDING.lock().expect("lock hot functions"));
+                let _ = REGISTERED.set(functions);
             }
-
-            IS_STALE.store(false, atomic::Ordering::Relaxed);
+            STALE.store(false, Ordering::Release);
         }));
     }
 
-    pub fn call<O>(f: impl FnOnce() -> O) -> O {
-        let mut f = Some(f);
-
-        // The `move` here is important. Hotpatching will not work
-        // otherwise.
-        let mut f = cargo_hot::subsecond::HotFn::current(move || {
-            f.take().expect("Hot function is stale")()
+    pub fn call<O>(work: impl FnOnce() -> O) -> O {
+        let mut work = Some(work);
+        let mut function = cargo_hot::subsecond::HotFn::current(move || {
+            work.take().expect("hot function already consumed")()
         });
+        let address = function.ptr_address().0;
 
-        let address = f.ptr_address().0;
-
-        if let Some(hot_functions) = HOT_FUNCTIONS.get() {
-            if hot_functions.contains(&address) {
-                IS_STALE.store(true, atomic::Ordering::Relaxed);
+        if let Some(registered) = REGISTERED.get() {
+            if registered.contains(&address) {
+                STALE.store(true, Ordering::Release);
             }
         } else {
-            let _ = HOT_FUNCTIONS_PENDING
-                .lock()
-                .expect("Lock hot functions")
-                .insert(address);
+            let _ = PENDING.lock().expect("lock hot functions").insert(address);
         }
 
-        f.call(())
+        function.call(())
     }
 
-    pub fn on_hotpatch(f: impl Fn() + Send + Sync + 'static) {
-        cargo_hot::subsecond::register_handler(Arc::new(f));
+    pub fn on_hotpatch(callback: impl Fn() + Send + Sync + 'static) {
+        cargo_hot::subsecond::register_handler(Arc::new(callback));
     }
 
     pub fn is_stale() -> bool {
-        IS_STALE.load(atomic::Ordering::Relaxed)
+        STALE.load(Ordering::Acquire)
     }
 }
 
 #[cfg(any(not(feature = "hot"), target_arch = "wasm32"))]
-mod hot {
+mod hot_reload {
     pub fn init() {}
 
-    pub fn call<O>(f: impl FnOnce() -> O) -> O {
-        f()
+    pub fn call<O>(work: impl FnOnce() -> O) -> O {
+        work()
     }
 
-    pub fn on_hotpatch(_f: impl Fn()) {}
+    pub fn on_hotpatch(_callback: impl Fn() + Send + Sync + 'static) {}
 
     pub fn is_stale() -> bool {
         false

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="650" viewBox="0 0 1100 650" role="img" aria-labelledby="title desc">
+  <title id="title">TAIM native rendering path</title>
+  <desc id="desc">Application state flows through the TAIM runtime, shell, renderer router, and GPU or CPU backend</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1100" y2="650" gradientUnits="userSpaceOnUse"><stop stop-color="#08111F"/><stop offset="1" stop-color="#111C35"/></linearGradient>
+    <linearGradient id="primary" x1="430" y1="0" x2="690" y2="0" gradientUnits="userSpaceOnUse"><stop stop-color="#22D3EE"/><stop offset="0.52" stop-color="#2563EB"/><stop offset="1" stop-color="#7C3AED"/></linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0l10 5-10 5z" fill="#6F86A8"/></marker>
+  </defs>
+  <rect width="1100" height="650" rx="30" fill="url(#bg)"/>
+  <text x="56" y="58" fill="#F8FAFC" font-family="ui-sans-serif, system-ui, sans-serif" font-size="27" font-weight="750">TAIM native frame path</text>
+  <text x="56" y="87" fill="#94A3B8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15">One scheduler, retained state, format-aware presentation.</text>
+  <g font-family="ui-sans-serif, system-ui, sans-serif" text-anchor="middle">
+    <rect x="410" y="116" width="280" height="66" rx="20" fill="url(#primary)"/><text x="550" y="157" fill="#FFFFFF" font-size="20" font-weight="750">application + widgets</text>
+    <path d="M550 182v48" stroke="#6F86A8" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="370" y="236" width="360" height="74" rx="20" fill="#15233D" stroke="#3B82F6" stroke-width="2"/><text x="550" y="268" fill="#E2E8F0" font-size="19" font-weight="700">runtime + frame scheduler</text><text x="550" y="291" fill="#94A3B8" font-size="14">diff · layout · semantics · damage</text>
+    <path d="M550 310v24H266v28M550 334h284v28" fill="none" stroke="#6F86A8" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="128" y="362" width="276" height="72" rx="20" fill="#13283A" stroke="#22D3EE" stroke-width="2"/><text x="266" y="395" fill="#E2E8F0" font-size="19" font-weight="700">winit shell</text><text x="266" y="418" fill="#94A3B8" font-size="14">events · IME · windows</text>
+    <rect x="696" y="362" width="276" height="72" rx="20" fill="#261C47" stroke="#8B5CF6" stroke-width="2"/><text x="834" y="395" fill="#E2E8F0" font-size="19" font-weight="700">Vyom shell</text><text x="834" y="418" fill="#94A3B8" font-size="14">secure native lifecycle</text>
+    <path d="M266 434v42h284M834 434v42H550M550 476v32" fill="none" stroke="#6F86A8" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="370" y="514" width="360" height="62" rx="20" fill="#15233D" stroke="#64748B" stroke-width="2"/><text x="550" y="552" fill="#E2E8F0" font-size="19" font-weight="700">renderer router</text>
+    <path d="M550 576v22H326M550 598h224" fill="none" stroke="#6F86A8" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="188" y="596" width="276" height="42" rx="16" fill="#12304A" stroke="#22D3EE"/><text x="326" y="623" fill="#E2E8F0" font-size="17" font-weight="650">WGPU + text GPU</text>
+    <rect x="636" y="596" width="276" height="42" rx="16" fill="#2B214D" stroke="#8B5CF6"/><text x="774" y="623" fill="#E2E8F0" font-size="17" font-weight="650">Tiny Skia CPU</text>
+  </g>
+</svg>

@@ -1,5 +1,3 @@
-use crate::Vector;
-
 use num_traits::{Float, Num};
 use std::fmt;
 
@@ -12,6 +10,8 @@ pub struct Point<T = f32> {
     /// The Y coordinate.
     pub y: T,
 }
+
+mod ops;
 
 impl Point {
     /// The origin (i.e. a [`Point`] at (0, 0)).
@@ -33,6 +33,20 @@ impl<T: Num> Point<T> {
         let b = self.y - to.y;
 
         a.hypot(b)
+    }
+
+    /// Squared distance for comparisons that do not need a square root.
+    ///
+    /// Use [`Point::distance`] when coordinates may be extremely large and
+    /// the actual distance is required; `hypot` handles overflow better.
+    #[inline]
+    pub fn distance_squared(&self, to: Self) -> T
+    where
+        T: Copy,
+    {
+        let dx = self.x - to.x;
+        let dy = self.y - to.y;
+        dx * dx + dy * dy
     }
 }
 
@@ -60,65 +74,6 @@ impl<T> From<Point<T>> for [T; 2] {
     }
 }
 
-impl<T> std::ops::Add<Vector<T>> for Point<T>
-where
-    T: std::ops::Add<Output = T>,
-{
-    type Output = Self;
-
-    fn add(self, vector: Vector<T>) -> Self {
-        Self {
-            x: self.x + vector.x,
-            y: self.y + vector.y,
-        }
-    }
-}
-
-impl<T> std::ops::AddAssign<Vector<T>> for Point<T>
-where
-    T: std::ops::AddAssign,
-{
-    fn add_assign(&mut self, vector: Vector<T>) {
-        self.x += vector.x;
-        self.y += vector.y;
-    }
-}
-
-impl<T> std::ops::Sub<Vector<T>> for Point<T>
-where
-    T: std::ops::Sub<Output = T>,
-{
-    type Output = Self;
-
-    fn sub(self, vector: Vector<T>) -> Self {
-        Self {
-            x: self.x - vector.x,
-            y: self.y - vector.y,
-        }
-    }
-}
-
-impl<T> std::ops::SubAssign<Vector<T>> for Point<T>
-where
-    T: std::ops::SubAssign,
-{
-    fn sub_assign(&mut self, vector: Vector<T>) {
-        self.x -= vector.x;
-        self.y -= vector.y;
-    }
-}
-
-impl<T> std::ops::Sub<Point<T>> for Point<T>
-where
-    T: std::ops::Sub<Output = T>,
-{
-    type Output = Vector<T>;
-
-    fn sub(self, point: Self) -> Vector<T> {
-        Vector::new(self.x - point.x, self.y - point.y)
-    }
-}
-
 impl<T> fmt::Display for Point<T>
 where
     T: fmt::Display,
@@ -143,5 +98,18 @@ impl Point<f32> {
             x: self.x.round() as u32,
             y: self.y.round() as u32,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Point;
+
+    #[test]
+    fn squared_distance_preserves_nearby_hit_test_order() {
+        let origin = Point::ORIGIN;
+        assert_eq!(origin.distance_squared(Point::new(3.0, 4.0)), 25.0);
+        assert!(origin.distance_squared(Point::new(3.0, 4.0))
+            < origin.distance_squared(Point::new(6.0, 8.0)));
     }
 }

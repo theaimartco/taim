@@ -1,19 +1,19 @@
-//! Listen to keyboard events.
+//! Keyboard subscriptions built on TAIM's normalized interaction stream.
+
 use crate::core;
 use crate::core::keyboard::Event;
-use crate::subscription::{self, Subscription};
+use crate::subscription::Subscription;
 
-/// Returns a [`Subscription`] that listens to ignored keyboard events.
+/// Returns keyboard events that reached no focused widget or shortcut.
 pub fn listen() -> Subscription<Event> {
-    #[derive(Hash)]
-    struct Listen;
+    crate::event::listen_with(|event, status, _window| {
+        if status != core::event::Status::Ignored {
+            return None;
+        }
 
-    subscription::filter_map(Listen, move |event| match event {
-        subscription::Event::Interaction {
-            event: core::Event::Keyboard(event),
-            status: core::event::Status::Ignored,
-            ..
-        } => Some(event),
-        _ => None,
+        match event {
+            core::Event::Keyboard(event) => Some(event),
+            _ => None,
+        }
     })
 }

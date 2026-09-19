@@ -43,6 +43,17 @@ impl AllocationSnapshot {
             live_bytes: self.live_bytes - earlier.live_bytes,
         }
     }
+
+    /// Adds another measured UI interval without including time spent by the
+    /// harness between intervals (notably screenshot readback).
+    pub fn accumulate(&mut self, interval: Self) {
+        self.allocations = self.allocations.saturating_add(interval.allocations);
+        self.deallocations = self.deallocations.saturating_add(interval.deallocations);
+        self.bytes_allocated = self
+            .bytes_allocated
+            .saturating_add(interval.bytes_allocated);
+        self.live_bytes = self.live_bytes.saturating_add(interval.live_bytes);
+    }
 }
 
 // Only constructed by the `#[global_allocator]` static below, which is
@@ -128,5 +139,27 @@ mod tests {
         assert_eq!(delta.deallocations, 3);
         assert_eq!(delta.bytes_allocated, 500);
         assert_eq!(delta.live_bytes, -200);
+    }
+
+    #[test]
+    fn accumulation_excludes_unmeasured_gaps() {
+        let mut total = AllocationSnapshot::default();
+        total.accumulate(AllocationSnapshot {
+            allocations: 2,
+            deallocations: 1,
+            bytes_allocated: 64,
+            live_bytes: 32,
+        });
+        total.accumulate(AllocationSnapshot {
+            allocations: 3,
+            deallocations: 4,
+            bytes_allocated: 128,
+            live_bytes: -16,
+        });
+
+        assert_eq!(total.allocations, 5);
+        assert_eq!(total.deallocations, 5);
+        assert_eq!(total.bytes_allocated, 192);
+        assert_eq!(total.live_bytes, 16);
     }
 }

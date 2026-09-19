@@ -6,6 +6,8 @@ use crate::renderer;
 use crate::widget;
 use crate::{Event, Layout, Shell, Size};
 
+const MAX_RETAINED_MESSAGES: usize = 32;
+
 /// A generic [`Overlay`].
 pub struct Element<'a, Message, Theme, Renderer> {
     overlay: Box<dyn Overlay<Message, Theme, Renderer> + 'a>,
@@ -18,6 +20,11 @@ where
     /// Creates a new [`Element`] containing the given [`Overlay`].
     pub fn new(overlay: Box<dyn Overlay<Message, Theme, Renderer> + 'a>) -> Self {
         Self { overlay }
+    }
+
+    /// Boxes an overlay value into an [`Element`].
+    pub fn wrap(overlay: impl Overlay<Message, Theme, Renderer> + 'a) -> Self {
+        Self::new(Box::new(overlay))
     }
 
     /// Returns a reference to the [`Overlay`] of the [`Element`],
@@ -47,6 +54,7 @@ where
 struct Map<'a, A, B, Theme, Renderer> {
     content: Box<dyn Overlay<A, Theme, Renderer> + 'a>,
     mapper: &'a dyn Fn(A) -> B,
+    messages: Vec<A>,
 }
 
 impl<'a, A, B, Theme, Renderer> Map<'a, A, B, Theme, Renderer> {
@@ -54,7 +62,11 @@ impl<'a, A, B, Theme, Renderer> Map<'a, A, B, Theme, Renderer> {
         content: Box<dyn Overlay<A, Theme, Renderer> + 'a>,
         mapper: &'a dyn Fn(A) -> B,
     ) -> Map<'a, A, B, Theme, Renderer> {
-        Map { content, mapper }
+        Map {
+            content,
+            mapper,
+            messages: Vec::new(),
+        }
     }
 }
 
@@ -92,13 +104,19 @@ where
         renderer: &Renderer,
         shell: &mut Shell<'_, B>,
     ) {
-        let mut local_messages = Vec::new();
+        let mut local_messages = std::mem::take(&mut self.messages);
+        debug_assert!(local_messages.is_empty());
         let mut local_shell = shell.local(&mut local_messages);
 
         self.content
             .update(event, layout, cursor, renderer, &mut local_shell);
 
         shell.merge(local_shell, self.mapper);
+
+        if local_messages.capacity() > MAX_RETAINED_MESSAGES {
+            local_messages.shrink_to(MAX_RETAINED_MESSAGES);
+        }
+        self.messages = local_messages;
     }
 
     fn mouse_interaction(

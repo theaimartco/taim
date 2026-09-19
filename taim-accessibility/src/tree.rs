@@ -117,6 +117,12 @@ impl Tree {
         self.entries.get(id)
     }
 
+    /// Finds any entry matching `predicate` without allocating or sorting the
+    /// tree. Use this when traversal order does not affect the answer.
+    pub fn find(&self, mut predicate: impl FnMut(&Entry) -> bool) -> Option<&Entry> {
+        self.entries.values().find(|entry| predicate(entry))
+    }
+
     /// The number of nodes in the tree.
     pub fn len(&self) -> usize {
         self.entries.len()

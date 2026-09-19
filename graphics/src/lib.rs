@@ -1,7 +1,7 @@
 //! A bunch of backend-agnostic types that can be leveraged to build a renderer
 //! for [`taim`].
 //!
-//! ![The native path of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/native.png?raw=true)
+//! ![The native path of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/native.svg?raw=true)
 //!
 //! [`taim`]: https://github.com/theaimartco/taim
 #![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]

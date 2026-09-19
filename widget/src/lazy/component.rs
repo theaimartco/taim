@@ -1,18 +1,32 @@
 //! Build and reuse custom widgets using The Elm Architecture.
 #![allow(deprecated)]
-use crate::core::layout::{self, Layout};
-use crate::core::mouse;
+use crate::core::layout::Layout;
 use crate::core::overlay;
 use crate::core::renderer;
 use crate::core::widget;
-use crate::core::widget::tree::{self, Tree};
-use crate::core::widget::visit;
-use crate::core::{self, Element, Length, Rectangle, Shell, Size, Vector, Widget};
+use crate::core::widget::tree::Tree;
+use crate::core::{self, Element, Length, Rectangle, Size};
 
 use ouroboros::self_referencing;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
+
+#[path = "component/implementation.rs"]
+mod implementation;
+#[path = "component/overlay.rs"]
+mod overlay_runtime;
+
+const RETAINED_EVENT_CAPACITY: usize = 16;
+const MAX_RETAINED_EVENT_CAPACITY: usize = 64;
+
+fn trim_event_buffer<T>(events: &mut Vec<T>) {
+    debug_assert!(events.is_empty());
+
+    if events.capacity() > MAX_RETAINED_EVENT_CAPACITY {
+        events.shrink_to(RETAINED_EVENT_CAPACITY);
+    }
+}
 
 /// A reusable, custom widget that uses The Elm Architecture.
 ///
@@ -98,33 +112,40 @@ where
     Renderer: core::Renderer + 'a,
 {
     Element::new(Instance {
-        state: RefCell::new(Some(
-            StateBuilder {
-                component: Box::new(component),
-                message: PhantomData,
-                state: PhantomData,
-                element_builder: |_| None,
-            }
-            .build(),
-        )),
+        state: RefCell::new(Some(dormant_state(Box::new(component)))),
         tree: RefCell::new(Rc::new(RefCell::new(None))),
+        events: Vec::new(),
     })
 }
 
 struct Instance<'a, Message, Theme, Renderer, Event, S> {
     state: RefCell<Option<State<'a, Message, Theme, Renderer, Event, S>>>,
     tree: RefCell<Rc<RefCell<Option<Tree>>>>,
+    events: Vec<Event>,
 }
+
+type DynComponent<'a, Message, Theme, Renderer, Event, S> =
+    dyn Component<Message, Theme, Renderer, Event = Event, State = S> + 'a;
 
 #[self_referencing]
 struct State<'a, Message: 'a, Theme: 'a, Renderer: 'a, Event: 'a, S: 'a> {
-    component: Box<dyn Component<Message, Theme, Renderer, Event = Event, State = S> + 'a>,
-    message: PhantomData<Message>,
-    state: PhantomData<S>,
+    component: Box<DynComponent<'a, Message, Theme, Renderer, Event, S>>,
+    types: PhantomData<fn() -> (Message, S)>,
 
     #[borrows(component)]
     #[covariant]
     element: Option<Element<'this, Event, Theme, Renderer>>,
+}
+
+fn dormant_state<'a, Message, Theme, Renderer, Event, S>(
+    component: Box<DynComponent<'a, Message, Theme, Renderer, Event, S>>,
+) -> State<'a, Message, Theme, Renderer, Event, S> {
+    StateBuilder {
+        component,
+        types: PhantomData,
+        element_builder: |_| None,
+    }
+    .build()
 }
 
 impl<Message, Theme, Renderer, Event, S> Instance<'_, Message, Theme, Renderer, Event, S>
@@ -133,72 +154,39 @@ where
     Renderer: renderer::Renderer,
 {
     fn diff_self(&self) {
+        let tree = Rc::clone(&self.tree.borrow());
+
         self.with_element_mut(|element| {
-            self.tree
-                .borrow_mut()
-                .borrow_mut()
+            tree.borrow_mut()
                 .as_mut()
                 .unwrap()
                 .diff_children(std::slice::from_mut(element));
         });
     }
 
-    fn rebuild_element_if_necessary(&self) {
+    fn rebuild(&self, operation: Option<(Rectangle, &mut dyn widget::Operation)>) {
         let inner = self.state.borrow_mut().take().unwrap();
-        if inner.borrow_element().is_none() {
-            let heads = inner.into_heads();
 
-            *self.state.borrow_mut() = Some(
-                StateBuilder {
-                    component: heads.component,
-                    message: PhantomData,
-                    state: PhantomData,
-                    element_builder: |component| {
-                        Some(
-                            component.view(
-                                self.tree
-                                    .borrow()
-                                    .borrow()
-                                    .as_ref()
-                                    .unwrap()
-                                    .state
-                                    .downcast_ref::<S>(),
-                            ),
-                        )
-                    },
-                }
-                .build(),
-            );
-            self.diff_self();
-        } else {
+        if inner.borrow_element().is_some() && operation.is_none() {
             *self.state.borrow_mut() = Some(inner);
+            return;
         }
-    }
 
-    fn rebuild_element_with_operation(
-        &self,
-        layout: Layout<'_>,
-        operation: &mut dyn widget::Operation,
-    ) {
-        let heads = self.state.borrow_mut().take().unwrap().into_heads();
+        let tree = Rc::clone(&self.tree.borrow());
+        let heads = inner.into_heads();
 
-        heads.component.operate(
-            layout.bounds(),
-            self.tree
-                .borrow_mut()
-                .borrow_mut()
-                .as_mut()
-                .unwrap()
-                .state
-                .downcast_mut(),
-            operation,
-        );
+        if let Some((bounds, operation)) = operation {
+            heads.component.operate(
+                bounds,
+                tree.borrow_mut().as_mut().unwrap().state.downcast_mut(),
+                operation,
+            );
+        }
 
         *self.state.borrow_mut() = Some(
             StateBuilder {
                 component: heads.component,
-                message: PhantomData,
-                state: PhantomData,
+                types: PhantomData,
                 element_builder: |component| {
                     Some(
                         component.view(
@@ -218,6 +206,20 @@ where
         self.diff_self();
     }
 
+    #[inline]
+    fn rebuild_element_if_necessary(&self) {
+        self.rebuild(None);
+    }
+
+    #[inline]
+    fn rebuild_element_with_operation(
+        &self,
+        layout: Layout<'_>,
+        operation: &mut dyn widget::Operation,
+    ) {
+        self.rebuild(Some((layout.bounds(), operation)));
+    }
+
     fn with_element<T>(&self, f: impl FnOnce(&Element<'_, Event, Theme, Renderer>) -> T) -> T {
         self.with_element_mut(|element| f(element))
     }
@@ -235,278 +237,9 @@ where
     }
 }
 
-impl<Message, Theme, Renderer, Event, S> Widget<Message, Theme, Renderer>
-    for Instance<'_, Message, Theme, Renderer, Event, S>
-where
-    S: 'static + Default,
-    Renderer: core::Renderer,
-{
-    fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<Tag<S>>()
-    }
-
-    fn state(&self) -> tree::State {
-        let state = Rc::new(RefCell::new(Some(Tree::with_state(
-            tree::Tag::of::<Tag<S>>(),
-            tree::State::new(S::default()),
-            vec![Tree::empty()],
-        ))));
-
-        *self.tree.borrow_mut() = state.clone();
-        self.diff_self();
-
-        tree::State::new(state)
-    }
-
-    fn diff(&mut self, tree: &mut Tree) {
-        let tree = tree.state.downcast_ref::<Rc<RefCell<Option<Tree>>>>();
-        *self.tree.borrow_mut() = tree.clone();
-        self.rebuild_element_if_necessary();
-    }
-
-    fn size(&self) -> Size<Length> {
-        self.with_element(|element| element.as_widget().size())
-    }
-
-    fn layout(
-        &mut self,
-        tree: &mut Tree,
-        renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        let t = tree.state.downcast_mut::<Rc<RefCell<Option<Tree>>>>();
-
-        self.with_element_mut(|element| {
-            element.as_widget_mut().layout(
-                &mut t.borrow_mut().as_mut().unwrap().children[0],
-                renderer,
-                limits,
-            )
-        })
-    }
-
-    fn update(
-        &mut self,
-        tree: &mut Tree,
-        event: &core::Event,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &Renderer,
-        shell: &mut Shell<'_, Message>,
-        viewport: &Rectangle,
-    ) {
-        let mut local_messages = Vec::new();
-        let mut local_shell = shell.local(&mut local_messages);
-
-        let t = tree.state.downcast_mut::<Rc<RefCell<Option<Tree>>>>();
-        self.with_element_mut(|element| {
-            element.as_widget_mut().update(
-                &mut t.borrow_mut().as_mut().unwrap().children[0],
-                event,
-                layout,
-                cursor,
-                renderer,
-                &mut local_shell,
-                viewport,
-            );
-        });
-
-        if local_shell.is_event_captured() {
-            shell.capture_event();
-        }
-
-        local_shell.revalidate_layout(|diff| shell.invalidate_layout_with(diff));
-        shell.request_redraw_at(local_shell.redraw_request());
-        shell.request_input_method(local_shell.input_method());
-        shell.clipboard_mut().merge(local_shell.clipboard_mut());
-
-        if !local_messages.is_empty() {
-            let mut heads = self.state.take().unwrap().into_heads();
-
-            for message in local_messages.into_iter().filter_map(|message| {
-                heads.component.update(
-                    t.borrow_mut().as_mut().unwrap().state.downcast_mut(),
-                    message,
-                )
-            }) {
-                shell.publish(message);
-            }
-
-            self.state = RefCell::new(Some(
-                StateBuilder {
-                    component: heads.component,
-                    message: PhantomData,
-                    state: PhantomData,
-                    element_builder: |_| None,
-                }
-                .build(),
-            ));
-
-            shell.invalidate_layout();
-            shell.request_redraw();
-        }
-    }
-
-    /// Unlike [`operate`], this does not rebuild the element with the
-    /// visitor first: `rebuild_element_with_operation` exists so a focus
-    /// operation can reach state that only exists once the element is
-    /// built, and semantics has no equivalent need — `with_element_mut`
-    /// already rebuilds if necessary, which is all this requires.
-    ///
-    /// [`operate`]: Self::operate
-    fn visit_children(
-        &mut self,
-        tree: &mut Tree,
-        layout: Layout<'_>,
-        visit: &mut dyn FnMut(&mut dyn visit::Visit),
-    ) {
-        let tree = tree.state.downcast_mut::<Rc<RefCell<Option<Tree>>>>();
-
-        self.with_element_mut(|element| {
-            visit(&mut visit::Widgets::new(
-                element.as_widget_mut(),
-                &mut tree.borrow_mut().as_mut().unwrap().children[0],
-                layout,
-            ));
-        });
-    }
-
-    fn operate(
-        &mut self,
-        tree: &mut Tree,
-        layout: Layout<'_>,
-        renderer: &Renderer,
-        operation: &mut dyn widget::Operation,
-    ) {
-        self.rebuild_element_with_operation(layout, operation);
-
-        let tree = tree.state.downcast_mut::<Rc<RefCell<Option<Tree>>>>();
-        self.with_element_mut(|element| {
-            element.as_widget_mut().operate(
-                &mut tree.borrow_mut().as_mut().unwrap().children[0],
-                layout,
-                renderer,
-                operation,
-            );
-        });
-    }
-
-    fn draw(
-        &self,
-        tree: &Tree,
-        renderer: &mut Renderer,
-        theme: &Theme,
-        style: &renderer::Style,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-    ) {
-        let tree = tree.state.downcast_ref::<Rc<RefCell<Option<Tree>>>>();
-        self.with_element(|element| {
-            element.as_widget().draw(
-                &tree.borrow().as_ref().unwrap().children[0],
-                renderer,
-                theme,
-                style,
-                layout,
-                cursor,
-                viewport,
-            );
-        });
-    }
-
-    fn mouse_interaction(
-        &self,
-        tree: &Tree,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        viewport: &Rectangle,
-        renderer: &Renderer,
-    ) -> mouse::Interaction {
-        let tree = tree.state.downcast_ref::<Rc<RefCell<Option<Tree>>>>();
-        self.with_element(|element| {
-            element.as_widget().mouse_interaction(
-                &tree.borrow().as_ref().unwrap().children[0],
-                layout,
-                cursor,
-                viewport,
-                renderer,
-            )
-        })
-    }
-
-    fn overlay<'b>(
-        &'b mut self,
-        tree: &'b mut Tree,
-        layout: Layout<'b>,
-        renderer: &Renderer,
-        viewport: &Rectangle,
-        translation: Vector,
-    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
-        self.rebuild_element_if_necessary();
-
-        let state = tree.state.downcast_mut::<Rc<RefCell<Option<Tree>>>>();
-        let tree = state.borrow_mut().take().unwrap();
-
-        let overlay = InnerBuilder {
-            instance: self,
-            tree,
-            types: PhantomData,
-            overlay_builder: |instance, tree| {
-                instance
-                    .state
-                    .get_mut()
-                    .as_mut()
-                    .unwrap()
-                    .with_element_mut(move |element| {
-                        element
-                            .as_mut()
-                            .unwrap()
-                            .as_widget_mut()
-                            .overlay(
-                                &mut tree.children[0],
-                                layout,
-                                renderer,
-                                viewport,
-                                translation,
-                            )
-                            .map(|overlay| RefCell::new(overlay::Nested::new(overlay)))
-                    })
-            },
-        }
-        .build();
-
-        #[allow(clippy::redundant_closure_for_method_calls)]
-        if overlay.with_overlay(|overlay| overlay.is_some()) {
-            Some(overlay::Element::new(Box::new(OverlayInstance {
-                overlay: Some(Overlay(Some(overlay))), // Beautiful, I know
-            })))
-        } else {
-            let heads = overlay.into_heads();
-
-            // - You may not like it, but this is what peak performance looks like
-            // - TODO: Get rid of ouroboros, for good
-            // - What?!
-            *state.borrow_mut() = Some(heads.tree);
-
-            None
-        }
-    }
-}
-
 struct Overlay<'a, 'b, Message, Theme, Renderer, Event, S>(
     Option<Inner<'a, 'b, Message, Theme, Renderer, Event, S>>,
 );
-
-impl<Message, Theme, Renderer, Event, S> Drop
-    for Overlay<'_, '_, Message, Theme, Renderer, Event, S>
-{
-    fn drop(&mut self) {
-        if let Some(heads) = self.0.take().map(Inner::into_heads) {
-            *heads.instance.tree.borrow_mut().borrow_mut() = Some(heads.tree);
-        }
-    }
-}
 
 #[self_referencing]
 struct Inner<'a, 'b, Message, Theme, Renderer, Event, S> {
@@ -521,129 +254,5 @@ struct Inner<'a, 'b, Message, Theme, Renderer, Event, S> {
 
 struct OverlayInstance<'a, 'b, Message, Theme, Renderer, Event, S> {
     overlay: Option<Overlay<'a, 'b, Message, Theme, Renderer, Event, S>>,
-}
-
-impl<Message, Theme, Renderer, Event, S>
-    OverlayInstance<'_, '_, Message, Theme, Renderer, Event, S>
-{
-    fn with_overlay_maybe<T>(
-        &self,
-        f: impl FnOnce(&mut overlay::Nested<'_, Event, Theme, Renderer>) -> T,
-    ) -> Option<T> {
-        self.overlay
-            .as_ref()
-            .unwrap()
-            .0
-            .as_ref()
-            .unwrap()
-            .with_overlay(|overlay| overlay.as_ref().map(|nested| (f)(&mut nested.borrow_mut())))
-    }
-
-    fn with_overlay_mut_maybe<T>(
-        &mut self,
-        f: impl FnOnce(&mut overlay::Nested<'_, Event, Theme, Renderer>) -> T,
-    ) -> Option<T> {
-        self.overlay
-            .as_mut()
-            .unwrap()
-            .0
-            .as_mut()
-            .unwrap()
-            .with_overlay_mut(|overlay| overlay.as_mut().map(|nested| (f)(nested.get_mut())))
-    }
-}
-
-impl<Message, Theme, Renderer, Event, S> overlay::Overlay<Message, Theme, Renderer>
-    for OverlayInstance<'_, '_, Message, Theme, Renderer, Event, S>
-where
-    Renderer: core::Renderer,
-    S: 'static + Default,
-{
-    fn layout(&mut self, renderer: &Renderer, bounds: Size) -> layout::Node {
-        self.with_overlay_maybe(|overlay| overlay.layout(renderer, bounds))
-            .unwrap_or_default()
-    }
-
-    fn draw(
-        &self,
-        renderer: &mut Renderer,
-        theme: &Theme,
-        style: &renderer::Style,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-    ) {
-        let _ = self.with_overlay_maybe(|overlay| {
-            overlay.draw(renderer, theme, style, layout, cursor);
-        });
-    }
-
-    fn mouse_interaction(
-        &self,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &Renderer,
-    ) -> mouse::Interaction {
-        self.with_overlay_maybe(|overlay| overlay.mouse_interaction(layout, cursor, renderer))
-            .unwrap_or_default()
-    }
-
-    fn update(
-        &mut self,
-        event: &core::Event,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        renderer: &Renderer,
-        shell: &mut Shell<'_, Message>,
-    ) {
-        let mut local_messages = Vec::new();
-        let mut local_shell = shell.local(&mut local_messages);
-
-        let _ = self.with_overlay_mut_maybe(|overlay| {
-            overlay.update(event, layout, cursor, renderer, &mut local_shell);
-        });
-
-        if local_shell.is_event_captured() {
-            shell.capture_event();
-        }
-
-        local_shell.revalidate_layout(|diff| shell.invalidate_layout_with(diff));
-        shell.request_redraw_at(local_shell.redraw_request());
-        shell.request_input_method(local_shell.input_method());
-        shell.clipboard_mut().merge(local_shell.clipboard_mut());
-
-        if !local_messages.is_empty() {
-            let mut inner = self.overlay.take().unwrap().0.take().unwrap().into_heads();
-            let mut heads = inner.instance.state.take().unwrap().into_heads();
-
-            for message in local_messages.into_iter().filter_map(|message| {
-                heads
-                    .component
-                    .update(inner.tree.state.downcast_mut(), message)
-            }) {
-                shell.publish(message);
-            }
-
-            *inner.instance.state.borrow_mut() = Some(
-                StateBuilder {
-                    component: heads.component,
-                    message: PhantomData,
-                    state: PhantomData,
-                    element_builder: |_| None,
-                }
-                .build(),
-            );
-
-            self.overlay = Some(Overlay(Some(
-                InnerBuilder {
-                    instance: inner.instance,
-                    tree: inner.tree,
-                    types: PhantomData,
-                    overlay_builder: |_, _| None,
-                }
-                .build(),
-            )));
-
-            shell.invalidate_layout();
-        }
-    }
+    events: Vec<Event>,
 }

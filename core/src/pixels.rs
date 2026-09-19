@@ -12,6 +12,28 @@ pub struct Pixels(pub f32);
 impl Pixels {
     /// Zero pixels.
     pub const ZERO: Self = Self(0.0);
+
+    /// One logical pixel.
+    pub const ONE: Self = Self(1.0);
+
+    /// Creates a pixel value.
+    pub const fn new(amount: f32) -> Self {
+        Self(amount)
+    }
+
+    /// Returns the raw logical-pixel value.
+    pub const fn get(self) -> f32 {
+        self.0
+    }
+
+    /// Returns a finite, non-negative value safe for layout arithmetic.
+    pub fn normalized(self) -> Self {
+        if self.0.is_finite() {
+            Self(self.0.max(0.0))
+        } else {
+            Self::ZERO
+        }
+    }
 }
 
 impl From<f32> for Pixels {
@@ -32,58 +54,30 @@ impl From<Pixels> for f32 {
     }
 }
 
-impl std::ops::Add for Pixels {
-    type Output = Pixels;
+macro_rules! pixel_operation {
+    ($trait:ident::$method:ident for $rhs:ty => $body:expr) => {
+        impl std::ops::$trait<$rhs> for Pixels {
+            type Output = Pixels;
 
-    fn add(self, rhs: Self) -> Self {
-        Pixels(self.0 + rhs.0)
-    }
+            fn $method(self, rhs: $rhs) -> Self::Output {
+                Pixels(($body)(self.0, rhs))
+            }
+        }
+    };
 }
 
-impl std::ops::Add<f32> for Pixels {
-    type Output = Pixels;
+pixel_operation!(Add::add for Pixels => |left: f32, right: Pixels| left + right.0);
+pixel_operation!(Add::add for f32 => |left: f32, right: f32| left + right);
+pixel_operation!(Sub::sub for Pixels => |left: f32, right: Pixels| left - right.0);
+pixel_operation!(Sub::sub for f32 => |left: f32, right: f32| left - right);
+pixel_operation!(Mul::mul for Pixels => |left: f32, right: Pixels| left * right.0);
+pixel_operation!(Mul::mul for f32 => |left: f32, right: f32| left * right);
+pixel_operation!(Div::div for Pixels => |left: f32, right: Pixels| left / right.0);
+pixel_operation!(Div::div for f32 => |left: f32, right: f32| left / right);
+pixel_operation!(Div::div for u32 => |left: f32, right: u32| left / right as f32);
 
-    fn add(self, rhs: f32) -> Self {
-        Pixels(self.0 + rhs)
-    }
-}
-
-impl std::ops::Mul for Pixels {
-    type Output = Pixels;
-
-    fn mul(self, rhs: Self) -> Self {
-        Pixels(self.0 * rhs.0)
-    }
-}
-
-impl std::ops::Mul<f32> for Pixels {
-    type Output = Pixels;
-
-    fn mul(self, rhs: f32) -> Self {
-        Pixels(self.0 * rhs)
-    }
-}
-
-impl std::ops::Div for Pixels {
-    type Output = Pixels;
-
-    fn div(self, rhs: Self) -> Self {
-        Pixels(self.0 / rhs.0)
-    }
-}
-
-impl std::ops::Div<f32> for Pixels {
-    type Output = Pixels;
-
-    fn div(self, rhs: f32) -> Self {
-        Pixels(self.0 / rhs)
-    }
-}
-
-impl std::ops::Div<u32> for Pixels {
-    type Output = Pixels;
-
-    fn div(self, rhs: u32) -> Self {
-        Pixels(self.0 / rhs as f32)
+impl std::iter::Sum for Pixels {
+    fn sum<I: Iterator<Item = Self>>(values: I) -> Self {
+        Self(values.map(|pixels| pixels.0).sum())
     }
 }

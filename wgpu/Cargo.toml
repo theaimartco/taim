@@ -34,13 +34,15 @@ raster = ["taim_graphics/raster", "dep:taim-raster"]
 taim_debug.workspace = true
 taim_graphics.workspace = true
 taim-raster = { workspace = true, optional = true }
+taim_atlas.workspace = true
+taim_text_gpu.workspace = true
 
 bitflags.workspace = true
 bytemuck.workspace = true
 futures.workspace = true
-cryoglyph.workspace = true
 log.workspace = true
 rustc-hash.workspace = true
+smallvec.workspace = true
 thiserror.workspace = true
 wgpu.workspace = true
 

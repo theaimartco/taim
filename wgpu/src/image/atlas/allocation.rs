@@ -24,14 +24,20 @@ impl Allocation {
 
     pub fn size(&self) -> Size<u32> {
         match self {
-            Allocation::Partial { region, .. } => region.size(),
+            Allocation::Partial { region, .. } => {
+                let size = region.size();
+                Size::new(size.width, size.height)
+            }
             Allocation::Full { size, .. } => Size::new(*size, *size),
         }
     }
 
     pub fn padding(&self) -> Size<u32> {
         match self {
-            Allocation::Partial { region, .. } => region.padding(),
+            Allocation::Partial { region, .. } => {
+                let padding = region.padding();
+                Size::new(padding.width, padding.height)
+            }
             Allocation::Full { .. } => Size::new(0, 0),
         }
     }

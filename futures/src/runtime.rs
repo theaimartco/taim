@@ -3,7 +3,7 @@ use crate::scheduler::{CancelToken, TaskId, TaskScheduler};
 use crate::subscription;
 use crate::{BoxFuture, BoxStream, Executor, MaybeSend};
 
-use futures::{Sink, SinkExt, channel::mpsc};
+use futures::{Sink, SinkExt, StreamExt, channel::mpsc};
 use std::marker::PhantomData;
 
 /// A batteries-included runtime of commands and subscriptions.
@@ -18,7 +18,7 @@ pub struct Runtime<Executor, Sender, Message> {
     sender: Sender,
     subscriptions: subscription::Tracker,
     scheduler: TaskScheduler,
-    _message: PhantomData<Message>,
+    message_type: PhantomData<fn() -> Message>,
 }
 
 impl<Executor, Sender, Message> Runtime<Executor, Sender, Message>
@@ -38,7 +38,7 @@ where
             sender,
             subscriptions: subscription::Tracker::new(),
             scheduler: TaskScheduler::new(),
-            _message: PhantomData,
+            message_type: PhantomData,
         }
     }
 
@@ -49,7 +49,7 @@ where
             sender,
             subscriptions: subscription::Tracker::new(),
             scheduler,
-            _message: PhantomData,
+            message_type: PhantomData,
         }
     }
 
@@ -96,17 +96,19 @@ where
     ///
     /// [`Stream`]: BoxStream
     pub fn run(&mut self, stream: BoxStream<Message>) -> (TaskId, CancelToken) {
-        use futures::{FutureExt, StreamExt};
+        let mut inbox = stream;
+        let mut outbox = self.sender.clone();
 
-        let sender = self.sender.clone();
-        let future = stream.map(Ok).forward(sender).map(|result| match result {
-            Ok(()) => (),
-            Err(error) => {
-                log::warn!("Stream could not run until completion: {error}");
+        let forward = async move {
+            while let Some(message) = inbox.next().await {
+                if let Err(error) = outbox.send(message).await {
+                    log::warn!("runtime receiver closed while forwarding a stream: {error}");
+                    break;
+                }
             }
-        });
+        };
 
-        self.scheduler.spawn(Box::pin(future))
+        self.scheduler.spawn(Box::pin(forward))
     }
 
     /// Sends a message concurrently through the [`Runtime`].
@@ -194,9 +196,7 @@ mod tests {
         let mut runtime = Runtime::new(executor, sender);
 
         let (_tx, rx) = futures::channel::oneshot::channel::<i32>();
-        let stream = futures::stream::once(async move {
-            rx.await.unwrap_or(0)
-        }).boxed();
+        let stream = futures::stream::once(async move { rx.await.unwrap_or(0) }).boxed();
 
         let (task_id, cancel_token) = runtime.run(stream);
         assert_eq!(runtime.scheduler().active_tasks(), 1);

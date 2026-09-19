@@ -5,7 +5,7 @@
 //! tracking is automatic, including dynamic dependency sets, and subscriptions
 //! are removed when their [`Subscription`] is dropped.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock, Weak};
@@ -60,32 +60,94 @@ type Callback = Arc<dyn Fn(Revision) + Send + Sync + 'static>;
 
 struct Subscribers {
     next_id: AtomicU64,
-    callbacks: Mutex<BTreeMap<u64, Callback>>,
+    callbacks: Mutex<BTreeMap<u64, Listener>>,
+}
+
+#[derive(Clone)]
+struct Listener {
+    callback: Callback,
+    dependency: bool,
+}
+
+struct PendingNotification {
+    subscribers: Weak<Subscribers>,
+    id: u64,
+    revision: Revision,
 }
 
 thread_local! {
+    static FLUSHING: Cell<bool> = const { Cell::new(false) };
     static BATCH_DEPTH: RefCell<usize> = const { RefCell::new(0) };
-    static PENDING_NOTIFICATIONS: RefCell<Vec<(Callback, Revision)>> = const { RefCell::new(Vec::new()) };
+    static PENDING_NOTIFICATIONS: RefCell<BTreeMap<(usize, u64), PendingNotification>> = const { RefCell::new(BTreeMap::new()) };
 }
 
-/// Executes a closure within a reactive batch. Notifications from signal changes
-/// occurring during the batch are deferred until the outermost batch completes,
-/// avoiding redundant intermediate computations.
-pub fn batch<R>(f: impl FnOnce() -> R) -> R {
-    BATCH_DEPTH.with(|d| *d.borrow_mut() += 1);
-    let result = f();
-    let should_flush = BATCH_DEPTH.with(|d| {
-        let mut depth = d.borrow_mut();
-        *depth -= 1;
-        *depth == 0
-    });
-    if should_flush {
-        let pending = PENDING_NOTIFICATIONS.with(|p| std::mem::take(&mut *p.borrow_mut()));
-        for (callback, rev) in pending {
-            callback(rev);
+struct BatchGuard;
+
+impl Drop for BatchGuard {
+    fn drop(&mut self) {
+        let should_flush = BATCH_DEPTH.with_borrow_mut(|depth| {
+            *depth -= 1;
+            *depth == 0
+        });
+        if !should_flush || FLUSHING.with(|flushing| flushing.replace(true)) {
+            return;
+        }
+        struct FlushGuard;
+        impl Drop for FlushGuard {
+            fn drop(&mut self) {
+                FLUSHING.with(|flushing| flushing.set(false));
+            }
+        }
+        let _flushing = FlushGuard;
+        let mut first_panic = None;
+        // Pop individually: writes made by a listener can replace a pending
+        // revision instead of delivering a newer revision followed by an old one.
+        while let Some((_, notification)) =
+            PENDING_NOTIFICATIONS.with_borrow_mut(BTreeMap::pop_first)
+        {
+            let callback = notification.subscribers.upgrade().and_then(|subscribers| {
+                subscribers
+                    .callbacks
+                    .lock()
+                    .expect("reactive subscriber lock poisoned")
+                    .get(&notification.id)
+                    .map(|listener| listener.callback.clone())
+            });
+            if let Some(callback) = callback {
+                // All committed writes must remain observable even if another
+                // listener panics. Never double-panic while unwinding a batch.
+                if let Err(payload) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    callback(notification.revision);
+                })) && first_panic.is_none()
+                {
+                    first_panic = Some(payload);
+                }
+            }
+        }
+        if !std::thread::panicking()
+            && let Some(payload) = first_panic
+        {
+            std::panic::resume_unwind(payload);
         }
     }
-    result
+}
+
+/// Groups notifications on the calling thread until the outermost batch exits.
+///
+/// Values and memo invalidation update immediately, so reads inside the batch
+/// observe preceding writes. Each live subscriber is called once with its latest
+/// queued revision. Writes made by callbacks enqueue further delivery without
+/// recursive callback dispatch. Dropped subscriptions cancel queued delivery. Other threads
+/// are not batched, and reads across sources are not transactional.
+///
+/// Writes are not rolled back on panic: the depth is restored and committed
+/// notifications are delivered during unwinding. Listener panics do not suppress
+/// other queued listeners; the first panic resumes after delivery, unless the
+/// batch body is already unwinding (in which case its original panic is preserved).
+pub fn batch<R>(f: impl FnOnce() -> R) -> R {
+    BATCH_DEPTH.with_borrow_mut(|depth| *depth += 1);
+    let _guard = BatchGuard;
+    f()
 }
 
 /// Fine-grained dirty flags for reactive scene graph invalidation.
@@ -170,12 +232,26 @@ impl Subscribers {
     }
 
     fn subscribe(self: &Arc<Self>, callback: Callback) -> Subscription {
+        self.insert(callback, false)
+    }
+
+    fn subscribe_dependency(self: &Arc<Self>, callback: Callback) -> Subscription {
+        self.insert(callback, true)
+    }
+
+    fn insert(self: &Arc<Self>, callback: Callback, dependency: bool) -> Subscription {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let _ = self
             .callbacks
             .lock()
             .expect("reactive subscriber lock poisoned")
-            .insert(id, callback);
+            .insert(
+                id,
+                Listener {
+                    callback,
+                    dependency,
+                },
+            );
 
         Subscription {
             subscribers: Arc::downgrade(self),
@@ -183,28 +259,35 @@ impl Subscribers {
         }
     }
 
-    fn notify(&self, revision: Revision) {
-        let callbacks = self
+    fn notify(self: &Arc<Self>, revision: Revision) {
+        let listeners = self
             .callbacks
             .lock()
             .expect("reactive subscriber lock poisoned")
-            .values()
-            .cloned()
+            .iter()
+            .map(|(id, listener)| (*id, listener.clone()))
             .collect::<Vec<_>>();
 
-        let in_batch = BATCH_DEPTH.with(|d| *d.borrow() > 0);
-        if in_batch {
-            PENDING_NOTIFICATIONS.with(|p| {
-                let mut pending = p.borrow_mut();
-                for callback in callbacks {
-                    pending.push((callback, revision));
+        // An implicit batch also protects ordinary writes: a diamond's entire
+        // dependency graph is invalidated before any public callback can read it.
+        batch(|| {
+            for (id, listener) in listeners {
+                if listener.dependency {
+                    (listener.callback)(revision);
+                } else {
+                    PENDING_NOTIFICATIONS.with_borrow_mut(|pending| {
+                        let key = (Arc::as_ptr(self) as usize, id);
+                        let notification =
+                            pending.entry(key).or_insert_with(|| PendingNotification {
+                                subscribers: Arc::downgrade(self),
+                                id,
+                                revision,
+                            });
+                        notification.revision = revision;
+                    });
                 }
-            });
-        } else {
-            for callback in callbacks {
-                callback(revision);
             }
-        }
+        });
     }
 }
 
@@ -322,7 +405,7 @@ impl<T: Send + Sync + 'static> Source for SignalInner<T> {
     }
 
     fn subscribe_source(&self, callback: Callback) -> Subscription {
-        self.subscribers.subscribe(callback)
+        self.subscribers.subscribe_dependency(callback)
     }
 }
 
@@ -408,7 +491,7 @@ impl<T: Send + Sync + 'static> Signal<T> {
         result
     }
 
-    /// Runs `callback` after every subsequent change.
+    /// Runs `callback` after changes, coalescing delivery inside [`batch`].
     pub fn subscribe(&self, callback: impl Fn(Revision) + Send + Sync + 'static) -> Subscription {
         self.inner.subscribers.subscribe(Arc::new(callback))
     }
@@ -542,7 +625,7 @@ impl<T: Send + Sync + 'static> Source for MemoInner<T> {
     }
 
     fn subscribe_source(&self, callback: Callback) -> Subscription {
-        self.subscribers.subscribe(callback)
+        self.subscribers.subscribe_dependency(callback)
     }
 }
 
@@ -779,9 +862,128 @@ mod tests {
         });
 
         // Out of batch: notifications flushed
-        assert_eq!(notify_count.load(Ordering::Relaxed), 3);
+        assert_eq!(notify_count.load(Ordering::Relaxed), 2);
         assert_eq!(signal1.get(), 12);
         assert_eq!(signal2.get(), 21);
+    }
+
+    #[test]
+    fn batch_reads_see_current_memos_and_notify_once_at_latest_revision() {
+        let source = Signal::new(1);
+        let input = source.clone();
+        let memo = Memo::new(move || input.get() * 2);
+        assert_eq!(memo.get(), 2);
+        let revisions = Arc::new(Mutex::new(Vec::new()));
+        let output = revisions.clone();
+        let _subscription = memo.subscribe(move |revision| output.lock().unwrap().push(revision));
+        batch(|| {
+            assert!(source.set(2));
+            assert_eq!(memo.get(), 4);
+            batch(|| {
+                assert!(source.set(3));
+                assert_eq!(memo.get(), 6);
+            });
+            assert!(revisions.lock().unwrap().is_empty());
+        });
+        assert_eq!(*revisions.lock().unwrap(), vec![memo.revision()]);
+    }
+
+    #[test]
+    fn dropping_a_subscription_cancels_queued_delivery() {
+        let source = Signal::new(1);
+        let subscription = source.subscribe(|_| panic!("disconnected subscription called"));
+        batch(|| {
+            assert!(source.set(2));
+            drop(subscription);
+        });
+    }
+
+    #[test]
+    fn panic_in_batch_restores_delivery_and_keeps_committed_writes() {
+        let source = Signal::new(1);
+        let seen = Arc::new(AtomicUsize::new(0));
+        let output = seen.clone();
+        let _subscription = source.subscribe(move |_| {
+            let _ = output.fetch_add(1, Ordering::Relaxed);
+        });
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            batch(|| {
+                assert!(source.set(2));
+                panic!("abort batch");
+            })
+        }));
+        assert!(result.is_err());
+        assert_eq!(source.get(), 2);
+        assert_eq!(seen.load(Ordering::Relaxed), 1);
+        assert!(source.set(3));
+        assert_eq!(seen.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn diamond_is_current_before_subscriber_delivery() {
+        let source = Signal::new(1);
+        let input = source.clone();
+        let left = Memo::new(move || input.get() * 2);
+        let input = source.clone();
+        let right = Memo::new(move || input.get() * 3);
+        let sum = Memo::new(move || left.get() + right.get());
+        assert_eq!(sum.get(), 5);
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let output = seen.clone();
+        let read = sum.clone();
+        let _subscription = sum.subscribe(move |_| output.lock().unwrap().push(read.get()));
+        assert!(source.set(2));
+        assert_eq!(*seen.lock().unwrap(), vec![10]);
+    }
+
+    #[test]
+    fn reentrant_writes_replace_pending_revisions_without_recursive_delivery() {
+        let source = Signal::new(1);
+        let input = source.clone();
+        let active = Arc::new(AtomicBool::new(false));
+        let check = active.clone();
+        let _first = source.subscribe(move |_| {
+            assert!(!check.swap(true, Ordering::AcqRel));
+            let _ = input.set(3);
+            check.store(false, Ordering::Release);
+        });
+        let revisions = Arc::new(Mutex::new(Vec::new()));
+        let output = revisions.clone();
+        let _second = source.subscribe(move |revision| output.lock().unwrap().push(revision));
+        assert!(source.set(2));
+        assert_eq!(*revisions.lock().unwrap(), vec![source.revision()]);
+        assert!(!active.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn panicking_listener_does_not_skip_other_listeners_or_stick_the_queue() {
+        let source = Signal::new(1);
+        let first = source.subscribe(|_| panic!("listener panic"));
+        let seen = Arc::new(AtomicUsize::new(0));
+        let output = seen.clone();
+        let _second = source.subscribe(move |_| {
+            let _ = output.fetch_add(1, Ordering::Relaxed);
+        });
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| source.set(2)));
+        assert!(result.is_err());
+        assert_eq!(seen.load(Ordering::Relaxed), 1);
+        drop(first);
+        assert!(source.set(3));
+        assert_eq!(seen.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn batch_delivers_latest_revision_across_counter_wrap() {
+        let source = Signal::new(0);
+        source.inner.revision.store(u64::MAX - 1, Ordering::Release);
+        let revisions = Arc::new(Mutex::new(Vec::new()));
+        let output = revisions.clone();
+        let _subscription = source.subscribe(move |revision| output.lock().unwrap().push(revision));
+        batch(|| {
+            assert!(source.set(1));
+            assert!(source.set(2));
+        });
+        assert_eq!(*revisions.lock().unwrap(), vec![Revision::INITIAL]);
     }
 
     #[test]

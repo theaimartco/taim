@@ -6,8 +6,8 @@
 
 use crate::core::window;
 
-use std::collections::HashMap;
-use std::time::Instant;
+use crate::core::time::Instant;
+use rustc_hash::FxHashMap;
 
 /// Explicit dirty flags tracking frame pipeline invalidations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -96,6 +96,11 @@ pub enum PlatformEvent {
     FocusChanged(bool),
     /// Window visibility / occlusion changed.
     OcclusionChanged(bool),
+    /// Whether the drawable surface currently has a zero width or height.
+    SurfaceSizeChanged {
+        /// `true` when either physical dimension is zero.
+        zero_sized: bool,
+    },
     /// Window physical scale factor changed.
     ScaleFactorChanged(f32),
     /// Cursor moved to coordinates within window.
@@ -145,14 +150,14 @@ pub struct WindowStateTracker {
     pub is_focused: bool,
     /// Whether the window is minimized or fully occluded.
     pub is_occluded: bool,
+    /// Whether the window has no drawable surface area.
+    pub is_zero_sized: bool,
     /// Display scale factor.
     pub scale_factor: f32,
     /// Current dirty flags accumulated for the pending frame.
     pub dirty_flags: DirtyFlags,
     /// Timestamp of the last successful frame presentation.
     pub last_present_instant: Option<Instant>,
-    /// Deadline for the next animated tick.
-    pub animation_deadline: Option<Instant>,
 }
 
 impl WindowStateTracker {
@@ -164,23 +169,28 @@ impl WindowStateTracker {
             frame_generation: 0,
             is_focused: true,
             is_occluded: false,
-            scale_factor,
+            is_zero_sized: false,
+            scale_factor: valid_scale_factor(scale_factor).unwrap_or(1.0),
             dirty_flags: DirtyFlags::UPDATE_DIRTY
                 | DirtyFlags::LAYOUT_DIRTY
                 | DirtyFlags::PAINT_DIRTY,
             last_present_instant: None,
-            animation_deadline: None,
         }
     }
 
     /// Returns `true` if the window requires a render pass.
     pub fn should_render(&self) -> bool {
-        if self.is_occluded {
+        if self.is_suspended() {
             return false;
         }
 
         self.dirty_flags
             .intersects(DirtyFlags::PAINT_DIRTY | DirtyFlags::PRESENT_DIRTY | DirtyFlags::ANIMATING)
+    }
+
+    #[inline]
+    fn is_suspended(&self) -> bool {
+        self.is_occluded || self.is_zero_sized
     }
 }
 
@@ -190,7 +200,7 @@ impl WindowStateTracker {
 /// prevents redundant redraw requests, and guarantees zero framework wakeups
 /// when all managed windows are clean.
 pub struct FrameGate {
-    windows: HashMap<window::Id, WindowStateTracker>,
+    windows: FxHashMap<window::Id, WindowStateTracker>,
     total_wakeups: u64,
     collapsed_redraws: u64,
 }
@@ -199,7 +209,7 @@ impl FrameGate {
     /// Creates a new empty [`FrameGate`].
     pub fn new() -> Self {
         Self {
-            windows: HashMap::new(),
+            windows: FxHashMap::default(),
             total_wakeups: 0,
             collapsed_redraws: 0,
         }
@@ -220,14 +230,7 @@ impl FrameGate {
     /// Records an invalidation flag for the given window, coalescing with existing dirty flags.
     pub fn invalidate(&mut self, id: window::Id, flags: DirtyFlags) {
         if let Some(tracker) = self.windows.get_mut(&id) {
-            let had_paint = tracker.dirty_flags.contains(DirtyFlags::PAINT_DIRTY);
-            tracker.dirty_flags |= flags;
-
-            if had_paint && flags.contains(DirtyFlags::PAINT_DIRTY) {
-                self.collapsed_redraws += 1;
-            } else {
-                tracker.redraw_generation = tracker.redraw_generation.wrapping_add(1);
-            }
+            mark_dirty(tracker, flags, &mut self.collapsed_redraws);
         }
     }
 
@@ -237,44 +240,72 @@ impl FrameGate {
         window_id: window::Id,
         event: PlatformEvent,
     ) -> Option<TaimEvent> {
-        self.total_wakeups += 1;
+        self.total_wakeups = self.total_wakeups.wrapping_add(1);
 
         let tracker = self.windows.get_mut(&window_id)?;
 
         match &event {
             PlatformEvent::FocusChanged(focused) => {
                 tracker.is_focused = *focused;
-                self.invalidate(
-                    window_id,
+                mark_dirty(
+                    tracker,
                     DirtyFlags::UPDATE_DIRTY | DirtyFlags::PAINT_DIRTY,
+                    &mut self.collapsed_redraws,
                 );
             }
             PlatformEvent::OcclusionChanged(occluded) => {
                 tracker.is_occluded = *occluded;
-                if !*occluded {
-                    self.invalidate(window_id, DirtyFlags::PAINT_DIRTY);
+                if *occluded {
+                    tracker.dirty_flags &= !DirtyFlags::ANIMATING;
+                } else {
+                    mark_dirty(
+                        tracker,
+                        DirtyFlags::PAINT_DIRTY,
+                        &mut self.collapsed_redraws,
+                    );
+                }
+            }
+            PlatformEvent::SurfaceSizeChanged { zero_sized } => {
+                tracker.is_zero_sized = *zero_sized;
+                if *zero_sized {
+                    tracker.dirty_flags &= !DirtyFlags::ANIMATING;
+                } else {
+                    mark_dirty(
+                        tracker,
+                        DirtyFlags::LAYOUT_DIRTY | DirtyFlags::PAINT_DIRTY,
+                        &mut self.collapsed_redraws,
+                    );
                 }
             }
             PlatformEvent::ScaleFactorChanged(scale) => {
-                tracker.scale_factor = *scale;
-                self.invalidate(
-                    window_id,
-                    DirtyFlags::LAYOUT_DIRTY | DirtyFlags::PAINT_DIRTY,
-                );
+                if let Some(scale) = valid_scale_factor(*scale) {
+                    tracker.scale_factor = scale;
+                    mark_dirty(
+                        tracker,
+                        DirtyFlags::LAYOUT_DIRTY | DirtyFlags::PAINT_DIRTY,
+                        &mut self.collapsed_redraws,
+                    );
+                }
             }
             PlatformEvent::RedrawRequested => {
-                self.invalidate(
-                    window_id,
+                mark_dirty(
+                    tracker,
                     DirtyFlags::PAINT_DIRTY | DirtyFlags::PRESENT_DIRTY,
+                    &mut self.collapsed_redraws,
                 );
             }
             PlatformEvent::CursorMoved { .. } | PlatformEvent::KeyInput { .. } => {
-                self.invalidate(window_id, DirtyFlags::UPDATE_DIRTY);
+                mark_dirty(
+                    tracker,
+                    DirtyFlags::UPDATE_DIRTY,
+                    &mut self.collapsed_redraws,
+                );
             }
             PlatformEvent::ThemeChanged => {
-                self.invalidate(
-                    window_id,
+                mark_dirty(
+                    tracker,
                     DirtyFlags::LAYOUT_DIRTY | DirtyFlags::PAINT_DIRTY,
+                    &mut self.collapsed_redraws,
                 );
             }
         }
@@ -292,21 +323,28 @@ impl FrameGate {
             .map(|(id, _)| *id)
     }
 
-    /// Returns the earliest upcoming animation deadline across all tracked windows, if any.
-    pub fn next_wake_deadline(&self) -> Option<Instant> {
+    /// Returns whether a specific window currently requires rendering.
+    #[inline]
+    pub fn should_render(&self, id: window::Id) -> bool {
         self.windows
-            .values()
-            .filter_map(|t| t.animation_deadline)
-            .min()
+            .get(&id)
+            .is_some_and(WindowStateTracker::should_render)
     }
 
-    /// Returns `true` if any window has immediate dirty work or an animation deadline due now.
+    /// Returns the deadline owned by this gate.
+    ///
+    /// TAIM's runtime scheduler is the sole owner of animation deadlines, so
+    /// the platform frame gate deliberately has no independent timer to wake.
+    /// Keeping this query lets diagnostics assert that the event-loop adapter
+    /// remains quiescent without reintroducing duplicate deadline state.
+    #[inline]
+    pub const fn next_wake_deadline(&self) -> Option<Instant> {
+        None
+    }
+
+    /// Returns `true` if any visible window has immediate dirty work.
     pub fn has_immediate_work(&self) -> bool {
-        let now = Instant::now();
-        self.windows.values().any(|t| {
-            (!t.is_occluded && !t.dirty_flags.is_empty())
-                || t.animation_deadline.is_some_and(|deadline| now >= deadline)
-        })
+        self.windows.values().any(WindowStateTracker::should_render)
     }
 
     /// Returns `true` if the engine has no immediate work requiring execution this frame.
@@ -314,12 +352,11 @@ impl FrameGate {
         !self.has_immediate_work()
     }
 
-    /// Returns `true` if all windows are clean and no future animation is scheduled.
+    /// Returns `true` if all visible windows are clean.
     pub fn is_idle(&self) -> bool {
-        self.windows.values().all(|t| {
-            t.dirty_flags == DirtyFlags::CLEAN
-                && t.animation_deadline.is_none_or(|d| Instant::now() < d)
-        })
+        self.windows
+            .values()
+            .all(|tracker| !tracker.should_render())
     }
 
     /// Completes presentation for the given window, clearing dirty flags.
@@ -351,6 +388,27 @@ impl FrameGate {
     /// Returns a reference to the tracker for a specific window.
     pub fn tracker(&self, id: window::Id) -> Option<&WindowStateTracker> {
         self.windows.get(&id)
+    }
+}
+
+#[inline]
+fn valid_scale_factor(scale_factor: f32) -> Option<f32> {
+    (scale_factor.is_finite() && scale_factor > 0.0).then_some(scale_factor)
+}
+
+#[inline]
+fn mark_dirty(tracker: &mut WindowStateTracker, flags: DirtyFlags, collapsed_redraws: &mut u64) {
+    let previous = tracker.dirty_flags;
+    let adds_work = (flags.0 & !previous.0) != 0;
+
+    tracker.dirty_flags |= flags;
+
+    if previous.contains(DirtyFlags::PAINT_DIRTY) && flags.contains(DirtyFlags::PAINT_DIRTY) {
+        *collapsed_redraws = collapsed_redraws.wrapping_add(1);
+    }
+
+    if adds_work {
+        tracker.redraw_generation = tracker.redraw_generation.wrapping_add(1);
     }
 }
 
@@ -540,8 +598,9 @@ mod tests {
         assert!(gate.is_idle());
         assert!(gate.is_idle_now());
         assert!(!gate.has_immediate_work());
-        assert_eq!(gate.next_wake_deadline(), None);
-
-        assert_eq!(gate.tracker(win).unwrap().frame_generation, initial_generation);
+        assert_eq!(
+            gate.tracker(win).unwrap().frame_generation,
+            initial_generation
+        );
     }
 }

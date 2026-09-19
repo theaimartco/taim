@@ -273,8 +273,22 @@ impl<'a, Message> Shell<'a, Message> {
     /// function to the messages of the latter.
     ///
     /// This method is useful for composition.
-    pub fn merge<B>(&mut self, mut other: Shell<'_, B>, f: impl Fn(B) -> Message) {
-        self.messages.extend(other.messages.drain(..).map(f));
+    pub fn merge<B>(&mut self, other: Shell<'_, B>, mut f: impl FnMut(B) -> Message) {
+        self.merge_map(other, |message| Some(f(message)));
+    }
+
+    /// Merges another shell while allowing local messages to be filtered.
+    ///
+    /// This is useful for encapsulated components whose local update can
+    /// intentionally consume an event without publishing a parent message.
+    /// All non-message effects are still preserved.
+    pub fn merge_map<B>(
+        &mut self,
+        mut other: Shell<'_, B>,
+        mut f: impl FnMut(B) -> Option<Message>,
+    ) {
+        self.messages
+            .extend(other.messages.drain(..).filter_map(&mut f));
 
         self.is_layout_invalid = match (self.is_layout_invalid, other.is_layout_invalid) {
             (Some(a), Some(b)) => Some(a.max(b)),

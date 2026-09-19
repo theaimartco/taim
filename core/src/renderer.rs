@@ -1,155 +1,15 @@
 //! Write your own renderer.
+mod api;
 #[cfg(debug_assertions)]
 mod null;
 
-use crate::image;
-use crate::{
-    Background, Border, Color, Font, Pixels, Rectangle, Shadow, Size, Transformation, Vector,
-};
+pub use api::{Renderer, RetainedLayerStatistics};
+
+use crate::{Border, Color, Font, Pixels, Rectangle, Shadow, Size};
 
 /// Whether anti-aliasing should be avoided by snapping primitive coordinates to the
 /// pixel grid.
 pub const CRISP: bool = cfg!(feature = "crisp");
-
-/// Snapshot of retained-layer reuse in a renderer.
-///
-/// These counters are monotonic for the renderer's lifetime. They make
-/// retained rendering observable to diagnostics without exposing a backend's
-/// display-list implementation or cache ownership.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct RetainedLayerStatistics {
-    /// Number of display lists replayed without re-entering widget paint.
-    pub hits: u64,
-    /// Number of replay attempts that required a fresh recording.
-    pub misses: u64,
-    /// Number of cached display lists discarded as stale or incompatible.
-    pub evictions: u64,
-}
-
-/// A component that can be used by widgets to draw themselves on a screen.
-pub trait Renderer {
-    /// Starts recording a new layer.
-    fn start_layer(&mut self, bounds: Rectangle);
-
-    /// Ends recording a new layer.
-    ///
-    /// The new layer will clip its contents to the provided `bounds`.
-    fn end_layer(&mut self);
-
-    /// Draws the primitives recorded in the given closure in a new layer.
-    ///
-    /// The layer will clip its contents to the provided `bounds`.
-    fn with_layer(&mut self, bounds: Rectangle, f: impl FnOnce(&mut Self)) {
-        self.start_layer(bounds);
-        f(self);
-        self.end_layer();
-    }
-
-    /// Starts recording with a new [`Transformation`].
-    fn start_transformation(&mut self, transformation: Transformation);
-
-    /// Ends recording a new layer.
-    ///
-    /// The new layer will clip its contents to the provided `bounds`.
-    fn end_transformation(&mut self);
-
-    /// Applies a [`Transformation`] to the primitives recorded in the given closure.
-    fn with_transformation(&mut self, transformation: Transformation, f: impl FnOnce(&mut Self)) {
-        self.start_transformation(transformation);
-        f(self);
-        self.end_transformation();
-    }
-
-    /// Applies a translation to the primitives recorded in the given closure.
-    fn with_translation(&mut self, translation: Vector, f: impl FnOnce(&mut Self)) {
-        self.with_transformation(Transformation::translate(translation.x, translation.y), f);
-    }
-
-    /// Applies an opacity multiplier to all primitives recorded by `f`.
-    fn with_opacity(&mut self, opacity: f32, f: impl FnOnce(&mut Self)) {
-        self.start_opacity(opacity);
-        f(self);
-        self.end_opacity();
-    }
-
-    /// Pushes an opacity multiplier for subsequent primitives.
-    fn start_opacity(&mut self, opacity: f32) {
-        let _ = opacity;
-    }
-
-    /// Pops the current opacity multiplier.
-    fn end_opacity(&mut self) {}
-
-    /// Attempts to replay a retained display list for a stable subtree.
-    fn replay_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) -> bool {
-        let _ = (key, revision, bounds);
-        false
-    }
-
-    /// Starts recording a retained display list after a replay miss.
-    fn start_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) {
-        let _ = (key, revision);
-        self.start_layer(bounds);
-    }
-
-    /// Finishes recording a retained display list.
-    fn end_retained_layer(&mut self) {
-        self.end_layer();
-    }
-
-    /// Returns retained-layer reuse counters collected by this renderer.
-    fn retained_layer_statistics(&self) -> RetainedLayerStatistics {
-        RetainedLayerStatistics::default()
-    }
-
-    /// Fills a [`Quad`] with the provided [`Background`].
-    fn fill_quad(&mut self, quad: Quad, background: impl Into<Background>);
-
-    /// Creates an [`image::Allocation`] for the given [`image::Handle`] and calls the given callback with it.
-    fn allocate_image(
-        &mut self,
-        handle: &image::Handle,
-        callback: impl FnOnce(Result<image::Allocation, image::Error>) + Send + 'static,
-    );
-
-    /// Provides hints to the [`Renderer`] about the rendering target.
-    ///
-    /// This may be used internally by the [`Renderer`] to perform optimizations
-    /// and/or improve rendering quality.
-    ///
-    /// For instance, providing a `scale_factor` may be used by some renderers to
-    /// perform metrics hinting internally in physical coordinates while keeping
-    /// layout coordinates logical and, therefore, maintain linearity.
-    fn hint(&mut self, scale_factor: f32);
-
-    /// Returns the last scale factor provided as a [`hint`](Self::hint).
-    fn scale_factor(&self) -> Option<f32>;
-
-    /// Resets the [`Renderer`] to start drawing in the `new_bounds` from scratch.
-    fn reset(&mut self, new_bounds: Rectangle);
-
-    /// Sets the [`crate::material::SceneLight`] every [`Quad::material`]
-    /// responds to.
-    ///
-    /// A no-op by default: a renderer that never shades materials has
-    /// nothing to set.
-    fn set_light(&mut self, light: crate::material::SceneLight) {
-        let _ = light;
-    }
-
-    /// Returns the [`crate::material::SceneLight`] set by
-    /// [`Renderer::set_light`], or
-    /// [`SceneLight::KEY`](crate::material::SceneLight::KEY) if nothing has.
-    fn light(&self) -> crate::material::SceneLight {
-        crate::material::SceneLight::KEY
-    }
-
-    /// Polls any concurrent computations that may be pending in the [`Renderer`].
-    ///
-    /// By default, it does nothing.
-    fn tick(&mut self) {}
-}
-
 /// A polygon with four sides.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Quad {
@@ -224,6 +84,52 @@ impl Default for Quad {
     }
 }
 
+impl Quad {
+    /// Creates a default quad at `bounds`.
+    pub fn new(bounds: Rectangle) -> Self {
+        Self {
+            bounds,
+            ..Self::default()
+        }
+    }
+
+    /// Sets the quad border.
+    pub fn with_border(mut self, border: Border) -> Self {
+        self.border = border;
+        self
+    }
+
+    /// Sets the quad shadow.
+    pub fn with_shadow(mut self, shadow: Shadow) -> Self {
+        self.shadow = shadow;
+        self
+    }
+
+    /// Sets whether coordinates are snapped to physical pixels.
+    pub fn with_snapping(mut self, snap: bool) -> Self {
+        self.snap = snap;
+        self
+    }
+
+    /// Sets scene-relative surface luminance, sanitizing invalid values.
+    pub fn with_luminance(mut self, luminance: f32) -> Self {
+        self.luminance = if luminance.is_finite() {
+            luminance.max(0.0)
+        } else {
+            1.0
+        };
+        self
+    }
+
+    /// Returns whether the quad owns a positive finite paint area.
+    pub fn is_visible(&self) -> bool {
+        self.bounds.width.is_finite()
+            && self.bounds.height.is_finite()
+            && self.bounds.width > 0.0
+            && self.bounds.height > 0.0
+    }
+}
+
 /// The styling attributes of a [`Renderer`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Style {
@@ -288,6 +194,27 @@ impl Default for Settings {
     }
 }
 
+impl Settings {
+    /// Sets the default text font.
+    pub fn with_default_font(mut self, font: Font) -> Self {
+        self.default_font = font;
+        self
+    }
+
+    /// Sets a finite, non-negative default text size.
+    pub fn with_default_text_size(mut self, size: impl Into<Pixels>) -> Self {
+        let size = size.into().0;
+        self.default_text_size = Pixels(if size.is_finite() { size.max(0.0) } else { 16.0 });
+        self
+    }
+
+    /// Selects the rasterization strategy.
+    pub fn with_rasterizer(mut self, rasterizer: Rasterizer) -> Self {
+        self.rasterizer = rasterizer;
+        self
+    }
+}
+
 /// Rasterization path selected for a renderer.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Rasterizer {
@@ -299,6 +226,13 @@ pub enum Rasterizer {
     Compute,
     /// Always use the established quad/triangle path.
     Legacy,
+}
+
+impl Rasterizer {
+    /// Returns whether compute rasterization may be selected.
+    pub const fn allows_compute(self) -> bool {
+        !matches!(self, Self::Legacy)
+    }
 }
 
 #[cfg(test)]
