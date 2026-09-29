@@ -32,16 +32,16 @@ impl Editor {
         buffer_from_editor(&self.internal().editor)
     }
 
-    /// Creates a [`Weak`] reference to the [`Editor`].
+    /// Retains the current editor layout for deferred rendering.
     ///
-    /// This is useful to avoid cloning the [`Editor`] when
-    /// referential guarantees are unnecessary. For instance,
-    /// when creating a rendering tree.
+    /// This keeps the shaped buffer alive until a rendering tree is consumed.
+    /// Editing while a frame is pending uses copy-on-write so the frame keeps
+    /// the geometry that was measured for its own viewport.
     pub fn downgrade(&self) -> Weak {
         let editor = self.internal();
 
         Weak {
-            raw: Arc::downgrade(editor),
+            raw: editor.clone(),
             bounds: editor.bounds,
         }
     }
@@ -55,9 +55,7 @@ impl Editor {
     fn with_internal_mut<T>(&mut self, f: impl FnOnce(&mut Internal) -> T) -> T {
         let editor = self.0.take().expect("Editor should always be initialized");
 
-        // TODO: Handle multiple strong references somehow
-        let mut internal =
-            Arc::try_unwrap(editor).expect("Editor cannot have multiple strong references");
+        let mut internal = Arc::try_unwrap(editor).unwrap_or_else(|snapshot| (*snapshot).clone());
 
         // Clear cursor cache
         let _ = internal
@@ -123,6 +121,17 @@ impl editor::Editor for Editor {
 
     fn line_count(&self) -> usize {
         self.buffer().lines.len()
+    }
+
+    fn scroll_position(&self) -> (usize, f32) {
+        let internal = self.internal();
+        let buffer = buffer_from_editor(&internal.editor);
+        let scroll = buffer.scroll();
+        let line_height = buffer.metrics().line_height.max(1.0);
+        let rows = (scroll.vertical.max(0.0) / line_height).floor() as usize;
+        let line = (scroll.line + rows).min(buffer.lines.len().saturating_sub(1));
+        let remainder = scroll.vertical.max(0.0) % line_height;
+        (line, remainder / internal.hint_factor.max(0.001))
     }
 
     fn copy(&self) -> Option<String> {
@@ -332,6 +341,7 @@ impl editor::Editor for Editor {
                             pixels: lines as f32 * buffer_from_editor(editor).metrics().line_height,
                         },
                     );
+                    editor.shape_as_needed(font_system.raw(), false);
                 }
             }
         });
@@ -439,8 +449,7 @@ impl editor::Editor for Editor {
 
         let editor = self.0.take().expect("Editor should always be initialized");
 
-        let mut internal =
-            Arc::try_unwrap(editor).expect("Editor cannot have multiple strong references");
+        let mut internal = Arc::try_unwrap(editor).unwrap_or_else(|snapshot| (*snapshot).clone());
 
         let mut font_system = text::font_system()
             .write()

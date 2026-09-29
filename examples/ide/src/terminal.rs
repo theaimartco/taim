@@ -1,5 +1,281 @@
 //! Bottom terminal, build console, debug REPL, and compiler diagnostics for Taim Studio.
 
+use alacritty_terminal::event::VoidListener;
+use alacritty_terminal::grid::{Dimensions, Scroll};
+use alacritty_terminal::term::{Config, Term};
+use alacritty_terminal::vte::ansi::Processor;
+use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
+use std::io::{Read, Write};
+use std::path::Path;
+use taim_futures::futures::channel::mpsc;
+use taim_futures::futures::{SinkExt, executor::block_on};
+
+use crate::Message;
+
+pub const TERMINAL_COLUMNS: usize = 100;
+pub const TERMINAL_COLLAPSED_ROWS: usize = 8;
+pub const TERMINAL_EXPANDED_ROWS: usize = 24;
+
+#[derive(Clone, Copy)]
+struct TerminalSize {
+    rows: usize,
+    cols: usize,
+}
+
+impl Dimensions for TerminalSize {
+    fn total_lines(&self) -> usize {
+        self.rows
+    }
+    fn screen_lines(&self) -> usize {
+        self.rows
+    }
+    fn columns(&self) -> usize {
+        self.cols
+    }
+}
+
+/// A live PTY session with a VT-compatible screen and bounded scrollback.
+pub struct TerminalSession {
+    master: Box<dyn MasterPty + Send>,
+    child: Box<dyn Child + Send + Sync>,
+    writer: Box<dyn Write + Send>,
+    parser: Processor,
+    screen: Term<VoidListener>,
+    visible_lines: Vec<String>,
+    rows: usize,
+    cols: usize,
+}
+
+impl TerminalSession {
+    pub fn start(root: &Path, id: usize) -> Result<(Self, taim::Task<Message>), String> {
+        let rows = TERMINAL_COLLAPSED_ROWS;
+        let cols = TERMINAL_COLUMNS;
+        let pair = native_pty_system()
+            .openpty(PtySize {
+                rows: rows as u16,
+                cols: cols as u16,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|error| error.to_string())?;
+        let shell = std::env::var_os("SHELL")
+            .filter(|shell| Path::new(shell).is_file())
+            .unwrap_or_else(|| {
+                if cfg!(windows) {
+                    "cmd.exe".into()
+                } else {
+                    "/bin/sh".into()
+                }
+            });
+        let mut command = CommandBuilder::new(&shell);
+        if !cfg!(windows) {
+            command.arg("-i");
+        }
+        command.cwd(root);
+        command.env("TERM", "xterm-256color");
+        command.env("TERM_PROGRAM", "Virgo");
+        command.env_remove("TERM_SESSION_ID");
+        command.env_remove("ITERM_SESSION_ID");
+        let child = pair
+            .slave
+            .spawn_command(command)
+            .map_err(|error| error.to_string())?;
+        drop(pair.slave);
+        let writer = pair
+            .master
+            .take_writer()
+            .map_err(|error| error.to_string())?;
+        let mut reader = pair
+            .master
+            .try_clone_reader()
+            .map_err(|error| error.to_string())?;
+        let (mut sender, receiver) = mpsc::channel(32);
+        std::thread::Builder::new()
+            .name(format!("virgo-terminal-{id}"))
+            .spawn(move || {
+                let mut buffer = [0_u8; 4096];
+                loop {
+                    match reader.read(&mut buffer) {
+                        Ok(0) => break,
+                        Ok(count) => {
+                            if block_on(
+                                sender.send(Message::TerminalOutput(id, buffer[..count].to_vec())),
+                            )
+                            .is_err()
+                            {
+                                break;
+                            }
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                        Err(_) => break,
+                    }
+                }
+                let _ = block_on(sender.send(Message::TerminalExited(id)));
+            })
+            .map_err(|error| error.to_string())?;
+        let mut session = Self {
+            master: pair.master,
+            child,
+            writer,
+            parser: Processor::new(),
+            screen: Term::new(
+                Config::default(),
+                &TerminalSize { rows, cols },
+                VoidListener,
+            ),
+            visible_lines: Vec::new(),
+            rows,
+            cols,
+        };
+        session.refresh_visible();
+        Ok((session, taim::Task::run(receiver, |message| message)))
+    }
+
+    pub fn write(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+        self.writer.write_all(bytes)?;
+        self.writer.flush()
+    }
+
+    pub fn receive(&mut self, bytes: &[u8]) -> &[String] {
+        self.parser.advance(&mut self.screen, bytes);
+        self.refresh_visible();
+        &self.visible_lines
+    }
+
+    pub fn exit_code(&mut self) -> Option<u32> {
+        self.child
+            .try_wait()
+            .ok()
+            .flatten()
+            .map(|status| status.exit_code())
+    }
+
+    pub fn clear_output(&mut self) {
+        self.parser
+            .advance(&mut self.screen, b"\x1b[2J\x1b[3J\x1b[H");
+        self.refresh_visible();
+    }
+
+    pub fn resize(&mut self, rows: usize, cols: usize) -> Result<(), String> {
+        self.master
+            .resize(PtySize {
+                rows: rows as u16,
+                cols: cols as u16,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|error| error.to_string())?;
+        self.rows = rows;
+        self.cols = cols;
+        self.screen.resize(TerminalSize { rows, cols });
+        self.refresh_visible();
+        Ok(())
+    }
+
+    pub fn scroll(&mut self, delta: i32) -> &[String] {
+        self.screen.scroll_display(Scroll::Delta(delta));
+        self.refresh_visible();
+        &self.visible_lines
+    }
+
+    pub fn cursor(&self) -> Option<(usize, usize)> {
+        if self.screen.grid().display_offset() == 0 {
+            let point = self.screen.grid().cursor.point;
+            Some((point.line.0 as usize, point.column.0))
+        } else {
+            None
+        }
+    }
+
+    fn refresh_visible(&mut self) {
+        let offset = self.screen.grid().display_offset() as i32;
+        let mut lines = vec![String::with_capacity(self.cols); self.rows];
+        for indexed in self.screen.grid().display_iter() {
+            let row = indexed.point.line.0 + offset;
+            if let Some(buffer) = usize::try_from(row).ok().and_then(|row| lines.get_mut(row)) {
+                let character = indexed.cell.c;
+                buffer.push(if character == '\0' { ' ' } else { character });
+            }
+        }
+        for line in &mut lines {
+            line.truncate(line.trim_end_matches(' ').len());
+        }
+        self.visible_lines = lines;
+    }
+}
+
+impl Drop for TerminalSession {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+    }
+}
+
+/// Translate focused terminal keys to the bytes expected by PTY applications.
+pub fn keyboard_bytes(
+    key: taim::keyboard::Key<&str>,
+    modifiers: taim::keyboard::Modifiers,
+) -> Option<Vec<u8>> {
+    use taim::keyboard::Key;
+    use taim::keyboard::key::Named;
+    let bytes: &[u8] = match key {
+        Key::Named(Named::Enter) => b"\r",
+        Key::Named(Named::Backspace) => b"\x7f",
+        Key::Named(Named::Delete) => b"\x1b[3~",
+        Key::Named(Named::Tab) => b"\t",
+        Key::Named(Named::Escape) => b"\x1b",
+        Key::Named(Named::ArrowUp) => b"\x1b[A",
+        Key::Named(Named::ArrowDown) => b"\x1b[B",
+        Key::Named(Named::ArrowRight) => b"\x1b[C",
+        Key::Named(Named::ArrowLeft) => b"\x1b[D",
+        Key::Named(Named::Home) => b"\x1b[H",
+        Key::Named(Named::End) => b"\x1b[F",
+        Key::Named(Named::PageUp) => b"\x1b[5~",
+        Key::Named(Named::PageDown) => b"\x1b[6~",
+        Key::Named(Named::Space) => b" ",
+        Key::Character(character) if modifiers.control() && character.len() == 1 => {
+            let letter = character.as_bytes()[0].to_ascii_lowercase();
+            if letter.is_ascii_lowercase() {
+                return Some(vec![letter - b'a' + 1]);
+            }
+            return None;
+        }
+        Key::Character(character) if !modifiers.command() => {
+            return Some(character.as_bytes().to_vec());
+        }
+        _ => return None,
+    };
+    Some(bytes.to_vec())
+}
+
+#[cfg(test)]
+mod vt_tests {
+    use super::*;
+
+    #[test]
+    fn cursor_addressing_and_alternate_screen_restore_the_shell() {
+        let size = TerminalSize { rows: 4, cols: 20 };
+        let mut terminal = Term::new(Config::default(), &size, VoidListener);
+        let mut parser: Processor = Processor::new();
+        parser.advance(&mut terminal, b"shell> ");
+        parser.advance(&mut terminal, b"\x1b[?1049h\x1b[2J\x1b[2;4Hhello");
+        let alternate = terminal
+            .grid()
+            .display_iter()
+            .filter(|cell| cell.point.line.0 == 1)
+            .map(|cell| cell.cell.c)
+            .collect::<String>();
+        assert!(alternate.contains("hello"));
+        parser.advance(&mut terminal, b"\x1b[?1049l");
+        let restored = terminal
+            .grid()
+            .display_iter()
+            .filter(|cell| cell.point.line.0 == 0)
+            .map(|cell| cell.cell.c)
+            .collect::<String>();
+        assert!(restored.starts_with("shell>"));
+    }
+}
+
 /// The active bottom panel mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelTab {
@@ -77,6 +353,9 @@ pub struct TerminalInstance {
     pub id: usize,
     pub name: String,
     pub shell: String,
+    pub input: String,
+    pub lines: Vec<String>,
+    pub running: bool,
 }
 
 /// A comparison row between Taim Studio and VS Code.
@@ -193,6 +472,17 @@ impl Default for TerminalState {
 }
 
 impl TerminalState {
+    pub fn empty() -> Self {
+        let mut state = Self::new();
+        state.logs.clear();
+        state.build_logs.clear();
+        state.output_logs.clear();
+        state.debug_logs.clear();
+        state.diagnostics.clear();
+        state.terminals.clear();
+        state
+    }
+
     pub fn new() -> Self {
         let initial_logs = vec![
             LogEntry {
@@ -269,11 +559,17 @@ impl TerminalState {
                 id: 1,
                 name: "1: bash".to_string(),
                 shell: "/bin/zsh".to_string(),
+                input: String::new(),
+                lines: Vec::new(),
+                running: false,
             },
             TerminalInstance {
                 id: 2,
                 name: "2: cargo watch".to_string(),
                 shell: "cargo".to_string(),
+                input: String::new(),
+                lines: Vec::new(),
+                running: false,
             },
         ];
 
@@ -302,6 +598,9 @@ impl TerminalState {
             id,
             name: format!("{}: {}", id, name),
             shell: "/bin/zsh".to_string(),
+            input: String::new(),
+            lines: Vec::new(),
+            running: false,
         });
         self.active_terminal_idx = self.terminals.len() - 1;
     }

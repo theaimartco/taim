@@ -40,6 +40,11 @@ impl Default for PaletteState {
 impl PaletteState {
     /// Creates a new palette state populated with available files and commands.
     pub fn new() -> Self {
+        let primary = if cfg!(target_os = "macos") {
+            "Cmd"
+        } else {
+            "Ctrl"
+        };
         let items = vec![
             // Files
             PaletteItem {
@@ -120,7 +125,7 @@ impl PaletteState {
                 kind: PaletteKind::Action,
                 title: "> Build: Cargo Build Release".to_string(),
                 subtitle: "Trigger release compilation profile".to_string(),
-                shortcut: Some("Cmd+Shift+B".to_string()),
+                shortcut: Some(format!("{primary}+Shift+B")),
                 icon: "⚡",
                 payload: "action:build".to_string(),
             },
@@ -129,7 +134,7 @@ impl PaletteState {
                 kind: PaletteKind::Action,
                 title: "> View: Toggle Dual Split-Editor".to_string(),
                 subtitle: "Side-by-side editing layout".to_string(),
-                shortcut: Some("Cmd+\\".to_string()),
+                shortcut: Some(format!("{primary}+\\")),
                 icon: "◫",
                 payload: "action:split".to_string(),
             },
@@ -138,7 +143,7 @@ impl PaletteState {
                 kind: PaletteKind::Action,
                 title: "> View: Toggle Project Explorer".to_string(),
                 subtitle: "Show/hide left sidebar".to_string(),
-                shortcut: Some("Cmd+B".to_string()),
+                shortcut: Some(format!("{primary}+B")),
                 icon: "◧",
                 payload: "action:toggle_sidebar".to_string(),
             },
@@ -147,7 +152,7 @@ impl PaletteState {
                 kind: PaletteKind::Action,
                 title: "> View: Toggle Bottom Console".to_string(),
                 subtitle: "Show/hide terminal and build output".to_string(),
-                shortcut: Some("Cmd+J".to_string()),
+                shortcut: Some(format!("{primary}+J")),
                 icon: "⬒",
                 payload: "action:toggle_terminal".to_string(),
             },
@@ -174,7 +179,7 @@ impl PaletteState {
                 kind: PaletteKind::Action,
                 title: "> Editor: New Scratchpad".to_string(),
                 subtitle: "Create temporary Rust buffer".to_string(),
-                shortcut: Some("Cmd+N".to_string()),
+                shortcut: Some(format!("{primary}+N")),
                 icon: "＋",
                 payload: "action:new_scratch".to_string(),
             },
@@ -183,7 +188,7 @@ impl PaletteState {
                 kind: PaletteKind::Action,
                 title: "> View: Show Explorer".to_string(),
                 subtitle: "Show project file tree".to_string(),
-                shortcut: Some("Cmd+Shift+E".to_string()),
+                shortcut: Some(format!("{primary}+Shift+E")),
                 icon: "◧",
                 payload: "action:view_explorer".to_string(),
             },
@@ -192,7 +197,7 @@ impl PaletteState {
                 kind: PaletteKind::Action,
                 title: "> View: Show Global Search".to_string(),
                 subtitle: "Search and replace across all files".to_string(),
-                shortcut: Some("Cmd+Shift+F".to_string()),
+                shortcut: Some(format!("{primary}+Shift+F")),
                 icon: "⌕",
                 payload: "action:view_search".to_string(),
             },
@@ -201,7 +206,11 @@ impl PaletteState {
                 kind: PaletteKind::Action,
                 title: "> View: Show Source Control (Git)".to_string(),
                 subtitle: "View git staging, branches, and diffs".to_string(),
-                shortcut: Some("Cmd+Shift+G".to_string()),
+                shortcut: Some(if cfg!(target_os = "macos") {
+                    "Ctrl+Shift+G".to_string()
+                } else {
+                    format!("{primary}+Shift+G")
+                }),
                 icon: "⑂",
                 payload: "action:view_git".to_string(),
             },
@@ -210,7 +219,7 @@ impl PaletteState {
                 kind: PaletteKind::Action,
                 title: "> View: Show Run and Debug".to_string(),
                 subtitle: "Breakpoints, call stack, variables".to_string(),
-                shortcut: Some("Cmd+Shift+D".to_string()),
+                shortcut: Some(format!("{primary}+Shift+D")),
                 icon: "▷",
                 payload: "action:view_debug".to_string(),
             },
@@ -219,7 +228,7 @@ impl PaletteState {
                 kind: PaletteKind::Action,
                 title: "> View: Show Extensions Marketplace".to_string(),
                 subtitle: "Install and manage language plugins".to_string(),
-                shortcut: Some("Cmd+Shift+X".to_string()),
+                shortcut: Some(format!("{primary}+Shift+X")),
                 icon: "❖",
                 payload: "action:view_extensions".to_string(),
             },
@@ -228,7 +237,7 @@ impl PaletteState {
                 kind: PaletteKind::Action,
                 title: "> View: Open Settings".to_string(),
                 subtitle: "Configure editor, theme, and keybindings".to_string(),
-                shortcut: Some("Cmd+,".to_string()),
+                shortcut: Some(format!("{primary}+,")),
                 icon: "⚙",
                 payload: "action:view_settings".to_string(),
             },
@@ -264,9 +273,72 @@ impl PaletteState {
                 kind: PaletteKind::Action,
                 title: "> Terminal: Create New Terminal".to_string(),
                 subtitle: "Open additional shell instance".to_string(),
-                shortcut: Some("Cmd+Shift+`".to_string()),
+                shortcut: Some("Ctrl+Shift+`".to_string()),
                 icon: "❯_",
                 payload: "action:term_new".to_string(),
+            },
+            PaletteItem {
+                id: 119,
+                kind: PaletteKind::Action,
+                title: "> Go to Definition".to_string(),
+                subtitle: "Jump to definition of symbol under cursor".to_string(),
+                shortcut: Some("F12".to_string()),
+                icon: "↪",
+                payload: "action:goto_definition".to_string(),
+            },
+            PaletteItem {
+                id: 120,
+                kind: PaletteKind::Action,
+                title: "> Go to References".to_string(),
+                subtitle: "Find all references to symbol in workspace".to_string(),
+                shortcut: Some("Shift+F12".to_string()),
+                icon: "⌕",
+                payload: "action:find_references".to_string(),
+            },
+            PaletteItem {
+                id: 121,
+                kind: PaletteKind::Action,
+                title: "> Show Hover Info".to_string(),
+                subtitle: "Inspect docstring and type signature".to_string(),
+                shortcut: None,
+                icon: "ⓘ",
+                payload: "action:show_hover".to_string(),
+            },
+            PaletteItem {
+                id: 122,
+                kind: PaletteKind::Action,
+                title: "> Merge Conflicts: Accept All Current".to_string(),
+                subtitle: "Resolve all conflicts keeping HEAD changes".to_string(),
+                shortcut: None,
+                icon: "✓",
+                payload: "action:accept_all_current".to_string(),
+            },
+            PaletteItem {
+                id: 123,
+                kind: PaletteKind::Action,
+                title: "> Merge Conflicts: Accept All Incoming".to_string(),
+                subtitle: "Resolve all conflicts accepting incoming branch changes".to_string(),
+                shortcut: None,
+                icon: "📥",
+                payload: "action:accept_all_incoming".to_string(),
+            },
+            PaletteItem {
+                id: 124,
+                kind: PaletteKind::Action,
+                title: "> Fold All Blocks".to_string(),
+                subtitle: "Collapse all foldable code blocks".to_string(),
+                shortcut: None,
+                icon: "▸",
+                payload: "action:fold_all".to_string(),
+            },
+            PaletteItem {
+                id: 125,
+                kind: PaletteKind::Action,
+                title: "> Unfold All Blocks".to_string(),
+                subtitle: "Expand all folded code blocks".to_string(),
+                shortcut: None,
+                icon: "▾",
+                payload: "action:unfold_all".to_string(),
             },
         ];
 

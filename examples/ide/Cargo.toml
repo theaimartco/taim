@@ -12,17 +12,33 @@ taim.features = [
     "crisp",
     "hinting",
     "thread-pool",
+    "smol",
     "linux-theme-detection",
     "x11",
     "wayland",
     "fira-sans",
     "advanced",
     "highlighter",
+    "svg",
+    "image",
+    "canvas",
 ]
+taim_core.workspace = true
 taim-highlighter.workspace = true
 taim-design.workspace = true
+smol.workspace = true
+portable-pty = "0.9"
+taim_futures.workspace = true
+alacritty_terminal = "0.26"
+regex = "1"
+serde = { workspace = true, features = ["derive"] }
+serde_json = "1.0"
+memmap2 = "0.9"
+rayon = "1.10"
 
 [dev-dependencies]
-taim_core.workspace = true
 taim_runtime.workspace = true
 taim-accessibility.workspace = true
+taim_renderer.workspace = true
+taim_futures.workspace = true
+png.workspace = true

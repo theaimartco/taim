@@ -37,6 +37,11 @@ pub trait Editor: Sized + Default {
     /// Returns the amount of lines in the [`Editor`].
     fn line_count(&self) -> usize;
 
+    /// Returns the first visible logical line and its vertical pixel offset.
+    fn scroll_position(&self) -> (usize, f32) {
+        (0, 0.0)
+    }
+
     /// Performs an [`Action`] on the [`Editor`].
     fn perform(&mut self, action: Action);
 

@@ -36,6 +36,21 @@ impl Default for Internal {
     }
 }
 
+impl Clone for Internal {
+    fn clone(&self) -> Self {
+        Self {
+            editor: self.editor.clone(),
+            selection: RwLock::new(None),
+            font: self.font,
+            bounds: self.bounds,
+            topmost_line_changed: self.topmost_line_changed,
+            hint: self.hint,
+            hint_factor: self.hint_factor,
+            version: self.version,
+        }
+    }
+}
+
 impl PartialEq for Internal {
     fn eq(&self, other: &Self) -> bool {
         let left = buffer_from_editor(&self.editor);
@@ -68,30 +83,27 @@ impl fmt::Debug for Internal {
     }
 }
 
-/// A non-owning editor reference used by retained rendering trees.
+/// A snapshot of editor geometry retained until the renderer consumes it.
 #[derive(Debug, Clone)]
 pub struct Weak {
-    pub(super) raw: sync::Weak<Internal>,
+    pub(super) raw: sync::Arc<Internal>,
     /// Logical bounds captured without upgrading the editor.
     pub bounds: Size,
 }
 
 impl Weak {
-    /// Upgrades the reference while the editor is still alive.
+    /// Returns the retained editor snapshot.
     pub fn upgrade(&self) -> Option<Editor> {
-        self.raw.upgrade().map(Some).map(Editor)
+        Some(Editor(Some(self.raw.clone())))
     }
 }
 
 impl PartialEq for Weak {
     fn eq(&self, other: &Self) -> bool {
-        if sync::Weak::ptr_eq(&self.raw, &other.raw) {
-            return self.raw.strong_count() > 0;
+        if sync::Arc::ptr_eq(&self.raw, &other.raw) {
+            return true;
         }
 
-        match (self.upgrade(), other.upgrade()) {
-            (Some(left), Some(right)) => left == right,
-            _ => false,
-        }
+        self.raw.as_ref() == other.raw.as_ref()
     }
 }
