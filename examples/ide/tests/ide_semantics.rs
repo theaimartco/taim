@@ -532,3 +532,100 @@ fn test_breadcrumbs_generation() {
     assert_eq!(crumbs[2], "main.rs");
     assert_eq!(crumbs[3], "fn run()");
 }
+
+#[test]
+fn test_lsp_go_to_definition_simd_fallback() {
+    let (mut studio, _task) = Studio::new();
+    // Default open document has "fn main()" or similar
+    assert!(studio.fast_simd_definition_jump("main"));
+    let active = studio.docs.active().unwrap();
+    assert!(active.text().contains("fn main()"));
+}
+
+#[test]
+fn test_compiler_and_diagnostic_navigation() {
+    let (mut studio, _task) = Studio::new();
+    
+    // Test parser for compiler error format
+    let raw_error = "--> src/main.rs:5:10";
+    let loc = taim_ide::parse_compiler_location(raw_error).expect("should parse compiler error location");
+    assert_eq!(loc.0, "src/main.rs");
+    assert_eq!(loc.1, 5);
+    assert_eq!(loc.2, 10);
+
+    // Test NavigateToLocation
+    let _ = studio.update(Message::NavigateToLocation("src/main.rs".to_string(), 5, 2));
+    let active = studio.docs.active().unwrap();
+    assert_eq!(active.path, "src/main.rs");
+    assert_eq!(active.content.cursor().position.line, 4); // 0-based
+}
+
+#[test]
+fn test_interactive_merge_conflict_resolution() {
+    let (mut studio, _task) = Studio::new();
+    let conflicted = "\
+fn feature() {
+<<<<<<< HEAD (Current Change)
+    let engine = \"Metal GPU\";
+=======
+    let engine = \"Vulkan GPU\";
+>>>>>>> feature/vulkan (Incoming Change)
+    println!(\"{engine}\");
+}
+";
+    // Replace active doc content with conflicted code
+    if let Some(doc) = studio.docs.active_mut() {
+        doc.content = taim::widget::text_editor::Content::with_text(conflicted);
+    }
+    let doc = studio.docs.active().unwrap();
+    assert!(doc.has_merge_conflicts());
+    assert_eq!(doc.find_merge_conflicts().len(), 1);
+
+    // Accept Current
+    let _ = studio.update(Message::AcceptConflictCurrent(0));
+    let doc = studio.docs.active().unwrap();
+    assert!(!doc.has_merge_conflicts());
+    assert!(doc.text().contains("Metal GPU"));
+    assert!(!doc.text().contains("Vulkan GPU"));
+}
+
+#[test]
+fn test_code_folding_workbench_integration() {
+    let (mut studio, _task) = Studio::new();
+    let sample = "\
+fn compute() {
+    let a = 10;
+    let b = 20;
+}
+";
+    if let Some(doc) = studio.docs.active_mut() {
+        doc.content = taim::widget::text_editor::Content::with_text(sample);
+    }
+    assert!(studio.docs.active().unwrap().is_line_foldable(0));
+
+    // Toggle fold line 0
+    let _ = studio.update(Message::ToggleFold(studio.docs.active_tab, 0));
+    assert!(studio.docs.active().unwrap().is_line_folded(1));
+    assert!(studio.docs.active().unwrap().is_line_folded(2));
+
+    // Unfold all
+    let _ = studio.update(Message::UnfoldAll);
+    assert!(!studio.docs.active().unwrap().is_line_folded(1));
+
+    // Fold all
+    let _ = studio.update(Message::FoldAll);
+    assert!(studio.docs.active().unwrap().is_line_folded(1));
+}
+
+#[test]
+fn test_palette_and_shortcut_routes_for_new_features() {
+    let (mut studio, _task) = Studio::new();
+    // Test Go to Definition palette execution
+    let item_def = studio.palette.all_items.iter().find(|i| i.payload == "action:goto_definition").unwrap();
+    assert_eq!(item_def.shortcut, Some("F12".to_string()));
+
+    // Test Fold All palette execution
+    let item_fold = studio.palette.all_items.iter().find(|i| i.payload == "action:fold_all").unwrap();
+    assert!(item_fold.title.contains("Fold All Blocks"));
+    let _ = studio.update(Message::PaletteItemChosen(item_fold.id));
+}

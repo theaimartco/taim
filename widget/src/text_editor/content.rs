@@ -52,6 +52,27 @@ where
         self.0.borrow().editor.line_count()
     }
 
+    /// Returns the first visible line and its vertical pixel offset.
+    pub fn scroll_position(&self) -> (usize, f32) {
+        self.0.borrow().editor.scroll_position()
+    }
+
+    /// Counts non-space bytes in a short preview without cloning the whole line.
+    pub fn line_preview_density(&self, index: usize) -> usize {
+        let internal = self.0.borrow();
+        internal
+            .editor
+            .line(index)
+            .map(|line| {
+                line.text
+                    .bytes()
+                    .take(80)
+                    .filter(|byte| !byte.is_ascii_whitespace())
+                    .count()
+            })
+            .unwrap_or(0)
+    }
+
     /// Returns the text of the line at the given index, if it exists.
     pub fn line(&self, index: usize) -> Option<Line<'_>> {
         let internal = self.0.borrow();

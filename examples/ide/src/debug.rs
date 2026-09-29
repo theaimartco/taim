@@ -75,6 +75,16 @@ impl Default for DebugState {
 }
 
 impl DebugState {
+    pub fn empty() -> Self {
+        let mut state = Self::new();
+        state.active_config = "No debug adapter configured".to_string();
+        state.configs.clear();
+        state.breakpoints.clear();
+        state.call_stack.clear();
+        state.variables.clear();
+        state
+    }
+
     pub fn new() -> Self {
         Self {
             status: DebugStatus::Stopped,

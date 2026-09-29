@@ -133,6 +133,39 @@ pub struct FileTree {
 }
 
 impl FileTree {
+    /// Rebuilds the explorer while keeping opened folders and the selected file.
+    pub fn rescan(&mut self, root_path: &std::path::Path) {
+        fn opened(node: &FileNode, paths: &mut std::collections::HashSet<String>) {
+            if node.is_dir {
+                if node.is_expanded {
+                    paths.insert(node.path.clone());
+                }
+                for child in &node.children {
+                    opened(child, paths);
+                }
+            }
+        }
+        fn restore(node: &mut FileNode, paths: &std::collections::HashSet<String>) {
+            if node.is_dir {
+                node.is_expanded = paths.contains(&node.path);
+                for child in &mut node.children {
+                    restore(child, paths);
+                }
+            }
+        }
+        let selected = self
+            .selected_id
+            .and_then(|id| self.find(id))
+            .map(|node| node.path.clone());
+        let mut expanded = std::collections::HashSet::new();
+        opened(&self.root, &mut expanded);
+        let mut next = Self::from_path(root_path);
+        restore(&mut next.root, &expanded);
+        next.selected_id =
+            selected.and_then(|path| next.root.find_by_path(&path).map(|node| node.id));
+        *self = next;
+    }
+
     /// Creates a rich, realistic default project tree representing a Taim workspace.
     pub fn default_project() -> Self {
         let src = FileNode::dir(
@@ -209,7 +242,7 @@ impl FileTree {
             depth: usize,
             next_id: &mut usize,
         ) -> Vec<FileNode> {
-            if depth > 3 {
+            if depth > 15 {
                 return Vec::new();
             }
             let read_dir = match std::fs::read_dir(path) {
@@ -217,24 +250,36 @@ impl FileTree {
                 Err(_) => return Vec::new(),
             };
 
-            let mut sorted_entries: Vec<_> = read_dir.filter_map(|e| e.ok()).collect();
-            sorted_entries.sort_by_key(|e| {
-                (
-                    e.file_type().map(|t| !t.is_dir()).unwrap_or(true),
-                    e.file_name(),
-                )
-            });
-
-            let mut entries = Vec::new();
-            for entry in sorted_entries {
-                let name = entry.file_name().to_string_lossy().to_string();
-                if name.starts_with('.') || name == "target" || name == "node_modules" {
+            let mut valid_entries = Vec::new();
+            for entry in read_dir.flatten() {
+                let file_name = entry.file_name();
+                let name_bytes = file_name.as_encoded_bytes();
+                if name_bytes == b".git"
+                    || name_bytes == b".virgo-trash"
+                    || name_bytes == b".DS_Store"
+                    || name_bytes == b"target"
+                    || name_bytes == b"node_modules"
+                {
                     continue;
                 }
-                let file_type = match entry.file_type() {
-                    Ok(ft) => ft,
-                    Err(_) => continue,
+                let Ok(file_type) = entry.file_type() else {
+                    continue;
                 };
+                let is_dir = file_type.is_dir();
+                let is_file = file_type.is_file();
+                if !is_dir && !is_file {
+                    continue;
+                }
+                let name = file_name.to_string_lossy().into_owned();
+                valid_entries.push((name, entry.path(), is_dir, is_file));
+            }
+
+            valid_entries.sort_unstable_by(|a, b| {
+                (!a.2).cmp(&(!b.2)).then_with(|| a.0.cmp(&b.0))
+            });
+
+            let mut entries = Vec::with_capacity(valid_entries.len());
+            for (name, path, is_dir, is_file) in valid_entries {
                 let rel_path = if rel_prefix.is_empty() {
                     name.clone()
                 } else {
@@ -244,21 +289,12 @@ impl FileTree {
                 *next_id += 1;
                 let id = *next_id;
 
-                if file_type.is_dir() {
-                    let children = scan_dir(&entry.path(), &rel_path, depth + 1, next_id);
+                if is_dir {
+                    let children = scan_dir(&path, &rel_path, depth + 1, next_id);
                     let is_expanded = depth < 1;
                     entries.push(FileNode::dir(id, name, rel_path, is_expanded, children));
-                } else if file_type.is_file() {
-                    let path_buf = entry.path();
-                    let ext = path_buf.extension().and_then(|e| e.to_str()).unwrap_or("");
-                    let syntax = match ext {
-                        "rs" => "rust",
-                        "toml" => "toml",
-                        "wgsl" | "c" | "h" | "cpp" => "c",
-                        "md" => "markdown",
-                        "json" => "json",
-                        _ => "text",
-                    };
+                } else if is_file {
+                    let syntax = syntax_for_path(&path);
                     entries.push(FileNode::file(id, name, rel_path, syntax));
                 }
             }
@@ -266,10 +302,6 @@ impl FileTree {
         }
 
         let children = scan_dir(root_path, "", 0, &mut next_id);
-        if children.is_empty() {
-            return Self::default_project();
-        }
-
         let first_file_id = children
             .iter()
             .find_map(|c| {
@@ -296,5 +328,17 @@ impl FileTree {
     /// Finds a node by id.
     pub fn find(&self, node_id: usize) -> Option<&FileNode> {
         self.root.find(node_id)
+    }
+}
+
+/// Returns the editor syntax for a file, including files outside the visible tree depth.
+pub fn syntax_for_path(path: &std::path::Path) -> &'static str {
+    match path.extension().and_then(|extension| extension.to_str()) {
+        Some("rs") => "rust",
+        Some("toml") => "toml",
+        Some("wgsl" | "c" | "h" | "cpp") => "c",
+        Some("md") => "markdown",
+        Some("json") => "json",
+        _ => "text",
     }
 }
