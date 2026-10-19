@@ -22,7 +22,7 @@ if [ -n "$(git -C "$ROOT" status --porcelain)" ]; then
   echo "Refusing to collect release evidence from a dirty checkout" >&2
   exit 2
 fi
-if [ -z "$WAYLAND_DISPLAY" ] || [ -z "$XDG_RUNTIME_DIR" ]; then
+if [ -z "$(printenv WAYLAND_DISPLAY || true)" ] || [ -z "$(printenv XDG_RUNTIME_DIR || true)" ]; then
   echo "WAYLAND_DISPLAY and XDG_RUNTIME_DIR must identify a real Wayland session" >&2
   exit 2
 fi
@@ -45,8 +45,8 @@ cd "$ROOT"
   echo "UTC time: $(date -u +%FT%TZ)"
   echo "Kernel: $(uname -a)"
   echo "Wayland socket: $SOCKET"
-  echo "XDG_SESSION_TYPE: $XDG_SESSION_TYPE"
-  echo "LANG: $LANG"
+  echo "XDG_SESSION_TYPE: $(printenv XDG_SESSION_TYPE || echo unavailable)"
+  echo "LANG: $(printenv LANG || echo unavailable)"
   rustc --version
   cargo --version
   if command -v lspci >/dev/null 2>&1; then
