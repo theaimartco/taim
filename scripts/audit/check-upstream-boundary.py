@@ -18,16 +18,23 @@ def iced_package(name):
     return name == "iced" or name.startswith(("iced_", "iced-"))
 
 
-def nested_dependency_sections(tree):
+def nested_dependency_sections(tree, prefix=""):
     if not isinstance(tree, dict):
         return
     for key, value in tree.items():
-        if key in ("dependencies", "dev-dependencies", "build-dependencies") and isinstance(value, dict):
-            yield key, value
-        elif key == "target" and isinstance(value, dict):
-            for target, table in value.items():
-                for nested_key, entries in nested_dependency_sections(table):
-                    yield f"target.{target}.{nested_key}", entries
+        if not isinstance(value, dict):
+            continue
+        path = f"{prefix}.{key}" if prefix else key
+        if key in ("dependencies", "dev-dependencies", "build-dependencies", "replace"):
+            yield path, value
+        elif key == "patch":
+            for registry, dependencies in value.items():
+                if isinstance(dependencies, dict):
+                    yield f"{path}.{registry}", dependencies
+        elif key in ("target", "workspace"):
+            for child, section in value.items():
+                for nested_path, dependencies in nested_dependency_sections(section, f"{path}.{child}"):
+                    yield nested_path, dependencies
 
 
 def check_manifest(path):
@@ -36,7 +43,8 @@ def check_manifest(path):
     for section, dependencies in nested_dependency_sections(doc):
         for alias, spec in dependencies.items():
             actual_name = spec.get("package", alias) if isinstance(spec, dict) else alias
-            if iced_package(actual_name):
+            normalized_name = actual_name.split(":", 1)[0] if section.endswith(".replace") or section == "replace" else actual_name
+            if iced_package(normalized_name):
                 issues.append(f"{path}: {section} uses Iced crate {alias}/{actual_name}")
             if isinstance(spec, dict) and any(
                 token in str(spec.get("git", "")).lower() for token in FORBIDDEN_SOURCE
