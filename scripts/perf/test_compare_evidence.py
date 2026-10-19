@@ -1,6 +1,7 @@
 """Only synthetic contract tests. These numbers are not benchmark results."""
 
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -41,8 +42,15 @@ class EvidenceTests(unittest.TestCase):
     def compare(self, reports):
         with tempfile.TemporaryDirectory() as directory:
             paths = []
-            for i, report in enumerate(reports):
+            for i, original in enumerate(reports):
+                report = json.loads(json.dumps(original))
                 path = Path(directory) / f"{i}.json"
+                trace = Path(directory) / f"{i}.frames.csv"
+                frames = report["metrics"]["presented_frame_interval_ms"]
+                data = "".join(f"{n}\n" for n in frames).encode("utf-8")
+                trace.write_bytes(data)
+                report["evidence"]["raw_trace_path"] = trace.name
+                report["evidence"]["raw_trace_sha256"] = hashlib.sha256(data).hexdigest()
                 path.write_text(json.dumps(report))
                 paths.append(path)
             return module.compare(paths)
@@ -89,6 +97,33 @@ class EvidenceTests(unittest.TestCase):
     def test_duplicate_rejected(self):
         with self.assertRaisesRegex(ValueError, "Duplicate"):
             self.compare([fixture("taim")] * 4)
+
+    def test_real_trace_missing_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = fixture("taim")
+            path = Path(directory) / "taim.json"
+            report["evidence"]["raw_trace_sha256"] = "0" * 64
+            path.write_text(json.dumps(report))
+            with self.assertRaisesRegex(ValueError, "trace missing"):
+                module.read_report(path, 1000)
+
+    def test_trace_hash_tampering_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = fixture("taim")
+            path = Path(directory) / "taim.json"
+            trace = Path(directory) / "test.csv"
+            trace.write_text("16.0\n" * 1000)
+            report["evidence"]["raw_trace_path"] = trace.name
+            report["evidence"]["raw_trace_sha256"] = "0" * 64
+            path.write_text(json.dumps(report))
+            with self.assertRaisesRegex(ValueError, "hash mismatch"):
+                module.read_report(path, 1000)
+
+    def test_unproven_memory_rejected(self):
+        reports = self.reports()
+        reports[0]["metrics"]["gpu_memory_bytes"] = 1024
+        with self.assertRaisesRegex(ValueError, "gpu_memory_bytes_source"):
+            self.compare(reports)
 
     def test_nearest_rank(self):
         self.assertEqual(module.nearest_rank(list(range(1, 101)), 95), 95)

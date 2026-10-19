@@ -2,6 +2,7 @@
 """Validate and summarize SAME-device, real-frame benchmark evidence; do not acquire data."""
 
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -31,6 +32,56 @@ def sample_summary(samples):
                 p95=nearest_rank(samples, 95), p99=nearest_rank(samples, 99))
 
 
+def validate_trace(report_path, evidence, path_key, hash_key, samples):
+    """Verify the actual trace bytes and their numerical agreement with the manifest."""
+    rel = evidence.get(path_key)
+    expected = evidence.get(hash_key)
+    if not isinstance(rel, str) or not rel or not isinstance(expected, str):
+        raise ValueError(f"{report_path}: missing {path_key} or {hash_key}")
+    if len(expected) != 64 or any(char not in "0123456789abcdef" for char in expected.lower()):
+        raise ValueError(f"{report_path}: {hash_key} must be SHA-256 hex")
+    folder = Path(report_path).resolve().parent
+    target = (folder / rel).resolve()
+    if not target.is_relative_to(folder) or not target.is_file():
+        raise ValueError(f"{report_path}: trace missing or escapes report directory: {rel}")
+    if target.stat().st_size > 64 * 1024 * 1024:
+        raise ValueError(f"{report_path}: trace exceeds 64 MiB evidence limit")
+    content = target.read_bytes()
+    if hashlib.sha256(content).hexdigest() != expected.lower():
+        raise ValueError(f"{report_path}: {path_key} hash mismatch")
+    try:
+        observed = [float(line) for line in content.decode("utf-8").splitlines()]
+    except (ValueError, UnicodeDecodeError) as error:
+        raise ValueError(f"{report_path}: malformed numeric trace") from error
+    if len(observed) != len(samples):
+        raise ValueError(f"{report_path}: trace sample count disagrees with manifest")
+    for measured, recorded in zip(observed, samples):
+        positive(measured, f"{path_key} physical trace")
+        if not math.isclose(measured, recorded, rel_tol=1e-12, abs_tol=1e-9):
+            raise ValueError(f"{report_path}: trace values disagree with manifest")
+    return expected.lower()
+
+
+def validate_scalar_source(report_path, evidence, field):
+    """Require a present SHA-256-pinned source for any non-null scalar claim."""
+    key = field + "_source"
+    digest_key = field + "_sha256"
+    rel = evidence.get(key)
+    expected = evidence.get(digest_key)
+    if not isinstance(rel, str) or not rel or not isinstance(expected, str):
+        raise ValueError(f"{report_path}: non-null {field} needs {key} and {digest_key}")
+    if len(expected) != 64 or any(c not in "0123456789abcdef" for c in expected.lower()):
+        raise ValueError(f"{report_path}: invalid {digest_key}")
+    folder = Path(report_path).resolve().parent
+    target = (folder / rel).resolve()
+    if not target.is_relative_to(folder) or not target.is_file():
+        raise ValueError(f"{report_path}: evidence file missing or outside report folder")
+    if target.stat().st_size > 64 * 1024 * 1024:
+        raise ValueError(f"{report_path}: source file too large")
+    if hashlib.sha256(target.read_bytes()).hexdigest() != expected.lower():
+        raise ValueError(f"{report_path}: evidence hash mismatch for {field}")
+
+
 def read_report(path, minimum):
     report = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(report, dict) or report.get("framework") not in FRAMEWORKS:
@@ -58,6 +109,7 @@ def read_report(path, minimum):
         raise ValueError(f"{path}: need >= {minimum} raw presented frame intervals")
     for n in frames:
         positive(n, "presented_frame_interval_ms")
+    validate_trace(path, evidence, "raw_trace_path", "raw_trace_sha256", frames)
     latency = metrics.get("input_to_photon_ms")
     if latency is not None:
         if not isinstance(latency, list) or len(latency) < 30:
@@ -66,10 +118,14 @@ def read_report(path, minimum):
             positive(n, "input_to_photon_ms")
         if not evidence.get("latency_sensor"):
             raise ValueError(f"{path}: latency sensor provenance required")
+        validate_trace(path, evidence, "latency_trace_path", "latency_trace_sha256", latency)
     scalars = {}
     for name in ("rss_bytes", "gpu_memory_bytes", "idle_power_watts"):
         value = metrics.get(name)
-        scalars[name] = None if value is None else positive(value, name)
+        if value is not None:
+            positive(value, name)
+            validate_scalar_source(path, evidence, name)
+        scalars[name] = value
     return {
         "framework": report["framework"],
         "hardware": report["hardware"], "workload": report["workload"],

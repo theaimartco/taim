@@ -34,6 +34,7 @@ jobs:
           test -s docs/testing/wayland-vyom-device-acceptance.md
           test -s docs/performance/four-framework-comparison.md
           test -s docs/release/production-gates.md
+          test -s scripts/perf/compare-evidence.py
 
   formatting:
     name: Rust formatting gate

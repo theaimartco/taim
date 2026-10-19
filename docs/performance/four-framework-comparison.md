@@ -53,3 +53,17 @@ not public superiority claims.
 
 No benchmark winner should be announced before physical artifacts and
 uncertainty across repeated sessions are reviewed.
+
+## Trace integrity requirement
+
+Every `evidence.raw_trace_path` must exist **beside its JSON report** and
+contain one positive numeric `presented_frame_interval_ms` sample per line;
+its exact SHA-256 must be provided as `evidence.raw_trace_sha256`. The
+validator recomputes its hash and checks every value against the report's
+arrays. Physical latency similarly requires `latency_trace_path` and
+`latency_trace_sha256` plus the calibrated `latency_sensor`. Non-null
+`rss_bytes`, `gpu_memory_bytes` and `idle_power_watts` each require an
+existing pinned source (e.g. `rss_bytes_source` + `rss_bytes_sha256`).
+Strings naming imaginary traces are never sufficient evidence. Even a
+matching file hash does not authenticate actual physical measurement: an
+independent reviewer still checks instrumentation and target environment.
