@@ -104,6 +104,23 @@ Cargo, Clippy, real Wayland/VYOM, accessibility, GPU recovery and manual
 source lineage verification remain **NO-GO**; see
 `docs/audit/taim-input-delivery-window-20261020.md`.
 
+## Bounded window-icon decoder and menu overlay viewport placement
+
+The complete Git-tree exact same-path source comparison now finds **31**
+unchanged `.rs/.wgsl/.toml` files relative to historical Iced, down
+from 33. This narrow value does not measure original authorship.
+
+TAIM native window-icon loading now bounds compressed input to 8 MiB,
+validates header dimensions against 2048 pixels per edge before decode,
+and sets additional decoder allocation limits. Dropdown overlays now
+clamp invalid anchors and shift menus left to avoid right-edge clipping.
+Four added unit tests are committed but **not executed**.
+
+Rust/toolchain validation, previous PRs, real GPU/input/IME/accessibility
+tests and independent source-lineage review remain open. Do not merge
+to main or describe the framework as production ready.
+See `docs/audit/taim-native-icon-overlay-20261020.md`.
+
 ## Verification lanes
 
 - Hosted CI: .github/workflows/verification.yml on PRs and main.
