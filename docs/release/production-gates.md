@@ -62,3 +62,10 @@ For each PASS supply device, exact source SHA, test command, raw trace hash,
 independent reviewer and date. Do not substitute self-reported completeness
 percentages for evidence. Supported device promises must never exceed tested
 coverage.
+
+## Hardware smoke entrypoint
+
+Run `bash scripts/qa/wayland-smoke.sh <new-evidence-dir>` on actual hardware.
+It is an automatic compositor-protocol/process sanity check, not physical
+input-to-photon or screen-reader acceptance. Never certify hardware from
+that single script. Unverified VYOM-native paths remain BLOCKED.

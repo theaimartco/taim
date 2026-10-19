@@ -1,17 +1,15 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+# Fail closed: this command only validates actual same-device evidence.
+# Never print "comparison complete" without real source reports.
+set -euo pipefail
 
-echo "Starting framework comparison benchmark..."
+if [ "$#" -ne 5 ]; then
+  echo "Usage: bash scripts/perf/compare-frameworks.sh OUTPUT.json TAIM.json ICED.json SLINT.json EGUI.json" >&2
+  echo "Acquire and review actual physical presentation traces first." >&2
+  exit 64
+fi
 
-# Build taim_bench
-echo "Building taim_bench..."
-cargo build -p tools/taim_bench --release
-
-# Run Taim
-echo "Running Taim benchmark..."
-# ./target/release/taim_bench --report-json > taim_results.json
-
-# (Placeholder for running competitor frameworks like Qt or Flutter)
-
-echo "Comparison complete. Generating report..."
-# generate_report taim_results.json qt_results.json ...
+OUTPUT="$1"
+shift
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+exec python3 "$SCRIPT_DIR/compare-evidence.py" --output "$OUTPUT" "$@"
