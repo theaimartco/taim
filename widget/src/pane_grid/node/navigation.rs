@@ -53,3 +53,52 @@ impl Node {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pane_grid::{Axis, Split};
+
+    #[test]
+    fn centerline_probe_targets_correct_subdivided_neighbor() {
+        // The right-hand side is split 25%/75%; the left pane's
+        // center points into the lower-right pane. Sampling near the
+        // top-left corner would incorrectly choose Pane(1).
+        let workspace = Node::Split {
+            id: Split(4),
+            axis: Axis::Vertical,
+            ratio: 0.5,
+            a: Box::new(Node::Pane(Pane(0))),
+            b: Box::new(Node::Split {
+                id: Split(3),
+                axis: Axis::Horizontal,
+                ratio: 0.25,
+                a: Box::new(Node::Pane(Pane(1))),
+                b: Box::new(Node::Pane(Pane(2))),
+            }),
+        };
+
+        assert_eq!(
+            workspace.adjacent_pane(Pane(0), Direction::Right),
+            Some(Pane(2))
+        );
+        assert_eq!(
+            workspace.adjacent_pane(Pane(2), Direction::Left),
+            Some(Pane(0))
+        );
+    }
+
+    #[test]
+    fn navigation_does_not_wrap_at_workspace_boundary() {
+        let workspace = Node::Pane(Pane(0));
+
+        assert_eq!(
+            workspace.adjacent_pane(Pane(0), Direction::Right),
+            None
+        );
+        assert_eq!(
+            workspace.adjacent_pane(Pane(0), Direction::Up),
+            None
+        );
+    }
+}
