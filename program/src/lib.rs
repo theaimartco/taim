@@ -11,6 +11,7 @@ pub use taim_runtime::futures;
 pub mod app;
 pub mod compat;
 pub mod message;
+pub mod native;
 mod preset;
 
 pub use app::*;

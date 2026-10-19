@@ -5,29 +5,35 @@
 //! The runtime owns invalidation, window lifecycle, accessibility, and renderer
 //! recovery while applications remain ordinary state, update, and view code.
 //!
-//! ```no_run,standalone_crate
-//! use taim::widget::{button, column, text};
-//! use taim::Element;
+//! Native applications have a dedicated intent-first API. Updates explicitly
+//! declare whether to schedule a frame, avoiding a redraw on idle actions.
 //!
-//! #[derive(Debug, Clone)]
-//! enum Message { Increment }
+//! ```no_run
+//! use taim::{Element, Task};
+//! use taim::native::{app, Dispatch};
+//! use taim::AppContext;
+//! use taim::WindowContext;
 //!
-//! fn update(value: &mut u64, message: Message) {
-//!     match message {
-//!         Message::Increment => *value += 1,
-//!     }
+//! fn scene<'a>(value: &'a u64, _: &WindowContext) -> Element<'a, u64> {
+//!     taim::widget::text(format!("Count: {value}")).into()
 //! }
 //!
-//! fn view(value: &u64) -> Element<'_, Message> {
-//!     column![
-//!         text(value),
-//!         button("Increment").on_press(Message::Increment),
-//!     ]
-//!     .spacing(8)
-//!     .into()
+//! fn main() -> taim::Result {
+//!     let native = app(
+//!         "TAIM Native Example",
+//!         |_context: &mut AppContext| (0_u64, Task::none()),
+//!         |state: &mut u64, increment: u64, _context: &mut AppContext| {
+//!             if increment == 0 {
+//!                 Dispatch::idle()
+//!             } else {
+//!                 *state += increment;
+//!                 Dispatch::paint()
+//!             }
+//!         },
+//!         scene,
+//!     );
+//!     taim::run_app(native)
 //! }
-//!
-//! fn main() -> taim::Result { taim::run(update, view) }
 //! ```
 //!
 //! Use [`application`] for initialization, subscriptions, theming, and window
@@ -69,6 +75,11 @@ mod error;
 mod facade;
 
 pub mod application;
+
+/// Native intent-based TAIM application API (no legacy ProgramAdapter).
+pub mod native {
+    pub use crate::program::native::{Dispatch, NativeApp, app};
+}
 pub mod daemon;
 pub mod time;
 pub mod window;

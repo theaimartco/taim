@@ -73,7 +73,7 @@ impl StateDelta {
 #[derive(Debug)]
 pub struct AppContext {
     frame_count: u64,
-    request: FrameRequest,
+    pending: StateDelta,
 }
 
 impl AppContext {
@@ -81,7 +81,7 @@ impl AppContext {
     pub fn new() -> Self {
         Self {
             frame_count: 0,
-            request: FrameRequest::None,
+            pending: StateDelta::clean(),
         }
     }
 
@@ -96,19 +96,42 @@ impl AppContext {
         self.frame_count
     }
 
+    /// Merge an explicit state invalidation with pending framework work.
+    ///
+    /// The strongest presentation request wins; animation cannot be silently
+    /// overwritten by a later paint-only update in the same message batch.
+    pub fn invalidate(&mut self, delta: StateDelta) {
+        self.pending.layout_dirty |= delta.layout_dirty;
+        self.pending.paint_dirty |= delta.paint_dirty;
+        self.pending.frame = match (self.pending.frame, delta.frame) {
+            (FrameRequest::Animate, _) | (_, FrameRequest::Animate) => FrameRequest::Animate,
+            (FrameRequest::Redraw, _) | (_, FrameRequest::Redraw) => FrameRequest::Redraw,
+            (FrameRequest::None, FrameRequest::None) => FrameRequest::None,
+        };
+    }
+
     /// Requests a redraw on the next frame.
     pub fn request_redraw(&mut self) {
-        self.request = FrameRequest::Redraw;
+        self.invalidate(StateDelta::redraw());
     }
 
     /// Requests a continuous animation loop.
     pub fn request_animation(&mut self) {
-        self.request = FrameRequest::Animate;
+        self.invalidate(StateDelta {
+            layout_dirty: false,
+            paint_dirty: true,
+            frame: FrameRequest::Animate,
+        });
+    }
+
+    /// Consume all accumulated invalidation data after an update batch.
+    pub fn take_invalidation(&mut self) -> StateDelta {
+        std::mem::take(&mut self.pending)
     }
 
     /// Takes the currently pending frame request.
     pub fn take_request(&mut self) -> FrameRequest {
-        std::mem::take(&mut self.request)
+        self.take_invalidation().frame
     }
 }
 
@@ -260,6 +283,14 @@ pub trait App: Sized {
         false
     }
 
+    /// Opt in to explicit frame invalidation after message handling.
+    ///
+    /// Legacy apps and existing App implementations keep automatic redraw.
+    /// Native intent-based apps override this and return true.
+    fn controls_invalidation() -> bool {
+        false
+    }
+
     /// Adapts this native [`App`] into a legacy [`Program`].
     #[deprecated(
         note = "Native App execution runs directly through AppRunner. into_program is compatibility only."
@@ -285,6 +316,12 @@ impl<A: App> AppRunner<A> {
     pub fn is_legacy_compat(&self) -> bool {
         A::is_legacy_compat()
     }
+
+    /// Whether the app explicitly controls redraw after messages.
+    pub fn controls_invalidation(&self) -> bool {
+        A::controls_invalidation()
+    }
+
     /// Boots a new [`AppRunner`] for the given [`App`].
     pub fn new(app: A) -> (Self, Task<A::Message>) {
         let mut context = AppContext::new();

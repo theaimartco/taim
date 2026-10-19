@@ -1,7 +1,7 @@
 name: TAIM release verification
 on:
   pull_request:
-    branches: [main]
+    branches: [main, hardening/wayland-bench-release-gates-20261019]
   push:
     branches: [main]
   workflow_dispatch:
@@ -30,6 +30,10 @@ jobs:
         run: |
           bash -n scripts/qa/wayland-smoke.sh
           bash -n scripts/perf/compare-frameworks.sh
+      - name: Audit upstream dependency boundary
+        run: |
+          python3 -m unittest discover -s scripts/audit -p 'test_*.py' -v
+          python3 scripts/audit/check-upstream-boundary.py
       - name: Check release requirements
         run: |
           test -s SECURITY.md
@@ -38,6 +42,25 @@ jobs:
           test -s docs/release/production-gates.md
           test -s scripts/release/verify-readiness.py
           test -s scripts/perf/compare-evidence.py
+
+  source_lineage:
+    name: Strict current-source independence audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify original-fork ancestry and reject inherited source
+        run: |
+          python3 scripts/audit/source-lineage-gate.py --strict --output artifacts/source-lineage.json
+      - name: Preserve current-source audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: taim-source-lineage
+          path: artifacts/source-lineage.json
+          if-no-files-found: ignore
 
   formatting:
     name: Rust formatting gate

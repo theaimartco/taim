@@ -939,6 +939,12 @@ pub(super) async fn run_instance<A>(
                                 &mut update_outputs,
                             );
 
+                            // Native TAIM intent handlers explicitly report
+                            // state/layout/paint invalidation. Legacy apps still
+                            // receive automatic redraws after message batches.
+                            let explicit_invalidation = runner.controls_invalidation();
+                            let intent_delta = runner.context_mut().take_invalidation();
+
                             user_interfaces = ManuallyDrop::new(build_user_interfaces(
                                 &runner,
                                 &mut window_manager,
@@ -971,11 +977,22 @@ pub(super) async fn run_instance<A>(
                                 );
                             }
 
+                            let dirty = crate::frame_gate::after_message_batch(
+                                explicit_invalidation,
+                                uis_stale,
+                                intent_delta,
+                            );
                             for (window_id, window) in window_manager.iter_mut() {
-                                frame_gate.invalidate(
-                                    window_id,
-                                    crate::frame_gate::DirtyFlags::PAINT_DIRTY,
-                                );
+                                if dirty.is_empty() {
+                                    continue;
+                                }
+
+                                frame_gate.invalidate(window_id, dirty);
+                                if explicit_invalidation
+                                    && intent_delta.frame == program::FrameRequest::Animate
+                                {
+                                    window.scheduler.request_animation();
+                                }
                                 window.request_redraw(core::window::RedrawRequest::NextFrame);
                             }
                         }

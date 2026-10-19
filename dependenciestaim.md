@@ -2,6 +2,31 @@
 
 Last audited: 2026-09-19
 
+## October 19, 2026 — independent-source checkpoint (not 100%)
+
+At branch commit 935e88d1d92ec1b84e628aa330243a6d4eee9e22 the complete
+recursive Git trees for upstream Iced fork 56b706fc and TAIM were compared
+using exact Git blob SHA. 67 .rs/.wgsl/.toml files were still byte-identical
+at identical paths; the exact file inventory is preserved in
+docs/audit/exact-iced-blob-ledger.md.
+
+This figure is a LOWER BOUND for inherited origin: renamed, moved, lightly
+modified, and substantially rewritten source requires manual provenance
+review. The September 19 97.39% token metric is a historical estimate,
+not an exact current independence or original authorship percentage.
+
+Original implementations created on this branch include a direct
+intent-driven native App lifecycle, cancellation-aware subscription
+reconciliation (replacing the prior tracker.rs), and a nonwrapping
+concurrent window ID allocator. Hardware, independent visual correctness,
+Rust lint/build and source-pedigree gates have NOT passed latest CI:
+GitHub hosted jobs fail before allocating executable runner steps
+(see issue #2).
+
+Strict source-lineage CI now refuses to certify 100% while inherited
+code remains. Preserve Iced MIT copyright and fork history irrespective
+of eventual complete replacement of inherited live source.
+
 ## Non-negotiable rule
 
 TAIM ka final target **0% Iced runtime/code dependency** hai. Aage se koi bhi
