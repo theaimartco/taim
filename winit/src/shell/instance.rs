@@ -939,6 +939,12 @@ pub(super) async fn run_instance<A>(
                                 &mut update_outputs,
                             );
 
+                            // Native TAIM intent handlers explicitly report
+                            // state/layout/paint invalidation. Legacy apps still
+                            // receive automatic redraws after message batches.
+                            let explicit_invalidation = runner.controls_invalidation();
+                            let intent_delta = runner.context_mut().take_invalidation();
+
                             user_interfaces = ManuallyDrop::new(build_user_interfaces(
                                 &runner,
                                 &mut window_manager,
@@ -972,10 +978,34 @@ pub(super) async fn run_instance<A>(
                             }
 
                             for (window_id, window) in window_manager.iter_mut() {
-                                frame_gate.invalidate(
-                                    window_id,
-                                    crate::frame_gate::DirtyFlags::PAINT_DIRTY,
-                                );
+                                use crate::frame_gate::DirtyFlags;
+
+                                let mut dirty = if !explicit_invalidation || uis_stale {
+                                    DirtyFlags::PAINT_DIRTY
+                                } else {
+                                    DirtyFlags::CLEAN
+                                };
+
+                                if explicit_invalidation {
+                                    if intent_delta.layout_dirty {
+                                        dirty |= DirtyFlags::LAYOUT_DIRTY
+                                            | DirtyFlags::PAINT_DIRTY;
+                                    } else if intent_delta.paint_dirty {
+                                        dirty |= DirtyFlags::PAINT_DIRTY;
+                                    }
+                                    if intent_delta.frame != program::FrameRequest::None {
+                                        dirty |= DirtyFlags::PAINT_DIRTY;
+                                    }
+                                }
+
+                                if dirty.is_empty() {
+                                    continue;
+                                }
+
+                                frame_gate.invalidate(window_id, dirty);
+                                if intent_delta.frame == program::FrameRequest::Animate {
+                                    window.scheduler.request_animation();
+                                }
                                 window.request_redraw(core::window::RedrawRequest::NextFrame);
                             }
                         }
