@@ -174,6 +174,16 @@ impl Pointer {
     pub fn is_terminal(&self) -> bool {
         matches!(self.phase, Phase::Up | Phase::Cancel)
     }
+
+    /// Whether both logical position coordinates are finite.
+    ///
+    /// Gesture hit-testing and velocity estimation must not consume NaN or
+    /// infinity as an active touch or cursor position. Terminal events may
+    /// still be delivered to release an already-captured contact.
+    #[inline]
+    pub fn has_finite_position(&self) -> bool {
+        self.position.x.is_finite() && self.position.y.is_finite()
+    }
 }
 
 #[cfg(test)]
