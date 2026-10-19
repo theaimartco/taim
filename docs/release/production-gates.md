@@ -69,3 +69,52 @@ Run `bash scripts/qa/wayland-smoke.sh <new-evidence-dir>` on actual hardware.
 It is an automatic compositor-protocol/process sanity check, not physical
 input-to-photon or screen-reader acceptance. Never certify hardware from
 that single script. Unverified VYOM-native paths remain BLOCKED.
+
+
+## Programmatic pre-main release evidence contract
+
+Execute the evidence integrity validator only from a clean candidate checkout:
+
+    python3 scripts/release/verify-readiness.py \
+      --manifest /path/to/acceptance/manifest.json \
+      --commit "$(git rev-parse HEAD)" \
+      --repo-root . \
+      --output /path/to/acceptance/validated-contract.json
+
+Example JSON manifest structure (all placeholders must be replaced):
+
+    {
+      "schema_version": 1,
+      "candidate_commit": "<full 40-character candidate SHA>",
+      "operator": "<test operator identity>",
+      "supported_targets": ["VYOM-native-Wayland"],
+      "gates": {
+        "<each of the 12 names in REQUIRED_GATES>": {
+          "status": "PASS",
+          "reviewer": "<independent reviewer, different from operator>",
+          "reviewed_at": "2026-10-19T00:00:00Z",
+          "evidence": [
+            {"path": "physical-test-log.json", "sha256": "<sha256 hex>"}
+          ]
+        }
+      }
+    }
+
+ALL 12 required gate names must occur, with PASS, a different reviewer,
+a timezone-aware review date and at least one SHA-256-matching artifact.
+Exact candidate SHA and clean tree are enforced, and missing files are
+rejected. The validator runs synthetic contract tests in CI; those
+synthetic files are NOT actual hardware measurements.
+
+This checks declared evidence integrity only. It cannot independently
+prove physical measurements, real-world reviewer identity, security or
+compositor quality. An independent release reviewer must verify the
+underlying device, trace and acceptance evidence before allowing a merge.
+
+Live GitHub Actions runner allocation issue:
+https://github.com/theaimartco/taim/issues/2.
+Job failures with no executed steps are never Rust test results.
+
+Do NOT automatically merge into main, sign a stable tag, publish an
+unverified package, or claim production certification solely because
+this manifest validator passes.
