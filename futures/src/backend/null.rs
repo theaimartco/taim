@@ -1,7 +1,8 @@
 //! Deliberately disabled TAIM async backend.
 //!
-//! A runtime without an executor must fail initialization explicitly,
-//! rather than silently dropping all application tasks and subscriptions.
+//! Explicitly opting into this backend discards spawned futures.
+//! Production default selection must not choose it silently; see
+//! backend::default for the fail-fast missing-backend configuration.
 use crate::MaybeSend;
 
 /// An executor that drops all the futures, instead of spawning them.
@@ -10,10 +11,10 @@ pub struct Executor;
 
 impl crate::Executor for Executor {
     fn new() -> Result<Self, futures::io::Error> {
-        Err(futures::io::Error::new(
-            futures::io::ErrorKind::Unsupported,
-            "TAIM requires an async executor: enable smol, tokio or thread-pool",
-        ))
+        // Explicit null executors are useful for task-scheduler unit tests
+        // that never delegate work to the background pool. Rejecting a
+        // *default* missing executor is handled in backend::default.
+        Ok(Self)
     }
 
     fn spawn(&self, _future: impl Future<Output = ()> + MaybeSend + 'static) {}
@@ -33,8 +34,8 @@ mod taim_disabled_executor_tests {
     use super::*;
 
     #[test]
-    fn refuses_silent_default_task_loss() {
-        let error = <Executor as crate::Executor>::new().unwrap_err();
-        assert_eq!(error.kind(), futures::io::ErrorKind::Unsupported);
+    fn explicit_null_backend_is_constructible_for_scheduler_only_tests() {
+        let executor = <Executor as crate::Executor>::new();
+        assert!(executor.is_ok());
     }
 }
