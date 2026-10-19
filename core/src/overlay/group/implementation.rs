@@ -58,15 +58,18 @@ where
         cursor: mouse::Cursor,
         renderer: &Renderer,
     ) -> mouse::Interaction {
-        self.children.iter().zip(layout.children()).fold(
-            mouse::Interaction::None,
-            |current, (child, child_layout)| {
-                current.max(
+        // The final painted overlay has the first opportunity to choose the
+        // cursor. Enum ordering is unrelated to visual stacking order, and
+        // could let a covered resize handle override a foreground button.
+        mouse::Interaction::topmost(
+            self.children
+                .iter()
+                .zip(layout.children())
+                .map(|(child, child_layout)| {
                     child
                         .as_overlay()
-                        .mouse_interaction(child_layout, cursor, renderer),
-                )
-            },
+                        .mouse_interaction(child_layout, cursor, renderer)
+                }),
         )
     }
 
