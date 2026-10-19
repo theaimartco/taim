@@ -92,7 +92,11 @@ pub fn window_attributes(
         attributes = attributes.with_skip_taskbar(settings.platform_specific.skip_taskbar);
 
         attributes =
-            attributes.with_undecorated_shadow(settings.platform_specific.undecorated_shadow);
+            attributes.with_undecorated_shadow(
+                settings
+                    .platform_specific
+                    .effective_undecorated_shadow(settings.decorations),
+            );
 
         attributes =
             attributes.with_corner_preference(match settings.platform_specific.corner_preference {
