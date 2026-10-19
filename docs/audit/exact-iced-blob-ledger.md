@@ -1,14 +1,14 @@
-# TAIM source-origin exact-SHA ledger
+# TAIM current exact Git SHA source lineage
 
-Candidate commit: `63171505e8be004d480c69832a01ce3e12773b20`. Original Iced fork point: `56b706fc`. Both recursive GitHub Git trees were complete, not truncated.
+**Candidate:** `faefe0b6b91cdd1070cc035214df7c666db79aa0`. **Iced fork point:** `56b706fc`.
+Both GitHub recursive Git-tree inventories were untruncated. These are exact SHA matches at inherited paths for .rs / .wgsl / .toml files.
 
-## 62 byte-identical active source and config files still at inherited paths
+## 60 byte-identical files still remaining
 
-These SHA matches cover only exactly identical `.rs`, `.wgsl` and `.toml` files at the same paths. This count is a strict lower bound, **not** the actual number of inherited Rust lines: adapted or partially copied files also require review. The `exact-fork-blobs.py` audit checks renamed whole-file copies; token similarity and independent manual classification are separate mandatory gates. No code-origin scanner establishes legal authorship merely by returning zero matches.
+This is an **undercount of all inherited implementation**: token-identical renamed functions, moved snippets and edited Iced-derived code still require external provenance review. Do not equate a zero exact count with independent authorship, legal permission to erase notices or stable quality.
 
-### Core / input (18)
+### Core and input (17)
 
-- `core/src/background.rs`
 - `core/src/keyboard.rs`
 - `core/src/keyboard/location.rs`
 - `core/src/mouse.rs`
@@ -27,7 +27,7 @@ These SHA matches cover only exactly identical `.rs`, `.wgsl` and `.toml` files 
 - `core/src/window/settings/windows.rs`
 - `core/src/window/user_attention.rs`
 
-### Async / scheduling (11)
+### Futures, async and scheduling (11)
 
 - `futures/src/backend/default.rs`
 - `futures/src/backend/native.rs`
@@ -41,15 +41,14 @@ These SHA matches cover only exactly identical `.rs`, `.wgsl` and `.toml` files 
 - `futures/src/maybe.rs`
 - `futures/src/stream.rs`
 
-### Graphics (5)
+### Graphics (4)
 
 - `graphics/src/error.rs`
 - `graphics/src/geometry.rs`
 - `graphics/src/geometry/fill.rs`
 - `graphics/src/geometry/style.rs`
-- `graphics/src/shell.rs`
 
-### Program & runtime (6)
+### Application/runtime (6)
 
 - `program/src/message.rs`
 - `program/src/preset.rs`
@@ -68,7 +67,7 @@ These SHA matches cover only exactly identical `.rs`, `.wgsl` and `.toml` files 
 - `widget/src/pane_grid/pane.rs`
 - `widget/src/pane_grid/split.rs`
 
-### Rendering / shell (7)
+### Rendering and window platform (7)
 
 - `tiny_skia/src/window.rs`
 - `wgpu/src/image/null.rs`
@@ -78,7 +77,7 @@ These SHA matches cover only exactly identical `.rs`, `.wgsl` and `.toml` files 
 - `wgpu/src/shader/vertex.wgsl`
 - `winit/src/error.rs`
 
-### Configuration / facade (8)
+### Configuration and facade (8)
 
 - `.cargo/audit.toml`
 - `.cargo/config.toml`
@@ -89,17 +88,18 @@ These SHA matches cover only exactly identical `.rs`, `.wgsl` and `.toml` files 
 - `src/window.rs`
 - `src/window/icon.rs`
 
-## Functional TAIM-native implementations integrated on the feature branch
+## Native TAIM engineering added on the identity branch
 
-- Native app intent/reducer/scene contract and real Winit FrameGate invalidation with clean/paint/layout/animation distinctions.
-- Replacement subscription tracker with epoch-aware reconciliation, bounded event delivery and cancellation during output backpressure.
-- Non-wrapping atomic window IDs, original redraw/deadline merging, packed iterative pane geometry, bounded pane configuration validation.
-- GPU atlas fragmented image coverage preflight, adaptive pane-title control visibility and hidden-title overlay suppression.
-- **New native event queue coalescing:** immediately adjacent same-window cursor movement, same-finger touch movement, and matching window geometry changes are folded to the latest observation. Critical mouse/touch/keyboard/focus/window lifecycle boundaries, including wheel deltas, are never folded. Tests include multiple windows, gesture boundaries, finger isolation and geometry updates. `core/src/window/event.rs` provides the typed lifecycle coalescing contract.
+- Intent-driven boot/reduce/scene native app with actual Winit FrameGate semantics; old Program compatibility retained.
+- Cancellation-aware stream reconciliation, process-unique checked window IDs, redraw deadline merging, bounded and iterative pane-grid layout, source tile coverage guards for GPU atlas uploads.
+- Responsive pane title controls with consistent input/accessibility/overlay visibility, and same-pointer adjacent event coalescing in real Winit queue.
+- **TAIM batched renderer notification transaction:** one deferred layout/paint/tick notification per kind within each scope, compatibility with immediate notifier implementations retained; four unit tests added.
+- **TAIM transparent-surface paint culling:** conservative fully transparent background classification, finite bounded opacity scaling, and actual widget container short-circuit before GPU quad submission; four unit tests added.
+- Local Ubuntu verification script `scripts/release/verify-native-identity-local.sh`: verifies tracked source against candidate commit, writes exact source lineage evidence, then Rust fmt, workspace compilation, Clippy, tests and independent downstream Cargo app smoke. It deliberately fails 100%-original-source promotion until inherited code has been replaced and audited.
 
-## Release blockers
+## Gates currently not passed
 
-- `scripts/audit/source-lineage-gate.py --strict` must pass on the final commit with historical fork ancestry available. All inherited and modified source needs independent human provenance review.
-- GitHub Actions issue #2: jobs continue failing before a runner executes any steps, so Rust compilation, Clippy, golden-image, keyboard/IME, screen-reader, real VYOM and GPU hardware tests **have not been proven green**. Do not treat committed unit tests as executed tests.
-- Source speedups are unverified. Benchmark against Iced/Slint/egui under controlled hardware before performance claims.
-- Preserve actual Iced MIT notices, CREDITS.md and historical Git ancestry regardless of remaining source rewrite work. Keep main unchanged and PR draft.
+The user-requested 100% original live source is **NOT achieved** while 60 exact inherited files plus modified inherited code remain.
+The new Rust code, functionality and benchmarks have **not been compiled or tested here**. GitHub Actions workflow jobs are still failing with zero executed steps ([issue #2](https://github.com/theaimartco/taim/issues/2)), so source code is unverified. A local machine with Rust is required to execute the candidate verification script. No production signoff, real VYOM/Wayland/IME/AT-SPI/GPU acceptance, performance claim, or independent licensing review is complete.
+
+Preserve Iced's MIT LICENSE, CREDITS.md and historical Git ancestry even if all active source code is independently replaced. Keep PR draft and main unchanged.
