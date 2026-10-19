@@ -417,8 +417,8 @@ fn replaces_previous(previous: &core::Event, new: &core::Event) -> bool {
             core::Event::Mouse(mouse::Event::CursorMoved { .. }),
         ) => true,
         (
-            core::Event::Touch(touch::Event::FingerMoved { id: before, .. }),
-            core::Event::Touch(touch::Event::FingerMoved { id: after, .. }),
+            core::Event::Touch(crate::core::touch::Event::FingerMoved { id: before, .. }),
+            core::Event::Touch(crate::core::touch::Event::FingerMoved { id: after, .. }),
         ) => before == after,
         _ => false,
     }
