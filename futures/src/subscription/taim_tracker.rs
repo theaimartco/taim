@@ -21,7 +21,7 @@ use std::hash::Hasher as _;
 /// Listener closure is independent from recipe retirement.
 #[derive(Debug)]
 pub struct Execution {
-    cancel_on_drop: oneshot::Sender<()>,
+    _cancel_on_drop: oneshot::Sender<()>,
     event_sink: Option<mpsc::Sender<Event>>,
     observed_epoch: u64,
 }
@@ -149,7 +149,7 @@ impl Tracker {
             };
 
             self.active.insert(identity, Execution {
-                cancel_on_drop,
+                _cancel_on_drop: cancel_on_drop,
                 event_sink: Some(event_sink),
                 observed_epoch: epoch,
             });
@@ -214,7 +214,6 @@ mod tests {
     use crate::BoxStream;
     use crate::core::theme;
     use crate::subscription::EventStream;
-    use std::hash::Hasher;
 
     struct Constant {
         id: u64,
@@ -224,7 +223,7 @@ mod tests {
         type Output = u32;
 
         fn hash(&self, state: &mut Hasher) {
-            state.write_u64(self.id);
+            std::hash::Hasher::write_u64(state, self.id);
         }
 
         fn stream(self: Box<Self>, _events: EventStream) -> BoxStream<u32> {
@@ -233,7 +232,7 @@ mod tests {
     }
 
     fn batch(ids: &[u64]) -> impl Iterator<Item = Box<dyn Recipe<Output = u32>>> + '_ {
-        ids.iter().copied().map(|id| Box::new(Constant { id }) as _)
+        ids.iter().copied().map(|id| Box::new(Constant { id }) as Box<dyn Recipe<Output = u32>>)
     }
 
     #[test]
@@ -281,7 +280,7 @@ mod tests {
         for task in tasks {
             futures::executor::block_on(task);
         }
-        assert_eq!(receiver.try_next(), Ok(Some(42)));
+        assert!(matches!(receiver.try_next(), Ok(Some(42))));
     }
 
     #[test]
