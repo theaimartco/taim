@@ -1,10 +1,12 @@
-# TAIM current Iced-origin exact blob inventory
+# TAIM source-lineage exact Git SHA inventory
 
-Snapshot of complete recursive GitHub trees at the Iced fork `56b706fc` and TAIM SHA `7edf9417eec20f9c3ba726aaf6bfe235381d0c13`, taken October 20, 2026.
+Latest source commit: `681f172d46cc01d6a5dc8f533121f4ceeab5e683`. Comparison Iced fork baseline `56b706fc`. Both recursive GitHub trees were complete (not truncated).
 
-**65 same-path byte-identical .rs/.wgsl/.toml files remain.** Full-tree API responses were not truncated. This is a **lower bound** on inherited origin: edited, partially copied, relocated-source snippets, and any upstream-origin files with changed names still need manual provenance verification and the normalized-token scanner. Not a 100% original-ownership metric.
+## 63 exact same-path inherited Rust / WGSL / TOML files remain
 
-## Input and core — 19
+This lower-bound inventory only catches byte-identical files at the original paths. Renamed or moved identical files are checked separately by scripts/audit/exact-fork-blobs.py. Modified, partially reused, generated or adapted inherited code still requires independent source review; a zero exact count would NOT certify original authorship.
+
+### Core — 19
 
 - `core/src/background.rs`
 - `core/src/keyboard.rs`
@@ -26,7 +28,7 @@ Snapshot of complete recursive GitHub trees at the Iced fork `56b706fc` and TAIM
 - `core/src/window/settings/windows.rs`
 - `core/src/window/user_attention.rs`
 
-## Async and scheduling — 11
+### Async — 11
 
 - `futures/src/backend/default.rs`
 - `futures/src/backend/native.rs`
@@ -40,7 +42,7 @@ Snapshot of complete recursive GitHub trees at the Iced fork `56b706fc` and TAIM
 - `futures/src/maybe.rs`
 - `futures/src/stream.rs`
 
-## Graphics — 5
+### Graphics — 5
 
 - `graphics/src/error.rs`
 - `graphics/src/geometry.rs`
@@ -48,7 +50,7 @@ Snapshot of complete recursive GitHub trees at the Iced fork `56b706fc` and TAIM
 - `graphics/src/geometry/style.rs`
 - `graphics/src/shell.rs`
 
-## Application and runtime — 6
+### App and runtime — 6
 
 - `program/src/message.rs`
 - `program/src/preset.rs`
@@ -57,21 +59,19 @@ Snapshot of complete recursive GitHub trees at the Iced fork `56b706fc` and TAIM
 - `runtime/src/image.rs`
 - `runtime/src/system.rs`
 
-## Widgets — 8
+### Widget — 7
 
 - `widget/src/action.rs`
 - `widget/src/lazy/cache.rs`
 - `widget/src/overlay.rs`
-- `widget/src/pane_grid/controls.rs`
 - `widget/src/pane_grid/direction.rs`
 - `widget/src/pane_grid/draggable.rs`
 - `widget/src/pane_grid/pane.rs`
 - `widget/src/pane_grid/split.rs`
 
-## Rendering and shell — 8
+### GPU and shell — 7
 
 - `tiny_skia/src/window.rs`
-- `wgpu/src/image/atlas/entry.rs`
 - `wgpu/src/image/null.rs`
 - `wgpu/src/shader/blit.wgsl`
 - `wgpu/src/shader/color.wgsl`
@@ -79,7 +79,7 @@ Snapshot of complete recursive GitHub trees at the Iced fork `56b706fc` and TAIM
 - `wgpu/src/shader/vertex.wgsl`
 - `winit/src/error.rs`
 
-## Other — 8
+### Other — 8
 
 - `.cargo/audit.toml`
 - `.cargo/config.toml`
@@ -90,17 +90,18 @@ Snapshot of complete recursive GitHub trees at the Iced fork `56b706fc` and TAIM
 - `src/window.rs`
 - `src/window/icon.rs`
 
-## Material implementation replacements on the native identity branch
+## Substantive replacements on the native identity branch
 
-- Inherited subscription tracker replaced by TAIM's cancellation-aware stream reconciler (tests for deduplication, retire, epoch rollover)
-- Process-unique non-wrapping window IDs, with concurrent issuance and exhaustion tests
-- Frame redraw intent now supports explicit merge and deadlines, used by Winit's real scheduler
-- Original native App intent model and FrameGate layout/paint/animation invalidation policy
-- Recursive pane-grid geometry replaced with packed-index iterative region planner, including nested/mixed-axis tests
-- Native pane configuration now exposes bounded node/depth validation and checked State mounting; malformed split ratios rejected before state allocation
+- Direct TAIM native intent/reducer/scene application contract; explicit frame dirty-state semantics wired to Winit event loop.
+- Original cancellation-aware, bounded subscription tracker, replacing the prior inherited implementation.
+- Checked monotonic window-ID allocation and explicit frame request/deadline merging.
+- Packed, iterative geometry planner for deeply nested pane-grid regions, plus checked configuration validation.
+- Native GPU atlas entry preflight with linear-time exact row-major source coverage. The actual image upload rejects malformed tiling before GPU staging; tests cover overlap, missing tiles, incorrect bounds and valid tiling.
+- Original TAIM adaptive pane-title control presentation (full, compact, or title-hidden) unified across layout, draw, input, accessibility visits and overlay selection. Hidden title overlays are suppressed.
 
-## Production and authenticity gates
+## Verification and legal provenance
 
-`python3 scripts/audit/source-lineage-gate.py --strict --output artifacts/lineage.json` is required for any claim of zero inherited source. `scripts/audit/exact-fork-blobs.py` covers identical files moved to another path. **Neither scanner can prove original human authorship or extinguish MIT copyright notice requirements.**
-
-New Rust source **has not passed an executable CI run**: GitHub Actions runner allocation issue #2 still causes jobs to fail with zero executed steps. Native VYOM/Wayland, GPU recovery, IME, screen reader, hardware latency, performance and security/reproducibility gates remain open. Preserve `LICENSE`, `CREDITS.md` and historical fork Git ancestry. Keep main unchanged and this PR draft until independent acceptance.
+- Source audit strict runner and full source lineage review must complete before 100% independently implemented claims.
+- GitHub Actions issue #2: actual Rust compile, Clippy, tests and hardware verification are not passing. Hosted runner failures happen with zero executed job steps; exact infrastructure root cause not yet established.
+- No runtime performance speedup or correctness certification has been established for these changes; all Rust tests are **committed but currently unexecuted**.
+- Historical Iced origin, MIT attribution and Git history must be preserved; originality of current code does not erase source ancestry.
