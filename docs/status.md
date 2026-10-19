@@ -24,6 +24,15 @@ The new bounded-stream and overlay-cursor implementations have committed
 regression tests, but their Rust execution has not been certified.
 See docs/audit/taim-stream-overlay-native-20261020.md.
 
+## Native geometry and navigation checkpoint (candidate eddaf3aa)
+
+A complete Git-tree comparison finds **55 byte-identical same-path
+`.rs/.wgsl/.toml` files** at the Iced fork baseline, down from 58.
+Original screen-placement semantics, exact cardinal layout handling
+and centerline pane navigation are now committed with unexecuted tests.
+The inherited-code replacement and manual provenance review are unfinished.
+See docs/audit/taim-native-layout-20261020.md.
+
 ## Verification lanes
 
 - Hosted CI: .github/workflows/verification.yml on PRs and main.
