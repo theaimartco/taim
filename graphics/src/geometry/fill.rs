@@ -25,6 +25,21 @@ pub struct Fill {
     pub rule: Rule,
 }
 
+impl Fill {
+    /// Tell the geometry recorder whether this operation can be omitted.
+    /// Winding rules do not affect alpha contribution.
+    #[inline]
+    pub fn is_fully_transparent(self) -> bool {
+        self.style.is_fully_transparent()
+    }
+
+    /// Preserve the pigment while choosing even-odd/nonzero winding.
+    pub fn with_rule(mut self, rule: Rule) -> Self {
+        self.rule = rule;
+        self
+    }
+}
+
 impl Default for Fill {
     fn default() -> Self {
         Self {
@@ -72,4 +87,18 @@ impl From<gradient::Linear> for Fill {
 pub enum Rule {
     NonZero,
     EvenOdd,
+}
+
+#[cfg(test)]
+mod taim_fill_tests {
+    use super::*;
+
+    #[test]
+    fn winding_rule_does_not_change_culling_decision() {
+        let empty = Fill::from(Color::TRANSPARENT);
+        assert!(empty.is_fully_transparent());
+        assert!(empty.with_rule(Rule::EvenOdd).is_fully_transparent());
+        assert!(!Fill::default().is_fully_transparent());
+        assert_eq!(empty.with_rule(Rule::EvenOdd).rule, Rule::EvenOdd);
+    }
 }
