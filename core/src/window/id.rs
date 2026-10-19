@@ -36,7 +36,7 @@ impl Id {
 
     fn allocate(counter: &AtomicU64) -> Option<Self> {
         let previous = counter
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, u64::checked_add)
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| current.checked_add(1))
             .ok()?;
         Some(Self(previous + 1))
     }
