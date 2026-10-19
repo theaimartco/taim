@@ -95,10 +95,24 @@ where
     Renderer: text::Renderer,
 {
     fn layout(&mut self, renderer: &Renderer, bounds: Size) -> layout::Node {
-        let space_below = (bounds.height - (self.position.y + self.target_height)).max(0.0);
-        let space_above = self.position.y.clamp(0.0, bounds.height.max(0.0));
+        // Fit the menu's anchor horizontally into the actual window.
+        // Reject non-finite placement before layout arithmetic so a popup
+        // near the right edge does not vanish into a zero-width region.
+        let position = crate::overlay::fit_menu_anchor(self.position, bounds, self.width);
+        let viewport_height = if bounds.height.is_finite() {
+            bounds.height.max(0.0)
+        } else {
+            0.0
+        };
+        let target_height = if self.target_height.is_finite() {
+            self.target_height.clamp(0.0, viewport_height)
+        } else {
+            0.0
+        };
+        let space_below = (viewport_height - (position.y + target_height)).max(0.0);
+        let space_above = position.y;
         let available_height = space_below.max(space_above);
-        let available_width = (bounds.width - self.position.x).max(0.0);
+        let available_width = (bounds.width - position.x).max(0.0);
         let limits = layout::Limits::new(Size::ZERO, Size::new(available_width, available_height))
             .width(self.width.min(available_width));
 
@@ -106,9 +120,9 @@ where
         let size = node.size();
 
         node.move_to(if space_below > space_above {
-            self.position + Vector::new(0.0, self.target_height)
+            position + Vector::new(0.0, target_height)
         } else {
-            self.position - Vector::new(0.0, size.height)
+            position - Vector::new(0.0, size.height)
         })
     }
 
