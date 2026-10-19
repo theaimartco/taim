@@ -45,6 +45,21 @@ window presentation semantics, workspace IDs and Linux application-ID
 sanitization. Neither compilation nor production acceptance is verified.
 See `docs/audit/taim-remaining-source-20261020.md`.
 
+## Rendering and executor safety checkpoint (candidate 706a0575)
+
+The native-render/executor branch now has **39 byte-identical same-path
+`.rs/.wgsl/.toml` paths** against the recorded original Iced fork,
+down from 46 in the previous checkpoint. This is a narrow SHA-count,
+**not an original-source completion percentage**.
+
+TAIM now conservatively skips fully zero-alpha path/rectangle fills at
+the geometry Frame dispatch boundary, normalizes invalid default font
+text size, rejects a missing async executor during runtime initialization,
+and clamps zero-duration timers on Tokio, smol and Wasm backends. The
+eight added regression tests and whole-workspace builds are **unexecuted**.
+Provenance review and release acceptance remain NO-GO. See
+`docs/audit/taim-native-render-executor-20261020.md`.
+
 ## Verification lanes
 
 - Hosted CI: .github/workflows/verification.yml on PRs and main.
