@@ -31,7 +31,7 @@ impl PlatformSpecific {
             || id.ends_with('.')
             || id.as_bytes().iter().any(|byte| {
                 !matches!(
-                    byte,
+                    *byte,
                     b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'.' | b'-' | b'_'
                 )
             })
