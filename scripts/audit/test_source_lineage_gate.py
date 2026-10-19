@@ -36,6 +36,17 @@ class SourceGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "incomplete"):
             gate.assess(x)
 
+    def test_relocated_exact_upstream_blob_blocks_even_when_heuristic_clears(self):
+        x = gate.assess(report())
+        gate.include_exact_matches(x, {"exact_match_count": 1, "matches": [{"path": "moved.rs"}]})
+        self.assertEqual(x["status"], "NO_GO")
+        self.assertIn("exact_git_blob_sha_matches=1", x["blockers"])
+
+    def test_incomplete_exact_inventory_rejected(self):
+        x = gate.assess(report())
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            gate.include_exact_matches(x, {"exact_match_count": 2, "matches": []})
+
     def test_missing_metric_blocks(self):
         x = report()
         del x["summary"]["disguised_copies"]
