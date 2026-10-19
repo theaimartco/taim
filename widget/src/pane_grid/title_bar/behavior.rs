@@ -1,4 +1,5 @@
 use super::*;
+use crate::pane_grid::controls::Presentation;
 
 impl<Message, Theme, Renderer> TitleBar<'_, Message, Theme, Renderer>
 where
@@ -90,7 +91,11 @@ where
             && (show_controls || self.always_show_controls)
         {
             let controls_layout = children.next().unwrap();
-            if title_layout.bounds().width + controls_layout.bounds().width > padded.bounds().width
+            if controls.presentation(
+                title_layout.bounds().width,
+                controls_layout.bounds().width,
+                padded.bounds().width,
+            ) != Presentation::FullWithTitle
             {
                 if let Some(compact) = controls.compact.as_ref() {
                     let compact_layout = children.next().unwrap();
@@ -157,8 +162,11 @@ where
             if let Some(controls) = self.controls.as_ref() {
                 let controls_layout = children.next().unwrap();
 
-                if title_layout.bounds().width + controls_layout.bounds().width
-                    > padded.bounds().width
+                if controls.presentation(
+                title_layout.bounds().width,
+                controls_layout.bounds().width,
+                padded.bounds().width,
+            ) != Presentation::FullWithTitle
                 {
                     if controls.compact.is_some() {
                         let compact_layout = children.next().unwrap();
@@ -206,7 +214,11 @@ where
                     .layout(state, renderer, &child_limits)
             });
 
-            if title_layout.bounds().width + controls_layout.bounds().width > max_size.width {
+            if controls.presentation(
+                title_layout.bounds().width,
+                controls_layout.bounds().width,
+                max_size.width,
+            ) != Presentation::FullWithTitle {
                 if let Some(compact) = controls.compact.as_mut() {
                     let compact_layout =
                         tree.children[2].layout_with_cache(child_limits, |state| {
@@ -286,7 +298,11 @@ where
         if let Some(controls) = &mut self.controls {
             let controls_layout = children.next().unwrap();
 
-            if title_layout.bounds().width + controls_layout.bounds().width > padded.bounds().width
+            if controls.presentation(
+                title_layout.bounds().width,
+                controls_layout.bounds().width,
+                padded.bounds().width,
+            ) != Presentation::FullWithTitle
             {
                 if let Some(compact) = controls.compact.as_mut() {
                     let compact_layout = children.next().unwrap();
@@ -340,7 +356,11 @@ where
         if let Some(controls) = &mut self.controls {
             let controls_layout = children.next().unwrap();
 
-            if title_layout.bounds().width + controls_layout.bounds().width > padded.bounds().width
+            if controls.presentation(
+                title_layout.bounds().width,
+                controls_layout.bounds().width,
+                padded.bounds().width,
+            ) != Presentation::FullWithTitle
             {
                 if let Some(compact) = controls.compact.as_mut() {
                     let compact_layout = children.next().unwrap();
@@ -401,7 +421,11 @@ where
         if let Some(controls) = &mut self.controls {
             let controls_layout = children.next().unwrap();
 
-            if title_layout.bounds().width + controls_layout.bounds().width > padded.bounds().width
+            if controls.presentation(
+                title_layout.bounds().width,
+                controls_layout.bounds().width,
+                padded.bounds().width,
+            ) != Presentation::FullWithTitle
             {
                 if let Some(compact) = controls.compact.as_mut() {
                     let compact_layout = children.next().unwrap();
@@ -492,7 +516,11 @@ where
                 renderer,
             );
 
-            if title_layout.bounds().width + controls_layout.bounds().width > padded.bounds().width
+            if controls.presentation(
+                title_layout.bounds().width,
+                controls_layout.bounds().width,
+                padded.bounds().width,
+            ) != Presentation::FullWithTitle
             {
                 if let Some(compact) = controls.compact.as_ref() {
                     let compact_layout = children.next().unwrap();
@@ -545,8 +573,11 @@ where
                 controls.as_mut().and_then(|controls| {
                     let controls_layout = children.next()?;
 
-                    if title_layout.bounds().width + controls_layout.bounds().width
-                        > padded.bounds().width
+                    if controls.presentation(
+                title_layout.bounds().width,
+                controls_layout.bounds().width,
+                padded.bounds().width,
+            ) != Presentation::FullWithTitle
                     {
                         if let Some(compact) = controls.compact.as_mut() {
                             let compact_state = states.next().unwrap();
