@@ -30,6 +30,10 @@ jobs:
         run: |
           bash -n scripts/qa/wayland-smoke.sh
           bash -n scripts/perf/compare-frameworks.sh
+      - name: Audit upstream dependency boundary
+        run: |
+          python3 -m unittest discover -s scripts/audit -p 'test_*.py' -v
+          python3 scripts/audit/check-upstream-boundary.py
       - name: Check release requirements
         run: |
           test -s SECURITY.md
