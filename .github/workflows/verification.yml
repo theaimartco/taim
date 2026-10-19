@@ -73,5 +73,7 @@ jobs:
         run: dbus-run-session -- cargo test -p taim-accessibility --features atspi --test atspi_bus
       - name: Package inventory (does not publish)
         run: cargo package -p taim --list --allow-dirty
+      - name: Independent external Cargo consumer compile
+        run: bash scripts/release/external-consumer-smoke.sh
 
 # Hosted CI cannot establish real-device presentation or physical latency.
