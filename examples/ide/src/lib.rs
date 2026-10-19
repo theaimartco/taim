@@ -313,10 +313,17 @@ pub fn parse_compiler_location(text: &str) -> Option<(String, usize, usize)> {
     let trimmed = text.trim();
     let stripped = trimmed.strip_prefix("--> ").unwrap_or(trimmed);
     for part in stripped.split_whitespace() {
-        let clean = part.trim_matches(|c: char| c == '(' || c == ')' || c == '[' || c == ']' || c == '\'' || c == '\"');
+        let clean = part.trim_matches(|c: char| {
+            c == '(' || c == ')' || c == '[' || c == ']' || c == '\'' || c == '\"'
+        });
         let mut segments = clean.split(':');
-        if let (Some(file), Some(line_str), Some(col_str)) = (segments.next(), segments.next(), segments.next()) {
-            if (file.ends_with(".rs") || file.ends_with(".toml") || file.ends_with(".json") || file.ends_with(".md"))
+        if let (Some(file), Some(line_str), Some(col_str)) =
+            (segments.next(), segments.next(), segments.next())
+        {
+            if (file.ends_with(".rs")
+                || file.ends_with(".toml")
+                || file.ends_with(".json")
+                || file.ends_with(".md"))
                 && let (Ok(line), Ok(col)) = (line_str.parse::<usize>(), col_str.parse::<usize>())
             {
                 return Some((file.to_string(), line, col));
@@ -1430,7 +1437,10 @@ impl Studio {
             return;
         }
         if let Some(disk_path) = self.disk_path(&path) {
-            match self.docs.open_disk_file(id, &path, &name, syntax, &disk_path) {
+            match self
+                .docs
+                .open_disk_file(id, &path, &name, syntax, &disk_path)
+            {
                 Ok(()) => {
                     self.docs.focused_pane = 0;
                     self.tree.selected_id = Some(id);
@@ -1466,12 +1476,24 @@ impl Studio {
             self.open_file(id);
         } else if let Some(disk_path) = self.disk_path(&clean_path) {
             let id = self.docs.reserve_virtual_id();
-            let name = clean_path.split('/').last().unwrap_or(&clean_path).to_string();
+            let name = clean_path
+                .split('/')
+                .last()
+                .unwrap_or(&clean_path)
+                .to_string();
             let syntax = crate::tree::syntax_for_path(&disk_path);
-            let _ = self.docs.open_disk_file(id, &clean_path, &name, syntax, &disk_path);
+            let _ = self
+                .docs
+                .open_disk_file(id, &clean_path, &name, syntax, &disk_path);
         }
-        if let Some(doc) = self.docs.active_mut().filter(|d| d.path == clean_path || d.path.ends_with(&clean_path)) {
-            let line_index = line.saturating_sub(1).min(doc.line_count().saturating_sub(1));
+        if let Some(doc) = self
+            .docs
+            .active_mut()
+            .filter(|d| d.path == clean_path || d.path.ends_with(&clean_path))
+        {
+            let line_index = line
+                .saturating_sub(1)
+                .min(doc.line_count().saturating_sub(1));
             let byte_column = doc
                 .content
                 .line(line_index)
@@ -1518,7 +1540,10 @@ impl Studio {
                     {
                         let path = doc.path.clone();
                         self.jump_to_file_location(&path, i + 1, 1);
-                        self.terminal.log(LogLevel::Success, format!("Jumped to definition of `{token}` in {}:{}:1", path, i + 1));
+                        self.terminal.log(
+                            LogLevel::Success,
+                            format!("Jumped to definition of `{token}` in {}:{}:1", path, i + 1),
+                        );
                         return true;
                     }
                 }
@@ -1559,11 +1584,9 @@ impl Studio {
                                         .windows(pat_bytes.len())
                                         .position(|window| window == pat_bytes)
                                     {
-                                        let line_num = mmap[..offset]
-                                            .iter()
-                                            .filter(|&&b| b == b'\n')
-                                            .count()
-                                            + 1;
+                                        let line_num =
+                                            mmap[..offset].iter().filter(|&&b| b == b'\n').count()
+                                                + 1;
                                         return Some((node.path.clone(), line_num));
                                     }
                                 }
@@ -1575,12 +1598,19 @@ impl Studio {
             }
             if let Some((rel_path, line_num)) = search_node(root, &self.tree.root, &patterns) {
                 self.jump_to_file_location(&rel_path, line_num, 1);
-                self.terminal.log(LogLevel::Success, format!("Instant SIMD jump to definition of `{token}` in {}:{}:1", rel_path, line_num));
+                self.terminal.log(
+                    LogLevel::Success,
+                    format!(
+                        "Instant SIMD jump to definition of `{token}` in {}:{}:1",
+                        rel_path, line_num
+                    ),
+                );
                 return true;
             }
         }
 
-        self.terminal.log(LogLevel::Info, format!("No definition found for `{token}`"));
+        self.terminal
+            .log(LogLevel::Info, format!("No definition found for `{token}`"));
         false
     }
 
@@ -1594,27 +1624,55 @@ impl Studio {
     }
 
     fn view_merge_conflict_banner(&self) -> Element<'_, Message> {
-        let count = self.docs.active().map(|d| d.find_merge_conflicts().len()).unwrap_or(0);
+        let count = self
+            .docs
+            .active()
+            .map(|d| d.find_merge_conflicts().len())
+            .unwrap_or(0);
         let banner = row![
-            text(format!("⚠️ Merge Conflict ({} conflict{})", count, if count == 1 { "" } else { "s" }))
-                .size(11)
-                .style(text::warning),
+            text(format!(
+                "⚠️ Merge Conflict ({} conflict{})",
+                count,
+                if count == 1 { "" } else { "s" }
+            ))
+            .size(11)
+            .style(text::warning),
             space().width(Length::Fill),
             button(text("Accept Current").size(10))
                 .style(button::primary)
-                .padding(Padding { top: 2.0, bottom: 2.0, left: 6.0, right: 6.0 })
+                .padding(Padding {
+                    top: 2.0,
+                    bottom: 2.0,
+                    left: 6.0,
+                    right: 6.0
+                })
                 .on_press(Message::AcceptConflictCurrent(0)),
             button(text("Accept Incoming").size(10))
                 .style(button::secondary)
-                .padding(Padding { top: 2.0, bottom: 2.0, left: 6.0, right: 6.0 })
+                .padding(Padding {
+                    top: 2.0,
+                    bottom: 2.0,
+                    left: 6.0,
+                    right: 6.0
+                })
                 .on_press(Message::AcceptConflictIncoming(0)),
             button(text("Accept Both").size(10))
                 .style(button::text)
-                .padding(Padding { top: 2.0, bottom: 2.0, left: 6.0, right: 6.0 })
+                .padding(Padding {
+                    top: 2.0,
+                    bottom: 2.0,
+                    left: 6.0,
+                    right: 6.0
+                })
                 .on_press(Message::AcceptConflictBoth(0)),
         ]
         .spacing(8)
-        .padding(Padding { top: 3.0, bottom: 3.0, left: 10.0, right: 10.0 })
+        .padding(Padding {
+            top: 3.0,
+            bottom: 3.0,
+            left: 10.0,
+            right: 10.0,
+        })
         .align_y(Center);
 
         container(banner)
@@ -1889,21 +1947,23 @@ impl Studio {
             .filter(|doc| doc.is_dirty)
             .map(|doc| (doc.path.as_str(), doc.text()))
             .collect();
-        let dirty_refs: Vec<(&str, &str)> = dirty_docs
-            .iter()
-            .map(|(p, c)| (*p, c.as_str()))
-            .collect();
+        let dirty_refs: Vec<(&str, &str)> =
+            dirty_docs.iter().map(|(p, c)| (*p, c.as_str())).collect();
         let mut extra_docs = Vec::new();
         for doc in &self.docs.documents {
-            if !self.search.cached_buffers.iter().any(|(p, _)| p == &doc.path) {
+            if !self
+                .search
+                .cached_buffers
+                .iter()
+                .any(|(p, _)| p == &doc.path)
+            {
                 extra_docs.push((doc.path.as_str(), doc.text()));
             }
         }
-        let extra_refs: Vec<(&str, &str)> = extra_docs
-            .iter()
-            .map(|(p, c)| (*p, c.as_str()))
-            .collect();
-        self.search.recompute_search_cached(&dirty_refs, &extra_refs);
+        let extra_refs: Vec<(&str, &str)> =
+            extra_docs.iter().map(|(p, c)| (*p, c.as_str())).collect();
+        self.search
+            .recompute_search_cached(&dirty_refs, &extra_refs);
     }
 
     fn checked_workspace_file(&self, relative: &str) -> std::io::Result<PathBuf> {
@@ -2542,14 +2602,22 @@ impl Studio {
                             }
                             "action:debug_start" => return self.update(Message::DebugStart),
                             "action:term_new" => return self.update(Message::NewTerminalTab),
-                            "action:goto_definition" => return self.update(Message::GoToDefinition),
-                            "action:find_references" => return self.update(Message::FindReferences),
+                            "action:goto_definition" => {
+                                return self.update(Message::GoToDefinition);
+                            }
+                            "action:find_references" => {
+                                return self.update(Message::FindReferences);
+                            }
                             "action:show_hover" => return self.update(Message::ShowHover),
                             "action:accept_all_current" => {
-                                return self.update(Message::AcceptAllConflicts(document::ConflictChoice::AcceptCurrent));
+                                return self.update(Message::AcceptAllConflicts(
+                                    document::ConflictChoice::AcceptCurrent,
+                                ));
                             }
                             "action:accept_all_incoming" => {
-                                return self.update(Message::AcceptAllConflicts(document::ConflictChoice::AcceptIncoming));
+                                return self.update(Message::AcceptAllConflicts(
+                                    document::ConflictChoice::AcceptIncoming,
+                                ));
                             }
                             "action:fold_all" => return self.update(Message::FoldAll),
                             "action:unfold_all" => return self.update(Message::UnfoldAll),
@@ -3737,7 +3805,10 @@ impl Studio {
                                 return Task::none();
                             }
                             Err(error) => {
-                                self.terminal.log(LogLevel::Warning, format!("LSP definition error: {error}"));
+                                self.terminal.log(
+                                    LogLevel::Warning,
+                                    format!("LSP definition error: {error}"),
+                                );
                             }
                         }
                     }
@@ -3764,7 +3835,10 @@ impl Studio {
                                 return Task::none();
                             }
                             Err(error) => {
-                                self.terminal.log(LogLevel::Warning, format!("LSP references error: {error}"));
+                                self.terminal.log(
+                                    LogLevel::Warning,
+                                    format!("LSP references error: {error}"),
+                                );
                             }
                         }
                     }
@@ -3794,14 +3868,19 @@ impl Studio {
                                 return Task::none();
                             }
                             Err(error) => {
-                                self.terminal.log(LogLevel::Warning, format!("LSP hover error: {error}"));
+                                self.terminal
+                                    .log(LogLevel::Warning, format!("LSP hover error: {error}"));
                             }
                         }
                     }
                 }
 
                 if let Some(token) = word {
-                    self.hover.show(&token, &format!("symbol `{token}`"), "Workspace symbol (instant inspection)");
+                    self.hover.show(
+                        &token,
+                        &format!("symbol `{token}`"),
+                        "Workspace symbol (instant inspection)",
+                    );
                 }
                 Task::none()
             }
@@ -3812,28 +3891,40 @@ impl Studio {
             Message::AcceptConflictCurrent(index) => {
                 if let Some(doc) = self.docs.active_mut() {
                     doc.resolve_conflict(index, document::ConflictChoice::AcceptCurrent);
-                    self.terminal.log(LogLevel::Success, "Resolved merge conflict (kept current change)");
+                    self.terminal.log(
+                        LogLevel::Success,
+                        "Resolved merge conflict (kept current change)",
+                    );
                 }
                 Task::none()
             }
             Message::AcceptConflictIncoming(index) => {
                 if let Some(doc) = self.docs.active_mut() {
                     doc.resolve_conflict(index, document::ConflictChoice::AcceptIncoming);
-                    self.terminal.log(LogLevel::Success, "Resolved merge conflict (accepted incoming change)");
+                    self.terminal.log(
+                        LogLevel::Success,
+                        "Resolved merge conflict (accepted incoming change)",
+                    );
                 }
                 Task::none()
             }
             Message::AcceptConflictBoth(index) => {
                 if let Some(doc) = self.docs.active_mut() {
                     doc.resolve_conflict(index, document::ConflictChoice::AcceptBoth);
-                    self.terminal.log(LogLevel::Success, "Resolved merge conflict (kept both changes)");
+                    self.terminal.log(
+                        LogLevel::Success,
+                        "Resolved merge conflict (kept both changes)",
+                    );
                 }
                 Task::none()
             }
             Message::AcceptAllConflicts(choice) => {
                 if let Some(doc) = self.docs.active_mut() {
                     let count = doc.resolve_all_conflicts(choice);
-                    self.terminal.log(LogLevel::Success, format!("Resolved {count} merge conflict(s)"));
+                    self.terminal.log(
+                        LogLevel::Success,
+                        format!("Resolved {count} merge conflict(s)"),
+                    );
                 }
                 Task::none()
             }
@@ -3896,10 +3987,16 @@ impl Studio {
                             self.lsp_definition_request = None;
                             if let Some(locations) = lsp::parse_definition_result(&value) {
                                 if let Some(first) = locations.first() {
-                                    let target_path = self.language_server.as_ref()
+                                    let target_path = self
+                                        .language_server
+                                        .as_ref()
                                         .and_then(|s| s.relative_path(&first.uri))
                                         .unwrap_or_else(|| first.uri.clone());
-                                    self.jump_to_file_location(&target_path, first.line, first.column);
+                                    self.jump_to_file_location(
+                                        &target_path,
+                                        first.line,
+                                        first.column,
+                                    );
                                 }
                             }
                         } else if value.get("id").and_then(serde_json::Value::as_u64)
@@ -3908,10 +4005,16 @@ impl Studio {
                             self.lsp_references_request = None;
                             if let Some(locations) = lsp::parse_references_result(&value) {
                                 if let Some(first) = locations.first() {
-                                    let target_path = self.language_server.as_ref()
+                                    let target_path = self
+                                        .language_server
+                                        .as_ref()
                                         .and_then(|s| s.relative_path(&first.uri))
                                         .unwrap_or_else(|| first.uri.clone());
-                                    self.jump_to_file_location(&target_path, first.line, first.column);
+                                    self.jump_to_file_location(
+                                        &target_path,
+                                        first.line,
+                                        first.column,
+                                    );
                                 }
                             }
                         } else if value.get("id").and_then(serde_json::Value::as_u64)
@@ -7065,7 +7168,10 @@ impl Studio {
                     }
                 }
             };
-            format!("Ln {}, Col {}{} ({} lines){}", line, col, extra, line_count, backing)
+            format!(
+                "Ln {}, Col {}{} ({} lines){}",
+                line, col, extra, line_count, backing
+            )
         } else {
             format!("Ln {}, Col {} ({} lines)", line, col, line_count)
         };
