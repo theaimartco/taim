@@ -25,6 +25,19 @@ jobs:
           test -s docs/performance/four-framework-comparison.md
           test -s docs/release/production-gates.md
 
+  formatting:
+    name: Rust formatting gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned formatter
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt
+          rustup default 1.95.0
+      - name: Verify rustfmt (nonconformance blocks release)
+        run: cargo fmt --all -- --check
+
   rust:
     name: Rust checks, golden images, accessibility
     runs-on: ubuntu-latest
@@ -44,10 +57,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev dbus dbus-x11
-      - name: Check workspace and format
-        run: |
-          bash scripts/ci/check-workspace.sh
-          cargo fmt --all -- --check
+      - name: Check workspace
+        run: bash scripts/ci/check-workspace.sh
       - name: Check and lint
         run: |
           cargo check --workspace --all-targets
