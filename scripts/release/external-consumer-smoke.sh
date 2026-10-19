@@ -23,6 +23,38 @@ EOF
 
 cp "$ROOT/examples/trivial/src/main.rs" "$TEMP/src/main.rs"
 
-echo "Checking public TAIM API in isolated temporary Cargo workspace"
+echo "Checking legacy API in isolated temporary Cargo workspace"
 cargo check --manifest-path "$TEMP/Cargo.toml"
-echo "External consumer smoke passed (local path dependency; no publication implied)"
+
+# Exercise the new native application interface as an actual external
+# downstream crate. This would catch facade exports and trait-bound regressions
+# that cannot be seen from a test inside taim_program.
+cat > "$TEMP/src/main.rs" <<'RUST'
+use taim::{AppContext, Element, Task, WindowContext};
+use taim::native::{app, Dispatch};
+
+fn scene<'a>(count: &'a u64, _window: &WindowContext) -> Element<'a, u64> {
+    taim::widget::text(format!("TAIM native: {count}")).into()
+}
+
+fn main() -> taim::Result {
+    let application = app(
+        "Native consumer",
+        |_context: &mut AppContext| (0_u64, Task::none()),
+        |state: &mut u64, amount: u64, _context: &mut AppContext| {
+            if amount == 0 {
+                Dispatch::idle()
+            } else {
+                *state += amount;
+                Dispatch::paint()
+            }
+        },
+        scene,
+    );
+    taim::run_app(application)
+}
+RUST
+
+echo "Checking TAIM-native API without legacy ProgramAdapter"
+cargo check --manifest-path "$TEMP/Cargo.toml"
+echo "Both external consumer contracts compiled (path dependency; not publication or hardware proof)"
