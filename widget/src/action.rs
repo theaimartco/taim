@@ -38,6 +38,9 @@ impl<Message> Action<Message> {
     pub fn publish(message: Message) -> Self {
         Self {
             message_to_publish: Some(message),
+            // An event-driven message may change the application state even
+            // when it does not invalidate the widget tree directly.
+            redraw_request: window::RedrawRequest::NextFrame,
             ..Self::new()
         }
     }
@@ -69,6 +72,18 @@ impl<Message> Action<Message> {
         self
     }
 
+    /// Combine this action with another frame deadline without losing
+    /// an already pending message or event-capture decision.
+    ///
+    /// The earliest frame wins; publishing always selects NextFrame.
+    /// This is used by TAIM's single shared per-window frame clock.
+    #[must_use]
+    pub fn and_request_redraw_at(mut self, at: Instant) -> Self {
+        self.redraw_request =
+            self.redraw_request.merge(window::RedrawRequest::At(at));
+        self
+    }
+
     /// Converts the [`Action`] into its internal parts.
     ///
     /// This method is meant to be used by runtimes, libraries, or internal
@@ -79,5 +94,53 @@ impl<Message> Action<Message> {
             self.redraw_request,
             self.event_status,
         )
+    }
+}
+
+#[cfg(test)]
+mod taim_action_tests {
+    use super::*;
+
+    #[test]
+    fn canvas_published_messages_request_an_immediate_frame() {
+        let (message, redraw, status) = Action::publish(17_u32).into_inner();
+
+        assert_eq!(message, Some(17));
+        assert_eq!(redraw, window::RedrawRequest::NextFrame);
+        assert_eq!(status, event::Status::Ignored);
+    }
+
+    #[test]
+    fn capture_keeps_publication_and_frame_intent() {
+        let (message, redraw, status) = Action::publish("changed")
+            .and_capture()
+            .into_inner();
+
+        assert_eq!(message, Some("changed"));
+        assert_eq!(redraw, window::RedrawRequest::NextFrame);
+        assert_eq!(status, event::Status::Captured);
+    }
+
+    #[test]
+    fn deadline_merge_never_overrides_an_immediate_message() {
+        let future = Instant::now() + crate::core::time::Duration::from_secs(10);
+        let (_, redraw, _) = Action::publish(1_u8)
+            .and_request_redraw_at(future)
+            .into_inner();
+
+        assert_eq!(redraw, window::RedrawRequest::NextFrame);
+    }
+
+    #[test]
+    fn multiple_deadline_requests_select_the_earliest() {
+        let now = Instant::now();
+        let soon = now + crate::core::time::Duration::from_millis(10);
+        let late = now + crate::core::time::Duration::from_secs(2);
+
+        let (_, redraw, _) = Action::<()>::request_redraw_at(late)
+            .and_request_redraw_at(soon)
+            .into_inner();
+
+        assert_eq!(redraw, window::RedrawRequest::At(soon));
     }
 }
