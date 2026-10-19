@@ -43,9 +43,7 @@ impl Interaction {
     /// `Idle` are *intentional* cursor decisions and must not be skipped.
     /// The double-ended iterator allows checking the highest layer first,
     /// short-circuiting without evaluating covered overlays.
-    pub fn topmost(
-        layers: impl DoubleEndedIterator<Item = Self>,
-    ) -> Self {
+    pub fn topmost(layers: impl DoubleEndedIterator<Item = Self>) -> Self {
         layers
             .rev()
             .find(|interaction| *interaction != Self::None)
