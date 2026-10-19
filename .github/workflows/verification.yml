@@ -5,6 +5,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 1'
 
 permissions:
   contents: read
@@ -46,6 +48,34 @@ jobs:
       - name: Verify rustfmt (nonconformance blocks release)
         run: cargo fmt --all -- --check
 
+  supply_chain:
+    name: Dependency advisories, licenses and source provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+
+  fuzz:
+    name: Nightly fuzz regression (not a GPU test)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo +nightly install cargo-fuzz --locked
+      - name: Exercise 4 fuzz targets
+        run: |
+          cargo +nightly fuzz run damage_region -- -max_total_time=60
+          cargo +nightly fuzz run pointer_stream -- -max_total_time=60
+          cargo +nightly fuzz run text_edit -- -max_total_time=60
+          cargo +nightly fuzz run layout_tree -- -max_total_time=60
+
   rust:
     name: Rust checks, golden images, accessibility
     runs-on: ubuntu-latest
@@ -79,6 +109,8 @@ jobs:
         env:
           TAIM_ATSPI_REQUIRE_BUS: "1"
         run: dbus-run-session -- cargo test -p taim-accessibility --features atspi --test atspi_bus
+      - name: Enforce dependency, binary-size and unsafe-code budgets
+        run: bash scripts/ci/check-budgets.sh
       - name: Package inventory (does not publish)
         run: cargo package -p taim --list --allow-dirty
       - name: Independent external Cargo consumer compile
