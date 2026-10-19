@@ -33,6 +33,18 @@ and centerline pane navigation are now committed with unexecuted tests.
 The inherited-code replacement and manual provenance review are unfinished.
 See docs/audit/taim-native-layout-20261020.md.
 
+## TAIM-native input and clock checkpoint (2026-10-20)
+
+A fresh, untruncated original-fork Git-tree comparison finds **46**
+byte-identical same-path `.rs`, `.wgsl`, and `.toml` files, compared
+with 55 before the input/clock/platform pass. This number **is not a
+source originality percentage**; much inherited code remains edited, moved,
+or token-similar. The 9 changed inherited files now include newly authored
+input classification, overflow-safe scheduling units, shadow validation,
+window presentation semantics, workspace IDs and Linux application-ID
+sanitization. Neither compilation nor production acceptance is verified.
+See `docs/audit/taim-remaining-source-20261020.md`.
+
 ## Verification lanes
 
 - Hosted CI: .github/workflows/verification.yml on PRs and main.
