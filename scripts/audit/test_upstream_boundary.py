@@ -41,6 +41,26 @@ class BoundaryTests(unittest.TestCase):
             path.write_text('[dependencies]\nmy_frontend = { package = "iced_widget", version = "0.14" }\n')
             self.assertIn("Iced crate", boundary.check_manifest(path)[0])
 
+    def test_workspace_iced_dependency_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "Cargo.toml"
+            path.write_text('[workspace.dependencies]\ngui = { package = "iced_widget", version = "0.14" }\n')
+            self.assertIn("Iced crate", boundary.check_manifest(path)[0])
+
+    def test_patched_iced_source_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "Cargo.toml"
+            path.write_text('[patch.crates-io]\niced_runtime = { git = "https://github.com/iced-rs/iced" }\n')
+            messages = boundary.check_manifest(path)
+            self.assertGreaterEqual(len(messages), 1)
+            self.assertTrue(any("Iced" in message or "iced-rs Git" in message for message in messages))
+
+    def test_replacement_iced_source_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "Cargo.toml"
+            path.write_text('[replace]\n"iced_core:0.14.0" = { path = "src" }\n')
+            self.assertIn("Iced crate", boundary.check_manifest(path)[0])
+
     def test_target_specific_iced_dependency_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "Cargo.toml"
