@@ -60,6 +60,18 @@ eight added regression tests and whole-workspace builds are **unexecuted**.
 Provenance review and release acceptance remain NO-GO. See
 `docs/audit/taim-native-render-executor-20261020.md`.
 
+## Widget event and drag arbitration checkpoint (candidate f849254b)
+
+The latest untruncated historical Iced-fork Git-tree comparison reports
+**37 byte-identical same-path .rs/.wgsl/.toml files**, down from 39.
+The TAIM widget `Action::publish` now schedules the next frame,
+matching its documented contract and live canvas/shader dispatch.
+Pane drag handlers now receive only finite, in-bounds cursor coordinates
+from the actual pane-grid interaction path. Six unit tests were added
+but **not executed**. Historical code provenance, build verification and
+production release are still NO-GO. See
+`docs/audit/taim-widget-action-drag-20261020.md`.
+
 ## Verification lanes
 
 - Hosted CI: .github/workflows/verification.yml on PRs and main.
