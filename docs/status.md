@@ -72,6 +72,20 @@ but **not executed**. Historical code provenance, build verification and
 production release are still NO-GO. See
 `docs/audit/taim-widget-action-drag-20261020.md`.
 
+## Executor compatibility and lifecycle correctness (candidate b76e5ffc)
+
+The current full fork-tree comparison finds **35 byte-identical same-path
+`.rs/.wgsl/.toml` files**, down from 37. Original Iced-derived code also
+remains in modified/relocated files. This metric is not an independence
+percentage. The previous null-backend fail-fast change broke scheduler
+tests constructing an explicit `null::Executor`; the explicit constructor
+is now restored and startup rejection moved to the **default** backend
+when no native async executor is configured. A TAIM-owned native thread-pool
+adapter now accounts for tasks submitted, active and terminated through
+atomics and handles cancellations before the first poll. Seven added/revised
+unit tests are unexecuted, and full Rust build remains blocked. See
+`docs/audit/taim-executor-contracts-20261020.md`. NO-GO for main/production.
+
 ## Verification lanes
 
 - Hosted CI: .github/workflows/verification.yml on PRs and main.
