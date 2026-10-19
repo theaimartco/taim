@@ -78,11 +78,13 @@ impl crate::Executor for Executor {
         self.counters.submitted.fetch_add(1, Ordering::Relaxed);
         self.counters.active.fetch_add(1, Ordering::Release);
 
-        let counters = Arc::clone(&self.counters);
+        // Construct the guard before scheduling. It is then owned by the
+        // submitted future even if the pool cancels it before first poll.
+        // Building it inside the async body would leak the active count for
+        // never-polled tasks.
+        let guard = InFlight(Arc::clone(&self.counters));
         self.pool.spawn_ok(async move {
-            // Cancellation drops this future and its guard; no task is
-            // retained indefinitely in the in-flight counter.
-            let _guard = InFlight(counters);
+            let _guard = guard;
             future.await;
         });
     }
@@ -122,6 +124,24 @@ mod tests {
             let _guard = InFlight(Arc::clone(&counters));
             assert_eq!(counters.active.load(Ordering::Acquire), 1);
         }
+        assert_eq!(counters.active.load(Ordering::Acquire), 0);
+        assert_eq!(counters.terminated.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn never_polled_task_releases_counter_when_cancelled() {
+        let counters = Arc::new(Counters::default());
+        counters.active.store(1, Ordering::Release);
+
+        // This future is never scheduled or polled: cancelling it still
+        // drops the preconstructed guard and releases active telemetry.
+        let guard = InFlight(Arc::clone(&counters));
+        let task = async move {
+            let _guard = guard;
+            futures::future::pending::<()>().await;
+        };
+        drop(task);
+
         assert_eq!(counters.active.load(Ordering::Acquire), 0);
         assert_eq!(counters.terminated.load(Ordering::Relaxed), 1);
     }
