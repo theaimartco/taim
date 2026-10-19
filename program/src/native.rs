@@ -76,14 +76,7 @@ impl<Message> Dispatch<Message> {
 
     /// Apply the invalidation decision to the native frame scheduler.
     fn apply(&self, context: &mut AppContext) {
-        match self.delta.frame {
-            FrameRequest::Animate => context.request_animation(),
-            FrameRequest::Redraw => context.request_redraw(),
-            FrameRequest::None if self.delta.layout_dirty || self.delta.paint_dirty => {
-                context.request_redraw();
-            }
-            FrameRequest::None => {}
-        }
+        context.invalidate(self.delta);
     }
 }
 
@@ -180,6 +173,10 @@ where
         "TAIM Native"
     }
 
+    fn controls_invalidation() -> bool {
+        true
+    }
+
     fn config(&self) -> AppConfig {
         self.config.clone()
     }
@@ -268,6 +265,7 @@ mod tests {
         );
         let (mut runner, _boot_task) = AppRunner::new(app);
         assert!(!runner.is_legacy_compat());
+        assert!(runner.controls_invalidation());
         let window = WindowContext::new(window::Id::unique(), 1.0);
         assert_eq!(runner.title(&window), "Native Intent Test");
         assert!(runner.app().config().window.is_some());
@@ -301,6 +299,14 @@ mod tests {
             },
         };
         zero_frame.apply(&mut context);
-        assert_eq!(context.take_request(), FrameRequest::Redraw);
+        let pending = context.take_invalidation();
+        assert_eq!(pending.frame, FrameRequest::None);
+        assert!(pending.layout_dirty);
+        assert!(!pending.paint_dirty);
+
+        // An explicit animation has higher priority than a subsequent repaint.
+        Dispatch::<()>::animate().apply(&mut context);
+        Dispatch::<()>::paint().apply(&mut context);
+        assert_eq!(context.take_request(), FrameRequest::Animate);
     }
 }
