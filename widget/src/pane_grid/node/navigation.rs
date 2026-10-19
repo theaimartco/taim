@@ -15,12 +15,7 @@ impl Node {
             Size::new(NAVIGATION_EXTENT, NAVIGATION_EXTENT),
         );
         let current = self.region_of(pane, bounds)?;
-        let target = match direction {
-            Direction::Left => Point::new(current.x - 1.0, current.y + 1.0),
-            Direction::Right => Point::new(current.x + current.width + 1.0, current.y + 1.0),
-            Direction::Up => Point::new(current.x + 1.0, current.y - 1.0),
-            Direction::Down => Point::new(current.x + 1.0, current.y + current.height + 1.0),
-        };
+        let target = direction.probe(current);
         let mut adjacent = None;
 
         self.pane_at(target, bounds, &mut adjacent);
