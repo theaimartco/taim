@@ -545,10 +545,11 @@ fn test_lsp_go_to_definition_simd_fallback() {
 #[test]
 fn test_compiler_and_diagnostic_navigation() {
     let (mut studio, _task) = Studio::new();
-    
+
     // Test parser for compiler error format
     let raw_error = "--> src/main.rs:5:10";
-    let loc = taim_ide::parse_compiler_location(raw_error).expect("should parse compiler error location");
+    let loc =
+        taim_ide::parse_compiler_location(raw_error).expect("should parse compiler error location");
     assert_eq!(loc.0, "src/main.rs");
     assert_eq!(loc.1, 5);
     assert_eq!(loc.2, 10);
@@ -621,11 +622,21 @@ fn compute() {
 fn test_palette_and_shortcut_routes_for_new_features() {
     let (mut studio, _task) = Studio::new();
     // Test Go to Definition palette execution
-    let item_def = studio.palette.all_items.iter().find(|i| i.payload == "action:goto_definition").unwrap();
+    let item_def = studio
+        .palette
+        .all_items
+        .iter()
+        .find(|i| i.payload == "action:goto_definition")
+        .unwrap();
     assert_eq!(item_def.shortcut, Some("F12".to_string()));
 
     // Test Fold All palette execution
-    let item_fold = studio.palette.all_items.iter().find(|i| i.payload == "action:fold_all").unwrap();
+    let item_fold = studio
+        .palette
+        .all_items
+        .iter()
+        .find(|i| i.payload == "action:fold_all")
+        .unwrap();
     assert!(item_fold.title.contains("Fold All Blocks"));
     let _ = studio.update(Message::PaletteItemChosen(item_fold.id));
 }

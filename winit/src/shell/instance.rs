@@ -536,7 +536,9 @@ pub(super) async fn run_instance<A>(
                             let scale_factor = window.state.viewport().scale_factor();
                             match state.damage_region() {
                                 Some(core_region) => {
-                                    let damage = graphics::damage::DamageRegion::from_core_region(core_region);
+                                    let damage = graphics::damage::DamageRegion::from_core_region(
+                                        core_region,
+                                    );
                                     graphics::FrameContext::with_damage(damage, scale_factor)
                                 }
                                 None => graphics::FrameContext::full_present(scale_factor),
