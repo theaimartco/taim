@@ -46,3 +46,25 @@ preparation and platform integration using separately reviewed behavior
 specifications. Each replacement needs source provenance review, API
 compatibility, ownership tests and comparative functionality/performance
 evidence before integration into main.
+
+## Exact Git-tree checkpoint
+
+At commit `9ba087a4f70d595c149764a5fa7e41c180a2d7fd`
+(candidate tree `06a2ddd5ddf5889fe45fb99f97ca967370a1d0aa`)
+a complete, nontruncated GitHub recursive-tree enumeration was compared
+with fork baseline `56b706fcd35aa881baede77a696bbb842773fdc6`.
+Among `.rs`, `.wgsl`, and `.toml` files at the **same paths**:
+
+| Item | Result |
+| --- | ---: |
+| Baseline source/config files | 459 |
+| Current source/config files | 997 |
+| Byte-identical inherited file paths | **58** |
+| Prior identity-branch byte-identical inherited files | 60 |
+| Net reduction | **2** |
+
+Changed exact blobs were `futures/src/stream.rs` and
+`core/src/mouse/interaction.rs`. The latter still retains Iced-derived
+enum variants; an edited blob is NOT automatically original work.
+Cross-path matches, copied code fragments, and high token similarity can
+exceed the exact same-path count. **Source independence remains NO-GO.**
