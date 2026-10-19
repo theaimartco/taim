@@ -20,6 +20,13 @@ pub mod time {
 
     use wasmtimer::std::Instant;
 
+    const MIN_INTERVAL: std::time::Duration = std::time::Duration::from_millis(1);
+
+    #[inline]
+    fn safe_interval(value: std::time::Duration) -> std::time::Duration {
+        value.max(MIN_INTERVAL)
+    }
+
     /// Returns a [`Subscription`] that produces messages at a set interval.
     ///
     /// The first message is produced after a `duration`, and then continues to
@@ -28,7 +35,7 @@ pub mod time {
         Subscription::run_with(duration, |duration| {
             use futures::stream::StreamExt;
 
-            let mut interval = wasmtimer::tokio::interval(*duration);
+            let mut interval = wasmtimer::tokio::interval(safe_interval(*duration));
             interval.set_missed_tick_behavior(wasmtimer::tokio::MissedTickBehavior::Skip);
 
             let stream = {
@@ -39,5 +46,20 @@ pub mod time {
 
             stream.boxed()
         })
+    }
+}
+
+#[cfg(test)]
+mod taim_timer_contract_tests {
+    use super::time::safe_interval;
+    use std::time::Duration;
+
+    #[test]
+    fn wasm_interval_never_runs_at_zero_period() {
+        assert_eq!(safe_interval(Duration::ZERO), Duration::from_millis(1));
+        assert_eq!(
+            safe_interval(Duration::from_millis(25)),
+            Duration::from_millis(25)
+        );
     }
 }
