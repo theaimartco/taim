@@ -14,6 +14,16 @@ golden tests, pointer/IME/accessibility modules, profiling and benchmarks.
 An implemented module, a passing unit test, a virtual screenshot and
 physical hardware acceptance are four different milestones.
 
+## Source origin checkpoint (candidate 9ba087a4)
+
+On the identity continuation branch, a full fork-tree Git SHA comparison
+finds **58 byte-identical same-path `.rs/.wgsl/.toml` files** against
+the original Iced fork, down from 60 in the prior candidate. This is a
+lower bound on inherited source, not a verified original-source percentage.
+The new bounded-stream and overlay-cursor implementations have committed
+regression tests, but their Rust execution has not been certified.
+See docs/audit/taim-stream-overlay-native-20261020.md.
+
 ## Verification lanes
 
 - Hosted CI: .github/workflows/verification.yml on PRs and main.
