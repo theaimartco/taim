@@ -41,6 +41,18 @@ def assess(data):
     }
 
 
+def include_exact_matches(verdict, record):
+    matches = record.get("matches")
+    count = record.get("exact_match_count")
+    if not isinstance(matches, list) or type(count) is not int or count != len(matches):
+        raise ValueError("exact Git blob inventory is incomplete")
+    if count:
+        verdict["status"] = "NO_GO"
+        verdict["blockers"].append(f"exact_git_blob_sha_matches={count}")
+    verdict["exact_git_blob_sha_matches"] = count
+    return verdict
+
+
 def run_audit(root):
     root = Path(root).resolve()
     for name in ("LICENSE", "CREDITS.md", "scripts/audit/check-independence.py"):
@@ -56,6 +68,20 @@ def run_audit(root):
         [sys.executable, str(root / "scripts/audit/check-independence.py"), "--json"],
         cwd=root, capture_output=True, text=True, check=True)
     result = assess(json.loads(process.stdout))
+
+    # The token scanner only compares current paths with likely upstream
+    # paths. Also inspect every exact upstream blob by SHA across *all*
+    # paths, including renamed/moved files.
+    from tempfile import TemporaryDirectory
+    with TemporaryDirectory() as directory:
+        evidence = Path(directory) / "exact-blobs.json"
+        subprocess.run(
+            [sys.executable, str(root / "scripts/audit/exact-fork-blobs.py"),
+             "--root", str(root), "--output", str(evidence)],
+            cwd=root, check=True,
+        )
+        include_exact_matches(result, json.loads(evidence.read_text()))
+
     result["head_sha"] = subprocess.check_output(
         ["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
     return result
