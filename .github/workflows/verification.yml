@@ -1,7 +1,7 @@
 name: TAIM release verification
 on:
   pull_request:
-    branches: [main]
+    branches: [main, hardening/wayland-bench-release-gates-20261019]
   push:
     branches: [main]
   workflow_dispatch:
