@@ -86,6 +86,24 @@ atomics and handles cancellations before the first poll. Seven added/revised
 unit tests are unexecuted, and full Rust build remains blocked. See
 `docs/audit/taim-executor-contracts-20261020.md`. NO-GO for main/production.
 
+## Input-delivery, gesture cancellation and Windows shell checkpoint
+
+The current untruncated fork-tree Git SHA comparison finds **33**
+byte-identical same-path `.rs/.wgsl/.toml` files, down from 35 in the
+previous executor checkpoint. This is NOT a total-source originality
+percentage. The TAIM core queue contract now protects wheel scroll
+deltas from replacement, filters malformed active pointer positions,
+and converts invalid terminal pointer events to safe cancellation.
+The actual pointer Router also enforces this policy for direct callers,
+including canceling a prepared arena after invalid initial Down.
+Windows applies custom undecorated shadows only to undecorated windows
+via its real Winit attribute conversion.
+
+Eight new regression cases are committed but **not executed**. Rust,
+Cargo, Clippy, real Wayland/VYOM, accessibility, GPU recovery and manual
+source lineage verification remain **NO-GO**; see
+`docs/audit/taim-input-delivery-window-20261020.md`.
+
 ## Verification lanes
 
 - Hosted CI: .github/workflows/verification.yml on PRs and main.
