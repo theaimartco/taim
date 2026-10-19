@@ -1,0 +1,66 @@
+name: TAIM release verification
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tooling:
+    name: Measurement and release contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run measurement harness unit tests
+        run: python3 -m unittest discover -s scripts/perf -p 'test_*.py' -v
+      - name: Check release requirements
+        run: |
+          test -s SECURITY.md
+          test -s docs/testing/wayland-vyom-device-acceptance.md
+          test -s docs/performance/four-framework-comparison.md
+          test -s docs/release/production-gates.md
+
+  rust:
+    name: Rust checks, golden images, accessibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+          rustup default 1.95.0
+          rustc --version
+      - uses: Swatinem/rust-cache@v2
+      - name: Install native build packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev dbus dbus-x11
+      - name: Check workspace and format
+        run: |
+          bash scripts/ci/check-workspace.sh
+          cargo fmt --all -- --check
+      - name: Check and lint
+        run: |
+          cargo check --workspace --all-targets
+          cargo clippy --workspace --all-targets -- -D warnings
+      - name: Workspace tests
+        run: cargo test --workspace
+      - name: Visual goldens
+        run: cargo test --test golden
+      - name: Accessibility D-Bus integration
+        env:
+          TAIM_ATSPI_REQUIRE_BUS: "1"
+        run: dbus-run-session -- cargo test -p taim-accessibility --features atspi --test atspi_bus
+      - name: Package inventory (does not publish)
+        run: cargo package -p taim --list --allow-dirty
+
+# Hosted CI cannot establish real-device presentation or physical latency.
