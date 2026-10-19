@@ -77,3 +77,55 @@ pub enum Event {
     /// - **Wayland:** Not implemented.
     FilesHoveredLeft,
 }
+
+
+impl Event {
+    /// Whether this newer event can replace the immediately preceding event
+    /// inside a single TAIM window's pending input batch.
+    ///
+    /// Only transient geometry observations can be folded. Open/close,
+    /// focus, file drop, compositor frame, and explicit close-request
+    /// notifications are semantic boundaries and are never coalesced.
+    /// Adjacent-only replacement is required so a move cannot cross a
+    /// keyboard, pointer, or focus event that should observe the old state.
+    #[must_use]
+    pub fn supersedes_adjacent(&self, earlier: &Self) -> bool {
+        matches!(
+            (earlier, self),
+            (Self::Moved(_), Self::Moved(_))
+                | (Self::Resized(_), Self::Resized(_))
+                | (Self::Rescaled(_), Self::Rescaled(_))
+        )
+    }
+}
+
+#[cfg(test)]
+mod taim_window_event_tests {
+    use super::*;
+
+    #[test]
+    fn newest_geometry_replaces_only_matching_adjacent_geometry() {
+        let old = Event::Moved(Point::new(1.0, 2.0));
+        let newest = Event::Moved(Point::new(3.0, 4.0));
+        assert!(newest.supersedes_adjacent(&old));
+        assert!(!Event::Resized(Size::new(50.0, 30.0)).supersedes_adjacent(&old));
+
+        let old = Event::Resized(Size::new(10.0, 10.0));
+        assert!(Event::Resized(Size::new(20.0, 20.0)).supersedes_adjacent(&old));
+        assert!(Event::Rescaled(2.0).supersedes_adjacent(&Event::Rescaled(1.5)));
+    }
+
+    #[test]
+    fn lifecycle_and_time_sensitive_notifications_are_never_replaced() {
+        let now = Instant::now();
+        for (previous, next) in [
+            (Event::Focused, Event::Focused),
+            (Event::Unfocused, Event::Unfocused),
+            (Event::CloseRequested, Event::CloseRequested),
+            (Event::RedrawRequested(now), Event::RedrawRequested(now)),
+            (Event::Closed, Event::Closed),
+        ] {
+            assert!(!next.supersedes_adjacent(&previous));
+        }
+    }
+}
