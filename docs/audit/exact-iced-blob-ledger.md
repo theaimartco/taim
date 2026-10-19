@@ -1,12 +1,12 @@
-# TAIM source-lineage exact Git SHA inventory
+# TAIM source-origin exact-SHA ledger
 
-Latest source commit: `681f172d46cc01d6a5dc8f533121f4ceeab5e683`. Comparison Iced fork baseline `56b706fc`. Both recursive GitHub trees were complete (not truncated).
+Candidate commit: `63171505e8be004d480c69832a01ce3e12773b20`. Original Iced fork point: `56b706fc`. Both recursive GitHub Git trees were complete, not truncated.
 
-## 63 exact same-path inherited Rust / WGSL / TOML files remain
+## 62 byte-identical active source and config files still at inherited paths
 
-This lower-bound inventory only catches byte-identical files at the original paths. Renamed or moved identical files are checked separately by scripts/audit/exact-fork-blobs.py. Modified, partially reused, generated or adapted inherited code still requires independent source review; a zero exact count would NOT certify original authorship.
+These SHA matches cover only exactly identical `.rs`, `.wgsl` and `.toml` files at the same paths. This count is a strict lower bound, **not** the actual number of inherited Rust lines: adapted or partially copied files also require review. The `exact-fork-blobs.py` audit checks renamed whole-file copies; token similarity and independent manual classification are separate mandatory gates. No code-origin scanner establishes legal authorship merely by returning zero matches.
 
-### Core — 19
+### Core / input (18)
 
 - `core/src/background.rs`
 - `core/src/keyboard.rs`
@@ -18,7 +18,6 @@ This lower-bound inventory only catches byte-identical files at the original pat
 - `core/src/shadow.rs`
 - `core/src/time.rs`
 - `core/src/window/direction.rs`
-- `core/src/window/event.rs`
 - `core/src/window/level.rs`
 - `core/src/window/mode.rs`
 - `core/src/window/position.rs`
@@ -28,7 +27,7 @@ This lower-bound inventory only catches byte-identical files at the original pat
 - `core/src/window/settings/windows.rs`
 - `core/src/window/user_attention.rs`
 
-### Async — 11
+### Async / scheduling (11)
 
 - `futures/src/backend/default.rs`
 - `futures/src/backend/native.rs`
@@ -42,7 +41,7 @@ This lower-bound inventory only catches byte-identical files at the original pat
 - `futures/src/maybe.rs`
 - `futures/src/stream.rs`
 
-### Graphics — 5
+### Graphics (5)
 
 - `graphics/src/error.rs`
 - `graphics/src/geometry.rs`
@@ -50,7 +49,7 @@ This lower-bound inventory only catches byte-identical files at the original pat
 - `graphics/src/geometry/style.rs`
 - `graphics/src/shell.rs`
 
-### App and runtime — 6
+### Program & runtime (6)
 
 - `program/src/message.rs`
 - `program/src/preset.rs`
@@ -59,7 +58,7 @@ This lower-bound inventory only catches byte-identical files at the original pat
 - `runtime/src/image.rs`
 - `runtime/src/system.rs`
 
-### Widget — 7
+### Widgets (7)
 
 - `widget/src/action.rs`
 - `widget/src/lazy/cache.rs`
@@ -69,7 +68,7 @@ This lower-bound inventory only catches byte-identical files at the original pat
 - `widget/src/pane_grid/pane.rs`
 - `widget/src/pane_grid/split.rs`
 
-### GPU and shell — 7
+### Rendering / shell (7)
 
 - `tiny_skia/src/window.rs`
 - `wgpu/src/image/null.rs`
@@ -79,7 +78,7 @@ This lower-bound inventory only catches byte-identical files at the original pat
 - `wgpu/src/shader/vertex.wgsl`
 - `winit/src/error.rs`
 
-### Other — 8
+### Configuration / facade (8)
 
 - `.cargo/audit.toml`
 - `.cargo/config.toml`
@@ -90,18 +89,17 @@ This lower-bound inventory only catches byte-identical files at the original pat
 - `src/window.rs`
 - `src/window/icon.rs`
 
-## Substantive replacements on the native identity branch
+## Functional TAIM-native implementations integrated on the feature branch
 
-- Direct TAIM native intent/reducer/scene application contract; explicit frame dirty-state semantics wired to Winit event loop.
-- Original cancellation-aware, bounded subscription tracker, replacing the prior inherited implementation.
-- Checked monotonic window-ID allocation and explicit frame request/deadline merging.
-- Packed, iterative geometry planner for deeply nested pane-grid regions, plus checked configuration validation.
-- Native GPU atlas entry preflight with linear-time exact row-major source coverage. The actual image upload rejects malformed tiling before GPU staging; tests cover overlap, missing tiles, incorrect bounds and valid tiling.
-- Original TAIM adaptive pane-title control presentation (full, compact, or title-hidden) unified across layout, draw, input, accessibility visits and overlay selection. Hidden title overlays are suppressed.
+- Native app intent/reducer/scene contract and real Winit FrameGate invalidation with clean/paint/layout/animation distinctions.
+- Replacement subscription tracker with epoch-aware reconciliation, bounded event delivery and cancellation during output backpressure.
+- Non-wrapping atomic window IDs, original redraw/deadline merging, packed iterative pane geometry, bounded pane configuration validation.
+- GPU atlas fragmented image coverage preflight, adaptive pane-title control visibility and hidden-title overlay suppression.
+- **New native event queue coalescing:** immediately adjacent same-window cursor movement, same-finger touch movement, and matching window geometry changes are folded to the latest observation. Critical mouse/touch/keyboard/focus/window lifecycle boundaries, including wheel deltas, are never folded. Tests include multiple windows, gesture boundaries, finger isolation and geometry updates. `core/src/window/event.rs` provides the typed lifecycle coalescing contract.
 
-## Verification and legal provenance
+## Release blockers
 
-- Source audit strict runner and full source lineage review must complete before 100% independently implemented claims.
-- GitHub Actions issue #2: actual Rust compile, Clippy, tests and hardware verification are not passing. Hosted runner failures happen with zero executed job steps; exact infrastructure root cause not yet established.
-- No runtime performance speedup or correctness certification has been established for these changes; all Rust tests are **committed but currently unexecuted**.
-- Historical Iced origin, MIT attribution and Git history must be preserved; originality of current code does not erase source ancestry.
+- `scripts/audit/source-lineage-gate.py --strict` must pass on the final commit with historical fork ancestry available. All inherited and modified source needs independent human provenance review.
+- GitHub Actions issue #2: jobs continue failing before a runner executes any steps, so Rust compilation, Clippy, golden-image, keyboard/IME, screen-reader, real VYOM and GPU hardware tests **have not been proven green**. Do not treat committed unit tests as executed tests.
+- Source speedups are unverified. Benchmark against Iced/Slint/egui under controlled hardware before performance claims.
+- Preserve actual Iced MIT notices, CREDITS.md and historical Git ancestry regardless of remaining source rewrite work. Keep main unchanged and PR draft.
