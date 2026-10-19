@@ -1,12 +1,10 @@
-# Current TAIM source-identity ledger
+# TAIM current Iced-origin exact blob inventory
 
-Exact candidate baseline: upstream Iced fork `56b706fc`, TAIM branch SHA `f4b19d7845b2fbf88ddf9a1b1e3f8749e743e9b2`. GitHub full recursive Git tree reads returned untruncated inventories.
+Snapshot of complete recursive GitHub trees at the Iced fork `56b706fc` and TAIM SHA `7edf9417eec20f9c3ba726aaf6bfe235381d0c13`, taken October 20, 2026.
 
-## Blocking exact inherited files: 66
+**65 same-path byte-identical .rs/.wgsl/.toml files remain.** Full-tree API responses were not truncated. This is a **lower bound** on inherited origin: edited, partially copied, relocated-source snippets, and any upstream-origin files with changed names still need manual provenance verification and the normalized-token scanner. Not a 100% original-ownership metric.
 
-Git blob SHA identity at the same path is hard evidence of identical bytes. Modified inherited source, near-matches, and relocated snippets are additional unverified scope; **the remaining source-origin count is not limited to these files**.
-
-### Core types and input — 19
+## Input and core — 19
 
 - `core/src/background.rs`
 - `core/src/keyboard.rs`
@@ -28,7 +26,7 @@ Git blob SHA identity at the same path is hard evidence of identical bytes. Modi
 - `core/src/window/settings/windows.rs`
 - `core/src/window/user_attention.rs`
 
-### Futures and executors — 11
+## Async and scheduling — 11
 
 - `futures/src/backend/default.rs`
 - `futures/src/backend/native.rs`
@@ -42,7 +40,7 @@ Git blob SHA identity at the same path is hard evidence of identical bytes. Modi
 - `futures/src/maybe.rs`
 - `futures/src/stream.rs`
 
-### Graphics — 5
+## Graphics — 5
 
 - `graphics/src/error.rs`
 - `graphics/src/geometry.rs`
@@ -50,31 +48,27 @@ Git blob SHA identity at the same path is hard evidence of identical bytes. Modi
 - `graphics/src/geometry/style.rs`
 - `graphics/src/shell.rs`
 
-### Program/application — 2
+## Application and runtime — 6
 
 - `program/src/message.rs`
 - `program/src/preset.rs`
-
-### Runtime — 4
-
 - `runtime/src/backend.rs`
 - `runtime/src/font.rs`
 - `runtime/src/image.rs`
 - `runtime/src/system.rs`
 
-### Widgets — 9
+## Widgets — 8
 
 - `widget/src/action.rs`
 - `widget/src/lazy/cache.rs`
 - `widget/src/overlay.rs`
-- `widget/src/pane_grid/configuration.rs`
 - `widget/src/pane_grid/controls.rs`
 - `widget/src/pane_grid/direction.rs`
 - `widget/src/pane_grid/draggable.rs`
 - `widget/src/pane_grid/pane.rs`
 - `widget/src/pane_grid/split.rs`
 
-### GPU/CPU renderer — 7
+## Rendering and shell — 8
 
 - `tiny_skia/src/window.rs`
 - `wgpu/src/image/atlas/entry.rs`
@@ -83,12 +77,9 @@ Git blob SHA identity at the same path is hard evidence of identical bytes. Modi
 - `wgpu/src/shader/color.wgsl`
 - `wgpu/src/shader/color/linear_rgb.wgsl`
 - `wgpu/src/shader/vertex.wgsl`
-
-### Window shell — 1
-
 - `winit/src/error.rs`
 
-### Configuration and facade — 8
+## Other — 8
 
 - `.cargo/audit.toml`
 - `.cargo/config.toml`
@@ -99,18 +90,17 @@ Git blob SHA identity at the same path is hard evidence of identical bytes. Modi
 - `src/window.rs`
 - `src/window/icon.rs`
 
-## Non-cosmetic replacements implemented on this branch
+## Material implementation replacements on the native identity branch
 
-- `futures/src/subscription/tracker.rs` removed and replaced with independently implemented cancellation-aware subscription reconciler, `taim_tracker.rs` (tests added)
-- `core/src/window/id.rs` replaced with atomic no-wrap allocation (multi-thread and exhaustion tests)
-- `core/src/window/redraw_request.rs` replaced with frame-intent/deadline merge semantics wired into Winit (ordering tests)
-- `widget/src/pane_grid/node/regions.rs` rewritten to use iterative packed-index, no-recursion pane geometry planning (mixed-axis, invalid bounds and deep nesting tests)
-- Native `App` and explicit dirty-state path integrated in real Winit event loop
+- Inherited subscription tracker replaced by TAIM's cancellation-aware stream reconciler (tests for deduplication, retire, epoch rollover)
+- Process-unique non-wrapping window IDs, with concurrent issuance and exhaustion tests
+- Frame redraw intent now supports explicit merge and deadlines, used by Winit's real scheduler
+- Original native App intent model and FrameGate layout/paint/animation invalidation policy
+- Recursive pane-grid geometry replaced with packed-index iterative region planner, including nested/mixed-axis tests
+- Native pane configuration now exposes bounded node/depth validation and checked State mounting; malformed split ratios rejected before state allocation
 
-## Evidence limitations and required release gates
+## Production and authenticity gates
 
-- This SHA inventory uses a byte-exact comparison; it is not a legal originality verdict.
-- `scripts/audit/source-lineage-gate.py --strict --output /tmp/taim-audit.json` rejects unresolved inherited source, including token similarity. `exact-fork-blobs.py` checks exact relocated Git blob matches.
-- External source reviewer must independently assess altered but inherited source, license records, CI/goldens/AT-SPI and real VYOM hardware acceptance.
-- GitHub Actions runner allocation [issue #2](https://github.com/theaimartco/taim/issues/2) remains blocking; latest executed steps = zero. No Rust pass or runtime speedup has been proven for this patch.
-- Iced MIT attribution and historical Git ancestry must remain intact, irrespective of current-source independence.
+`python3 scripts/audit/source-lineage-gate.py --strict --output artifacts/lineage.json` is required for any claim of zero inherited source. `scripts/audit/exact-fork-blobs.py` covers identical files moved to another path. **Neither scanner can prove original human authorship or extinguish MIT copyright notice requirements.**
+
+New Rust source **has not passed an executable CI run**: GitHub Actions runner allocation issue #2 still causes jobs to fail with zero executed steps. Native VYOM/Wayland, GPU recovery, IME, screen reader, hardware latency, performance and security/reproducibility gates remain open. Preserve `LICENSE`, `CREDITS.md` and historical fork Git ancestry. Keep main unchanged and this PR draft until independent acceptance.
