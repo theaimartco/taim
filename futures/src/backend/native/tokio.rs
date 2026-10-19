@@ -33,7 +33,7 @@ pub mod time {
 
     /// Keep zero-period timers from panicking or spinning the UI event loop.
     #[inline]
-    fn safe_interval(value: Duration) -> Duration {
+    pub(super) fn safe_interval(value: Duration) -> Duration {
         value.max(MIN_INTERVAL)
     }
 

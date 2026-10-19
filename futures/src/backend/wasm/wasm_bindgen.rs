@@ -23,7 +23,7 @@ pub mod time {
     const MIN_INTERVAL: std::time::Duration = std::time::Duration::from_millis(1);
 
     #[inline]
-    fn safe_interval(value: std::time::Duration) -> std::time::Duration {
+    pub(super) fn safe_interval(value: std::time::Duration) -> std::time::Duration {
         value.max(MIN_INTERVAL)
     }
 
