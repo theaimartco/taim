@@ -98,6 +98,15 @@ impl Atlas {
         }
 
         let entry = self.packing.allocate(width, height)?;
+
+        // Fail before allocating additional GPU texture storage or staging
+        // fragments unless the packing plan covers every source pixel exactly
+        // once. This makes malformed tile metadata a bounded CPU-side error.
+        if !entry.valid_source_coverage() {
+            self.packing.remove(&entry);
+            return None;
+        }
+
         if !self.storage.ensure_capacity(
             self.packing.layer_count(),
             self.packing.layers(),
