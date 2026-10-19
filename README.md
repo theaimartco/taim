@@ -2,6 +2,14 @@
 
 **The High-Performance, GPU-Native Reactive GUI Framework in Rust.**
 
+> **Release status: experimental (0.15.0-dev), NOT production-certified.**
+> Actual Wayland/VYOM hardware presentation, IME, Orca, GPU loss/recovery and
+> physical frame/power measurements must be signed off before a stable release.
+> See [release gates](docs/release/production-gates.md),
+> [device tests](docs/testing/wayland-vyom-device-acceptance.md) and
+> [fair comparisons](docs/performance/four-framework-comparison.md).
+> No v1.0 tag or third-party published crate is implied by this README.
+
 [![Rust 2024](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Frame Latency](https://img.shields.io/badge/frame%20latency-0.28ms-brightgreen.svg)]()
@@ -38,7 +46,7 @@ cargo run -p mobile_shell      # Full mobile application shell with touch naviga
 
 ### 1. Zero-Rebuild Reactive Architecture (`taim-signal`)
 - **Fine-Grained Granular Reactivity**: State mutations propagate through `Signal<T>` dependency graphs. Only widgets bound to modified signals recalculate; the framework never wastes CPU cycles traversing or re-rendering unchanged subtrees.
-- **Zero Idle CPU Work**: When no input arrives or animations run, Taim consumes **0% CPU** and produces **0 allocations**.
+- **Idle-Work Design Goal**: Unchanged scenes should not submit new frames; real-device idle CPU, allocations and power still require acceptance measurements.
 
 ### 2. GPU Compute-Raster Pipeline (`taim-raster` & `wgpu`)
 - **Division-Free Iterative Bézier Subdivision**: High-precision vector curve flattening implemented with zero-allocation, array-backed L1 cache loops and division-free bounding oracles, accelerating vector path generation by 3x–5x.
@@ -59,7 +67,7 @@ cargo run -p mobile_shell      # Full mobile application shell with touch naviga
 
 ## Hardcore Performance & Hardware Telemetry
 
-Every metric below is captured on registered reference hardware and committed directly to `benchmarks/baseline/`. Nothing is simulated, estimated, or projected. All measurements reflect pure framework execution turning application state into submitted GPU command buffers.
+The table below contains historical internal benchmark reports from `benchmarks/baseline/`. Interpret these values using `docs/performance/methodology.md`: internal update/build/draw costs are **not** compositor-present intervals, physical input-to-photon latency or independent claims against other frameworks. Re-run against an identified commit/device before release decisions.
 
 ### Ground Truth Performance Metrics
 
@@ -112,7 +120,7 @@ cargo run -p taim_bench --release --features profiling -- --scene ten_thousand_r
 
 ## Component Ecosystem (79+ Controls)
 
-Taim ships with a rich, production-tested widget suite across 6 major domains:
+Taim implements a broad widget catalog across 6 domains; full hardware and accessibility production acceptance remains pending:
 
 ### 1. Navigation & App Structure
 - `scaffold` — Standard mobile/desktop viewport structure
@@ -181,7 +189,7 @@ Taim ships with a rich, production-tested widget suite across 6 major domains:
 
 ```toml
 [dependencies]
-taim = { version = "0.15.0-dev", features = ["wgpu", "highlighter", "signal"] }
+taim = { path = "../taim", features = ["wgpu", "highlighter", "signal"] } # adjust to your local checkout; unpublished development package
 ```
 
 ### 2. Write Your First Reactive Application
