@@ -25,6 +25,40 @@ cargo run -p mobile_shell      # Full mobile application shell with touch naviga
 
 ---
 
+## TAIM-native application path
+
+TAIM now offers an intent-driven entry point without the inherited `Program` adapter:
+
+```rust
+use taim::{AppContext, Element, Task, WindowContext};
+use taim::native::{app, Dispatch};
+
+fn scene<'a>(count: &'a u64, _: &WindowContext) -> Element<'a, u64> {
+    taim::widget::text(format!("Count: {count}")).into()
+}
+
+fn main() -> taim::Result {
+    let application = app(
+        "TAIM Native",
+        |_context: &mut AppContext| (0_u64, Task::none()),
+        |count: &mut u64, amount: u64, _context: &mut AppContext| {
+            if amount == 0 { Dispatch::idle() }
+            else { *count += amount; Dispatch::paint() }
+        },
+        scene,
+    );
+    taim::run_app(application)
+}
+```
+
+This dispatch path goes straight to the TAIM `AppRunner` and frame scheduling. It
+is a **new native application contract**, not proof that the entire framework
+is independently authored: most existing widgets and portions of the renderer
+still have historic Iced origin, correctly acknowledged in `CREDITS.md` and
+`LICENSE`. The older API remains available for existing applications.
+
+For the migration acceptance gates, see `docs/architecture/native-identity.md`.
+
 ## Architectural Pillars
 
 ```text
