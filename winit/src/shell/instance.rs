@@ -977,33 +977,20 @@ pub(super) async fn run_instance<A>(
                                 );
                             }
 
+                            let dirty = crate::frame_gate::after_message_batch(
+                                explicit_invalidation,
+                                uis_stale,
+                                intent_delta,
+                            );
                             for (window_id, window) in window_manager.iter_mut() {
-                                use crate::frame_gate::DirtyFlags;
-
-                                let mut dirty = if !explicit_invalidation || uis_stale {
-                                    DirtyFlags::PAINT_DIRTY
-                                } else {
-                                    DirtyFlags::CLEAN
-                                };
-
-                                if explicit_invalidation {
-                                    if intent_delta.layout_dirty {
-                                        dirty |= DirtyFlags::LAYOUT_DIRTY
-                                            | DirtyFlags::PAINT_DIRTY;
-                                    } else if intent_delta.paint_dirty {
-                                        dirty |= DirtyFlags::PAINT_DIRTY;
-                                    }
-                                    if intent_delta.frame != program::FrameRequest::None {
-                                        dirty |= DirtyFlags::PAINT_DIRTY;
-                                    }
-                                }
-
                                 if dirty.is_empty() {
                                     continue;
                                 }
 
                                 frame_gate.invalidate(window_id, dirty);
-                                if intent_delta.frame == program::FrameRequest::Animate {
+                                if explicit_invalidation
+                                    && intent_delta.frame == program::FrameRequest::Animate
+                                {
                                     window.scheduler.request_animation();
                                 }
                                 window.request_redraw(core::window::RedrawRequest::NextFrame);
