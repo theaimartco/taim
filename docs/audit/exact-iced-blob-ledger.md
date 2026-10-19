@@ -110,3 +110,9 @@ This report is generated from GitHub's complete recursive tree for upstream fork
 - Manual origin review remains mandatory after a machine audit; true public distinction requires a novel API and meaningful architecture, not rebranding
 - `CREDITS.md`, inherited MIT license and Git history remain intact
 - Production gate also requires executable CI, VYOM device and independent licensing/QA signoff
+
+## Follow-up checkpoint: original redraw request semantics
+
+At code commit `5b88de015f3acb052e4df8bab9b7dac3baeca06f`, the exact same-path Rust/WGSL/TOML SHA count decreased **from 67 to 66** after original `core/src/window/redraw_request.rs` was implemented with an explicit request-merging/deadline contract and wired into `winit/src/window.rs`. Added tests cover merge associativity, commutativity, no-op idle semantics, and delayed deadlines. Exact Git-tree inspection was done for complete, non-truncated trees. `scripts/audit/exact-fork-blobs.py` also checks identical blobs that may have moved to different paths.
+
+This change is **not** certification that the remaining modified files were originally authored. Rust compile/tests are currently unverified because GitHub Actions jobs are failing before executing runner steps.
