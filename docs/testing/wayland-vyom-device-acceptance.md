@@ -28,7 +28,7 @@ Run from a clean checkout at the candidate commit:
     cargo test --test golden
     TAIM_ATSPI_REQUIRE_BUS=1 dbus-run-session -- cargo test -p taim-accessibility --features atspi --test atspi_bus
     cargo build --release -p taim-showcase
-    cargo build --release -p mobile_shell
+    cargo build --release -p mobile_shell --features taim/measurement
 
 Start the real GUI app while recording exact backend selection, software/GPU
 fallback status, compositor logs and presentation feedback. Run separate
@@ -80,3 +80,15 @@ software key-to-raster or input-to-submit time.
 | Orca screen-reader interaction | NOT RUN | — |
 | GPU loss/fallback | NOT RUN | — |
 | Stable memory and measured idle power | NOT RUN | — |
+
+## Executable live Wayland preflight
+
+On the actual named Wayland device, from a clean checkout with a working
+compositor session, invoke `bash scripts/qa/wayland-smoke.sh /tmp/taim-acceptance-1`.
+This script checks the real Wayland socket, captures a hardware inventory,
+compiles the probe-enabled shell, launches it, and checks the measured first
+successful compositor present marker and process RSS. It records logs and
+SHA-256 evidence hashes; it never claims a physical photon or VYOM-native
+GPU acceptance without an instrumented device/session and reviewer.
+Optional second argument is a readable `energy_uj` counter; 15-second
+power measurements are diagnostics only, not a steady-state power verdict.
