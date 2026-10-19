@@ -68,13 +68,20 @@ where
     /// Draws the given [`Path`] on the [`Frame`] by filling it with the
     /// provided style.
     pub fn fill(&mut self, path: &Path, fill: impl Into<Fill>) {
-        self.raw.fill(path, fill);
+        let fill = fill.into();
+        if !fill.is_fully_transparent() {
+            self.raw.fill(path, fill);
+        }
     }
 
     /// Draws an axis-aligned rectangle given its top-left corner coordinate and
     /// its `Size` on the [`Frame`] by filling it with the provided style.
     pub fn fill_rectangle(&mut self, top_left: Point, size: Size, fill: impl Into<Fill>) {
-        if is_drawable(top_left, size) {
+        if !is_drawable(top_left, size) {
+            return;
+        }
+        let fill = fill.into();
+        if !fill.is_fully_transparent() {
             self.raw.fill_rectangle(top_left, size, fill);
         }
     }
