@@ -8,7 +8,6 @@
 use super::Node;
 use crate::core::{Rectangle, Size};
 use crate::pane_grid::{Axis, Pane, Split};
-use rustc_hash::FxHashMap;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy)]
@@ -37,39 +36,68 @@ impl Extents {
     }
 }
 
+/// A packed scan record. Child indexes always exceed the parent's index,
+/// permitting a cache-friendly reverse pass to determine minimum extents.
+struct PlanNode<'a> {
+    source: &'a Node,
+    left: Option<usize>,
+    right: Option<usize>,
+    extent: Extents,
+}
+
 impl Node {
-    /// Compute the minimum-size split factors in one iterative postorder pass.
+    /// Flatten a pane tree without recursion or per-node hash table probes.
     ///
-    /// Raw pointers are used only as hashable identities while the immutable
-    /// tree is borrowed; they are never dereferenced or stored after return.
-    fn subtree_extents(&self) -> FxHashMap<*const Node, Extents> {
-        let mut finished = FxHashMap::default();
-        let mut visit = vec![(self, false)];
+    /// The plan is compact and stable for the duration of this immutable
+    /// borrow. Reverse index order is guaranteed to visit children before
+    /// parents, including highly unbalanced nested workspaces.
+    fn flat_plan(&self) -> Vec<PlanNode<'_>> {
+        let mut plan = vec![PlanNode {
+            source: self,
+            left: None,
+            right: None,
+            extent: Extents::LEAF,
+        }];
+        let mut pending = vec![0_usize];
 
-        while let Some((node, children_visited)) = visit.pop() {
-            let key = std::ptr::from_ref(node);
-
-            match node {
-                Self::Pane(_) => {
-                    finished.insert(key, Extents::LEAF);
-                }
-                Self::Split { axis, a, b, .. } => {
-                    if children_visited {
-                        let left = finished[&std::ptr::from_ref(a.as_ref())];
-                        let right = finished[&std::ptr::from_ref(b.as_ref())];
-                        finished.insert(key, Extents::combine(*axis, left, right));
-                    } else {
-                        visit.push((node, true));
-                        visit.push((b, false));
-                        visit.push((a, false));
-                    }
-                }
+        while let Some(index) = pending.pop() {
+            let source = plan[index].source;
+            if let Self::Split { a, b, .. } = source {
+                let left = plan.len();
+                plan.push(PlanNode {
+                    source: a.as_ref(),
+                    left: None,
+                    right: None,
+                    extent: Extents::LEAF,
+                });
+                let right = plan.len();
+                plan.push(PlanNode {
+                    source: b.as_ref(),
+                    left: None,
+                    right: None,
+                    extent: Extents::LEAF,
+                });
+                plan[index].left = Some(left);
+                plan[index].right = Some(right);
+                pending.push(right);
+                pending.push(left);
             }
         }
-        finished
+
+        for index in (0..plan.len()).rev() {
+            let source = plan[index].source;
+            if let Self::Split { axis, .. } = source {
+                let left = plan[index].left.expect("split has left child");
+                let right = plan[index].right.expect("split has right child");
+                plan[index].extent =
+                    Extents::combine(*axis, plan[left].extent, plan[right].extent);
+            }
+        }
+        plan
     }
 
-    /// Visit the same geometry plan for both pane painting and split hit-testing.
+    /// Visit one immutable packed geometry plan for both painting and hit testing.
+
     ///
     /// Keeping output callbacks separate means pane-only and split-only
     /// callers do not allocate the other result map.
@@ -84,17 +112,20 @@ impl Node {
         let spacing = finite_nonnegative(spacing);
         let min_size = finite_nonnegative(min_size);
         let bounds = finite_size(bounds);
-        let extents = self.subtree_extents();
+        let plan = self.flat_plan();
 
         let root = Rectangle::new([0.0, 0.0].into(), bounds);
-        let mut pending = vec![(self, root)];
+        let mut pending = vec![(0_usize, root)];
 
-        while let Some((node, region)) = pending.pop() {
-            match node {
+        while let Some((index, region)) = pending.pop() {
+            let entry = &plan[index];
+            match entry.source {
                 Self::Pane(pane) => on_pane(*pane, region),
-                Self::Split { id, axis, ratio, a, b } => {
-                    let left = extents[&std::ptr::from_ref(a.as_ref())];
-                    let right = extents[&std::ptr::from_ref(b.as_ref())];
+                Self::Split { id, axis, ratio, .. } => {
+                    let a = entry.left.expect("split has left child");
+                    let b = entry.right.expect("split has right child");
+                    let left = plan[a].extent;
+                    let right = plan[b].extent;
                     let (left_factor, right_factor) = match axis {
                         Axis::Horizontal => (left.horizontal, right.horizontal),
                         Axis::Vertical => (left.vertical, right.vertical),
