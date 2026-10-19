@@ -31,10 +31,11 @@ def nested_dependency_sections(tree, prefix=""):
             for registry, dependencies in value.items():
                 if isinstance(dependencies, dict):
                     yield f"{path}.{registry}", dependencies
-        elif key in ("target", "workspace"):
+        elif key == "workspace":
+            yield from nested_dependency_sections(value, path)
+        elif key == "target":
             for child, section in value.items():
-                for nested_path, dependencies in nested_dependency_sections(section, f"{path}.{child}"):
-                    yield nested_path, dependencies
+                yield from nested_dependency_sections(section, f"{path}.{child}")
 
 
 def check_manifest(path):
