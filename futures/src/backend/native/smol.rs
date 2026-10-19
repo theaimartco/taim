@@ -24,6 +24,15 @@ pub mod time {
     use crate::core::time::{Duration, Instant};
     use crate::subscription::Subscription;
 
+    const MIN_INTERVAL: Duration = Duration::from_millis(1);
+
+    /// Keep zero-period timers from panicking or spinning the UI event loop.
+    #[inline]
+    fn safe_interval(value: Duration) -> Duration {
+        value.max(MIN_INTERVAL)
+    }
+
+
     use futures::stream;
 
     /// Returns a [`Subscription`] that produces messages at a set interval.
@@ -34,9 +43,10 @@ pub mod time {
         Subscription::run_with(duration, |duration| {
             use futures::stream::StreamExt;
 
-            let start = Instant::now() + *duration;
+            let interval = safe_interval(*duration);
+            let start = Instant::now() + interval;
 
-            smol::Timer::interval_at(start, *duration).boxed()
+            smol::Timer::interval_at(start, interval).boxed()
         })
     }
 
@@ -49,7 +59,7 @@ pub mod time {
     {
         Subscription::run_with((f, interval), |(f, interval)| {
             let f = *f;
-            let interval = *interval;
+            let interval = safe_interval(*interval);
 
             stream::unfold(0, move |i| async move {
                 if i > 0 {
@@ -59,5 +69,20 @@ pub mod time {
                 Some((f().await, i + 1))
             })
         })
+    }
+}
+
+#[cfg(test)]
+mod taim_timer_contract_tests {
+    use super::time::safe_interval;
+    use crate::core::time::Duration;
+
+    #[test]
+    fn smol_interval_never_runs_at_zero_period() {
+        assert_eq!(safe_interval(Duration::ZERO), Duration::from_millis(1));
+        assert_eq!(
+            safe_interval(Duration::from_millis(25)),
+            Duration::from_millis(25)
+        );
     }
 }
