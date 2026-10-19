@@ -50,7 +50,7 @@ pub(super) async fn run_instance<A>(
             mundy::ColorScheme::Dark => theme::Mode::Dark,
         };
 
-        runtime.run(
+        let _ = runtime.run(
             mundy::Preferences::stream(mundy::Interest::ColorScheme)
                 .map(move |preferences| {
                     Action::System(system::Action::NotifyTheme(to_mode(
