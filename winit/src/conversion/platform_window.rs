@@ -199,18 +199,13 @@ pub fn fullscreen(
     monitor: Option<winit::monitor::MonitorHandle>,
     mode: window::Mode,
 ) -> Option<winit::window::Fullscreen> {
-    match mode {
-        window::Mode::Windowed | window::Mode::Hidden => None,
-        window::Mode::Fullscreen => Some(winit::window::Fullscreen::Borderless(monitor)),
-    }
+    mode.requests_fullscreen()
+        .then_some(winit::window::Fullscreen::Borderless(monitor))
 }
 
 /// Converts a [`window::Mode`] into a visibility flag.
 pub fn visible(mode: window::Mode) -> bool {
-    match mode {
-        window::Mode::Windowed | window::Mode::Fullscreen => true,
-        window::Mode::Hidden => false,
-    }
+    mode.is_visible()
 }
 
 /// Converts a [`winit`] fullscreen mode into a [`window::Mode`].
