@@ -159,61 +159,35 @@ pub fn position(
     size: Size,
     position: window::Position,
 ) -> Option<winit::dpi::Position> {
-    match position {
-        window::Position::Default => None,
-        window::Position::Specific(position) => {
+    let monitor_extent = monitor.map(|monitor| {
+        let logical: winit::dpi::LogicalSize<f32> =
+            monitor.size().to_logical(monitor.scale_factor());
+        Size::new(logical.width, logical.height)
+    });
+
+    match position.resolve(size, monitor_extent)? {
+        window::ResolvedPosition::Global(global) => {
             Some(winit::dpi::Position::Logical(winit::dpi::LogicalPosition {
-                x: f64::from(position.x),
-                y: f64::from(position.y),
+                x: f64::from(global.x),
+                y: f64::from(global.y),
             }))
         }
-        window::Position::SpecificWith(to_position) => {
-            if let Some(monitor) = monitor {
-                let start = monitor.position();
-
-                let resolution: winit::dpi::LogicalSize<f32> =
-                    monitor.size().to_logical(monitor.scale_factor());
-
-                let position = to_position(size, Size::new(resolution.width, resolution.height));
-
-                let centered: winit::dpi::PhysicalPosition<i32> = winit::dpi::LogicalPosition {
-                    x: position.x,
-                    y: position.y,
+        window::ResolvedPosition::MonitorRelative(local) => {
+            let monitor = monitor?;
+            let origin = monitor.position();
+            let physical: winit::dpi::PhysicalPosition<i32> =
+                winit::dpi::LogicalPosition {
+                    x: f64::from(local.x),
+                    y: f64::from(local.y),
                 }
                 .to_physical(monitor.scale_factor());
 
-                Some(winit::dpi::Position::Physical(
-                    winit::dpi::PhysicalPosition {
-                        x: start.x.saturating_add(centered.x),
-                        y: start.y.saturating_add(centered.y),
-                    },
-                ))
-            } else {
-                None
-            }
-        }
-        window::Position::Centered => {
-            if let Some(monitor) = monitor {
-                let start = monitor.position();
-
-                let resolution: winit::dpi::LogicalSize<f64> =
-                    monitor.size().to_logical(monitor.scale_factor());
-
-                let centered: winit::dpi::PhysicalPosition<i32> = winit::dpi::LogicalPosition {
-                    x: (resolution.width - f64::from(size.width)) / 2.0,
-                    y: (resolution.height - f64::from(size.height)) / 2.0,
-                }
-                .to_physical(monitor.scale_factor());
-
-                Some(winit::dpi::Position::Physical(
-                    winit::dpi::PhysicalPosition {
-                        x: start.x.saturating_add(centered.x),
-                        y: start.y.saturating_add(centered.y),
-                    },
-                ))
-            } else {
-                None
-            }
+            Some(winit::dpi::Position::Physical(
+                winit::dpi::PhysicalPosition {
+                    x: origin.x.saturating_add(physical.x),
+                    y: origin.y.saturating_add(physical.y),
+                },
+            ))
         }
     }
 }

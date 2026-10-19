@@ -18,7 +18,7 @@ pub use icon::Icon;
 pub use id::Id;
 pub use level::Level;
 pub use mode::Mode;
-pub use position::Position;
+pub use position::{Position, ResolvedPosition};
 pub use redraw_request::RedrawRequest;
 pub use screenshot::Screenshot;
 pub use settings::Settings;
