@@ -1,10 +1,12 @@
-# Exact Git blob identity against inherited Iced commit
+# Current TAIM source-identity ledger
 
-This report is generated from GitHub's complete recursive tree for upstream fork commit `56b706fc` and branch commit `935e88d1d92ec1b84e628aa330243a6d4eee9e22`. No source similarity heuristic is used here: an identical SHA at the **same path** means identical file bytes.
+Exact candidate baseline: upstream Iced fork `56b706fc`, TAIM branch SHA `f4b19d7845b2fbf88ddf9a1b1e3f8749e743e9b2`. GitHub full recursive Git tree reads returned untruncated inventories.
 
-**Exact identical .rs/.wgsl/.toml files: 67.** Tree reads were complete (not truncated). This is a lower bound on copied origin: renamed/copied files, code moved to new files, source with small changes, historical source lineage and third-party license obligations are not resolved by this count. Do not report 100% source independence based on blob count alone. This report is a pinned snapshot and must be recomputed after later commits.
+## Blocking exact inherited files: 66
 
-## core (20)
+Git blob SHA identity at the same path is hard evidence of identical bytes. Modified inherited source, near-matches, and relocated snippets are additional unverified scope; **the remaining source-origin count is not limited to these files**.
+
+### Core types and input — 19
 
 - `core/src/background.rs`
 - `core/src/keyboard.rs`
@@ -20,14 +22,13 @@ This report is generated from GitHub's complete recursive tree for upstream fork
 - `core/src/window/level.rs`
 - `core/src/window/mode.rs`
 - `core/src/window/position.rs`
-- `core/src/window/redraw_request.rs`
 - `core/src/window/settings/linux.rs`
 - `core/src/window/settings/macos.rs`
 - `core/src/window/settings/other.rs`
 - `core/src/window/settings/windows.rs`
 - `core/src/window/user_attention.rs`
 
-## futures (11)
+### Futures and executors — 11
 
 - `futures/src/backend/default.rs`
 - `futures/src/backend/native.rs`
@@ -41,7 +42,7 @@ This report is generated from GitHub's complete recursive tree for upstream fork
 - `futures/src/maybe.rs`
 - `futures/src/stream.rs`
 
-## graphics (5)
+### Graphics — 5
 
 - `graphics/src/error.rs`
 - `graphics/src/geometry.rs`
@@ -49,19 +50,19 @@ This report is generated from GitHub's complete recursive tree for upstream fork
 - `graphics/src/geometry/style.rs`
 - `graphics/src/shell.rs`
 
-## program (2)
+### Program/application — 2
 
 - `program/src/message.rs`
 - `program/src/preset.rs`
 
-## runtime (4)
+### Runtime — 4
 
 - `runtime/src/backend.rs`
 - `runtime/src/font.rs`
 - `runtime/src/image.rs`
 - `runtime/src/system.rs`
 
-## widgets (9)
+### Widgets — 9
 
 - `widget/src/action.rs`
 - `widget/src/lazy/cache.rs`
@@ -73,7 +74,7 @@ This report is generated from GitHub's complete recursive tree for upstream fork
 - `widget/src/pane_grid/pane.rs`
 - `widget/src/pane_grid/split.rs`
 
-## renderer (7)
+### GPU/CPU renderer — 7
 
 - `tiny_skia/src/window.rs`
 - `wgpu/src/image/atlas/entry.rs`
@@ -83,11 +84,11 @@ This report is generated from GitHub's complete recursive tree for upstream fork
 - `wgpu/src/shader/color/linear_rgb.wgsl`
 - `wgpu/src/shader/vertex.wgsl`
 
-## shell (1)
+### Window shell — 1
 
 - `winit/src/error.rs`
 
-## others (8)
+### Configuration and facade — 8
 
 - `.cargo/audit.toml`
 - `.cargo/config.toml`
@@ -98,21 +99,18 @@ This report is generated from GitHub's complete recursive tree for upstream fork
 - `src/window.rs`
 - `src/window/icon.rs`
 
-## Real replacements in this PR
+## Non-cosmetic replacements implemented on this branch
 
-- Inherited `futures/src/subscription/tracker.rs` replaced by separately authored and wired `taim_tracker.rs` with streaming cancellation, dedup and epoch tests
-- `core/src/window/id.rs` reimplemented with checked monotonic atomic IDs and concurrency tests
-- A separate native app/intent API with real Winit FrameGate dirty-state support and behavior tests
+- `futures/src/subscription/tracker.rs` removed and replaced with independently implemented cancellation-aware subscription reconciler, `taim_tracker.rs` (tests added)
+- `core/src/window/id.rs` replaced with atomic no-wrap allocation (multi-thread and exhaustion tests)
+- `core/src/window/redraw_request.rs` replaced with frame-intent/deadline merge semantics wired into Winit (ordering tests)
+- `widget/src/pane_grid/node/regions.rs` rewritten to use iterative packed-index, no-recursion pane geometry planning (mixed-axis, invalid bounds and deep nesting tests)
+- Native `App` and explicit dirty-state path integrated in real Winit event loop
 
-## Promotion controls
+## Evidence limitations and required release gates
 
-- `scripts/audit/source-lineage-gate.py --strict` must pass before any zero-inherited-source marketing
-- Manual origin review remains mandatory after a machine audit; true public distinction requires a novel API and meaningful architecture, not rebranding
-- `CREDITS.md`, inherited MIT license and Git history remain intact
-- Production gate also requires executable CI, VYOM device and independent licensing/QA signoff
-
-## Follow-up checkpoint: original redraw request semantics
-
-At code commit `5b88de015f3acb052e4df8bab9b7dac3baeca06f`, the exact same-path Rust/WGSL/TOML SHA count decreased **from 67 to 66** after original `core/src/window/redraw_request.rs` was implemented with an explicit request-merging/deadline contract and wired into `winit/src/window.rs`. Added tests cover merge associativity, commutativity, no-op idle semantics, and delayed deadlines. Exact Git-tree inspection was done for complete, non-truncated trees. `scripts/audit/exact-fork-blobs.py` also checks identical blobs that may have moved to different paths.
-
-This change is **not** certification that the remaining modified files were originally authored. Rust compile/tests are currently unverified because GitHub Actions jobs are failing before executing runner steps.
+- This SHA inventory uses a byte-exact comparison; it is not a legal originality verdict.
+- `scripts/audit/source-lineage-gate.py --strict --output /tmp/taim-audit.json` rejects unresolved inherited source, including token similarity. `exact-fork-blobs.py` checks exact relocated Git blob matches.
+- External source reviewer must independently assess altered but inherited source, license records, CI/goldens/AT-SPI and real VYOM hardware acceptance.
+- GitHub Actions runner allocation [issue #2](https://github.com/theaimartco/taim/issues/2) remains blocking; latest executed steps = zero. No Rust pass or runtime speedup has been proven for this patch.
+- Iced MIT attribution and historical Git ancestry must remain intact, irrespective of current-source independence.
