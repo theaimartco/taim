@@ -89,6 +89,86 @@ impl std::ops::Not for DirtyFlags {
     }
 }
 
+/// Determine which frame work follows a batch of application messages.
+///
+/// The older Program contract continues to redraw automatically. Native
+/// TAIM intent applications explicitly report layout/paint/animation changes.
+/// This function is pure so those semantics are exercised without a GPU.
+pub(crate) fn after_message_batch(
+    native_invalidation: bool,
+    ui_stale: bool,
+    intent: crate::program::StateDelta,
+) -> DirtyFlags {
+    let mut dirty = if !native_invalidation || ui_stale {
+        DirtyFlags::PAINT_DIRTY
+    } else {
+        DirtyFlags::CLEAN
+    };
+
+    if native_invalidation {
+        if intent.layout_dirty {
+            dirty |= DirtyFlags::LAYOUT_DIRTY | DirtyFlags::PAINT_DIRTY;
+        } else if intent.paint_dirty {
+            dirty |= DirtyFlags::PAINT_DIRTY;
+        }
+        if intent.frame != crate::program::FrameRequest::None {
+            dirty |= DirtyFlags::PAINT_DIRTY;
+        }
+    }
+    dirty
+}
+
+#[cfg(test)]
+mod native_message_tests {
+    use super::*;
+    use crate::program::{FrameRequest, StateDelta};
+
+    #[test]
+    fn untouched_native_message_does_not_dirty_a_frame() {
+        assert_eq!(after_message_batch(true, false, StateDelta::clean()), DirtyFlags::CLEAN);
+    }
+
+    #[test]
+    fn legacy_message_keeps_automatic_redraw() {
+        assert_eq!(
+            after_message_batch(false, false, StateDelta::clean()),
+            DirtyFlags::PAINT_DIRTY
+        );
+    }
+
+    #[test]
+    fn native_paint_does_not_invalidate_layout() {
+        let flags = after_message_batch(true, false, StateDelta::redraw());
+        assert!(flags.contains(DirtyFlags::PAINT_DIRTY));
+        assert!(!flags.intersects(DirtyFlags::LAYOUT_DIRTY));
+    }
+
+    #[test]
+    fn native_layout_invalidates_layout_and_paint() {
+        let flags = after_message_batch(true, false, StateDelta::relayout());
+        assert!(flags.contains(DirtyFlags::LAYOUT_DIRTY | DirtyFlags::PAINT_DIRTY));
+    }
+
+    #[test]
+    fn stale_ui_requires_paint_even_for_clean_native_message() {
+        assert!(after_message_batch(true, true, StateDelta::clean())
+            .intersects(DirtyFlags::PAINT_DIRTY));
+    }
+
+    #[test]
+    fn animation_request_produces_a_frame_without_other_changes() {
+        let flags = after_message_batch(
+            true,
+            false,
+            StateDelta {
+                frame: FrameRequest::Animate,
+                ..StateDelta::clean()
+            },
+        );
+        assert!(flags.intersects(DirtyFlags::PAINT_DIRTY));
+    }
+}
+
 /// Normalized platform event emitted from the OS layer.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlatformEvent {
