@@ -5,9 +5,9 @@
 //! paid before the stream itself is even started.
 
 mod plan;
-mod tracker;
+mod taim_tracker;
 
-pub use tracker::Tracker;
+pub use taim_tracker::Tracker;
 
 use crate::core::event;
 use crate::core::theme;
