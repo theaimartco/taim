@@ -119,14 +119,10 @@ impl Event {
         match self {
             Event::Touch(touch) => {
                 let pointer = touch.to_pointer(timestamp);
-                // Invalid active coordinates must not enter gesture hit tests.
-                // Terminal events must still reach the router to release
-                // any captured contact, even with unknown final coordinates.
-                if !pointer.has_finite_position() && !pointer.is_terminal() {
-                    None
-                } else {
-                    Some(pointer)
-                }
+                // TAIM rejects malformed active coordinates. A malformed
+                // terminal coordinate becomes a safe Cancel event so the
+                // router releases capture without reporting a successful tap.
+                pointer.sanitize_coordinates()
             },
             Event::Mouse(mouse_event) => {
                 let (phase, position) = match mouse_event {
@@ -138,16 +134,7 @@ impl Event {
                     | mouse::Event::WheelScrolled { .. } => return None,
                 };
 
-                // Keep Up events even if the reported final position is
-                // non-finite: dropping a terminal event would leave capture
-                // state permanently tracked. Reject malformed Down/Move.
-                if (!position.x.is_finite() || !position.y.is_finite())
-                    && !matches!(phase, pointer::Phase::Up)
-                {
-                    return None;
-                }
-
-                Some(pointer::Pointer {
+                pointer::Pointer {
                     id: pointer::Id::MOUSE,
                     device: pointer::DeviceKind::Mouse,
                     phase,
@@ -155,7 +142,8 @@ impl Event {
                     timestamp,
                     metadata: pointer::Metadata::NONE,
                     captured: false,
-                })
+                }
+                .sanitize_coordinates()
             }
             Event::Keyboard(_)
             | Event::Window(_)
@@ -287,7 +275,8 @@ mod tests {
         let invalid = crate::Point::new(f32::INFINITY, 1.0);
         let released_mouse = Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left));
         let mouse_up = released_mouse.to_pointer(Some(invalid), now()).unwrap();
-        assert_eq!(mouse_up.phase, pointer::Phase::Up);
+        assert_eq!(mouse_up.phase, pointer::Phase::Cancel);
+        assert_eq!(mouse_up.position, crate::Point::ORIGIN);
 
         let touch_move = Event::Touch(touch::Event::FingerMoved {
             id: touch::Finger(4),
@@ -302,7 +291,8 @@ mod tests {
             metadata: pointer::Metadata::NONE,
         });
         let up = touch_release.to_pointer(None, now()).unwrap();
-        assert_eq!(up.phase, pointer::Phase::Up);
+        assert_eq!(up.phase, pointer::Phase::Cancel);
+        assert_eq!(up.position, crate::Point::ORIGIN);
         assert!(up.is_terminal());
     }
 
