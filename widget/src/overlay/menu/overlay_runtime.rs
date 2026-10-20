@@ -112,9 +112,19 @@ where
         let space_below = (viewport_height - (position.y + target_height)).max(0.0);
         let space_above = position.y;
         let available_height = space_below.max(space_above);
-        let available_width = (bounds.width - position.x).max(0.0);
+        let viewport_width = if bounds.width.is_finite() {
+            bounds.width.max(0.0)
+        } else {
+            0.0
+        };
+        let available_width = (viewport_width - position.x).max(0.0);
+        let desired_width = if self.width.is_finite() {
+            self.width.max(0.0)
+        } else {
+            0.0
+        };
         let limits = layout::Limits::new(Size::ZERO, Size::new(available_width, available_height))
-            .width(self.width.min(available_width));
+            .width(desired_width.min(available_width));
 
         let node = self.list.layout(self.tree, renderer, &limits);
         let size = node.size();

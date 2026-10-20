@@ -84,7 +84,15 @@ impl Event {
                     Coalescing::Critical
                 }
             }
-            Event::Touch(touch::Event::FingerMoved { .. }) => Coalescing::Mergeable,
+            Event::Touch(touch::Event::FingerMoved { position, .. }) => {
+                // Invalid motion is never a valid replacement for a prior
+                // finite sample; preserve the original queue semantics.
+                if position.x.is_finite() && position.y.is_finite() {
+                    Coalescing::Mergeable
+                } else {
+                    Coalescing::Critical
+                }
+            },
             Event::Touch(_) => Coalescing::Critical,
             Event::Keyboard(_)
             | Event::Window(_)
@@ -212,6 +220,16 @@ mod tests {
         });
 
         assert_eq!(event.coalescing(), Coalescing::Mergeable);
+    }
+
+    #[test]
+    fn invalid_touch_motion_cannot_replace_valid_queued_motion() {
+        let invalid = Event::Touch(touch::Event::FingerMoved {
+            id: touch::Finger(17),
+            position: crate::Point::new(f32::NAN, 10.0),
+            metadata: crate::pointer::Metadata::NONE,
+        });
+        assert_eq!(invalid.coalescing(), Coalescing::Critical);
     }
 
     #[test]
