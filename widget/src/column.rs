@@ -1,5 +1,5 @@
 //! Distribute content vertically.
-mod placement;
+pub(crate) mod placement;
 use crate::core::alignment::{self, Alignment};
 use crate::core::layout;
 use crate::core::mouse;
