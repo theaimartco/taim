@@ -231,6 +231,7 @@ public_modules!(
 );
 
 mod helpers;
+mod linear;
 
 pub use helpers::*;
 

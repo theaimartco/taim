@@ -50,6 +50,8 @@ pub struct Row<'a, Message, Theme = crate::Theme, Renderer = crate::Renderer> {
     padding: Padding,
     width: Length,
     height: Length,
+    /// Original builder lengths, unaffected by inferred child sizing.
+    declared: Size<Length>,
     align: Alignment,
     clip: bool,
     children: Vec<Element<'a, Message, Theme, Renderer>>,
@@ -93,6 +95,7 @@ where
             padding: Padding::ZERO,
             width: Length::Fit,
             height: Length::Fit,
+            declared: Size::new(Length::Fit, Length::Fit),
             align: Alignment::Start,
             clip: false,
             children,
@@ -117,13 +120,17 @@ where
 
     /// Sets the width of the [`Row`].
     pub fn width(mut self, width: impl Into<Length>) -> Self {
-        self.width = width.into();
+        let width = width.into();
+        self.declared.width = width;
+        self.width = width;
         self
     }
 
     /// Sets the height of the [`Row`].
     pub fn height(mut self, height: impl Into<Length>) -> Self {
-        self.height = height.into();
+        let height = height.into();
+        self.declared.height = height;
+        self.height = height;
         self
     }
 
@@ -225,14 +232,13 @@ where
         // re-measuring an otherwise-untouched tree) hit the cache.
         tree.state.downcast_mut::<State>().cache.clear();
 
-        if self.width.is_fit() || self.height.is_fit() {
-            for child in &self.children {
-                let size = child.as_widget().size();
-
-                self.width = self.width.stack(size.width);
-                self.height = self.height.cross(size.height);
-            }
-        }
+        let size = crate::linear::measure_intent(
+            self.declared,
+            crate::linear::Flow::Row,
+            self.children.iter().map(|child| child.as_widget().size()),
+        );
+        self.width = size.width;
+        self.height = size.height;
     }
 
     fn size(&self) -> Size<Length> {
@@ -248,14 +254,13 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        let fingerprint = layout::cache::Fingerprint::build(|hasher| {
-            hasher.write_usize(self.children.len());
-            self.width.hash_stable(hasher);
-            self.height.hash_stable(hasher);
-            hasher.write_u32(self.spacing.to_bits());
-            hash_padding(self.padding, hasher);
-            hasher.write_u8(alignment_tag(self.align));
-        });
+        let fingerprint = crate::linear::fingerprint(
+            self.children.len(),
+            Size::new(self.width, self.height),
+            self.padding,
+            self.spacing,
+            self.align,
+        );
 
         let state = tree.state.downcast_mut::<State>();
         let children = &mut self.children;
@@ -606,19 +611,3 @@ fn finite_nonnegative(value: f32) -> f32 {
     }
 }
 
-#[inline]
-fn hash_padding(padding: Padding, hasher: &mut dyn std::hash::Hasher) {
-    hasher.write_u32(padding.top.to_bits());
-    hasher.write_u32(padding.right.to_bits());
-    hasher.write_u32(padding.bottom.to_bits());
-    hasher.write_u32(padding.left.to_bits());
-}
-
-#[inline]
-const fn alignment_tag(alignment: Alignment) -> u8 {
-    match alignment {
-        Alignment::Start => 0,
-        Alignment::Center => 1,
-        Alignment::End => 2,
-    }
-}
