@@ -4,9 +4,10 @@ use super::*;
 ///
 /// [`UserAttention`]: window::UserAttention
 pub fn user_attention(user_attention: window::UserAttention) -> winit::window::UserAttentionType {
-    match user_attention {
-        window::UserAttention::Critical => winit::window::UserAttentionType::Critical,
-        window::UserAttention::Informational => winit::window::UserAttentionType::Informational,
+    if user_attention.is_critical() {
+        winit::window::UserAttentionType::Critical
+    } else {
+        winit::window::UserAttentionType::Informational
     }
 }
 
