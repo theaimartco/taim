@@ -1,0 +1,7 @@
+# Candidate code-gates workflow — 2026-10-21
+
+This addition creates an active, **non-publishing** candidate workflow at `.github/workflows/taim-code-gates.yml`. It validates full-history source similarity and Python release contracts; checks the pinned 1.95.0 Rust compiler, format, build, Clippy, unit/workspace tests and CPU image goldens; exercises D-Bus accessibility and independent Cargo consumption; and checks third-party advisory/license/source rules. Actions permissions are read-only. Other historically disabled workflows remain unchanged.
+
+This workflow triggers on PRs to main, new main commits and explicit workflow dispatch. **It does not certify production**. The older GitHub runner-allocation incident https://github.com/theaimartco/taim/issues/2 may prevent any steps from executing; zero-step failures do not count as code-test results. Branch protection, required checks, independent author/license review, Wayland/VYOM device QA, GPU recovery, multilingual IME and screen-reader hardware acceptance, performance and signed release provenance remain release blockers.
+
+The initial Row/Column layout change in this candidate eliminates persistent inferred width/height fields and calculates effective child sizing during `size()`, `layout()`, and both wrapping placement paths, including before the first `Widget::diff`. Three source regression tests were added. These are **unexecuted**, not passing test results. Do not tag or publish a stable production version from this commit without completing the documented release evidence and owner signoff.

@@ -48,9 +48,7 @@ struct State {
 pub struct Row<'a, Message, Theme = crate::Theme, Renderer = crate::Renderer> {
     spacing: f32,
     padding: Padding,
-    width: Length,
-    height: Length,
-    /// Original builder lengths, unaffected by inferred child sizing.
+    /// Source-of-truth builder lengths; inferred sizing is never persisted.
     declared: Size<Length>,
     align: Alignment,
     clip: bool,
@@ -93,8 +91,6 @@ where
         Self {
             spacing: 0.0,
             padding: Padding::ZERO,
-            width: Length::Fit,
-            height: Length::Fit,
             declared: Size::new(Length::Fit, Length::Fit),
             align: Alignment::Start,
             clip: false,
@@ -122,7 +118,6 @@ where
     pub fn width(mut self, width: impl Into<Length>) -> Self {
         let width = width.into();
         self.declared.width = width;
-        self.width = width;
         self
     }
 
@@ -130,7 +125,6 @@ where
     pub fn height(mut self, height: impl Into<Length>) -> Self {
         let height = height.into();
         self.declared.height = height;
-        self.height = height;
         self
     }
 
@@ -173,6 +167,16 @@ where
         }
 
         self
+    }
+
+    /// Resolve effective constraints from the current children on demand.
+    /// No previous frame or diff may influence this result.
+    fn resolved_size(&self) -> Size<Length> {
+        crate::linear::measure_intent(
+            self.declared,
+            crate::linear::Flow::Row,
+            self.children.iter().map(|child| child.as_widget().size()),
+        )
     }
 
     /// Turns the [`Row`] into a [`Wrapping`] row.
@@ -232,20 +236,10 @@ where
         // re-measuring an otherwise-untouched tree) hit the cache.
         tree.state.downcast_mut::<State>().cache.clear();
 
-        let size = crate::linear::measure_intent(
-            self.declared,
-            crate::linear::Flow::Row,
-            self.children.iter().map(|child| child.as_widget().size()),
-        );
-        self.width = size.width;
-        self.height = size.height;
     }
 
     fn size(&self) -> Size<Length> {
-        Size {
-            width: self.width,
-            height: self.height,
-        }
+        self.resolved_size()
     }
 
     fn layout(
@@ -254,9 +248,10 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
+        let resolved = self.resolved_size();
         let fingerprint = crate::linear::fingerprint(
             self.children.len(),
-            Size::new(self.width, self.height),
+            resolved,
             self.padding,
             self.spacing,
             self.align,
@@ -267,8 +262,8 @@ where
         let padding = self.padding;
         let spacing = self.spacing;
         let align = self.align;
-        let width = self.width;
-        let height = self.height;
+        let width = resolved.width;
+        let height = resolved.height;
 
         layout::flex::resolve_cached(
             &mut state.cache,
@@ -485,9 +480,10 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
+        let resolved = self.row.resolved_size();
         let limits = limits
-            .width(self.row.width)
-            .height(self.row.height)
+            .width(resolved.width)
+            .height(resolved.height)
             .shrink(self.row.padding);
 
         // TAIM uses the same explicit-group placement contract for Row and
@@ -514,7 +510,7 @@ where
             self.align_x,
         );
 
-        let size = limits.resolve(self.row.width, self.row.height, intrinsic);
+        let size = limits.resolve(resolved.width, resolved.height, intrinsic);
         layout::Node::with_children(size.expand(self.row.padding), nodes)
     }
 

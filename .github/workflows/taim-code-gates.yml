@@ -1,0 +1,99 @@
+# Non-publishing validation for TAIM source candidates. This workflow deliberately
+# cannot certify real-device presentation, license originality, or release approval.
+name: TAIM candidate code gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: taim-code-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-and-contracts:
+    name: Source provenance and release contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check source and verifier contract tests
+        run: |
+          python3 -m unittest discover -s scripts/audit -p 'test_*.py' -v
+          python3 -m unittest discover -s scripts/qa -p 'test_*.py' -v
+          python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
+      - name: Strict original-source lineage audit
+        run: |
+          mkdir -p artifacts/taim-ci
+          python3 scripts/audit/source-lineage-gate.py --strict --output artifacts/taim-ci/source-lineage.json
+      - name: Save source audit report even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: taim-source-audit
+          path: artifacts/taim-ci/source-lineage.json
+          if-no-files-found: ignore
+
+  rust-gates:
+    name: Rust format, compile, Clippy, workspace tests and goldens
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust compiler and tools
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --component clippy --component rustfmt
+          rustup default 1.95.0
+          rustc --version
+      - uses: Swatinem/rust-cache@v2
+      - name: Native Linux development libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev dbus dbus-x11
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Build all Rust targets
+        run: cargo check --workspace --all-targets --locked
+      - name: Deny Clippy warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Core and widget unit tests
+        run: cargo test -p taim_core -p taim_widget --locked
+      - name: Whole-workspace regression tests
+        run: cargo test --workspace --locked
+      - name: CPU image golden tests
+        run: cargo test --test golden --locked
+      - name: Accessibility integration on a real D-Bus session
+        env:
+          TAIM_ATSPI_REQUIRE_BUS: "1"
+        run: dbus-run-session -- cargo test -p taim-accessibility --features atspi --test atspi_bus --locked
+      - name: Independent external workspace consumer compile
+        run: bash scripts/release/external-consumer-smoke.sh
+
+  dependencies:
+    name: Supply-chain advisories, source restrictions and licenses
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+
+# A successful workflow is only source/test evidence. Hardware, independent
+# security/lineage review, and signed release acceptance remain separate.

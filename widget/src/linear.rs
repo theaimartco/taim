@@ -144,6 +144,33 @@ mod tests {
     }
 
     #[test]
+    fn first_render_row_can_infer_fill_without_any_previous_diff() {
+        let effective = measure_intent(
+            fit(), Flow::Row,
+            [Size::new(Length::Fill, Length::Fit)],
+        );
+        assert_eq!(effective.width, Length::Fill);
+        assert_eq!(effective.height, Length::Fit);
+    }
+
+    #[test]
+    fn first_render_column_can_infer_fill_without_any_previous_diff() {
+        let effective = measure_intent(
+            fit(), Flow::Column,
+            [Size::new(Length::Fit, Length::Fill)],
+        );
+        assert_eq!(effective.width, Length::Fit);
+        assert_eq!(effective.height, Length::Fill);
+    }
+
+    #[test]
+    fn fresh_child_inputs_do_not_retain_prior_fluid_constraints() {
+        let fluid = [Size::new(Length::Fluid(Constraint::Min(5.0)), Length::Fit)];
+        assert_eq!(measure_intent(fit(), Flow::Row, fluid).width, Length::Fluid(Constraint::Min(5.0)));
+        assert_eq!(measure_intent(fit(), Flow::Row, []).width, Length::Fit);
+    }
+
+    #[test]
     fn fingerprint_tracks_all_structural_inputs() {
         let key = fingerprint(2, fit(), Padding::ZERO, 4.0, Alignment::Start);
         assert_ne!(key, fingerprint(3, fit(), Padding::ZERO, 4.0, Alignment::Start));
