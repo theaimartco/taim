@@ -35,12 +35,7 @@ where
         Size::new(compress_x, compress_y)
     };
 
-    let mut fill_main_sum = 0;
     let mut some_fill_cross = false;
-    let mut some_fill_max = false;
-    let mut some_fill_min = false;
-    let mut min_total = 0.0;
-    let mut min_factors = 0;
     let mut cross = 0.0;
     let mut available = axis.main(limits.max()) - total_spacing;
 
@@ -52,7 +47,6 @@ where
         main: Length,
         cross: Length,
         category: Category,
-        resolved: bool,
     }
 
     #[derive(Debug, Clone, Copy)]
@@ -93,41 +87,12 @@ where
         let meta = Meta {
             main: size_main,
             cross: size_cross,
-            resolved: false,
             category,
         };
 
         metas.push(meta);
 
-        match meta.main {
-            Length::Bounded {
-                sizing: length::Sizing::Fill(_),
-                bounds: length::Bounds::Min(min),
-            }
-            | Length::Fluid(length::Constraint::Min(min)) => {
-                min_total += min;
-                min_factors += fill_main_factor;
-                some_fill_min = true;
-            }
-            Length::Bounded {
-                sizing: length::Sizing::Fill(_),
-                bounds: length::Bounds::Max(_),
-            }
-            | Length::Fluid(length::Constraint::Max) => {
-                some_fill_max = true;
-            }
-            Length::Bounded {
-                sizing: length::Sizing::Fill(_),
-                bounds: length::Bounds::Both { .. },
-            } => {
-                some_fill_max = true;
-                some_fill_min = true;
-            }
-            _ => {}
-        }
-
         let Category::Static = meta.category else {
-            fill_main_sum += fill_main_factor;
             some_fill_cross = some_fill_cross || fill_cross_factor != 0;
             continue;
         };
@@ -191,163 +156,69 @@ where
         }
     }
 
-    let mut remaining = available.max(0.0);
-
-    // MIN / MAX PASSES
-    // We lay out any elements that are either bounded or fluid with some min / max constraints.
+    // TAIM WEIGHTED-SPACE PASS
     //
-    // First, we lay out any elements with `Max` bounds to potentially free up space; then
-    // another pass lays out elements with `Min` bounds.
-    //
-    // Since the remaining space may change mid-iteration, we need to revisit previous elements
-    // until they stabilize. Still, `layout` is only called once per element.
-    #[derive(Debug, Clone, Copy)]
-    enum Stage {
-        Max,
-        Min,
-    }
+    // The inherited recursive min/max passes depended on iteration order
+    // under tight constraints. TAIM first measures intrinsic caps, then
+    // allocates the remaining space using a pure bounded-waterfill planner.
+    if !main_compress {
+        let mut requests: Vec<super::allocator::Request> = metas
+            .iter()
+            .map(|meta| match meta.category {
+                Category::MainFluid => super::allocator::Request::from_length(meta.main),
+                _ => super::allocator::Request::from_length(Length::Fit),
+            })
+            .collect();
 
-    let mut step = if main_compress {
-        None
-    } else if some_fill_max {
-        Some(Stage::Max)
-    } else if some_fill_min {
-        Some(Stage::Min)
-    } else {
-        None
-    };
+        let initial_grants = super::allocator::allocate(available, &requests);
+        let mut remaining = available.max(0.0);
 
-    while let Some(stage) = step {
-        let current = remaining;
-        let (reserved_space, reserved_factors) = match stage {
-            Stage::Max => (min_total, min_factors),
-            Stage::Min => (0.0, 0),
-        };
-
+        // Children capped by their intrinsic width/height are measured
+        // at most once. Unused space is returned to the remaining pool.
         for (i, child) in items.iter_mut().enumerate() {
-            let meta = &mut metas[i];
-
-            if meta.resolved {
+            if !requests[i].intrinsic_cap() {
                 continue;
             }
 
-            let fill_main_factor = meta.main.fill_factor();
-
-            if fill_main_factor == 0 {
-                continue;
-            }
-
-            let bounds = match stage {
-                Stage::Max => match meta.main {
-                    Length::Bounded {
-                        bounds: bounds @ (length::Bounds::Max(_) | length::Bounds::Both { .. }),
-                        ..
-                    } => bounds,
-                    Length::Fluid(length::Constraint::Max) => length::Bounds::Min(0.0),
-                    _ => continue,
-                },
-                Stage::Min => match meta.main {
-                    Length::Bounded {
-                        bounds: bounds @ (length::Bounds::Min(_) | length::Bounds::Both { .. }),
-                        ..
-                    } => bounds,
-                    Length::Fluid(length::Constraint::Min(min)) => length::Bounds::Min(min),
-                    _ => continue,
-                },
-            };
-
-            let max_available = (remaining - reserved_space) * fill_main_factor as f32
-                / (fill_main_sum - reserved_factors) as f32;
-
-            let max_available = if max_available.is_nan() {
-                f32::INFINITY
-            } else {
-                max_available
-            };
-
-            let (min, max) = match bounds {
-                length::Bounds::Max(max) => (0.0, max),
-                length::Bounds::Both { min, max } => (min, max),
-                length::Bounds::Min(min) => (min, max_available),
-            };
-
-            match stage {
-                Stage::Max if max > max_available => continue,
-                Stage::Min if min < max_available => continue,
-                _ => {}
-            }
-
-            let min = min.min(remaining);
-            let max = max.min(max_available).max(min);
-
-            let (min_width, min_height) = axis.pack(min, 0.0);
+            let offer = initial_grants[i];
             let (max_width, max_height) = axis.pack(
-                max,
-                if !cross_compress || meta.cross.fill_factor() == 0 {
+                offer,
+                if !cross_compress || metas[i].cross.fill_factor() == 0 {
                     max_cross
                 } else {
                     cross
                 },
             );
-
             let child_limits = Limits::with_compression(
-                Size::new(min_width, min_height),
+                Size::ZERO,
                 Size::new(max_width, max_height),
                 compression,
             );
 
-            let layout = child
+            let node = child
                 .as_widget_mut()
                 .layout(&mut trees[i], renderer, &child_limits);
-
-            cross = cross.max(axis.cross(layout.size()));
-            remaining -= axis.main(layout.size());
-            fill_main_sum -= fill_main_factor;
-            nodes[i] = Some(layout);
-            meta.resolved = true;
+            remaining = (remaining - axis.main(node.size())).max(0.0);
+            cross = cross.max(axis.cross(node.size()));
+            nodes[i] = Some(node);
+            requests[i].suppress();
         }
 
-        if remaining == current {
-            step = match stage {
-                Stage::Max if some_fill_min => Some(Stage::Min),
-                _ => None,
-            };
-        }
-    }
-
-    // MAIN FLUID PASS (conditional)
-    // We lay out the elements that are fluid in the main axis.
-    // We use the remaining space to evenly allocate space based on fill factors.
-    if !main_compress {
+        let grants = super::allocator::allocate(remaining, &requests);
         for (i, child) in items.iter_mut().enumerate() {
-            let meta = &mut metas[i];
-
-            if meta.resolved {
+            let Category::MainFluid = metas[i].category else {
+                continue;
+            };
+            if nodes[i].is_some() {
                 continue;
             }
 
-            let Category::MainFluid = meta.category else {
-                continue;
-            };
-
-            let max_main = remaining * meta.main.fill_factor() as f32 / fill_main_sum as f32;
-
-            let max_main = if max_main.is_nan() {
-                f32::INFINITY
-            } else {
-                max_main
-            };
-
-            let min_main = if max_main.is_infinite() {
-                0.0
-            } else {
-                max_main
-            };
-
+            let grant = grants[i];
+            let min_main = if grant.is_finite() { grant } else { 0.0 };
             let (min_width, min_height) = axis.pack(min_main, 0.0);
             let (max_width, max_height) = axis.pack(
-                max_main,
-                if !cross_compress || meta.cross.fill_factor() == 0 {
+                grant,
+                if !cross_compress || metas[i].cross.fill_factor() == 0 {
                     max_cross
                 } else {
                     cross
@@ -359,13 +230,12 @@ where
                 Size::new(max_width, max_height),
                 compression,
             );
-
-            let layout = child
+            let node = child
                 .as_widget_mut()
                 .layout(&mut trees[i], renderer, &child_limits);
 
-            cross = cross.max(axis.cross(layout.size()));
-            nodes[i] = Some(layout);
+            cross = cross.max(axis.cross(node.size()));
+            nodes[i] = Some(node);
         }
     }
 
