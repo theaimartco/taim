@@ -1,8 +1,8 @@
 {
   "pack": "TAIM Premium SVG",
-  "edition": "01 + 02",
-  "version": "2.0.0",
-  "count": 60,
+  "edition": "01 + 02 + 03",
+  "version": "3.0.0",
+  "count": 119,
   "viewBox": "0 0 64 64",
   "palette": {
     "graphite": "#11151d",
@@ -11,64 +11,64 @@
   },
   "icons": [
     {
-      "name": "home",
-      "label": "Home",
-      "source": "home.svg"
+      "name": "add",
+      "label": "Add",
+      "source": "add.svg"
     },
     {
-      "name": "settings",
-      "label": "Settings",
-      "source": "settings.svg"
+      "name": "archive",
+      "label": "Archive",
+      "source": "archive.svg"
     },
     {
-      "name": "folder",
-      "label": "Files",
-      "source": "folder.svg"
+      "name": "arrow_down",
+      "label": "Arrow Down",
+      "source": "arrow_down.svg"
     },
     {
-      "name": "search",
-      "label": "Search",
-      "source": "search.svg"
+      "name": "arrow_left",
+      "label": "Arrow Left",
+      "source": "arrow_left.svg"
     },
     {
-      "name": "notifications",
-      "label": "Notifications",
-      "source": "notifications.svg"
+      "name": "arrow_right",
+      "label": "Arrow Right",
+      "source": "arrow_right.svg"
     },
     {
-      "name": "user",
-      "label": "Profile",
-      "source": "user.svg"
+      "name": "arrow_up",
+      "label": "Arrow Up",
+      "source": "arrow_up.svg"
     },
     {
-      "name": "chat",
-      "label": "Messages",
-      "source": "chat.svg"
+      "name": "attachment",
+      "label": "Attachment",
+      "source": "attachment.svg"
     },
     {
-      "name": "terminal",
-      "label": "Terminal",
-      "source": "terminal.svg"
+      "name": "backspace",
+      "label": "Backspace",
+      "source": "backspace.svg"
     },
     {
-      "name": "store",
-      "label": "App Store",
-      "source": "store.svg"
+      "name": "battery",
+      "label": "Battery",
+      "source": "battery.svg"
     },
     {
-      "name": "power",
-      "label": "Power",
-      "source": "power.svg"
+      "name": "battery_charging",
+      "label": "Battery Charging",
+      "source": "battery_charging.svg"
     },
     {
-      "name": "lock",
-      "label": "Lock",
-      "source": "lock.svg"
+      "name": "bluetooth",
+      "label": "Bluetooth",
+      "source": "bluetooth.svg"
     },
     {
-      "name": "shield",
-      "label": "Shield",
-      "source": "shield.svg"
+      "name": "bookmark",
+      "label": "Bookmark",
+      "source": "bookmark.svg"
     },
     {
       "name": "calendar",
@@ -76,59 +76,9 @@
       "source": "calendar.svg"
     },
     {
-      "name": "clock",
-      "label": "Clock",
-      "source": "clock.svg"
-    },
-    {
       "name": "camera",
       "label": "Camera",
       "source": "camera.svg"
-    },
-    {
-      "name": "image",
-      "label": "Gallery",
-      "source": "image.svg"
-    },
-    {
-      "name": "music",
-      "label": "Music",
-      "source": "music.svg"
-    },
-    {
-      "name": "download",
-      "label": "Download",
-      "source": "download.svg"
-    },
-    {
-      "name": "upload",
-      "label": "Upload",
-      "source": "upload.svg"
-    },
-    {
-      "name": "cloud",
-      "label": "Cloud",
-      "source": "cloud.svg"
-    },
-    {
-      "name": "database",
-      "label": "Database",
-      "source": "database.svg"
-    },
-    {
-      "name": "cpu",
-      "label": "Processor",
-      "source": "cpu.svg"
-    },
-    {
-      "name": "code",
-      "label": "Code",
-      "source": "code.svg"
-    },
-    {
-      "name": "rocket",
-      "label": "Launch",
-      "source": "rocket.svg"
     },
     {
       "name": "chart",
@@ -136,34 +86,74 @@
       "source": "chart.svg"
     },
     {
-      "name": "globe",
-      "label": "Globe",
-      "source": "globe.svg"
+      "name": "chat",
+      "label": "Messages",
+      "source": "chat.svg"
     },
     {
-      "name": "heart",
-      "label": "Favorites",
-      "source": "heart.svg"
+      "name": "check",
+      "label": "Check",
+      "source": "check.svg"
     },
     {
-      "name": "star",
-      "label": "Starred",
-      "source": "star.svg"
+      "name": "checkbox_checked",
+      "label": "Checkbox Checked",
+      "source": "checkbox_checked.svg"
     },
     {
-      "name": "trash",
-      "label": "Delete",
-      "source": "trash.svg"
+      "name": "checkbox_unchecked",
+      "label": "Checkbox Unchecked",
+      "source": "checkbox_unchecked.svg"
     },
     {
-      "name": "edit",
-      "label": "Edit",
-      "source": "edit.svg"
+      "name": "chevron_down",
+      "label": "Chevron Down",
+      "source": "chevron_down.svg"
     },
     {
-      "name": "save",
-      "label": "Save",
-      "source": "save.svg"
+      "name": "chevron_left",
+      "label": "Chevron Left",
+      "source": "chevron_left.svg"
+    },
+    {
+      "name": "chevron_right",
+      "label": "Chevron Right",
+      "source": "chevron_right.svg"
+    },
+    {
+      "name": "chevron_up",
+      "label": "Chevron Up",
+      "source": "chevron_up.svg"
+    },
+    {
+      "name": "clear",
+      "label": "Clear",
+      "source": "clear.svg"
+    },
+    {
+      "name": "clock",
+      "label": "Clock",
+      "source": "clock.svg"
+    },
+    {
+      "name": "close",
+      "label": "Close",
+      "source": "close.svg"
+    },
+    {
+      "name": "cloud",
+      "label": "Cloud",
+      "source": "cloud.svg"
+    },
+    {
+      "name": "code",
+      "label": "Code",
+      "source": "code.svg"
+    },
+    {
+      "name": "collapse",
+      "label": "Collapse",
+      "source": "collapse.svg"
     },
     {
       "name": "copy",
@@ -171,9 +161,9 @@
       "source": "copy.svg"
     },
     {
-      "name": "paste",
-      "label": "Paste",
-      "source": "paste.svg"
+      "name": "cpu",
+      "label": "Processor",
+      "source": "cpu.svg"
     },
     {
       "name": "cut",
@@ -181,9 +171,259 @@
       "source": "cut.svg"
     },
     {
-      "name": "undo",
-      "label": "Undo",
-      "source": "undo.svg"
+      "name": "database",
+      "label": "Database",
+      "source": "database.svg"
+    },
+    {
+      "name": "delete",
+      "label": "Delete",
+      "source": "delete.svg"
+    },
+    {
+      "name": "document",
+      "label": "Document",
+      "source": "document.svg"
+    },
+    {
+      "name": "download",
+      "label": "Download",
+      "source": "download.svg"
+    },
+    {
+      "name": "edit",
+      "label": "Edit",
+      "source": "edit.svg"
+    },
+    {
+      "name": "error",
+      "label": "Error",
+      "source": "error.svg"
+    },
+    {
+      "name": "exit_fullscreen",
+      "label": "Exit Fullscreen",
+      "source": "exit_fullscreen.svg"
+    },
+    {
+      "name": "expand",
+      "label": "Expand",
+      "source": "expand.svg"
+    },
+    {
+      "name": "external_link",
+      "label": "External Link",
+      "source": "external_link.svg"
+    },
+    {
+      "name": "filter",
+      "label": "Filter",
+      "source": "filter.svg"
+    },
+    {
+      "name": "folder",
+      "label": "Files",
+      "source": "folder.svg"
+    },
+    {
+      "name": "folder_add",
+      "label": "Folder Add",
+      "source": "folder_add.svg"
+    },
+    {
+      "name": "folder_open",
+      "label": "Folder Open",
+      "source": "folder_open.svg"
+    },
+    {
+      "name": "fullscreen",
+      "label": "Fullscreen",
+      "source": "fullscreen.svg"
+    },
+    {
+      "name": "globe",
+      "label": "Globe",
+      "source": "globe.svg"
+    },
+    {
+      "name": "grid",
+      "label": "Grid View",
+      "source": "grid.svg"
+    },
+    {
+      "name": "heart",
+      "label": "Favorites",
+      "source": "heart.svg"
+    },
+    {
+      "name": "help",
+      "label": "Help",
+      "source": "help.svg"
+    },
+    {
+      "name": "history",
+      "label": "History",
+      "source": "history.svg"
+    },
+    {
+      "name": "home",
+      "label": "Home",
+      "source": "home.svg"
+    },
+    {
+      "name": "image",
+      "label": "Gallery",
+      "source": "image.svg"
+    },
+    {
+      "name": "info",
+      "label": "Info",
+      "source": "info.svg"
+    },
+    {
+      "name": "keyboard",
+      "label": "Keyboard",
+      "source": "keyboard.svg"
+    },
+    {
+      "name": "link",
+      "label": "Link",
+      "source": "link.svg"
+    },
+    {
+      "name": "list",
+      "label": "List View",
+      "source": "list.svg"
+    },
+    {
+      "name": "lock",
+      "label": "Lock",
+      "source": "lock.svg"
+    },
+    {
+      "name": "mail",
+      "label": "Mail",
+      "source": "mail.svg"
+    },
+    {
+      "name": "maximize",
+      "label": "Maximize",
+      "source": "maximize.svg"
+    },
+    {
+      "name": "menu",
+      "label": "Menu",
+      "source": "menu.svg"
+    },
+    {
+      "name": "microphone",
+      "label": "Microphone",
+      "source": "microphone.svg"
+    },
+    {
+      "name": "microphone_off",
+      "label": "Microphone Muted",
+      "source": "microphone_off.svg"
+    },
+    {
+      "name": "minimize",
+      "label": "Minimize",
+      "source": "minimize.svg"
+    },
+    {
+      "name": "monitor",
+      "label": "Monitor",
+      "source": "monitor.svg"
+    },
+    {
+      "name": "more_horiz",
+      "label": "More Horiz",
+      "source": "more_horiz.svg"
+    },
+    {
+      "name": "more_vert",
+      "label": "More Vert",
+      "source": "more_vert.svg"
+    },
+    {
+      "name": "mouse",
+      "label": "Mouse",
+      "source": "mouse.svg"
+    },
+    {
+      "name": "music",
+      "label": "Music",
+      "source": "music.svg"
+    },
+    {
+      "name": "notifications",
+      "label": "Notifications",
+      "source": "notifications.svg"
+    },
+    {
+      "name": "paste",
+      "label": "Paste",
+      "source": "paste.svg"
+    },
+    {
+      "name": "pause",
+      "label": "Pause",
+      "source": "pause.svg"
+    },
+    {
+      "name": "pdf",
+      "label": "PDF Document",
+      "source": "pdf.svg"
+    },
+    {
+      "name": "person",
+      "label": "Person",
+      "source": "person.svg"
+    },
+    {
+      "name": "pin",
+      "label": "Pin",
+      "source": "pin.svg"
+    },
+    {
+      "name": "play",
+      "label": "Play",
+      "source": "play.svg"
+    },
+    {
+      "name": "power",
+      "label": "Power",
+      "source": "power.svg"
+    },
+    {
+      "name": "presentation",
+      "label": "Presentation",
+      "source": "presentation.svg"
+    },
+    {
+      "name": "printer",
+      "label": "Printer",
+      "source": "printer.svg"
+    },
+    {
+      "name": "progress",
+      "label": "Progress",
+      "source": "progress.svg"
+    },
+    {
+      "name": "qr_code",
+      "label": "QR Code",
+      "source": "qr_code.svg"
+    },
+    {
+      "name": "radio_checked",
+      "label": "Radio Selected",
+      "source": "radio_checked.svg"
+    },
+    {
+      "name": "radio_unchecked",
+      "label": "Radio Unselected",
+      "source": "radio_unchecked.svg"
     },
     {
       "name": "redo",
@@ -196,9 +436,29 @@
       "source": "refresh.svg"
     },
     {
-      "name": "sync",
-      "label": "Sync",
-      "source": "sync.svg"
+      "name": "remove",
+      "label": "Remove",
+      "source": "remove.svg"
+    },
+    {
+      "name": "rocket",
+      "label": "Launch",
+      "source": "rocket.svg"
+    },
+    {
+      "name": "save",
+      "label": "Save",
+      "source": "save.svg"
+    },
+    {
+      "name": "search",
+      "label": "Search",
+      "source": "search.svg"
+    },
+    {
+      "name": "settings",
+      "label": "Settings",
+      "source": "settings.svg"
     },
     {
       "name": "share",
@@ -206,29 +466,19 @@
       "source": "share.svg"
     },
     {
-      "name": "link",
-      "label": "Link",
-      "source": "link.svg"
+      "name": "shield",
+      "label": "Shield",
+      "source": "shield.svg"
     },
     {
-      "name": "unlink",
-      "label": "Unlink",
-      "source": "unlink.svg"
+      "name": "shopping_cart",
+      "label": "Shopping Cart",
+      "source": "shopping_cart.svg"
     },
     {
-      "name": "attachment",
-      "label": "Attachment",
-      "source": "attachment.svg"
-    },
-    {
-      "name": "bookmark",
-      "label": "Bookmark",
-      "source": "bookmark.svg"
-    },
-    {
-      "name": "pin",
-      "label": "Pin",
-      "source": "pin.svg"
+      "name": "slider",
+      "label": "Slider",
+      "source": "slider.svg"
     },
     {
       "name": "sort",
@@ -246,71 +496,116 @@
       "source": "sort_descending.svg"
     },
     {
-      "name": "list",
-      "label": "List View",
-      "source": "list.svg"
+      "name": "sparkle",
+      "label": "AI Sparkle",
+      "source": "sparkle.svg"
     },
     {
-      "name": "grid",
-      "label": "Grid View",
-      "source": "grid.svg"
+      "name": "spreadsheet",
+      "label": "Spreadsheet",
+      "source": "spreadsheet.svg"
     },
     {
-      "name": "expand",
-      "label": "Expand",
-      "source": "expand.svg"
+      "name": "star",
+      "label": "Starred",
+      "source": "star.svg"
     },
     {
-      "name": "collapse",
-      "label": "Collapse",
-      "source": "collapse.svg"
+      "name": "store",
+      "label": "App Store",
+      "source": "store.svg"
     },
     {
-      "name": "fullscreen",
-      "label": "Fullscreen",
-      "source": "fullscreen.svg"
+      "name": "success",
+      "label": "Success",
+      "source": "success.svg"
     },
     {
-      "name": "exit_fullscreen",
-      "label": "Exit Fullscreen",
-      "source": "exit_fullscreen.svg"
+      "name": "sync",
+      "label": "Sync",
+      "source": "sync.svg"
     },
     {
-      "name": "maximize",
-      "label": "Maximize",
-      "source": "maximize.svg"
+      "name": "terminal",
+      "label": "Terminal",
+      "source": "terminal.svg"
     },
     {
-      "name": "minimize",
-      "label": "Minimize",
-      "source": "minimize.svg"
+      "name": "toggle_off",
+      "label": "Toggle Off",
+      "source": "toggle_off.svg"
     },
     {
-      "name": "backspace",
-      "label": "Backspace",
-      "source": "backspace.svg"
+      "name": "toggle_on",
+      "label": "Toggle On",
+      "source": "toggle_on.svg"
     },
     {
-      "name": "clear",
-      "label": "Clear",
-      "source": "clear.svg"
+      "name": "trash",
+      "label": "Delete",
+      "source": "trash.svg"
     },
     {
-      "name": "help",
-      "label": "Help",
-      "source": "help.svg"
+      "name": "undo",
+      "label": "Undo",
+      "source": "undo.svg"
     },
     {
-      "name": "external_link",
-      "label": "External Link",
-      "source": "external_link.svg"
+      "name": "unlink",
+      "label": "Unlink",
+      "source": "unlink.svg"
     },
     {
-      "name": "history",
-      "label": "History",
-      "source": "history.svg"
+      "name": "upload",
+      "label": "Upload",
+      "source": "upload.svg"
+    },
+    {
+      "name": "usb",
+      "label": "USB",
+      "source": "usb.svg"
+    },
+    {
+      "name": "user",
+      "label": "Profile",
+      "source": "user.svg"
+    },
+    {
+      "name": "visibility",
+      "label": "Visibility",
+      "source": "visibility.svg"
+    },
+    {
+      "name": "volume",
+      "label": "Volume",
+      "source": "volume.svg"
+    },
+    {
+      "name": "volume_off",
+      "label": "Volume Muted",
+      "source": "volume_off.svg"
+    },
+    {
+      "name": "wallet",
+      "label": "Wallet",
+      "source": "wallet.svg"
+    },
+    {
+      "name": "warning",
+      "label": "Warning",
+      "source": "warning.svg"
+    },
+    {
+      "name": "wifi",
+      "label": "Wi-Fi",
+      "source": "wifi.svg"
+    },
+    {
+      "name": "wifi_off",
+      "label": "Wi-Fi Off",
+      "source": "wifi_off.svg"
     }
   ],
   "license": "MIT / TAIM original vector drawings",
-  "description": "60 independently drawn premium TAIM SVGs: system icons and UI actions"
+  "description": "119 original premium SVG assets; 24 legacy monochrome asset replacements + 35 new icons added in Batch 03"
 }
