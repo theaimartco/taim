@@ -53,7 +53,9 @@ impl State {
                 } => {
                     let bounds = (*bounds * scale).round();
                     let clip_bounds = (*clip_bounds * scale).round();
-                    if !drawable(bounds) {
+                    if !drawable_paint(bounds, clip_bounds, image.opacity) {
+                        // Do not upload completely invisible or invalid
+                        // image data to the GPU atlas.
                         continue;
                     }
 
@@ -89,7 +91,7 @@ impl State {
                 } => {
                     let bounds = (*bounds * scale).round();
                     let clip_bounds = (*clip_bounds * scale).round();
-                    if !drawable(bounds) {
+                    if !drawable_paint(bounds, clip_bounds, svg.opacity) {
                         continue;
                     }
 
@@ -312,8 +314,22 @@ pub(super) struct Uniforms {
     transform: [f32; 16],
 }
 
-fn drawable(bounds: Rectangle) -> bool {
-    bounds.width >= 1.0 && bounds.height >= 1.0
+/// TAIM image-atlas admission: reject invisible primitives before the
+/// CPU/GPU upload, including malformed coordinates and clips.
+///
+/// Do not cull by rectangle overlap: image rotation can move visible pixels
+/// into a clip even if the unrotated bounds appear out of view.
+#[inline]
+fn drawable_paint(bounds: Rectangle, clip: Rectangle, opacity: f32) -> bool {
+    [bounds.x, bounds.y, bounds.width, bounds.height, clip.x, clip.y,
+     clip.width, clip.height, opacity]
+        .iter()
+        .all(|value| value.is_finite())
+        && bounds.width >= 1.0
+        && bounds.height >= 1.0
+        && clip.width > 0.0
+        && clip.height > 0.0
+        && opacity > 0.0
 }
 
 fn add_instances(
@@ -433,4 +449,30 @@ fn constants(
             },
         ],
     })
+}
+
+#[cfg(test)]
+mod taim_image_admission_tests {
+    use super::*;
+    use crate::core::Point;
+    use crate::core::Size;
+
+    #[test]
+    fn fully_transparent_images_skip_atlas_upload() {
+        let rect = Rectangle::new(Point::ORIGIN, Size::new(12.0, 8.0));
+        assert!(drawable_paint(rect, rect, 1.0));
+        assert!(!drawable_paint(rect, rect, 0.0));
+        assert!(!drawable_paint(rect, rect, -1.0));
+    }
+
+    #[test]
+    fn malformed_clip_and_transforms_cannot_poison_atlas() {
+        let rect = Rectangle::new(Point::ORIGIN, Size::new(12.0, 8.0));
+        let invalid = Rectangle::new(Point::new(f32::NAN, 0.0), Size::new(12.0, 8.0));
+        let empty_clip = Rectangle::new(Point::ORIGIN, Size::new(0.0, 8.0));
+        assert!(!drawable_paint(invalid, rect, 1.0));
+        assert!(!drawable_paint(rect, invalid, 1.0));
+        assert!(!drawable_paint(rect, empty_clip, 1.0));
+        assert!(!drawable_paint(rect, rect, f32::INFINITY));
+    }
 }
