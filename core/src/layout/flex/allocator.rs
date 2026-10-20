@@ -208,6 +208,35 @@ mod tests {
     }
 
     #[test]
+    fn child_order_does_not_change_weighted_grants() {
+        let first = [
+            demand(2, 10.0, 25.0),
+            demand(4, 0.0, f32::INFINITY),
+            demand(1, 5.0, 9.0),
+            demand(3, 0.0, 25.0),
+        ];
+        let swapped = [first[3], first[1], first[0], first[2]];
+        let baseline = allocate(100.0, &first);
+        let reordered = allocate(100.0, &swapped);
+        close(reordered[0], baseline[3]);
+        close(reordered[1], baseline[1]);
+        close(reordered[2], baseline[0]);
+        close(reordered[3], baseline[2]);
+    }
+
+    #[test]
+    fn large_finite_budgets_never_invent_infinite_grants() {
+        let req = [
+            demand(u16::MAX, 0.0, f32::MAX),
+            demand(u16::MAX, 0.0, f32::MAX),
+        ];
+        let grants = allocate(f32::MAX, &req);
+        assert!(grants.iter().all(|x| x.is_finite() && *x >= 0.0));
+        let total = grants.iter().map(|x| f64::from(*x)).sum::<f64>();
+        assert!(total <= f64::from(f32::MAX) * 1.000001);
+    }
+
+    #[test]
     fn malformed_bounds_cannot_poison_results() {
         let req = [
             demand(1, 0.0, f32::INFINITY),
