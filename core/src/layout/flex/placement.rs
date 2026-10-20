@@ -24,7 +24,8 @@ impl Frame<'_> {
     ///
     /// No child layout or allocation of another node vector happens here.
     pub(super) fn finish(self, mut children: Vec<Node>) -> Node {
-        let (pad_main, pad_cross) = self.axis.pack(self.padding.left, self.padding.top);
+        let padding = self.padding.normalized();
+        let (pad_main, pad_cross) = self.axis.pack(padding.left, padding.top);
         let cross = match self.axis {
             Axis::Horizontal => self.limits.resolve_height(self.height, self.cross_extent),
             Axis::Vertical => self.limits.resolve_width(self.width, self.cross_extent),
@@ -41,12 +42,17 @@ impl Frame<'_> {
 
             // Align *within* the resolved cross span, not within the raw
             // measured maximum, so Fill/Fixed cross policies remain sound.
-            match self.axis {
-                Axis::Horizontal => {
-                    child.align_mut(Alignment::Start, self.alignment, Size::new(0.0, cross));
-                }
-                Axis::Vertical => {
-                    child.align_mut(self.alignment, Alignment::Start, Size::new(cross, 0.0));
+            // An untrusted custom child may return NaN/Inf dimensions.
+            // Do not let alignment arithmetic replace a finite position
+            // with NaN by subtracting an invalid child cross extent.
+            if cross.is_finite() && self.axis.cross(child.size()).is_finite() {
+                match self.axis {
+                    Axis::Horizontal => {
+                        child.align_mut(Alignment::Start, self.alignment, Size::new(0.0, cross));
+                    }
+                    Axis::Vertical => {
+                        child.align_mut(self.alignment, Alignment::Start, Size::new(cross, 0.0));
+                    }
                 }
             }
 
@@ -61,9 +67,11 @@ impl Frame<'_> {
 
         let size = Size::from(self.axis.pack(main, cross));
         let baseline = first_baseline(&self.axis, &children);
-        let result = Node::with_children(size.expand(self.padding), children);
+        let result = Node::with_children(size.expand(padding), children);
         match baseline {
-            Some(value) => result.with_baseline(coordinate(f64::from(value) + f64::from(extent(self.padding.top)))),
+            // Child bounds already include the container's top padding.
+            // Adding it again would double-count the text baseline offset.
+            Some(value) => result.with_baseline(value),
             None => result,
         }
     }
@@ -198,6 +206,58 @@ mod tests {
             ],
         );
         assert_eq!(column.baseline(), None);
+    }
+
+    #[test]
+    fn row_baseline_counts_top_padding_exactly_once() {
+        let layout = Frame {
+            axis: Axis::Horizontal,
+            limits: &Limits::NONE,
+            width: Length::Fit,
+            height: Length::Fit,
+            padding: Padding::sides(7.0, 0.0, 0.0, 0.0),
+            spacing: 0.0,
+            alignment: Alignment::Start,
+            cross_extent: 20.0,
+        }
+        .finish(vec![Node::new(Size::new(10.0, 20.0)).with_baseline(10.0)]);
+        assert_eq!(layout.children()[0].bounds().y, 7.0);
+        assert_eq!(layout.baseline(), Some(17.0));
+    }
+
+    #[test]
+    fn malformed_cross_extent_does_not_create_nan_child_position() {
+        let layout = arrange(
+            Axis::Horizontal,
+            Alignment::End,
+            0.0,
+            20.0,
+            vec![Node::new(Size::new(10.0, f32::NAN))],
+        );
+        assert!(layout.children()[0].bounds().y.is_finite());
+        assert_eq!(layout.children()[0].bounds().y, 0.0);
+    }
+
+    #[test]
+    fn malformed_padding_is_normalized_before_positioning() {
+        let layout = Frame {
+            axis: Axis::Horizontal,
+            limits: &Limits::NONE,
+            width: Length::Fit,
+            height: Length::Fit,
+            padding: Padding {
+                top: f32::NAN,
+                right: f32::NAN,
+                bottom: -2.0,
+                left: -9.0,
+            },
+            spacing: 0.0,
+            alignment: Alignment::Start,
+            cross_extent: 10.0,
+        }
+        .finish(vec![Node::new(Size::new(10.0, 10.0))]);
+        assert_eq!(layout.children()[0].bounds().position(), Point::ORIGIN);
+        assert_eq!(layout.size(), Size::new(10.0, 10.0));
     }
 
     #[test]
