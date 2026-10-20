@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate TAIM Premium Editions 01 and 02 SVG assets with only the Python stdlib."""
+"""Validate all TAIM Premium icon SVG assets including Edition 03 with only the Python stdlib."""
 from __future__ import annotations
 
 import json
@@ -25,11 +25,17 @@ def verify() -> tuple[int, list[str]]:
     manifest = json.loads((PACK / "manifest.json").read_text(encoding="utf-8"))
     records = manifest["icons"]
     expected = [r["name"] for r in records]
-    if len(expected) != 60 or len(set(expected)) != 60:
-        errors.append(f"Expected 60 unique icons, got {len(expected)}")
+    if len(expected) != 119 or len(set(expected)) != 119:
+        errors.append(f"Expected 119 unique icons, got {len(expected)}")
     if manifest["count"] != len(expected):
         errors.append("Manifest count mismatch")
     discovered = {p.stem for p in PACK.glob("*.svg")}
+    root_names = {p.stem for p in PACK.parent.glob("*.svg")}
+    if root_names != set(expected):
+        errors.append(
+            f"Root SVG inventory must contain exactly the 119 TAIM premium names: "
+            f"unexpected={root_names - set(expected)}; missing={set(expected) - root_names}"
+        )
     if discovered != set(expected):
         errors.append(
             f"Manifest/files mismatch: missing={set(expected)-discovered}; extra={discovered-set(expected)}"
@@ -73,6 +79,13 @@ def verify() -> tuple[int, list[str]]:
                     errors.append(f"{name}: embedded event handler / href forbidden")
                 elif FORBIDDEN.search(value):
                     errors.append(f"{name}: untrusted external/data reference")
+        # External resources inside CSS text can bypass attribute-only checks.
+        for style in xml.iter(SVG_NS + "style"):
+            css = (style.text or "").lower()
+            if "@import" in css or any(
+                scheme in css for scheme in ("http:", "https:", "data:", "javascript:")
+            ):
+                errors.append(f"{name}: external CSS/resource import forbidden")
         if xml.find(SVG_NS + "title") is None:
             errors.append(f"{name}: accessible title missing")
         if xml.find(SVG_NS + "desc") is None:

@@ -1,20 +1,25 @@
-# TAIM `assets/icons` — 84 SVG assets
+# TAIM Icons — 119 Premium SVGs
 
-This directory contains **84 distinct root SVGs**: 36 original icon-font-compatible glyph names (12 also with premium overrides), 18 new SVG-only names from Premium Edition 01, and 30 new SVG-only names from Premium Edition 02.
+The root `assets/icons/` directory now holds **119 unique premium vector SVG files**. All root icons are exact copies of `assets/icons/premium/` source files, with a machine-readable [119-icon manifest](./premium/manifest.json).
 
-**60 premium SVGs** appear as identical root exports, with authoritative sources in [premium/](./premium/) and [premium/manifest.json](./premium/manifest.json). Batch 02 adds Save, Copy, Paste, Cut, Undo, Redo, Refresh, Sync, Share, Link, Unlink, Attachment, Bookmark, Pin, Sort, List, Grid, Fullscreen, Maximize, Minimize, Help, History and other UI controls.
+### Legacy SVG retirement and Batch 03
 
-Edit the `assets/icons/premium/<name>.svg` source for any change; `assets/icons/<name>.svg` is its copy. `scripts/assets/build-icon-font.py` copies premium files *after* regenerating the 36 monochrome glyphs. Existing `graphics/fonts/Taim-Icons.ttf` codepoints remain unchanged.
+- **24 legacy monochrome SVG artworks replaced**, preserving their useful icon filenames (such as `add`, `chevron_down`, `close`, `play`, `pause`, `warning`, `mail`, `filter`).
+- **35 new premium SVG concepts**: Wi-Fi, connectivity, battery, audio/video equipment, keyboard, form states, progress, document types, commerce and AI sparkle.
+- Previous 60 premium SVGs remain preserved.
+- Existing 36 icon-font codepoints remain unchanged; no font binary is modified. The legacy font and Rust glyph API still require a separate audit/migration if the goal is to remove every inherited font implementation.
 
-The new 30 Batch 02 SVGs are not automatically installed as codepoints or Rust `Icon` constants. Runtime SVG rendering must be integrated separately.
+### Source-of-truth
 
-View [premium/README.md](./premium/README.md) or [premium/gallery.html](./premium/gallery.html) to review all 60 icons.
+Edit `premium/<name>.svg`, then use `scripts/assets/build-icon-font.py` to regenerate root exports. The generator no longer writes legacy 24×24 SVG artwork into the root folder. **It still generates the older-compatible icon font**; regenerating the font has independent build and provenance requirements.
 
-## Manual checks
+Browse [119 previews](./premium/gallery.html) or read [the premium pack guide](./premium/README.md).
+
+### Validation
 
 ```bash
 python3 scripts/assets/validate-premium-icons.py
 bash scripts/design/check-icons.sh
 ```
 
-CI workflows remain disabled at owner request. Manual rendering, small-size contrast and accessibility checks are still necessary.
+The CI YAML files remain disabled at owner request. Do not claim these source changes validate runtime rendering or the entire framework's clean-room status.

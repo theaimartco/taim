@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validate TAIM font glyph manifest and the 60 full-color root SVG exports.
+# Validate TAIM font glyph manifest and the 119 new-design TAIM root SVG exports.
 # Run from repository root. GitHub CI stays commented at owner's request.
 set -euo pipefail
 
@@ -27,8 +27,8 @@ for icon in icons:
     assert icon["grid"] == expected_grid, f"Wrong grid for {name}"
     premium_count += variant == "premium-svg"
 
-assert premium_count == 12, "Expected 12 premium replacements of existing glyph SVGs"
-print(f"Font manifest validated: {len(icons)} entries; {premium_count} premium overrides")
+assert premium_count == 36, "All 36 font-compatible SVG names must now use premium artwork"
+print(f"Font manifest validated: {len(icons)} entries, all {premium_count} SVG paths are premium")
 PY
 
 python3 scripts/assets/validate-premium-icons.py

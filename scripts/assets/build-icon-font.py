@@ -111,8 +111,8 @@ def premium_sources():
     """
     with open(PREMIUM_MANIFEST, encoding="utf-8") as source:
         entries = json.load(source)["icons"]
-    if len(entries) != 60 or len({i["name"] for i in entries}) != 60:
-        raise ValueError("TAIM premium manifest must contain 60 unique icons")
+    if len(entries) != 119 or len({i["name"] for i in entries}) != 119:
+        raise ValueError("TAIM premium manifest must contain 119 unique icons")
     sources = {}
     for icon in entries:
         name = icon["name"]
@@ -187,24 +187,14 @@ def main():
           f"({len(assigned)} new glyphs, {len(LEGACY)} legacy preserved)")
 
     os.makedirs(SVG_DIR, exist_ok=True)
-    for name, contours in sorted(ICONS.items()):
-        path = os.path.join(SVG_DIR, f"{name}.svg")
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(
-                '<svg xmlns="http://www.w3.org/2000/svg" '
-                f'viewBox="0 0 {int(GRID)} {int(GRID)}" '
-                f'width="{int(GRID)}" height="{int(GRID)}">\n'
-                f'  <path fill="currentColor" fill-rule="nonzero" '
-                f'd="{svg_path(contours)}"/>\n</svg>\n')
-    print(f"svg:      {os.path.relpath(SVG_DIR, ROOT)}/*.svg ({len(ICONS)} files)")
-    # The 24px single-color assets are regenerated for the icon font.
-    # Premium originals live at premium/*.svg; copy them last into the
-    # assets/icons/ root so regeneration never clobbers the 60 premium exports.
+    # All exported SVG files now originate in TAIM's 64x64 premium pack.
+    # The old Iced-era-style 24x24 monochrome SVG generator is retired.
+    # ICONS still drives the backwards-compatible TTF/Rust font glyphs,
+    # but never recreates those old SVG assets in assets/icons/.
     premium = premium_sources()
     for name, source in sorted(premium.items()):
         shutil.copyfile(source, os.path.join(SVG_DIR, name + ".svg"))
-    print(f"svg:      synced {len(premium)} premium root icons (64x64 vectors)")
-
+    print(f"svg:      exported {len(premium)} original TAIM root SVGs (64x64)")
 
     with open(MANIFEST, "w", encoding="utf-8") as handle:
         handle.write(
