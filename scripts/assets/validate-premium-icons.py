@@ -25,15 +25,15 @@ def verify() -> tuple[int, list[str]]:
     manifest = json.loads((PACK / "manifest.json").read_text(encoding="utf-8"))
     records = manifest["icons"]
     expected = [r["name"] for r in records]
-    if len(expected) != 119 or len(set(expected)) != 119:
-        errors.append(f"Expected 119 unique icons, got {len(expected)}")
+    if len(expected) != 149 or len(set(expected)) != 149:
+        errors.append(f"Expected 149 unique icons, got {len(expected)}")
     if manifest["count"] != len(expected):
         errors.append("Manifest count mismatch")
     discovered = {p.stem for p in PACK.glob("*.svg")}
     root_names = {p.stem for p in PACK.parent.glob("*.svg")}
     if root_names != set(expected):
         errors.append(
-            f"Root SVG inventory must contain exactly the 119 TAIM premium names: "
+            f"Root SVG inventory must contain exactly the 149 TAIM premium names: "
             f"unexpected={root_names - set(expected)}; missing={set(expected) - root_names}"
         )
     if discovered != set(expected):

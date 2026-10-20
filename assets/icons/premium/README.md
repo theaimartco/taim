@@ -1,12 +1,12 @@
-# TAIM Premium SVG Pack · Edition 03
+# TAIM Premium SVG Pack · Edition 04
 
-**119 individually named and editable SVG icons**, transparent 64×64 viewport, actual vector paths and native gradients—not PNG files renamed to SVG. Every premium source is also exposed byte-identically in `assets/icons/<name>.svg`.
+**149 individually named and editable SVG icons**, transparent 64×64 viewport, actual vector paths and native gradients—not PNG files renamed to SVG. Every premium source is also exposed byte-identically in `assets/icons/<name>.svg`.
 
 This edition converts **all 24 previous monochrome-only root SVG names** to new TAIM-style vector artwork and adds **35 entirely new icons**. It does not delete useful legacy filenames or break consumers of those paths. The 36 icon-font glyph codepoints remain available separately for backward compatibility, and must not be misrepresented as independently re-authored by this asset change.
 
 ## Gallery
 
-[Open the gallery](./gallery.html) to browse/filter all 119 symbols.
+[Open the gallery](./gallery.html) to browse/filter all 149 symbols.
 
 | Icon | Icon | Icon | Icon | Icon |
 |:---:|:---:|:---:|:---:|:---:|
@@ -35,12 +35,24 @@ This edition converts **all 24 previous monochrome-only root SVG names** to new 
 |![usb](./usb.svg)<br>usb|![user](./user.svg)<br>user|![visibility](./visibility.svg)<br>visibility|![volume](./volume.svg)<br>volume|![volume_off](./volume_off.svg)<br>volume_off|
 |![wallet](./wallet.svg)<br>wallet|![warning](./warning.svg)<br>warning|![wifi](./wifi.svg)<br>wifi|![wifi_off](./wifi_off.svg)<br>wifi_off|
 
+
+## Edition 04 — 30 new premium SVGs
+
+| Icon | Icon | Icon | Icon | Icon |
+|:---:|:---:|:---:|:---:|:---:|
+|![ai_brain](./ai_brain.svg)<br>ai_brain|![neural_network](./neural_network.svg)<br>neural_network|![bot](./bot.svg)<br>bot|![api](./api.svg)<br>api|![git_branch](./git_branch.svg)<br>git_branch|
+|![git_merge](./git_merge.svg)<br>git_merge|![bug](./bug.svg)<br>bug|![debug](./debug.svg)<br>debug|![server](./server.svg)<br>server|![container](./container.svg)<br>container|
+|![receipt](./receipt.svg)<br>receipt|![credit_card](./credit_card.svg)<br>credit_card|![barcode](./barcode.svg)<br>barcode|![delivery_truck](./delivery_truck.svg)<br>delivery_truck|![invoice](./invoice.svg)<br>invoice|
+|![shopping_bag](./shopping_bag.svg)<br>shopping_bag|![phone](./phone.svg)<br>phone|![phone_call](./phone_call.svg)<br>phone_call|![send](./send.svg)<br>send|![video_call](./video_call.svg)<br>video_call|
+|![location_pin](./location_pin.svg)<br>location_pin|![compass](./compass.svg)<br>compass|![navigation](./navigation.svg)<br>navigation|![sun](./sun.svg)<br>sun|![moon](./moon.svg)<br>moon|
+|![rain](./rain.svg)<br>rain|![map](./map.svg)<br>map|![accessibility](./accessibility.svg)<br>accessibility|![eye_off](./eye_off.svg)<br>eye_off|![fingerprint](./fingerprint.svg)<br>fingerprint|
+
 ## Files and integration
 
 - `premium/<name>.svg`: original artwork, the single source of truth.
 - `../<name>.svg`: identical root export for existing asset-path consumers.
-- `manifest.json`: machine-readable list of 119 unique names.
-- `scripts/assets/build-icon-font.py`: regenerates the font codepoints from existing glyph geometry but **no longer generates monochrome root SVGs**; it copies all 119 premium sources to `assets/icons/` instead.
+- `manifest.json`: machine-readable list of 149 unique names.
+- `scripts/assets/build-icon-font.py`: regenerates the font codepoints from existing glyph geometry but **no longer generates monochrome root SVGs**; it copies all 149 premium sources to `assets/icons/` instead.
 - `scripts/assets/validate-premium-icons.py`: structure, manifest, root parity and security checks.
 
 ```bash

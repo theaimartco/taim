@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validate TAIM font glyph manifest and the 119 new-design TAIM root SVG exports.
+# Validate TAIM font glyph manifest and the 149 new-design TAIM root SVG exports.
 # Run from repository root. GitHub CI stays commented at owner's request.
 set -euo pipefail
 
