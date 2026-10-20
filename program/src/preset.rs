@@ -60,10 +60,14 @@ impl<State, Message> fmt::Debug for Preset<State, Message> {
     }
 }
 
+/// Validation error from a named TAIM startup preset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PresetNameError {
+    /// The name contains no visible characters.
     Empty,
+    /// The UTF-8 name exceeds 128 encoded bytes.
     TooLong,
+    /// The name contains a control character, such as a newline.
     ControlCharacter,
 }
 

@@ -53,7 +53,10 @@ pub fn check_icon_dimensions(width: u32, height: u32) -> Result<(), Error> {
 pub fn from_file<P: AsRef<Path>>(icon_path: P) -> Result<Icon, Error> {
     let file = std::fs::File::open(icon_path)?;
     let mut encoded = Vec::new();
-    file.take(MAX_ICON_ENCODED_BYTES as u64 + 1)
+    // The workspace denies unused_results; record the bounded read
+    // explicitly, then reject over-budget data before decoder allocation.
+    let _bytes_read = file
+        .take(MAX_ICON_ENCODED_BYTES as u64 + 1)
         .read_to_end(&mut encoded)?;
 
     from_file_data(&encoded, None)
