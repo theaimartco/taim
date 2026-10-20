@@ -133,12 +133,164 @@ pub(super) fn arrange(
     (Size::new(total_width, total_height), nodes)
 }
 
+
+/// Place measured horizontal-flow children into explicit row groups.
+///
+/// Rows have independent heights; the tallest determines the intrinsic
+/// vertical span of its group, and only inter-row gaps contribute to the
+/// intrinsic total. Padding does not enter row-break detection.
+pub(crate) fn arrange_rows(
+    mut nodes: Vec<Node>,
+    max_width: f32,
+    horizontal_spacing: f32,
+    vertical_spacing: f32,
+    padding: Padding,
+    vertical_alignment: Alignment,
+    horizontal_alignment: alignment::Horizontal,
+) -> (Size, Vec<Node>) {
+    if nodes.is_empty() {
+        return (Size::ZERO, nodes);
+    }
+
+    let gap = finite_extent(horizontal_spacing);
+    let gutter = finite_extent(vertical_spacing);
+    let padding = padding.normalized();
+    let horizontal_limit = if max_width.is_nan() {
+        0.0
+    } else {
+        max_width.max(0.0)
+    };
+
+    #[derive(Debug)]
+    struct RowGroup {
+        start: usize,
+        end: usize,
+        width: f32,
+        height: f32,
+        y: f32,
+    }
+
+    let mut groups: Vec<RowGroup> = Vec::new();
+    for (index, node) in nodes.iter().enumerate() {
+        let size = node.size();
+        let width = finite_extent(size.width);
+        let height = finite_extent(size.height);
+
+        if let Some(last) = groups.last_mut() {
+            let next_width = last.width + gap + width;
+            if next_width <= horizontal_limit || horizontal_limit.is_infinite() {
+                last.width = next_width;
+                last.height = last.height.max(height);
+                last.end = index + 1;
+                continue;
+            }
+        }
+
+        groups.push(RowGroup {
+            start: index,
+            end: index + 1,
+            width,
+            height,
+            y: 0.0,
+        });
+    }
+
+    let mut y = 0.0;
+    let mut widest = 0.0_f32;
+    for row in &mut groups {
+        row.y = y;
+        widest = widest.max(row.width);
+        y += row.height + gutter;
+    }
+
+    let full_height = y - gutter;
+    let cross_fraction = alignment_fraction(vertical_alignment);
+    let row_fraction = match horizontal_alignment {
+        alignment::Horizontal::Left => 0.0,
+        alignment::Horizontal::Center => 0.5,
+        alignment::Horizontal::Right => 1.0,
+    };
+
+    for row in groups {
+        let x_offset = (widest - row.width).max(0.0) * row_fraction;
+        let mut x = 0.0;
+        for (offset, node) in nodes[row.start..row.end].iter_mut().enumerate() {
+            if offset > 0 {
+                x += gap;
+            }
+
+            let node_height = finite_extent(node.size().height);
+            let y_offset = (row.height - node_height).max(0.0) * cross_fraction;
+
+            node.move_to_mut(Point::new(
+                padding.left + x_offset + x,
+                padding.top + row.y + y_offset,
+            ));
+
+            x += finite_extent(node.size().width);
+        }
+    }
+
+    (Size::new(widest, full_height), nodes)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn node(width: f32, height: f32) -> Node {
         Node::new(Size::new(width, height))
+    }
+
+
+    #[test]
+    fn row_wrapping_has_explicit_breaks_and_correct_dimensions() {
+        let (size, placed) = arrange_rows(
+            vec![node(20.0, 10.0), node(20.0, 20.0), node(30.0, 5.0)],
+            45.0,
+            5.0,
+            7.0,
+            Padding::ZERO,
+            Alignment::Start,
+            alignment::Horizontal::Left,
+        );
+        assert_eq!(size, Size::new(45.0, 32.0));
+        assert_eq!(placed[0].bounds().position(), Point::ORIGIN);
+        assert_eq!(placed[1].bounds().position(), Point::new(25.0, 0.0));
+        assert_eq!(placed[2].bounds().position(), Point::new(0.0, 27.0));
+    }
+
+    #[test]
+    fn row_horizontal_and_vertical_alignment_respect_padding() {
+        let (size, placed) = arrange_rows(
+            vec![node(20.0, 10.0), node(20.0, 20.0), node(30.0, 5.0)],
+            45.0,
+            5.0,
+            7.0,
+            Padding::sides(3.0, 0.0, 0.0, 2.0),
+            Alignment::Center,
+            alignment::Horizontal::Center,
+        );
+        assert_eq!(size, Size::new(45.0, 32.0));
+        assert_eq!(placed[0].bounds().position(), Point::new(2.0, 8.0));
+        assert_eq!(placed[1].bounds().position(), Point::new(27.0, 3.0));
+        assert_eq!(placed[2].bounds().position(), Point::new(9.5, 30.0));
+    }
+
+    #[test]
+    fn row_oversized_item_does_not_leave_empty_front_group() {
+        let (size, placed) = arrange_rows(
+            vec![node(100.0, 10.0), node(4.0, 8.0)],
+            45.0,
+            5.0,
+            3.0,
+            Padding::ZERO,
+            Alignment::End,
+            alignment::Horizontal::Right,
+        );
+        assert_eq!(size, Size::new(100.0, 21.0));
+        assert_eq!(placed[0].bounds().position(), Point::ORIGIN);
+        assert_eq!(placed[1].bounds().position(), Point::new(96.0, 13.0));
     }
 
     #[test]
