@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate TAIM Premium Edition 01 SVG assets with only the Python stdlib."""
+"""Validate TAIM Premium Editions 01 and 02 SVG assets with only the Python stdlib."""
 from __future__ import annotations
 
 import json
@@ -25,8 +25,8 @@ def verify() -> tuple[int, list[str]]:
     manifest = json.loads((PACK / "manifest.json").read_text(encoding="utf-8"))
     records = manifest["icons"]
     expected = [r["name"] for r in records]
-    if len(expected) != 30 or len(set(expected)) != 30:
-        errors.append(f"Expected 30 unique icons, got {len(expected)}")
+    if len(expected) != 60 or len(set(expected)) != 60:
+        errors.append(f"Expected 60 unique icons, got {len(expected)}")
     if manifest["count"] != len(expected):
         errors.append("Manifest count mismatch")
     discovered = {p.stem for p in PACK.glob("*.svg")}
