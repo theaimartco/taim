@@ -121,9 +121,33 @@ tests and independent source-lineage review remain open. Do not merge
 to main or describe the framework as production ready.
 See `docs/audit/taim-native-icon-overlay-20261020.md`.
 
+## All 31 formerly exact inherited paths addressed — code candidate d8f60030
+
+Against the complete historical Iced Git tree `56b706fc`, the current
+TAIM candidate has **zero byte-identical files at the same original path**
+with extensions `.rs`, `.wgsl`, `.toml`, down from 31 in the
+previous checkpoint. This is **NOT** proof of 100% independent TAIM
+implementation: substantial old Iced-derived designs/code, including
+changed/moved modules, may remain. Manual/token provenance gate
+and substantive replacement of derivative source are still required.
+
+Implementation includes GPU image admission before atlas upload,
+native macOS titlebar normalization, full error-source propagation,
+checked application setup and startup presets, explicit runtime
+diagnostics and optional work submission, bounded CPU screenshot/geometry
+APIs, window/input facades, shader vertex/color policy, and local Cargo
+verification commands. New Rust/WGSL regression and visual acceptance
+remain unexecuted. See
+`docs/audit/taim-all-31-source-paths-20261020.md`.
+
+CI is intentionally disabled at owner's request; this is a **release
+NO-GO**, not a successful verification result.
+
 ## Verification lanes
 
-- Hosted CI: .github/workflows/verification.yml on PRs and main.
+- Hosted CI: DISABLED at owner request — verification.yml is fully commented;
+  historical ci.yml, fuzz.yml, golden.yml, licenses.yml and perf.yml
+  also have no active YAML lines. Manual checks remain required.
 - Physical presentation, input, screen-reader, device-loss and idle-energy:
   docs/testing/wayland-vyom-device-acceptance.md.
 - Same-device Iced / Slint / egui comparison:
