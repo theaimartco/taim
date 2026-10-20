@@ -43,7 +43,7 @@ pub(super) fn click_pane<'a, Message, T>(
         }
 
         if let Some(on_drag) = &on_drag
-            && content.can_be_dragged_at(layout, cursor_position)
+            && content.can_start_drag(layout, cursor_position)
         {
             *action = state::Action::Dragging {
                 pane,

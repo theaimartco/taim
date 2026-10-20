@@ -148,6 +148,20 @@ impl Router {
     /// treated as a genuinely new contact rather than tripping
     /// [`Router::start`]'s "already tracked" panic.
     pub fn route(&mut self, pointer: Pointer) -> Routing {
+        // Direct users of Router may bypass core::Event::to_pointer.
+        // Enforce the same finite-coordinate/cancellation contract here.
+        // Invalid Move/Down is ignored, whereas invalid Up/Cancel is
+        // converted to a safe Cancel so captured contacts are released.
+        let Some(pointer) = pointer.sanitize_coordinates() else {
+            // Hit-testing may already have prepared an arena for Down.
+            // Rejecting that malformed initial sample must also discard
+            // the pending arena, otherwise it would leak until focus reset.
+            // A stray invalid Move must NOT discard existing capture.
+            if matches!(pointer.phase, Phase::Down) {
+                self.cancel(pointer.id);
+            }
+            return Routing::None;
+        };
         let is_terminal = pointer.is_terminal();
 
         let routing = match self.contacts.get_mut(&pointer.id) {
@@ -466,6 +480,49 @@ mod tests {
 
         assert_eq!(router.route(pointer(1, Phase::Move, 20)), Routing::None);
         assert!(!router.is_captured(PointerId::from_raw(1)));
+    }
+
+    #[test]
+    fn invalid_initial_down_cancels_the_prepared_pending_arena() {
+        let mut router = Router::new();
+        let mut arena = Arena::new();
+        let _ = arena.register(AlwaysAccepts, Team::solo(), Priority::NORMAL);
+        let id = PointerId::from_raw(5);
+        router.start(id, path(&[0]), arena);
+
+        let invalid_down = Pointer {
+            position: crate::core::Point::new(f32::NAN, 0.0),
+            ..pointer(5, Phase::Down, 0)
+        };
+        assert_eq!(router.route(invalid_down), Routing::None);
+        assert_eq!(router.tracked_ids().count(), 0);
+    }
+
+    #[test]
+    fn malformed_pointer_motion_never_poisoned_capture_and_invalid_up_cancels() {
+        let mut router = Router::new();
+        let mut arena = Arena::new();
+        let _ = arena.register(AlwaysAccepts, Team::solo(), Priority::NORMAL);
+        let id = PointerId::from_raw(1);
+        router.start(id, path(&[0]), arena);
+        let _ = router.route(pointer(1, Phase::Down, 0));
+        assert!(router.is_captured(id));
+
+        let malformed_motion = Pointer {
+            position: crate::core::Point::new(f32::NAN, 0.0),
+            ..pointer(1, Phase::Move, 1)
+        };
+        assert_eq!(router.route(malformed_motion), Routing::None);
+        assert!(router.is_captured(id));
+
+        let malformed_release = Pointer {
+            position: crate::core::Point::new(f32::INFINITY, 0.0),
+            ..pointer(1, Phase::Up, 2)
+        };
+        let result = router.route(malformed_release);
+        assert!(matches!(result, Routing::Captured { .. }));
+        assert!(!router.is_captured(id));
+        assert_eq!(router.tracked_ids().count(), 0);
     }
 
     #[test]

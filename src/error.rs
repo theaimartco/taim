@@ -6,16 +6,16 @@ use crate::shell;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// The futures executor could not be created.
-    #[error("the futures executor could not be created")]
-    ExecutorCreationFailed(futures::io::Error),
+    #[error("TAIM executor startup failed: {0}")]
+    ExecutorCreationFailed(#[source] futures::io::Error),
 
     /// The application window could not be created.
-    #[error("the application window could not be created")]
-    WindowCreationFailed(Box<dyn std::error::Error + Send + Sync>),
+    #[error("TAIM native window creation failed: {0}")]
+    WindowCreationFailed(#[source] Box<dyn std::error::Error + Send + Sync>),
 
     /// The application graphics context could not be created.
-    #[error("the application graphics context could not be created")]
-    GraphicsCreationFailed(backend::Error),
+    #[error("TAIM graphics initialization failed: {0}")]
+    GraphicsCreationFailed(#[source] backend::Error),
 }
 
 impl From<shell::Error> for Error {
@@ -38,5 +38,18 @@ mod tests {
     fn assert_send_sync() {
         fn _assert<T: Send + Sync>() {}
         _assert::<Error>();
+    }
+}
+
+#[cfg(test)]
+mod taim_error_chain_tests {
+    use super::*;
+
+    #[test]
+    fn executor_failure_preserves_original_operating_system_reason() {
+        use std::error::Error as _;
+        let err = Error::ExecutorCreationFailed(futures::io::Error::other("no worker threads"));
+        assert!(err.to_string().contains("no worker threads"));
+        assert!(err.source().unwrap().to_string().contains("no worker threads"));
     }
 }

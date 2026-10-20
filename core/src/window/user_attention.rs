@@ -6,7 +6,7 @@
 ///
 /// [`Critical`]: Self::Critical
 /// [`Informational`]: Self::Informational
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserAttention {
     /// ## Platform-specific
     ///
@@ -18,4 +18,24 @@ pub enum UserAttention {
     /// - **macOS:** Bounces the dock icon once.
     /// - **Windows:** Flashes the taskbar button until the application is in focus.
     Informational,
+}
+
+impl UserAttention {
+    /// A critical request should keep drawing attention until the window
+    /// receives focus; an informational one is a single-notification hint.
+    #[inline]
+    pub const fn is_critical(self) -> bool {
+        matches!(self, Self::Critical)
+    }
+}
+
+#[cfg(test)]
+mod taim_attention_tests {
+    use super::*;
+
+    #[test]
+    fn urgent_attention_can_be_distinguished_from_informational() {
+        assert!(UserAttention::Critical.is_critical());
+        assert!(!UserAttention::Informational.is_critical());
+    }
 }

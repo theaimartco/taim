@@ -555,11 +555,7 @@ pub fn parse_definition_result(value: &Value) -> Option<Vec<LspLocation>> {
 
     if let Some(arr) = result.as_array() {
         let list: Vec<LspLocation> = arr.iter().filter_map(parse_single).collect();
-        if list.is_empty() {
-            None
-        } else {
-            Some(list)
-        }
+        if list.is_empty() { None } else { Some(list) }
     } else {
         parse_single(result).map(|loc| vec![loc])
     }

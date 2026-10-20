@@ -485,103 +485,32 @@ where
             .height(self.row.height)
             .shrink(self.row.padding);
 
+        // TAIM uses the same explicit-group placement contract for Row and
+        // Column. Child measurement is a single pass; positioning requires
+        // no second invocation of widget layout or inference from x == 0.
         let child_limits = limits.loose();
-        let spacing = self.row.spacing;
-        let vertical_spacing = self.vertical_spacing.unwrap_or(spacing);
-        let max_width = limits.max().width;
+        let nodes: Vec<_> = self
+            .row
+            .children
+            .iter_mut()
+            .zip(&mut tree.children)
+            .map(|(element, state)| {
+                element.as_widget_mut().layout(state, renderer, &child_limits)
+            })
+            .collect();
 
-        let mut children = Vec::with_capacity(self.row.children.len());
-        let mut intrinsic_size = Size::ZERO;
-        let mut row_start = 0;
-        let mut row_height = 0.0;
-        let mut x = 0.0;
-        let mut y = 0.0;
+        let (intrinsic, nodes) = crate::column::placement::arrange_rows(
+            nodes,
+            limits.max().width,
+            self.row.spacing,
+            self.vertical_spacing.unwrap_or(self.row.spacing),
+            self.row.padding,
+            self.row.align,
+            self.align_x,
+        );
 
-        let align_factor = match self.row.align {
-            Alignment::Start => 0.0,
-            Alignment::Center => 2.0,
-            Alignment::End => 1.0,
-        };
-
-        let align_y = |row_start: std::ops::Range<usize>,
-                       row_height: f32,
-                       children: &mut Vec<layout::Node>| {
-            if align_factor != 0.0 {
-                for node in &mut children[row_start] {
-                    let height = node.size().height;
-
-                    node.translate_mut(Vector::new(0.0, (row_height - height) / align_factor));
-                }
-            }
-        };
-
-        for (i, child) in self.row.children.iter_mut().enumerate() {
-            let node = child
-                .as_widget_mut()
-                .layout(&mut tree.children[i], renderer, &child_limits);
-
-            let child_size = node.size();
-
-            if x != 0.0 && x + child_size.width > max_width {
-                intrinsic_size.width = intrinsic_size.width.max(x - spacing);
-
-                align_y(row_start..i, row_height, &mut children);
-
-                y += row_height + vertical_spacing;
-                x = 0.0;
-                row_start = i;
-                row_height = 0.0;
-            }
-
-            row_height = row_height.max(child_size.height);
-
-            children.push(node.move_to((x + self.row.padding.left, y + self.row.padding.top)));
-
-            x += child_size.width + spacing;
-        }
-
-        if x != 0.0 {
-            intrinsic_size.width = intrinsic_size.width.max(x - spacing);
-        }
-
-        intrinsic_size.height = y + row_height;
-        align_y(row_start..children.len(), row_height, &mut children);
-
-        let align_factor = match self.align_x {
-            alignment::Horizontal::Left => 0.0,
-            alignment::Horizontal::Center => 2.0,
-            alignment::Horizontal::Right => 1.0,
-        };
-
-        if align_factor != 0.0 {
-            let total_width = intrinsic_size.width;
-
-            let mut row_start = 0;
-
-            for i in 0..children.len() {
-                let bounds = children[i].bounds();
-                let row_width = bounds.x + bounds.width;
-
-                let next_x = children
-                    .get(i + 1)
-                    .map(|node| node.bounds().x)
-                    .unwrap_or_default();
-
-                if next_x == 0.0 {
-                    let translation = Vector::new((total_width - row_width) / align_factor, 0.0);
-
-                    for node in &mut children[row_start..=i] {
-                        node.translate_mut(translation);
-                    }
-
-                    row_start = i + 1;
-                }
-            }
-        }
-
-        let size = limits.resolve(self.row.width, self.row.height, intrinsic_size);
-
-        layout::Node::with_children(size.expand(self.row.padding), children)
+        let size = limits.resolve(self.row.width, self.row.height, intrinsic);
+        layout::Node::with_children(size.expand(self.row.padding), nodes)
     }
 
     fn visit_children(

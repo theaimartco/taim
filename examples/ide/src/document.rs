@@ -221,7 +221,8 @@ impl Document {
                     if let Some(offset) = line.text[col_start..].find(&query) {
                         let match_col = col_start + offset + query.len();
                         let match_pos = text_editor::Position::new(line_idx, match_col);
-                        if !self.extra_cursors.contains(&match_pos) && match_pos != cursor.position {
+                        if !self.extra_cursors.contains(&match_pos) && match_pos != cursor.position
+                        {
                             found = Some(match_pos);
                             break;
                         }
@@ -242,7 +243,8 @@ impl Document {
                     if let Some(offset) = line.text[..max_col.min(line.text.len())].find(&query) {
                         let match_col = offset + query.len();
                         let match_pos = text_editor::Position::new(line_idx, match_col);
-                        if !self.extra_cursors.contains(&match_pos) && match_pos != cursor.position {
+                        if !self.extra_cursors.contains(&match_pos) && match_pos != cursor.position
+                        {
                             found = Some(match_pos);
                             break;
                         }
@@ -273,7 +275,11 @@ impl Document {
         let mut start = col;
         if start == bytes.len() && start > 0 && is_ident(bytes[start - 1]) {
             start -= 1;
-        } else if start < bytes.len() && !is_ident(bytes[start]) && start > 0 && is_ident(bytes[start - 1]) {
+        } else if start < bytes.len()
+            && !is_ident(bytes[start])
+            && start > 0
+            && is_ident(bytes[start - 1])
+        {
             start -= 1;
         }
         if start >= bytes.len() || !is_ident(bytes[start]) {
@@ -304,15 +310,29 @@ impl Document {
             if let Some(line) = self.content.line(i) {
                 let trimmed = line.text.trim_start();
                 if trimmed.starts_with("<<<<<<<") {
-                    let label = trimmed.strip_prefix("<<<<<<<").unwrap_or("").trim().to_string();
+                    let label = trimmed
+                        .strip_prefix("<<<<<<<")
+                        .unwrap_or("")
+                        .trim()
+                        .to_string();
                     current_start = Some((i, label));
                     current_sep = None;
-                } else if trimmed.starts_with("=======") && current_start.is_some() && current_sep.is_none() {
+                } else if trimmed.starts_with("=======")
+                    && current_start.is_some()
+                    && current_sep.is_none()
+                {
                     current_sep = Some(i);
-                } else if trimmed.starts_with(">>>>>>>") && current_start.is_some() && current_sep.is_some() {
+                } else if trimmed.starts_with(">>>>>>>")
+                    && current_start.is_some()
+                    && current_sep.is_some()
+                {
                     let (start, cur_label) = current_start.take().unwrap();
                     let sep = current_sep.take().unwrap();
-                    let inc_label = trimmed.strip_prefix(">>>>>>>").unwrap_or("").trim().to_string();
+                    let inc_label = trimmed
+                        .strip_prefix(">>>>>>>")
+                        .unwrap_or("")
+                        .trim()
+                        .to_string();
                     conflicts.push(MergeConflict {
                         start_line: start,
                         separator_line: sep,
@@ -425,20 +445,30 @@ impl Document {
 
     /// Returns whether the specified line starts a foldable block.
     pub fn is_line_foldable(&self, line: usize) -> bool {
-        self.foldable_blocks().iter().any(|(start, _)| *start == line)
+        self.foldable_blocks()
+            .iter()
+            .any(|(start, _)| *start == line)
     }
 
     /// Returns whether the specified line is currently hidden inside a folded block.
     pub fn is_line_folded(&self, line: usize) -> bool {
-        self.folded_ranges.iter().any(|(start, end)| line > *start && line <= *end)
+        self.folded_ranges
+            .iter()
+            .any(|(start, end)| line > *start && line <= *end)
     }
 
     /// Toggles folding for the block starting at `line`.
     pub fn toggle_fold_at(&mut self, line: usize) -> bool {
-        if let Some(pos) = self.folded_ranges.iter().position(|(start, _)| *start == line) {
+        if let Some(pos) = self
+            .folded_ranges
+            .iter()
+            .position(|(start, _)| *start == line)
+        {
             self.folded_ranges.remove(pos);
             true
-        } else if let Some((start, end)) = self.foldable_blocks().into_iter().find(|(s, _)| *s == line) {
+        } else if let Some((start, end)) =
+            self.foldable_blocks().into_iter().find(|(s, _)| *s == line)
+        {
             self.folded_ranges.push((start, end));
             true
         } else {
@@ -489,7 +519,8 @@ impl Document {
                 let mut updated_cursors = Vec::with_capacity(sorted_cursors.len());
                 for pos in sorted_cursors {
                     self.content.move_to(text_editor::Cursor::new(pos));
-                    self.content.perform(text_editor::Action::Edit(edit.clone()));
+                    self.content
+                        .perform(text_editor::Action::Edit(edit.clone()));
                     updated_cursors.push(self.content.cursor().position);
                 }
 

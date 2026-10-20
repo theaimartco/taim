@@ -308,7 +308,8 @@ pub fn read_blame_for_line(repo_root: &Path, file_path: &str, line_num: usize) -
     let output = git_output(
         repo_root,
         &["blame", "-L", &line_arg, "--porcelain", file_path],
-    ).ok()?;
+    )
+    .ok()?;
     parse_porcelain_blame(&output)
 }
 
@@ -653,7 +654,10 @@ mod tests {
     fn test_parse_porcelain_blame_committed() {
         let sample = b"e82f48c08da6238b15e2193b2a095cd5dfcf6b95 1 1 1\nauthor Satpal Singh\nauthor-mail <satpal@example.com>\nauthor-time 1711200000\nauthor-tz +0530\ncommitter Satpal Singh\ncommitter-mail <satpal@example.com>\ncommitter-time 1711200000\ncommitter-tz +0530\nsummary feat(ide): add native GPU editor\nfilename src/lib.rs\n\tlet x = 42;\n";
         let parsed = parse_porcelain_blame(sample).unwrap();
-        assert_eq!(parsed, "Satpal Singh (e82f48c) • feat(ide): add native GPU editor");
+        assert_eq!(
+            parsed,
+            "Satpal Singh (e82f48c) • feat(ide): add native GPU editor"
+        );
     }
 
     #[test]

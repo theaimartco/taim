@@ -50,7 +50,7 @@ pub(super) async fn run_instance<A>(
             mundy::ColorScheme::Dark => theme::Mode::Dark,
         };
 
-        runtime.run(
+        let _ = runtime.run(
             mundy::Preferences::stream(mundy::Interest::ColorScheme)
                 .map(move |preferences| {
                     Action::System(system::Action::NotifyTheme(to_mode(
@@ -536,7 +536,9 @@ pub(super) async fn run_instance<A>(
                             let scale_factor = window.state.viewport().scale_factor();
                             match state.damage_region() {
                                 Some(core_region) => {
-                                    let damage = graphics::damage::DamageRegion::from_core_region(core_region);
+                                    let damage = graphics::damage::DamageRegion::from_core_region(
+                                        core_region,
+                                    );
                                     graphics::FrameContext::with_damage(damage, scale_factor)
                                 }
                                 None => graphics::FrameContext::full_present(scale_factor),
@@ -937,6 +939,12 @@ pub(super) async fn run_instance<A>(
                                 &mut update_outputs,
                             );
 
+                            // Native TAIM intent handlers explicitly report
+                            // state/layout/paint invalidation. Legacy apps still
+                            // receive automatic redraws after message batches.
+                            let explicit_invalidation = runner.controls_invalidation();
+                            let intent_delta = runner.context_mut().take_invalidation();
+
                             user_interfaces = ManuallyDrop::new(build_user_interfaces(
                                 &runner,
                                 &mut window_manager,
@@ -969,11 +977,22 @@ pub(super) async fn run_instance<A>(
                                 );
                             }
 
+                            let dirty = crate::frame_gate::after_message_batch(
+                                explicit_invalidation,
+                                uis_stale,
+                                intent_delta,
+                            );
                             for (window_id, window) in window_manager.iter_mut() {
-                                frame_gate.invalidate(
-                                    window_id,
-                                    crate::frame_gate::DirtyFlags::PAINT_DIRTY,
-                                );
+                                if dirty.is_empty() {
+                                    continue;
+                                }
+
+                                frame_gate.invalidate(window_id, dirty);
+                                if explicit_invalidation
+                                    && intent_delta.frame == program::FrameRequest::Animate
+                                {
+                                    window.scheduler.request_animation();
+                                }
                                 window.request_redraw(core::window::RedrawRequest::NextFrame);
                             }
                         }

@@ -1,14 +1,57 @@
+//! TAIM shadow geometry used by paint and retained-cache decisions.
+
 use crate::{Color, Vector};
 
-/// A shadow.
+/// Shadows are paint effects, not layout extents.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Shadow {
-    /// The color of the shadow.
     pub color: Color,
-
-    /// The offset of the shadow.
     pub offset: Vector,
-
-    /// The blur radius of the shadow.
     pub blur_radius: f32,
+}
+
+impl Shadow {
+    /// Drop non-finite or negative blur radii before queuing paint work.
+    ///
+    /// A zero radius remains a valid hard-edged shadow. Offset and color are
+    /// preserved so renderers can validate their own coordinate-space limits.
+    #[must_use]
+    pub fn normalized(mut self) -> Self {
+        if !self.blur_radius.is_finite() || self.blur_radius < 0.0 {
+            self.blur_radius = 0.0;
+        }
+        self
+    }
+
+    /// True only when no alpha contribution is possible. NaN alpha is
+    /// deliberately treated as potentially visible (conservative culling).
+    #[must_use]
+    pub fn is_fully_transparent(self) -> bool {
+        self.color.a == 0.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_blur_cannot_leak_into_shadow_geometry() {
+        let mut shadow = Shadow::default();
+        shadow.blur_radius = f32::NAN;
+        assert_eq!(shadow.normalized().blur_radius, 0.0);
+        shadow.blur_radius = -10.0;
+        assert_eq!(shadow.normalized().blur_radius, 0.0);
+        shadow.blur_radius = 2.0;
+        assert_eq!(shadow.normalized().blur_radius, 2.0);
+    }
+
+    #[test]
+    fn transparent_shadow_culling_is_conservative() {
+        let mut shadow = Shadow::default();
+        shadow.color = Color::TRANSPARENT;
+        assert!(shadow.is_fully_transparent());
+        shadow.color = Color::BLACK;
+        assert!(!shadow.is_fully_transparent());
+    }
 }

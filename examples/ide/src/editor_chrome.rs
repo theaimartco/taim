@@ -70,16 +70,18 @@ pub fn scrollbar(viewport: EditorViewport) -> Canvas<Scrollbar, Message> {
         .height(taim::Length::Fill)
 }
 
-pub fn minimap(viewport: EditorViewport, density: std::sync::Arc<[u8]>) -> Canvas<Minimap, Message> {
+pub fn minimap(
+    viewport: EditorViewport,
+    density: std::sync::Arc<[u8]>,
+) -> Canvas<Minimap, Message> {
     Canvas::new(Minimap { viewport, density })
         .width(taim::Length::Fixed(52.0))
         .height(taim::Length::Fill)
 }
 
 fn line_string(line_1_based: usize) -> String {
-    static NUMBERS: std::sync::LazyLock<Vec<String>> = std::sync::LazyLock::new(|| {
-        (0..=2048).map(|n| n.to_string()).collect()
-    });
+    static NUMBERS: std::sync::LazyLock<Vec<String>> =
+        std::sync::LazyLock::new(|| (0..=2048).map(|n| n.to_string()).collect());
     if line_1_based <= 2048 {
         NUMBERS[line_1_based].clone()
     } else {

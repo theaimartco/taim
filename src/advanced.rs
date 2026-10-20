@@ -25,3 +25,13 @@ pub use crate::core::text::{self, Text};
 pub use crate::renderer::graphics;
 
 pub use widget::Widget;
+
+/// TAIM frame/input low-level observability for specialized widget authors.
+pub mod native_contracts {
+    /// Event-queue coalescing policy: lifecycle events must not be lost.
+    pub use crate::core::event::Coalescing;
+    /// Per-window redraw deadlines selected by the TAIM frame scheduler.
+    pub use crate::core::window::RedrawRequest;
+    /// Cross-device mouse/touch/pen gesture identity and lifecycle.
+    pub use crate::core::pointer::{Id as PointerId, Phase as PointerPhase, Pointer};
+}

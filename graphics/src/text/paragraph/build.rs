@@ -1,9 +1,9 @@
 //! Paragraph construction shared by plain and attributed text.
 
 use super::{Internal, Paragraph};
+use crate::core::Font;
 use crate::core::alignment;
 use crate::core::text::{Alignment, Ellipsis, Shaping, Span, Text, Wrapping};
-use crate::core::Font;
 use crate::text;
 
 use rustc_hash::{FxHashMap, FxHasher};
@@ -133,11 +133,19 @@ fn quantize_definition(definition: &Text<&str>) -> (f32, u32, u32, u32, u32, u32
     let hint = text::hint_factor(definition.size, definition.hint_factor);
     let scale = hint.unwrap_or(1.0);
     let size_bits = (definition.size.0 * scale).to_bits();
-    let line_height_bits = (definition.line_height.to_absolute(definition.size).0 * scale).to_bits();
+    let line_height_bits =
+        (definition.line_height.to_absolute(definition.size).0 * scale).to_bits();
     let bounds_w_bits = (definition.bounds.width * scale).to_bits();
     let bounds_h_bits = (definition.bounds.height * scale).to_bits();
     let hint_factor_bits = definition.hint_factor.unwrap_or(1.0).to_bits();
-    (scale, size_bits, line_height_bits, bounds_w_bits, bounds_h_bits, hint_factor_bits)
+    (
+        scale,
+        size_bits,
+        line_height_bits,
+        bounds_w_bits,
+        bounds_h_bits,
+        hint_factor_bits,
+    )
 }
 
 fn compute_hash(
@@ -176,12 +184,10 @@ impl Seed {
     fn new<Content>(definition: &Text<Content>) -> Self {
         let hint = text::hint_factor(definition.size, definition.hint_factor);
         let scale = hint.unwrap_or(1.0);
-        let mut buffer = cosmic_text::Buffer::new_empty(
-            cosmic_text::Metrics::new(
-                definition.size.0 * scale,
-                definition.line_height.to_absolute(definition.size).0 * scale,
-            ),
-        );
+        let mut buffer = cosmic_text::Buffer::new_empty(cosmic_text::Metrics::new(
+            definition.size.0 * scale,
+            definition.line_height.to_absolute(definition.size).0 * scale,
+        ));
 
         if hint.is_some() {
             buffer.set_hinting(cosmic_text::Hinting::Enabled);
@@ -397,4 +403,3 @@ mod tests {
         assert!(!Arc::ptr_eq(&p_base.0, &p_diff_bounds.0));
     }
 }
-

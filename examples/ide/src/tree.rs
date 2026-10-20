@@ -274,9 +274,7 @@ impl FileTree {
                 valid_entries.push((name, entry.path(), is_dir, is_file));
             }
 
-            valid_entries.sort_unstable_by(|a, b| {
-                (!a.2).cmp(&(!b.2)).then_with(|| a.0.cmp(&b.0))
-            });
+            valid_entries.sort_unstable_by(|a, b| (!a.2).cmp(&(!b.2)).then_with(|| a.0.cmp(&b.0)));
 
             let mut entries = Vec::with_capacity(valid_entries.len());
             for (name, path, is_dir, is_file) in valid_entries {

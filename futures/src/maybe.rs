@@ -33,3 +33,22 @@ mod platform {
 }
 
 pub use platform::{MaybeSend, MaybeSync};
+
+/// Whether this compilation target requires Send for asynchronous task
+/// handoff. Browser-local futures are not automatically transferable.
+pub const fn requires_send_for_spawn() -> bool {
+    cfg!(not(target_arch = "wasm32"))
+}
+
+#[cfg(test)]
+mod taim_async_contract_tests {
+    use super::*;
+
+    #[test]
+    fn task_thread_transfer_matches_target_marker_constraints() {
+        assert_eq!(
+            requires_send_for_spawn(),
+            cfg!(not(target_arch = "wasm32"))
+        );
+    }
+}
