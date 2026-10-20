@@ -186,6 +186,33 @@ implementations, then compiling, testing and reviewing source origin
 remains an open production gate. User-disabled GitHub CI remains
 fully commented. See `docs/audit/taim-native-wrapping-20261020.md`.
 
+## TAIM-native weighted flex allocator — 2026-10-20
+
+The actual non-wrapping Row/Column flex engine now delegates weighted
+main-axis space allocation to an independently implemented TAIM
+water-filling kernel at `core/src/layout/flex/allocator.rs`.
+It replaces the inherited recursive min/max/main-fluid allocation
+passes (not the whole legacy constraint engine). The new allocator
+reserves feasible minimums, shares shortage proportionally, and sorts
+maximum-saturation breakpoints for deterministic O(n log n) weighted
+distribution. Intrinsic-content-capped fluid widgets are measured
+once, with unused space redistributed to remaining flexible children.
+
+The wrapping Row/Column group planner was also corrected to avoid
+subtracting an overflow-saturated trailing gutter (which could
+incorrectly produce zero intrinsic width/height). 12 new Rust tests
+were committed in this branch — **not executed**. The flex allocator
+is not benchmarked; O(n log n) is algorithmic analysis, not a measured
+frame-rate improvement.
+
+**Not 100% TAIM:** static/cross-axis flex measurement retains
+inherited druid-inspired structure under Apache 2.0, and widgets,
+platform adapters and other framework subsystems remain subject to
+complete semantic source-origin audit. Rust workspace compilation,
+cross-target rendering and actual device verification remain NO-GO
+until run. CI workflows are still fully commented at owner request.
+See `docs/audit/taim-native-flex-20261020.md`.
+
 ## Verification lanes
 
 - Hosted CI: DISABLED at owner request — verification.yml is fully commented;
