@@ -11,9 +11,13 @@ pub mod thread_pool;
 /// The executor selected by TAIM's default-backend feature precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectedBackend {
+    /// TAIM runs futures on the Tokio backend.
     Tokio,
+    /// TAIM runs futures on the smol backend.
     Smol,
+    /// TAIM runs futures on its instrumented native worker pool.
     ThreadPool,
+    /// No usable native async executor feature was enabled.
     Unavailable,
 }
 

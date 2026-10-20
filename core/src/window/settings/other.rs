@@ -7,8 +7,11 @@ pub struct PlatformSpecific;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NativeWindowEffect {
+    /// Allows app content behind a native transparent titlebar.
     TransparentTitlebar,
+    /// Applies a window-manager-backed background blur.
     BackgroundBlur,
+    /// Requests a custom shadow on undecorated windows.
     CustomWindowShadow,
 }
 
