@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t-clock d-clock">
+<title id="t-clock">TAIM Clock</title><desc id="d-clock">Premium original vector symbol for Clock, with crimson enamel and brushed-metal depth.</desc>
+<defs><linearGradient id="graphite" x1="0" x2=".9" y1="0" y2="1"><stop stop-color="#545b69"/><stop offset=".21" stop-color="#292d38"/><stop offset=".62" stop-color="#11151d"/><stop offset="1" stop-color="#06080e"/></linearGradient>
+<linearGradient id="steel" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#f0f4fc"/><stop offset=".2" stop-color="#878e9e"/><stop offset=".6" stop-color="#343844"/><stop offset=".84" stop-color="#aab2bf"/><stop offset="1" stop-color="#272c36"/></linearGradient>
+<linearGradient id="red" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff9ba0"/><stop offset=".28" stop-color="#fa243f"/><stop offset=".68" stop-color="#a80724"/><stop offset="1" stop-color="#4d0518"/></linearGradient>
+<radialGradient id="garnet" cx=".35" cy=".21"><stop stop-color="#ff9a9a"/><stop offset=".28" stop-color="#ee203f"/><stop offset=".76" stop-color="#89051c"/><stop offset="1" stop-color="#320711"/></radialGradient>
+<linearGradient id="shine" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".9"/><stop offset=".5" stop-color="#f7c6cf" stop-opacity=".4"/><stop offset="1" stop-color="#fff" stop-opacity=".02"/></linearGradient>
+<filter id="shadow" x="-35%" y="-35%" width="170%" height="170%"><feDropShadow dx="0" dy="2" stdDeviation="1.8" flood-color="#010308" flood-opacity=".65"/></filter></defs>
+<style>.body{fill:url(#graphite);stroke:url(#steel);stroke-width:1.55;filter:url(#shadow)}.enamel{fill:none;stroke:url(#red);stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round}.glint{fill:none;stroke:url(#shine);stroke-width:1.4;stroke-linecap:round}.gem{fill:url(#garnet);stroke:url(#steel);stroke-width:1.15}.void{fill:#07090f;stroke:url(#red);stroke-width:2}</style>
+<g stroke-linecap="round" stroke-linejoin="round"><circle class="body" cx="32" cy="32" r="25"/><circle class="void" cx="32" cy="32" r="19"/><path class="enamel" d="M32 19 V32 L43 38"/><circle class="gem" cx="32" cy="32" r="3.4"/><path class="glint" d="M16 24 A17 17 0 0 1 33 15"/></g></svg>

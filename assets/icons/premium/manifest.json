@@ -1,0 +1,165 @@
+{
+  "pack": "TAIM Premium SVG",
+  "edition": "01",
+  "version": "1.0.0",
+  "count": 30,
+  "viewBox": "0 0 64 64",
+  "palette": {
+    "graphite": "#11151d",
+    "crimson": "#fa243f",
+    "steel": "#f0f4fc"
+  },
+  "icons": [
+    {
+      "name": "home",
+      "label": "Home",
+      "source": "home.svg"
+    },
+    {
+      "name": "settings",
+      "label": "Settings",
+      "source": "settings.svg"
+    },
+    {
+      "name": "folder",
+      "label": "Files",
+      "source": "folder.svg"
+    },
+    {
+      "name": "search",
+      "label": "Search",
+      "source": "search.svg"
+    },
+    {
+      "name": "notifications",
+      "label": "Notifications",
+      "source": "notifications.svg"
+    },
+    {
+      "name": "user",
+      "label": "Profile",
+      "source": "user.svg"
+    },
+    {
+      "name": "chat",
+      "label": "Messages",
+      "source": "chat.svg"
+    },
+    {
+      "name": "terminal",
+      "label": "Terminal",
+      "source": "terminal.svg"
+    },
+    {
+      "name": "store",
+      "label": "App Store",
+      "source": "store.svg"
+    },
+    {
+      "name": "power",
+      "label": "Power",
+      "source": "power.svg"
+    },
+    {
+      "name": "lock",
+      "label": "Lock",
+      "source": "lock.svg"
+    },
+    {
+      "name": "shield",
+      "label": "Shield",
+      "source": "shield.svg"
+    },
+    {
+      "name": "calendar",
+      "label": "Calendar",
+      "source": "calendar.svg"
+    },
+    {
+      "name": "clock",
+      "label": "Clock",
+      "source": "clock.svg"
+    },
+    {
+      "name": "camera",
+      "label": "Camera",
+      "source": "camera.svg"
+    },
+    {
+      "name": "image",
+      "label": "Gallery",
+      "source": "image.svg"
+    },
+    {
+      "name": "music",
+      "label": "Music",
+      "source": "music.svg"
+    },
+    {
+      "name": "download",
+      "label": "Download",
+      "source": "download.svg"
+    },
+    {
+      "name": "upload",
+      "label": "Upload",
+      "source": "upload.svg"
+    },
+    {
+      "name": "cloud",
+      "label": "Cloud",
+      "source": "cloud.svg"
+    },
+    {
+      "name": "database",
+      "label": "Database",
+      "source": "database.svg"
+    },
+    {
+      "name": "cpu",
+      "label": "Processor",
+      "source": "cpu.svg"
+    },
+    {
+      "name": "code",
+      "label": "Code",
+      "source": "code.svg"
+    },
+    {
+      "name": "rocket",
+      "label": "Launch",
+      "source": "rocket.svg"
+    },
+    {
+      "name": "chart",
+      "label": "Analytics",
+      "source": "chart.svg"
+    },
+    {
+      "name": "globe",
+      "label": "Globe",
+      "source": "globe.svg"
+    },
+    {
+      "name": "heart",
+      "label": "Favorites",
+      "source": "heart.svg"
+    },
+    {
+      "name": "star",
+      "label": "Starred",
+      "source": "star.svg"
+    },
+    {
+      "name": "trash",
+      "label": "Delete",
+      "source": "trash.svg"
+    },
+    {
+      "name": "edit",
+      "label": "Edit",
+      "source": "edit.svg"
+    }
+  ],
+  "license": "MIT / TAIM original vector drawings"
+}
