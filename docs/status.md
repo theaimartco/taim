@@ -167,6 +167,25 @@ Further substantive framework architecture and widget implementation
 rewrites are needed to establish TAIM's distinct implementation.
 See `docs/audit/taim-originality-and-build-gate-20261020.md`.
 
+## TAIM-native wrapping Row/Column engines (candidate f303f299)
+
+The interactive `Column::wrap` and `Row::wrap` layout paths now
+use a TAIM-specific explicit group planner, rather than detecting
+wrapping boundaries from already-positioned X/Y coordinates. This
+repairs nonzero-padding, per-group cross alignment, oversized-child,
+malformed-spacing and enormous numeric extent cases. Both planners
+measure each widget exactly once before arranging nodes; the placement
+pass is linear in child count. Nine source regression tests were
+committed, **not executed** in this environment.
+
+This is **not** full framework independence: normal Row and Column
+still use inherited multi-pass `layout::flex::resolve_cached`, and
+same-path Rust token-multiset spot audit still finds approximately
+90% historical overlap in both widgets. Replacing all derivative
+implementations, then compiling, testing and reviewing source origin
+remains an open production gate. User-disabled GitHub CI remains
+fully commented. See `docs/audit/taim-native-wrapping-20261020.md`.
+
 ## Verification lanes
 
 - Hosted CI: DISABLED at owner request — verification.yml is fully commented;
