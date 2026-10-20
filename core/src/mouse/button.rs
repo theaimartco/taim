@@ -6,18 +6,26 @@
 /// Physical mouse button translated by the platform adapter.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum Button {
+    /// The primary (usually left) pointing-device button.
     Left,
+    /// The secondary (usually right) pointing-device button.
     Right,
+    /// The middle button, often attached to the scroll wheel.
     Middle,
+    /// A dedicated backward-navigation side button.
     Back,
+    /// A dedicated forward-navigation side button.
     Forward,
+    /// A device-specific button number not represented by a named variant.
     Other(u16),
 }
 
 /// Navigation intent carried by a dedicated mouse side button.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum Navigation {
+    /// Navigate to a previous location or history entry.
     Back,
+    /// Navigate to the next location or history entry.
     Forward,
 }
 

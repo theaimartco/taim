@@ -6,8 +6,11 @@
 /// Runtime presentation mode of a window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
+    /// Present as an ordinary window managed by the compositor.
     Windowed,
+    /// Request fullscreen presentation on the active display.
     Fullscreen,
+    /// Keep the surface unmapped and skip visible presentation.
     Hidden,
 }
 

@@ -19,6 +19,8 @@ pub use interaction::Interaction;
 /// accumulated scroll distance, so they must be delivered individually until
 /// a future queue explicitly implements additive delta coalescing.
 impl Event {
+    /// True only for a finite cursor-move sample that may replace a previous
+    /// cursor position without discarding a relative wheel or button event.
     #[inline]
     pub fn can_replace_previous_without_loss(&self) -> bool {
         matches!(self, Self::CursorMoved { position } if position.x.is_finite() && position.y.is_finite())

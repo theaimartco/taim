@@ -3,13 +3,21 @@
 /// Cardinal/corner edges relative to the center of a window.
 #[derive(Debug, Clone, Copy)]
 pub enum Direction {
+    /// Resize the top edge of the window.
     North,
+    /// Resize the bottom edge of the window.
     South,
+    /// Resize the right edge of the window.
     East,
+    /// Resize the left edge of the window.
     West,
+    /// Resize the top-right corner of the window.
     NorthEast,
+    /// Resize the top-left corner of the window.
     NorthWest,
+    /// Resize the bottom-right corner of the window.
     SouthEast,
+    /// Resize the bottom-left corner of the window.
     SouthWest,
 }
 

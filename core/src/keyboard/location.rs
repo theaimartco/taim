@@ -3,16 +3,22 @@
 /// The physical key zone from the operating-system keyboard event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Location {
+    /// The default physical key area, excluding sided modifiers and keypad.
     Standard,
+    /// The left physical modifier or key zone.
     Left,
+    /// The right physical modifier or key zone.
     Right,
+    /// A key belonging to the separate numeric keypad.
     Numpad,
 }
 
 /// Whether a physical key is on a distinct side of the modifier cluster.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Side {
+    /// The left-hand modifier key.
     Left,
+    /// The right-hand modifier key.
     Right,
 }
 
