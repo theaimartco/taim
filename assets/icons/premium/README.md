@@ -13,6 +13,28 @@ No `<image>`, script, font dependency, external URL, bitmap trace, or CDN.
 - Some glossy details intentionally disappear at very small sizes; do not use
   these as a drop-in replacement for single-color 16 px typography glyphs.
 
+## Icon gallery
+
+The previews below display the **actual SVG files**, not raster thumbnails.
+
+| Icon | Icon | Icon | Icon | Icon |
+|:---:|:---:|:---:|:---:|:---:|
+|![home](./home.svg)<br>home|![settings](./settings.svg)<br>settings|![folder](./folder.svg)<br>folder|![search](./search.svg)<br>search|![notifications](./notifications.svg)<br>notifications|
+|![user](./user.svg)<br>user|![chat](./chat.svg)<br>chat|![terminal](./terminal.svg)<br>terminal|![store](./store.svg)<br>store|![power](./power.svg)<br>power|
+|![lock](./lock.svg)<br>lock|![shield](./shield.svg)<br>shield|![calendar](./calendar.svg)<br>calendar|![clock](./clock.svg)<br>clock|![camera](./camera.svg)<br>camera|
+|![image](./image.svg)<br>image|![music](./music.svg)<br>music|![download](./download.svg)<br>download|![upload](./upload.svg)<br>upload|![cloud](./cloud.svg)<br>cloud|
+|![database](./database.svg)<br>database|![cpu](./cpu.svg)<br>cpu|![code](./code.svg)<br>code|![rocket](./rocket.svg)<br>rocket|![chart](./chart.svg)<br>chart|
+|![globe](./globe.svg)<br>globe|![heart](./heart.svg)<br>heart|![star](./star.svg)<br>star|![trash](./trash.svg)<br>trash|![edit](./edit.svg)<br>edit|
+
+Open [gallery.html](./gallery.html) locally for a responsive dark-background
+showcase of all 30 icons.
+
+Validate the pack (stdlib only):
+
+```bash
+python3 scripts/assets/validate-premium-icons.py
+```
+
 ## Files
 
 1. `home.svg` — Home
