@@ -22,7 +22,8 @@ where
     Renderer: crate::Renderer,
 {
     let limits = limits.width(width).height(height).shrink(padding);
-    let total_spacing = spacing * items.len().saturating_sub(1) as f32;
+    // Direct callers may bypass the Row/Column spacing setters.
+    let spacing = if spacing.is_finite() { spacing.max(0.0) } else { 0.0 };
     let max_cross = axis.cross(limits.max());
 
     let (main_compress, cross_compress) = {
@@ -35,124 +36,70 @@ where
         Size::new(compress_x, compress_y)
     };
 
-    let mut some_fill_cross = false;
+    // TAIM classifies children once, before performing any layout. In
+    // particular, fixed-size cross-dependent children reserve room up
+    // front instead of stealing it based on their sibling order.
+    let schedule = super::plan::Schedule::build(
+        items.iter().map(|child| {
+            let size = child.as_widget().size();
+            axis.pack(size.width, size.height)
+        }),
+        main_compress,
+        cross_compress,
+    );
+    let mut available = schedule.main_budget(axis.main(limits.max()), spacing);
     let mut cross = 0.0;
-    let mut available = axis.main(limits.max()) - total_spacing;
 
     let mut nodes: SmallVec<[Option<Node>; INLINE_CHILDREN]> =
         smallvec::smallvec![None; items.len()];
 
-    #[derive(Debug, Clone, Copy)]
-    struct Meta {
-        main: Length,
-        cross: Length,
-        category: Category,
-    }
-
-    #[derive(Debug, Clone, Copy)]
-    enum Category {
-        Static,
-        CrossFluid,
-        CrossFluidDeferred(f32),
-        MainFluid,
-    }
-
-    let mut metas: SmallVec<[Meta; INLINE_CHILDREN]> = SmallVec::with_capacity(items.len());
-
-    // STATIC PASS
-    // We lay out non-fluid elements in the main axis.
-    // If we need to compress the cross axis, then we skip any of these elements
-    // that are also fluid in the cross axis.
+    // Intrinsic sizing is measured first; cross-dependent children are
+    // probed only after the cross span has been discovered.
     for (i, child) in items.iter_mut().enumerate() {
-        let size = child.as_widget().size();
-        let (size_main, size_cross) = axis.pack(size.width, size.height);
-
-        let fill_main_factor = size_main.fill_factor();
-        let fill_cross_factor = size_cross.fill_factor();
-        let main_is_static = main_compress || fill_main_factor == 0;
-
-        let category = match (main_is_static, cross_compress, fill_cross_factor == 0) {
-            (true, false, _) | (true, _, true) => Category::Static,
-            (true, true, false) => {
-                if let Length::Fixed(main) = size_main {
-                    available -= main;
-                    Category::CrossFluidDeferred(main)
-                } else {
-                    Category::CrossFluid
-                }
-            }
-            (false, _, _) => Category::MainFluid,
-        };
-
-        let meta = Meta {
-            main: size_main,
-            cross: size_cross,
-            category,
-        };
-
-        metas.push(meta);
-
-        let Category::Static = meta.category else {
-            some_fill_cross = some_fill_cross || fill_cross_factor != 0;
+        let slot = schedule.slots[i];
+        if slot.pass != super::plan::Pass::Intrinsic {
             continue;
-        };
+        }
 
         let (max_width, max_height) = axis.pack(
             available,
-            if !cross_compress || fill_cross_factor == 0 {
+            if !cross_compress || slot.cross.fill_factor() == 0 {
                 max_cross
             } else {
                 cross
             },
         );
-
-        let child_limits =
-            Limits::with_compression(Size::ZERO, Size::new(max_width, max_height), compression);
-
-        let layout = child
+        let child_limits = Limits::with_compression(
+            Size::ZERO,
+            Size::new(max_width, max_height),
+            compression,
+        );
+        let node = child
             .as_widget_mut()
             .layout(&mut trees[i], renderer, &child_limits);
-
-        let size = layout.size();
-
-        available -= axis.main(size);
-        cross = cross.max(axis.cross(size));
-        nodes[i] = Some(layout);
+        available = (available - axis.main(node.size())).max(0.0);
+        cross = cross.max(axis.cross(node.size()));
+        nodes[i] = Some(node);
     }
 
-    // CROSS FLUID PASS
-    // If we must compress the cross axis and there are fluid elements in the
-    // cross axis, we lay out any of these elements that are also non-fluid in
-    // the main axis (i.e. the ones we deliberately skipped in the first pass).
-    //
-    // We use the maximum cross length obtained in the first pass as the maximum
-    // cross limit.
-    //
-    // We can defer the layout of any elements that have a fixed size in the main axis,
-    // allowing them to use the cross calculations of the next pass.
-    if cross_compress && some_fill_cross {
+    if cross_compress && schedule.has_cross_dependents {
         for (i, child) in items.iter_mut().enumerate() {
-            let meta = metas[i];
-
-            let Category::CrossFluid = meta.category else {
+            if schedule.slots[i].pass != super::plan::Pass::CrossProbe {
                 continue;
-            };
+            }
 
-            let (max_width, max_height) =
-                axis.pack(available, if cross_compress { cross } else { max_cross });
-
-            let child_limits =
-                Limits::with_compression(Size::ZERO, Size::new(max_width, max_height), compression);
-
-            let layout = child
+            let (max_width, max_height) = axis.pack(available, cross);
+            let child_limits = Limits::with_compression(
+                Size::ZERO,
+                Size::new(max_width, max_height),
+                compression,
+            );
+            let node = child
                 .as_widget_mut()
                 .layout(&mut trees[i], renderer, &child_limits);
-
-            let size = layout.size();
-
-            available -= axis.main(size);
-            cross = cross.max(axis.cross(size));
-            nodes[i] = Some(layout);
+            available = (available - axis.main(node.size())).max(0.0);
+            cross = cross.max(axis.cross(node.size()));
+            nodes[i] = Some(node);
         }
     }
 
@@ -162,10 +109,10 @@ where
     // under tight constraints. TAIM first measures intrinsic caps, then
     // allocates the remaining space using a pure bounded-waterfill planner.
     if !main_compress {
-        let mut requests: Vec<super::allocator::Request> = metas
+        let mut requests: Vec<super::allocator::Request> = schedule.slots
             .iter()
-            .map(|meta| match meta.category {
-                Category::MainFluid => super::allocator::Request::from_length(meta.main),
+            .map(|meta| match meta.pass {
+                super::plan::Pass::Weighted => super::allocator::Request::from_length(meta.main),
                 _ => super::allocator::Request::from_length(Length::Fit),
             })
             .collect();
@@ -183,7 +130,7 @@ where
             let offer = initial_grants[i];
             let (max_width, max_height) = axis.pack(
                 offer,
-                if !cross_compress || metas[i].cross.fill_factor() == 0 {
+                if !cross_compress || schedule.slots[i].cross.fill_factor() == 0 {
                     max_cross
                 } else {
                     cross
@@ -206,7 +153,7 @@ where
 
         let grants = super::allocator::allocate(remaining, &requests);
         for (i, child) in items.iter_mut().enumerate() {
-            let Category::MainFluid = metas[i].category else {
+            let super::plan::Pass::Weighted = schedule.slots[i].pass else {
                 continue;
             };
             if nodes[i].is_some() {
@@ -218,7 +165,7 @@ where
             let (min_width, min_height) = axis.pack(min_main, 0.0);
             let (max_width, max_height) = axis.pack(
                 grant,
-                if !cross_compress || metas[i].cross.fill_factor() == 0 {
+                if !cross_compress || schedule.slots[i].cross.fill_factor() == 0 {
                     max_cross
                 } else {
                     cross
@@ -239,29 +186,19 @@ where
         }
     }
 
-    // CROSS FLUID DEFERRED PASS (conditional)
-    // We lay out any elements that were deferred in the second pass.
-    // These are elements that must be compressed in their cross axis and have
-    // a fixed length in the main axis.
-    if cross_compress && some_fill_cross {
+    // Last, use the settled cross span for fixed-main cross-flexible children.
+    if cross_compress && schedule.has_cross_dependents {
         for (i, child) in items.iter_mut().enumerate() {
-            let meta = metas[i];
-
-            let Category::CrossFluidDeferred(main) = meta.category else {
+            let super::plan::Pass::CrossDeferred(main) = schedule.slots[i].pass else {
                 continue;
             };
-
             let (max_width, max_height) = axis.pack(main, cross);
             let child_limits = Limits::new(Size::ZERO, Size::new(max_width, max_height));
-
-            let layout = child
+            let node = child
                 .as_widget_mut()
                 .layout(&mut trees[i], renderer, &child_limits);
-
-            let size = layout.size();
-
-            cross = cross.max(axis.cross(size));
-            nodes[i] = Some(layout);
+            cross = cross.max(axis.cross(node.size()));
+            nodes[i] = Some(node);
         }
     }
 
