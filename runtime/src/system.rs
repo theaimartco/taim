@@ -47,6 +47,23 @@ pub struct Information {
     pub graphics_adapter: String,
 }
 
+impl Information {
+    /// Never report fewer than one CPU for worker-pool sizing.
+    pub fn effective_cpu_cores(&self) -> usize {
+        self.cpu_cores.unwrap_or(1).max(1)
+    }
+
+    /// Best-effort process-memory pressure, clipped to the range [0,1].
+    /// Missing measurements or zero total memory return None.
+    pub fn process_memory_fraction(&self) -> Option<f64> {
+        if self.memory_total == 0 {
+            return None;
+        }
+        let used = self.memory_used?;
+        Some((used as f64 / self.memory_total as f64).min(1.0))
+    }
+}
+
 /// Returns available system information.
 pub fn information() -> Task<Information> {
     task::oneshot(|channel| crate::Action::System(Action::GetInformation(channel)))
@@ -69,4 +86,25 @@ pub fn theme_changes() -> Subscription<theme::Mode> {
 
         Some(mode)
     })
+}
+
+#[cfg(test)]
+mod taim_system_tests {
+    use super::*;
+
+    #[test]
+    fn handles_unavailable_topology_without_zero_workers() {
+        let mut info = Information {
+            system_name: None, system_kernel: None, system_version: None,
+            system_short_version: None, cpu_brand: String::new(), cpu_cores: Some(0),
+            memory_total: 0, memory_used: Some(100), graphics_backend: String::new(),
+            graphics_adapter: String::new(),
+        };
+        assert_eq!(info.effective_cpu_cores(), 1);
+        assert_eq!(info.process_memory_fraction(), None);
+        info.memory_total = 80;
+        assert_eq!(info.process_memory_fraction(), Some(1.0));
+        info.cpu_cores = Some(12);
+        assert_eq!(info.effective_cpu_cores(), 12);
+    }
 }
