@@ -132,6 +132,7 @@ where
 
 mod allocator;
 mod engine;
+mod placement;
 mod plan;
 
 pub use engine::resolve;
