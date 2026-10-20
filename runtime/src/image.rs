@@ -25,8 +25,6 @@ pub fn allocate(handle: impl Into<Handle>) -> Task<Result<Allocation, Error>> {
 ///
 /// TAIM can display successfully uploaded assets even if one fails.
 /// The returned task does not aggregate into a single all-or-nothing result.
-pub fn allocate_many(
-    handles: impl IntoIterator<Item = Handle>,
-) -> Task<Result<Allocation, Error>> {
+pub fn allocate_many(handles: impl IntoIterator<Item = Handle>) -> Task<Result<Allocation, Error>> {
     Task::batch(handles.into_iter().map(|handle| allocate(handle)))
 }

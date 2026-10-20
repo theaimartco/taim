@@ -112,7 +112,10 @@ where
 ///
 /// The producer is cancelled on drop; no detached executor or background
 /// thread is involved. A small capacity naturally exerts MPSC backpressure.
-pub fn channel<T>(size: usize, produce: impl AsyncFnOnce(mpsc::Sender<T>)) -> impl Stream<Item = T> {
+pub fn channel<T>(
+    size: usize,
+    produce: impl AsyncFnOnce(mpsc::Sender<T>),
+) -> impl Stream<Item = T> {
     let (sender, receiver) = mpsc::channel(size);
 
     Channel {

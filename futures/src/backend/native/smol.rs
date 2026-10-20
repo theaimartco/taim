@@ -32,7 +32,6 @@ pub mod time {
         value.max(MIN_INTERVAL)
     }
 
-
     use futures::stream;
 
     /// Returns a [`Subscription`] that produces messages at a set interval.

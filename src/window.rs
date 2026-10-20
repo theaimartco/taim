@@ -29,11 +29,8 @@ mod taim_window_setup_tests {
     #[test]
     fn invalid_initial_size_does_not_reach_native_window() {
         let size = crate::core::Size::new(f32::NAN, 12.0);
-        let configured = constrained_settings(
-            size,
-            Some(crate::core::Size::new(400.0, 300.0)),
-            None,
-        );
+        let configured =
+            constrained_settings(size, Some(crate::core::Size::new(400.0, 300.0)), None);
         assert!(configured.size.width.is_finite());
         assert!(configured.size.width >= 400.0);
         assert!(configured.size.height >= 300.0);

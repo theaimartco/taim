@@ -8,9 +8,7 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use crate::app::{
-    App, AppConfig, AppContext, FrameRequest, StateDelta, ViewRoot, WindowContext,
-};
+use crate::app::{App, AppConfig, AppContext, FrameRequest, StateDelta, ViewRoot, WindowContext};
 use crate::core::{Settings, theme, window};
 use crate::runtime::Task;
 

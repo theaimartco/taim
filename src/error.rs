@@ -50,6 +50,11 @@ mod taim_error_chain_tests {
         use std::error::Error as _;
         let err = Error::ExecutorCreationFailed(futures::io::Error::other("no worker threads"));
         assert!(err.to_string().contains("no worker threads"));
-        assert!(err.source().unwrap().to_string().contains("no worker threads"));
+        assert!(
+            err.source()
+                .unwrap()
+                .to_string()
+                .contains("no worker threads")
+        );
     }
 }

@@ -10,7 +10,9 @@ pub const MAX_SCREENSHOT_RGBA_BYTES: u64 = 128 * 1024 * 1024;
 
 /// Return the number of pixels for a safely bounded software screenshot.
 pub fn screenshot_pixel_budget(width: u32, height: u32) -> Option<usize> {
-    let bytes = u64::from(width).checked_mul(u64::from(height))?.checked_mul(4)?;
+    let bytes = u64::from(width)
+        .checked_mul(u64::from(height))?
+        .checked_mul(4)?;
     if bytes == 0 || bytes > MAX_SCREENSHOT_RGBA_BYTES {
         return None;
     }

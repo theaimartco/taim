@@ -95,9 +95,15 @@ mod taim_system_tests {
     #[test]
     fn handles_unavailable_topology_without_zero_workers() {
         let mut info = Information {
-            system_name: None, system_kernel: None, system_version: None,
-            system_short_version: None, cpu_brand: String::new(), cpu_cores: Some(0),
-            memory_total: 0, memory_used: Some(100), graphics_backend: String::new(),
+            system_name: None,
+            system_kernel: None,
+            system_version: None,
+            system_short_version: None,
+            cpu_brand: String::new(),
+            cpu_cores: Some(0),
+            memory_total: 0,
+            memory_used: Some(100),
+            graphics_backend: String::new(),
             graphics_adapter: String::new(),
         };
         assert_eq!(info.effective_cpu_cores(), 1);

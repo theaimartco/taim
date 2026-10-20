@@ -479,11 +479,10 @@ pub(super) enum Control {
     SetAutomaticWindowTabbing(bool),
 }
 
-
 #[cfg(test)]
 mod taim_event_batch_tests {
     use super::*;
-    use crate::core::{mouse, touch, Point, Size};
+    use crate::core::{Point, Size, mouse, touch};
 
     fn mouse_move(x: f32) -> core::Event {
         core::Event::Mouse(mouse::Event::CursorMoved {
@@ -515,9 +514,15 @@ mod taim_event_batch_tests {
         let id = window::Id::unique();
         let mut queue = PendingEvents::default();
         queue.push(id, mouse_move(1.0));
-        queue.push(id, core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)));
+        queue.push(
+            id,
+            core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+        );
         queue.push(id, mouse_move(2.0));
-        queue.push(id, core::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)));
+        queue.push(
+            id,
+            core::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+        );
         queue.push(id, mouse_move(3.0));
         assert_eq!(queue.windows[&id].len(), 5);
         assert_eq!(queue.len, 5);
@@ -533,7 +538,11 @@ mod taim_event_batch_tests {
         queue.push(id, finger_move(1, 4.0));
         assert_eq!(
             queue.windows[&id],
-            vec![finger_move(1, 1.0), finger_move(2, 2.0), finger_move(1, 4.0)]
+            vec![
+                finger_move(1, 1.0),
+                finger_move(2, 2.0),
+                finger_move(1, 4.0)
+            ]
         );
     }
 
@@ -541,8 +550,14 @@ mod taim_event_batch_tests {
     fn adjacent_resize_coalesces_but_close_request_does_not() {
         let id = window::Id::unique();
         let mut queue = PendingEvents::default();
-        queue.push(id, core::Event::Window(window::Event::Resized(Size::new(10.0, 10.0))));
-        queue.push(id, core::Event::Window(window::Event::Resized(Size::new(20.0, 30.0))));
+        queue.push(
+            id,
+            core::Event::Window(window::Event::Resized(Size::new(10.0, 10.0))),
+        );
+        queue.push(
+            id,
+            core::Event::Window(window::Event::Resized(Size::new(20.0, 30.0))),
+        );
         assert_eq!(queue.len, 1);
         queue.push(id, core::Event::Window(window::Event::CloseRequested));
         queue.push(id, core::Event::Window(window::Event::CloseRequested));

@@ -37,7 +37,10 @@ impl<State, Message> Preset<State, Message> {
         if name.chars().any(char::is_control) {
             return Err(PresetNameError::ControlCharacter);
         }
-        Ok(Self { name, boot: Box::new(boot) })
+        Ok(Self {
+            name,
+            boot: Box::new(boot),
+        })
     }
 
     /// Returns the name of the [`Preset`].

@@ -91,12 +91,11 @@ pub fn window_attributes(
 
         attributes = attributes.with_skip_taskbar(settings.platform_specific.skip_taskbar);
 
-        attributes =
-            attributes.with_undecorated_shadow(
-                settings
-                    .platform_specific
-                    .effective_undecorated_shadow(settings.decorations),
-            );
+        attributes = attributes.with_undecorated_shadow(
+            settings
+                .platform_specific
+                .effective_undecorated_shadow(settings.decorations),
+        );
 
         attributes =
             attributes.with_corner_preference(match settings.platform_specific.corner_preference {
@@ -111,9 +110,7 @@ pub fn window_attributes(
     {
         use winit::platform::macos::WindowAttributesExtMacOS;
 
-        let macos = settings
-            .platform_specific
-            .normalized(settings.decorations);
+        let macos = settings.platform_specific.normalized(settings.decorations);
         attributes = attributes
             .with_title_hidden(macos.title_hidden)
             .with_titlebar_transparent(macos.titlebar_transparent)
@@ -180,12 +177,11 @@ pub fn position(
         window::ResolvedPosition::MonitorRelative(local) => {
             let monitor = monitor?;
             let origin = monitor.position();
-            let physical: winit::dpi::PhysicalPosition<i32> =
-                winit::dpi::LogicalPosition {
-                    x: f64::from(local.x),
-                    y: f64::from(local.y),
-                }
-                .to_physical(monitor.scale_factor());
+            let physical: winit::dpi::PhysicalPosition<i32> = winit::dpi::LogicalPosition {
+                x: f64::from(local.x),
+                y: f64::from(local.y),
+            }
+            .to_physical(monitor.scale_factor());
 
             Some(winit::dpi::Position::Physical(
                 winit::dpi::PhysicalPosition {
