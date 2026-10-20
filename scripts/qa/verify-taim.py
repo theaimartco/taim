@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -32,6 +33,10 @@ def commands(python: str = sys.executable) -> list[tuple[str, list[str]]]:
             python, "-m", "unittest", "discover", "-s", "scripts/qa",
             "-p", "test_*.py", "-v",
         ]),
+        ("release_contract_tests", [
+            python, "-m", "unittest", "discover", "-s", "scripts/release",
+            "-p", "test_*.py", "-v",
+        ]),
         ("rustfmt", ["cargo", "fmt", "--all", "--", "--check"]),
         ("workspace_check", [
             "cargo", "check", "--workspace", "--all-targets",
@@ -44,6 +49,9 @@ def commands(python: str = sys.executable) -> list[tuple[str, list[str]]]:
         ("workspace_tests", [
             "cargo", "test", "--workspace", "--all-features", "--locked",
         ]),
+        ("cpu_golden_tests", ["cargo", "test", "--test", "golden", "--locked"]),
+        ("frame_time_contract", ["cargo", "test", "-p", "taim_bench", "frame_time", "--locked"]),
+        ("license_and_advisory_check", ["cargo", "deny", "check", "licenses", "advisories"]),
         ("package_inventory", [
             "cargo", "package", "-p", "taim", "--list", "--allow-dirty",
         ]),
@@ -54,7 +62,8 @@ def classify(results: list[dict], all_tools_present: bool) -> str:
     """Never represent missing tests or skipped tests as production success."""
     if not all_tools_present or not results or any(x["status"] != "PASS" for x in results):
         return "NO_GO"
-    if len(results) != len(commands()):
+    expected = [name for name, _ in commands()]
+    if [result.get("name") for result in results] != expected:
         return "NO_GO"
     return "CODE_CHECKS_PASSED_HUMAN_ORIGIN_AND_DEVICE_REVIEW_REQUIRED"
 
@@ -78,19 +87,34 @@ def main(argv: list[str] | None = None) -> int:
     evidence.mkdir(parents=True, exist_ok=True)
 
     sha = "UNKNOWN"
+    checkout_errors = []
     try:
         sha = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=root, text=True,
+            ["git", "rev-parse", "--verify", "HEAD"], cwd=root, text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
+        dirty = subprocess.check_output(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            cwd=root, text=True, stderr=subprocess.DEVNULL,
+        )
+        if dirty:
+            checkout_errors.append("modified tracked files")
+        if len(sha) != 40 or any(c not in "0123456789abcdef" for c in sha.lower()):
+            checkout_errors.append("invalid full commit SHA")
     except (OSError, subprocess.CalledProcessError):
-        pass
+        checkout_errors.append("missing full Git checkout")
 
     steps = commands()
     needed = sorted({cmd[0] for _, cmd in steps})
     missing = [exe for exe in needed if shutil.which(exe) is None]
     results: list[dict] = []
-    for name, cmd in steps:
+    if checkout_errors:
+        results.append({
+            "name": "checkout_preflight", "status": "FAIL",
+            "returncode": None, "command": ["git", "rev-parse", "HEAD"],
+            "errors": checkout_errors,
+        })
+    for name, cmd in ([] if checkout_errors else steps):
         path = evidence / (name + ".log")
         if shutil.which(cmd[0]) is None:
             path.write_text("Missing executable: " + cmd[0] + "\n", encoding="utf-8")
@@ -118,18 +142,20 @@ def main(argv: list[str] | None = None) -> int:
         results.append({
             "name": name, "status": status, "returncode": code,
             "command": cmd, "log": str(path),
+            "log_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         })
         print(f"{name}: {status}", flush=True)
         if status != "PASS" and args.stop_on_failure:
             break
 
-    status = classify(results, not missing)
+    status = classify(results, not missing and not checkout_errors)
     summary = {
         "schema_version": 1,
         "head_sha": sha,
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "status": status,
         "missing_tools": missing,
+        "checkout_errors": checkout_errors,
         "checks": results,
         "source_authorship_verified": False,
         "production_release_certified": False,
