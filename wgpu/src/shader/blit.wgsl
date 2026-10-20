@@ -1,4 +1,6 @@
-var<private> uvs: array<vec2<f32>, 6> = array<vec2<f32>, 6>(
+// TAIM immutable fullscreen-triangle pair. A constant LUT avoids mutable
+// shader-private arrays, and index clamping protects malformed draw calls.
+const TAIM_BLIT_UVS: array<vec2<f32>, 6> = array<vec2<f32>, 6>(
     vec2<f32>(0.0, 0.0),
     vec2<f32>(1.0, 0.0),
     vec2<f32>(1.0, 1.0),
@@ -22,7 +24,7 @@ struct VertexOutput {
 
 @vertex
 fn vs_main(input: VertexInput) -> VertexOutput {
-    let uv = uvs[input.vertex_index];
+    let uv = TAIM_BLIT_UVS[min(input.vertex_index, 5u)];
 
     var out: VertexOutput;
     out.uv = uv * u_ratio.xy;
