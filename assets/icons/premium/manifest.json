@@ -1,8 +1,8 @@
 {
   "pack": "TAIM Premium SVG",
-  "edition": "01 + 02 + 03",
-  "version": "3.0.0",
-  "count": 119,
+  "edition": "01 + 02 + 03 + 04",
+  "version": "4.0.0",
+  "count": 149,
   "viewBox": "0 0 64 64",
   "palette": {
     "graphite": "#11151d",
@@ -11,9 +11,24 @@
   },
   "icons": [
     {
+      "name": "accessibility",
+      "label": "Accessibility",
+      "source": "accessibility.svg"
+    },
+    {
       "name": "add",
       "label": "Add",
       "source": "add.svg"
+    },
+    {
+      "name": "ai_brain",
+      "label": "AI Brain",
+      "source": "ai_brain.svg"
+    },
+    {
+      "name": "api",
+      "label": "API Interface",
+      "source": "api.svg"
     },
     {
       "name": "archive",
@@ -51,6 +66,11 @@
       "source": "backspace.svg"
     },
     {
+      "name": "barcode",
+      "label": "Barcode",
+      "source": "barcode.svg"
+    },
+    {
       "name": "battery",
       "label": "Battery",
       "source": "battery.svg"
@@ -69,6 +89,16 @@
       "name": "bookmark",
       "label": "Bookmark",
       "source": "bookmark.svg"
+    },
+    {
+      "name": "bot",
+      "label": "AI Assistant",
+      "source": "bot.svg"
+    },
+    {
+      "name": "bug",
+      "label": "Bug",
+      "source": "bug.svg"
     },
     {
       "name": "calendar",
@@ -156,6 +186,16 @@
       "source": "collapse.svg"
     },
     {
+      "name": "compass",
+      "label": "Compass",
+      "source": "compass.svg"
+    },
+    {
+      "name": "container",
+      "label": "Container",
+      "source": "container.svg"
+    },
+    {
       "name": "copy",
       "label": "Copy",
       "source": "copy.svg"
@@ -164,6 +204,11 @@
       "name": "cpu",
       "label": "Processor",
       "source": "cpu.svg"
+    },
+    {
+      "name": "credit_card",
+      "label": "Credit Card",
+      "source": "credit_card.svg"
     },
     {
       "name": "cut",
@@ -176,9 +221,19 @@
       "source": "database.svg"
     },
     {
+      "name": "debug",
+      "label": "Debug",
+      "source": "debug.svg"
+    },
+    {
       "name": "delete",
       "label": "Delete",
       "source": "delete.svg"
+    },
+    {
+      "name": "delivery_truck",
+      "label": "Delivery Truck",
+      "source": "delivery_truck.svg"
     },
     {
       "name": "document",
@@ -216,9 +271,19 @@
       "source": "external_link.svg"
     },
     {
+      "name": "eye_off",
+      "label": "Visibility Off",
+      "source": "eye_off.svg"
+    },
+    {
       "name": "filter",
       "label": "Filter",
       "source": "filter.svg"
+    },
+    {
+      "name": "fingerprint",
+      "label": "Fingerprint",
+      "source": "fingerprint.svg"
     },
     {
       "name": "folder",
@@ -239,6 +304,16 @@
       "name": "fullscreen",
       "label": "Fullscreen",
       "source": "fullscreen.svg"
+    },
+    {
+      "name": "git_branch",
+      "label": "Git Branch",
+      "source": "git_branch.svg"
+    },
+    {
+      "name": "git_merge",
+      "label": "Git Merge",
+      "source": "git_merge.svg"
     },
     {
       "name": "globe",
@@ -281,6 +356,11 @@
       "source": "info.svg"
     },
     {
+      "name": "invoice",
+      "label": "Invoice",
+      "source": "invoice.svg"
+    },
+    {
       "name": "keyboard",
       "label": "Keyboard",
       "source": "keyboard.svg"
@@ -296,6 +376,11 @@
       "source": "list.svg"
     },
     {
+      "name": "location_pin",
+      "label": "Location Pin",
+      "source": "location_pin.svg"
+    },
+    {
       "name": "lock",
       "label": "Lock",
       "source": "lock.svg"
@@ -304,6 +389,11 @@
       "name": "mail",
       "label": "Mail",
       "source": "mail.svg"
+    },
+    {
+      "name": "map",
+      "label": "Map",
+      "source": "map.svg"
     },
     {
       "name": "maximize",
@@ -336,6 +426,11 @@
       "source": "monitor.svg"
     },
     {
+      "name": "moon",
+      "label": "Moon",
+      "source": "moon.svg"
+    },
+    {
       "name": "more_horiz",
       "label": "More Horiz",
       "source": "more_horiz.svg"
@@ -354,6 +449,16 @@
       "name": "music",
       "label": "Music",
       "source": "music.svg"
+    },
+    {
+      "name": "navigation",
+      "label": "Navigation",
+      "source": "navigation.svg"
+    },
+    {
+      "name": "neural_network",
+      "label": "Neural Network",
+      "source": "neural_network.svg"
     },
     {
       "name": "notifications",
@@ -379,6 +484,16 @@
       "name": "person",
       "label": "Person",
       "source": "person.svg"
+    },
+    {
+      "name": "phone",
+      "label": "Phone",
+      "source": "phone.svg"
+    },
+    {
+      "name": "phone_call",
+      "label": "Phone Call",
+      "source": "phone_call.svg"
     },
     {
       "name": "pin",
@@ -426,6 +541,16 @@
       "source": "radio_unchecked.svg"
     },
     {
+      "name": "rain",
+      "label": "Rain",
+      "source": "rain.svg"
+    },
+    {
+      "name": "receipt",
+      "label": "Receipt",
+      "source": "receipt.svg"
+    },
+    {
       "name": "redo",
       "label": "Redo",
       "source": "redo.svg"
@@ -456,6 +581,16 @@
       "source": "search.svg"
     },
     {
+      "name": "send",
+      "label": "Send",
+      "source": "send.svg"
+    },
+    {
+      "name": "server",
+      "label": "Server Rack",
+      "source": "server.svg"
+    },
+    {
       "name": "settings",
       "label": "Settings",
       "source": "settings.svg"
@@ -469,6 +604,11 @@
       "name": "shield",
       "label": "Shield",
       "source": "shield.svg"
+    },
+    {
+      "name": "shopping_bag",
+      "label": "Shopping Bag",
+      "source": "shopping_bag.svg"
     },
     {
       "name": "shopping_cart",
@@ -521,6 +661,11 @@
       "source": "success.svg"
     },
     {
+      "name": "sun",
+      "label": "Sun",
+      "source": "sun.svg"
+    },
+    {
       "name": "sync",
       "label": "Sync",
       "source": "sync.svg"
@@ -569,6 +714,11 @@
       "name": "user",
       "label": "Profile",
       "source": "user.svg"
+    },
+    {
+      "name": "video_call",
+      "label": "Video Call",
+      "source": "video_call.svg"
     },
     {
       "name": "visibility",

@@ -111,8 +111,8 @@ def premium_sources():
     """
     with open(PREMIUM_MANIFEST, encoding="utf-8") as source:
         entries = json.load(source)["icons"]
-    if len(entries) != 119 or len({i["name"] for i in entries}) != 119:
-        raise ValueError("TAIM premium manifest must contain 119 unique icons")
+    if len(entries) != 149 or len({i["name"] for i in entries}) != 149:
+        raise ValueError("TAIM premium manifest must contain 149 unique icons")
     sources = {}
     for icon in entries:
         name = icon["name"]
