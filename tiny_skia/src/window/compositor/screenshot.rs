@@ -4,12 +4,10 @@ use crate::graphics::Viewport;
 
 pub(super) fn capture(renderer: &mut Renderer, viewport: &Viewport, background: Color) -> Vec<u8> {
     let size = viewport.physical_size();
-    let Some(pixel_count) = (size.width as usize).checked_mul(size.height as usize) else {
+    let Some(pixel_count) = crate::window::screenshot_pixel_budget(size.width, size.height) else {
+        // The capture budget covers both target storage and output emission.
         return Vec::new();
     };
-    if pixel_count == 0 {
-        return Vec::new();
-    }
 
     let mut buffer = Vec::new();
     if buffer.try_reserve_exact(pixel_count).is_err() {
