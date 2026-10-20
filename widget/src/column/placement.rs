@@ -27,6 +27,17 @@ fn finite_extent(value: f32) -> f32 {
     }
 }
 
+// Defend against f32 overflow when an untrusted custom widget reports a
+// near-MAX intrinsic extent. Returned layout coordinates stay finite.
+fn finite_sum(a: f32, b: f32) -> f32 {
+    let result = a + b;
+    if result.is_finite() {
+        result
+    } else {
+        f32::MAX
+    }
+}
+
 fn alignment_fraction(align: Alignment) -> f32 {
     match align {
         Alignment::Start => 0.0,
@@ -80,7 +91,7 @@ pub(super) fn arrange(
         let height = finite_extent(size.height);
 
         if let Some(last) = groups.last_mut() {
-            let proposed = last.height + gap + height;
+            let proposed = finite_sum(last.height, finite_sum(gap, height));
             if proposed <= vertical_limit || vertical_limit.is_infinite() {
                 last.height = proposed;
                 last.width = last.width.max(width);
@@ -103,7 +114,7 @@ pub(super) fn arrange(
     let mut total_height = 0.0_f32;
     for group in &mut groups {
         group.x = x;
-        x += group.width + gutter;
+        x = finite_sum(x, finite_sum(group.width, gutter));
         total_height = total_height.max(group.height);
     }
 
@@ -118,15 +129,15 @@ pub(super) fn arrange(
         let mut y = 0.0;
         for (offset, node) in nodes[group.start..group.end].iter_mut().enumerate() {
             if offset > 0 {
-                y += gap;
+                y = finite_sum(y, gap);
             }
             let width = finite_extent(node.size().width);
             let x_shift = (group.width - width).max(0.0) * align_x;
             node.move_to_mut(Point::new(
-                padding.left + group.x + x_shift,
-                padding.top + y_shift + y,
+                finite_sum(padding.left, finite_sum(group.x, x_shift)),
+                finite_sum(padding.top, finite_sum(y_shift, y)),
             ));
-            y += finite_extent(node.size().height);
+            y = finite_sum(y, finite_extent(node.size().height));
         }
     }
 
@@ -177,7 +188,7 @@ pub(crate) fn arrange_rows(
         let height = finite_extent(size.height);
 
         if let Some(last) = groups.last_mut() {
-            let next_width = last.width + gap + width;
+            let next_width = finite_sum(last.width, finite_sum(gap, width));
             if next_width <= horizontal_limit || horizontal_limit.is_infinite() {
                 last.width = next_width;
                 last.height = last.height.max(height);
@@ -200,7 +211,7 @@ pub(crate) fn arrange_rows(
     for row in &mut groups {
         row.y = y;
         widest = widest.max(row.width);
-        y += row.height + gutter;
+        y = finite_sum(y, finite_sum(row.height, gutter));
     }
 
     let full_height = y - gutter;
@@ -216,18 +227,18 @@ pub(crate) fn arrange_rows(
         let mut x = 0.0;
         for (offset, node) in nodes[row.start..row.end].iter_mut().enumerate() {
             if offset > 0 {
-                x += gap;
+                x = finite_sum(x, gap);
             }
 
             let node_height = finite_extent(node.size().height);
             let y_offset = (row.height - node_height).max(0.0) * cross_fraction;
 
             node.move_to_mut(Point::new(
-                padding.left + x_offset + x,
-                padding.top + row.y + y_offset,
+                finite_sum(padding.left, finite_sum(x_offset, x)),
+                finite_sum(padding.top, finite_sum(row.y, y_offset)),
             ));
 
-            x += finite_extent(node.size().width);
+            x = finite_sum(x, finite_extent(node.size().width));
         }
     }
 
@@ -242,6 +253,39 @@ mod tests {
         Node::new(Size::new(width, height))
     }
 
+
+    #[test]
+    fn extreme_custom_widget_sizes_never_produce_infinite_positions() {
+        let (column_size, column) = arrange(
+            vec![node(f32::MAX, 3.0), node(f32::MAX, 3.0)],
+            4.0,
+            2.0,
+            5.0,
+            Padding::ZERO,
+            Alignment::Start,
+            alignment::Vertical::Top,
+        );
+        assert!(column_size.width.is_finite());
+        assert!(column.iter().all(|child| {
+            let position = child.bounds().position();
+            position.x.is_finite() && position.y.is_finite()
+        }));
+
+        let (row_size, row) = arrange_rows(
+            vec![node(3.0, f32::MAX), node(3.0, f32::MAX)],
+            4.0,
+            2.0,
+            5.0,
+            Padding::ZERO,
+            Alignment::Start,
+            alignment::Horizontal::Left,
+        );
+        assert!(row_size.height.is_finite());
+        assert!(row.iter().all(|child| {
+            let position = child.bounds().position();
+            position.x.is_finite() && position.y.is_finite()
+        }));
+    }
 
     #[test]
     fn row_wrapping_has_explicit_breaks_and_correct_dimensions() {
