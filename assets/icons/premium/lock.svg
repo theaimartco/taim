@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t-lock d-lock">
+<title id="t-lock">TAIM Lock</title><desc id="d-lock">Premium original vector symbol for Lock, with crimson enamel and brushed-metal depth.</desc>
+<defs><linearGradient id="graphite" x1="0" x2=".9" y1="0" y2="1"><stop stop-color="#545b69"/><stop offset=".21" stop-color="#292d38"/><stop offset=".62" stop-color="#11151d"/><stop offset="1" stop-color="#06080e"/></linearGradient>
+<linearGradient id="steel" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#f0f4fc"/><stop offset=".2" stop-color="#878e9e"/><stop offset=".6" stop-color="#343844"/><stop offset=".84" stop-color="#aab2bf"/><stop offset="1" stop-color="#272c36"/></linearGradient>
+<linearGradient id="red" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff9ba0"/><stop offset=".28" stop-color="#fa243f"/><stop offset=".68" stop-color="#a80724"/><stop offset="1" stop-color="#4d0518"/></linearGradient>
+<radialGradient id="garnet" cx=".35" cy=".21"><stop stop-color="#ff9a9a"/><stop offset=".28" stop-color="#ee203f"/><stop offset=".76" stop-color="#89051c"/><stop offset="1" stop-color="#320711"/></radialGradient>
+<linearGradient id="shine" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".9"/><stop offset=".5" stop-color="#f7c6cf" stop-opacity=".4"/><stop offset="1" stop-color="#fff" stop-opacity=".02"/></linearGradient>
+<filter id="shadow" x="-35%" y="-35%" width="170%" height="170%"><feDropShadow dx="0" dy="2" stdDeviation="1.8" flood-color="#010308" flood-opacity=".65"/></filter></defs>
+<style>.body{fill:url(#graphite);stroke:url(#steel);stroke-width:1.55;filter:url(#shadow)}.enamel{fill:none;stroke:url(#red);stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round}.glint{fill:none;stroke:url(#shine);stroke-width:1.4;stroke-linecap:round}.gem{fill:url(#garnet);stroke:url(#steel);stroke-width:1.15}.void{fill:#07090f;stroke:url(#red);stroke-width:2}</style>
+<g stroke-linecap="round" stroke-linejoin="round"><path class="body" d="M18 29 V22 Q18 8 32 8 Q46 8 46 22 V29 H40 V22 Q40 15 32 15 Q24 15 24 22 V29 Z"/><rect class="body" x="13" y="27" width="38" height="30" rx="7"/><circle class="body" cx="32" cy="39" r="5"/><path class="enamel" d="M32 42 V49"/><path class="glint" d="M17 32 H47"/></g></svg>
