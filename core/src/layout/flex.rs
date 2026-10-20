@@ -21,8 +21,9 @@
 // scaffold contains upstream-derived layout/lifecycle concepts.
 // TAIM now uses an upfront measurement schedule in plan.rs and a bounded
 // deterministic weighted water-fill planner in allocator.rs.
-// Inline SmallVec bookkeeping and first-baseline handling remain modified
-// features. Upstream copyright and license notices remain intact.
+// Node placement and baseline resolution now live in a TAIM-owned
+// prefix-scan pass in placement.rs. Source-origin history and relevant
+// upstream copyright and license notices remain intact.
 use crate::Element;
 
 use crate::layout::{Limits, Node};
