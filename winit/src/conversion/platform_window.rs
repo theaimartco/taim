@@ -111,10 +111,13 @@ pub fn window_attributes(
     {
         use winit::platform::macos::WindowAttributesExtMacOS;
 
+        let macos = settings
+            .platform_specific
+            .normalized(settings.decorations);
         attributes = attributes
-            .with_title_hidden(settings.platform_specific.title_hidden)
-            .with_titlebar_transparent(settings.platform_specific.titlebar_transparent)
-            .with_fullsize_content_view(settings.platform_specific.fullsize_content_view);
+            .with_title_hidden(macos.title_hidden)
+            .with_titlebar_transparent(macos.titlebar_transparent)
+            .with_fullsize_content_view(macos.fullsize_content_view);
     }
 
     #[cfg(target_os = "linux")]
