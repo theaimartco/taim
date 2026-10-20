@@ -58,6 +58,22 @@ impl<T> State<T> {
         State { panes, internal }
     }
 
+    /// Mount a pane configuration only when it satisfies explicit resource
+    /// and geometry budgets, before allocating live widget state IDs.
+    ///
+    /// Existing applications may use with_configuration for compatibility.
+    /// Native VYOM workspaces should use this checked path for persisted,
+    /// plugin-provided, or dynamically assembled pane layouts.
+    pub fn try_with_configuration(
+        config: impl Into<Configuration<T>>,
+        max_nodes: usize,
+        max_depth: usize,
+    ) -> Result<Self, crate::pane_grid::LayoutError> {
+        let config = config.into();
+        let _stats = config.validate(max_nodes, max_depth)?;
+        Ok(Self::with_configuration(config))
+    }
+
     /// Returns the total amount of panes in the [`State`].
     pub fn len(&self) -> usize {
         self.panes.len()
@@ -94,5 +110,39 @@ impl<T> State<T> {
     /// Returns the layout of the [`State`].
     pub fn layout(&self) -> &Node {
         &self.internal.layout
+    }
+}
+
+
+#[cfg(test)]
+mod native_config_tests {
+    use super::*;
+    use crate::pane_grid::{Axis, LayoutError};
+
+    #[test]
+    fn checked_configuration_preserves_pane_map_contract() {
+        let config = Configuration::split(
+            Axis::Vertical,
+            0.5,
+            Configuration::pane(10),
+            Configuration::pane(20),
+        );
+        let state = State::try_with_configuration(config, 3, 1).expect("valid tree");
+        assert_eq!(state.len(), 2);
+        assert_eq!(state.panes.values().copied().collect::<Vec<_>>(), vec![10, 20]);
+    }
+
+    #[test]
+    fn invalid_ratio_is_rejected_before_live_state_allocates() {
+        let config = Configuration::split(
+            Axis::Horizontal,
+            f32::NAN,
+            Configuration::pane("top"),
+            Configuration::pane("bottom"),
+        );
+        assert!(matches!(
+            State::try_with_configuration(config, 3, 1),
+            Err(LayoutError::InvalidRatio)
+        ));
     }
 }

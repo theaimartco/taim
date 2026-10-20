@@ -77,12 +77,23 @@ impl Event {
     /// [`Coalescing`] for the full contract.
     pub fn coalescing(&self) -> Coalescing {
         match self {
-            Event::Mouse(mouse::Event::CursorMoved { .. } | mouse::Event::WheelScrolled { .. }) => {
-                Coalescing::Mergeable
+            Event::Mouse(mouse_event) => {
+                if mouse_event.can_replace_previous_without_loss() {
+                    Coalescing::Mergeable
+                } else {
+                    Coalescing::Critical
+                }
             }
-            Event::Touch(touch::Event::FingerMoved { .. }) => Coalescing::Mergeable,
-
-            Event::Mouse(_) | Event::Touch(_) => Coalescing::Critical,
+            Event::Touch(touch::Event::FingerMoved { position, .. }) => {
+                // Invalid motion is never a valid replacement for a prior
+                // finite sample; preserve the original queue semantics.
+                if position.x.is_finite() && position.y.is_finite() {
+                    Coalescing::Mergeable
+                } else {
+                    Coalescing::Critical
+                }
+            },
+            Event::Touch(_) => Coalescing::Critical,
             Event::Keyboard(_)
             | Event::Window(_)
             | Event::InputMethod(_)
@@ -114,7 +125,13 @@ impl Event {
         timestamp: crate::time::Instant,
     ) -> Option<pointer::Pointer> {
         match self {
-            Event::Touch(touch) => Some(touch.to_pointer(timestamp)),
+            Event::Touch(touch) => {
+                let pointer = touch.to_pointer(timestamp);
+                // TAIM rejects malformed active coordinates. A malformed
+                // terminal coordinate becomes a safe Cancel event so the
+                // router releases capture without reporting a successful tap.
+                pointer.sanitize_coordinates()
+            },
             Event::Mouse(mouse_event) => {
                 let (phase, position) = match mouse_event {
                     mouse::Event::ButtonPressed(_) => (pointer::Phase::Down, cursor?),
@@ -125,7 +142,7 @@ impl Event {
                     | mouse::Event::WheelScrolled { .. } => return None,
                 };
 
-                Some(pointer::Pointer {
+                pointer::Pointer {
                     id: pointer::Id::MOUSE,
                     device: pointer::DeviceKind::Mouse,
                     phase,
@@ -133,7 +150,8 @@ impl Event {
                     timestamp,
                     metadata: pointer::Metadata::NONE,
                     captured: false,
-                })
+                }
+                .sanitize_coordinates()
             }
             Event::Keyboard(_)
             | Event::Window(_)
@@ -181,7 +199,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cursor_moved_and_wheel_scrolled_are_mergeable() {
+    fn cursor_moves_coalesce_but_wheel_deltas_are_critical() {
         let moved = Event::Mouse(mouse::Event::CursorMoved {
             position: crate::Point::ORIGIN,
         });
@@ -190,7 +208,7 @@ mod tests {
         });
 
         assert_eq!(moved.coalescing(), Coalescing::Mergeable);
-        assert_eq!(scrolled.coalescing(), Coalescing::Mergeable);
+        assert_eq!(scrolled.coalescing(), Coalescing::Critical);
     }
 
     #[test]
@@ -202,6 +220,16 @@ mod tests {
         });
 
         assert_eq!(event.coalescing(), Coalescing::Mergeable);
+    }
+
+    #[test]
+    fn invalid_touch_motion_cannot_replace_valid_queued_motion() {
+        let invalid = Event::Touch(touch::Event::FingerMoved {
+            id: touch::Finger(17),
+            position: crate::Point::new(f32::NAN, 10.0),
+            metadata: crate::pointer::Metadata::NONE,
+        });
+        assert_eq!(invalid.coalescing(), Coalescing::Critical);
     }
 
     #[test]
@@ -247,6 +275,43 @@ mod tests {
         );
         assert_eq!(Event::Waken.coalescing(), Coalescing::Critical);
         assert_eq!(Event::Reactive(7).coalescing(), Coalescing::Critical);
+    }
+
+    #[test]
+    fn invalid_active_pointer_samples_cannot_enter_gesture_arena() {
+        let invalid = crate::Point::new(f32::NAN, 1.0);
+        let down = Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left));
+        let move_event = Event::Mouse(mouse::Event::CursorMoved { position: invalid });
+
+        assert_eq!(down.to_pointer(Some(invalid), now()), None);
+        assert_eq!(move_event.to_pointer(None, now()), None);
+        assert_eq!(move_event.coalescing(), Coalescing::Critical);
+    }
+
+    #[test]
+    fn invalid_terminal_coordinates_still_release_existing_contacts() {
+        let invalid = crate::Point::new(f32::INFINITY, 1.0);
+        let released_mouse = Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left));
+        let mouse_up = released_mouse.to_pointer(Some(invalid), now()).unwrap();
+        assert_eq!(mouse_up.phase, pointer::Phase::Cancel);
+        assert_eq!(mouse_up.position, crate::Point::ORIGIN);
+
+        let touch_move = Event::Touch(touch::Event::FingerMoved {
+            id: touch::Finger(4),
+            position: invalid,
+            metadata: pointer::Metadata::NONE,
+        });
+        assert_eq!(touch_move.to_pointer(None, now()), None);
+
+        let touch_release = Event::Touch(touch::Event::FingerLifted {
+            id: touch::Finger(4),
+            position: invalid,
+            metadata: pointer::Metadata::NONE,
+        });
+        let up = touch_release.to_pointer(None, now()).unwrap();
+        assert_eq!(up.phase, pointer::Phase::Cancel);
+        assert_eq!(up.position, crate::Point::ORIGIN);
+        assert!(up.is_terminal());
     }
 
     #[test]

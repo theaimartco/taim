@@ -1,2 +1,5 @@
-too-many-arguments-threshold = 20
-enum-variant-name-threshold = 10
+# TAIM's Rust review budgets favor smaller APIs and intentional enum design.
+# The tightened thresholds require a full workspace Clippy run before merging;
+# these are linter limits, NOT evidence of language/source independence.
+too-many-arguments-threshold = 18
+enum-variant-name-threshold = 9

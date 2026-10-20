@@ -1,6 +1,6 @@
-# Remove when https://github.com/Smithay/wayland-rs/pull/938 is merged
+# TAIM dependency advisory policy: fail closed.
+# Historical waivers for RUSTSEC-2026-0194 and RUSTSEC-2026-0195 are
+# deliberately removed. Resolve/update the affected dependency rather than
+# silently suppressing known findings when cargo-audit is run manually.
 [advisories]
-ignore = [
-    "RUSTSEC-2026-0194",
-    "RUSTSEC-2026-0195",
-]
+ignore = []

@@ -174,6 +174,37 @@ impl Pointer {
     pub fn is_terminal(&self) -> bool {
         matches!(self.phase, Phase::Up | Phase::Cancel)
     }
+
+    /// Whether both logical position coordinates are finite.
+    ///
+    /// Gesture hit-testing and velocity estimation must not consume NaN or
+    /// infinity as an active touch or cursor position. Terminal events may
+    /// still be delivered to release an already-captured contact.
+    #[inline]
+    pub fn has_finite_position(&self) -> bool {
+        self.position.x.is_finite() && self.position.y.is_finite()
+    }
+
+    /// Check TAIM's gesture position boundary without losing release events.
+    ///
+    /// Invalid Down/Move samples are rejected. Invalid Up/Cancel samples
+    /// are converted to `Cancel` at an inert, finite origin. This avoids
+    /// both leaked pointer capture and spurious successful tap/drag-end
+    /// dispatch on malformed terminal coordinates.
+    #[inline]
+    pub fn sanitize_coordinates(mut self) -> Option<Self> {
+        if self.has_finite_position() {
+            return Some(self);
+        }
+
+        if self.is_terminal() {
+            self.phase = Phase::Cancel;
+            self.position = Point::ORIGIN;
+            Some(self)
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -240,6 +271,41 @@ mod tests {
             }
             .is_terminal()
         );
+    }
+
+    #[test]
+    fn invalid_active_position_is_rejected_but_terminal_is_cancelled() {
+        let baseline = Pointer {
+            id: Id::MOUSE,
+            device: DeviceKind::Mouse,
+            phase: Phase::Move,
+            position: Point::new(f32::NAN, 42.0),
+            timestamp: Instant::now(),
+            metadata: Metadata::NONE,
+            captured: false,
+        };
+
+        assert_eq!(baseline.sanitize_coordinates(), None);
+
+        let cancelled = Pointer {
+            phase: Phase::Up,
+            ..baseline
+        }
+        .sanitize_coordinates()
+        .expect("must terminate captured contact");
+        assert_eq!(cancelled.phase, Phase::Cancel);
+        assert_eq!(cancelled.position, Point::ORIGIN);
+        assert!(cancelled.has_finite_position());
+
+        let valid_up = Pointer {
+            phase: Phase::Up,
+            position: Point::new(10.0, 15.0),
+            ..baseline
+        }
+        .sanitize_coordinates()
+        .unwrap();
+        assert_eq!(valid_up.phase, Phase::Up);
+        assert_eq!(valid_up.position, Point::new(10.0, 15.0));
     }
 
     #[test]

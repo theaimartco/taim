@@ -7,6 +7,8 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 mod antialiasing;
+#[path = "error.rs"]
+pub mod validation;
 mod viewport;
 
 pub mod cache;

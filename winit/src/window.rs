@@ -82,15 +82,13 @@ where
     }
 
     pub fn request_redraw(&mut self, redraw_request: RedrawRequest) {
-        match redraw_request {
-            RedrawRequest::NextFrame => {
-                self.scheduler.request_redraw_at(Instant::now());
+        // All widget requests feed the same TAIM-owned per-window clock.
+        // Future work is queued without an unnecessary immediate OS wake.
+        if let Some(deadline) = redraw_request.deadline(Instant::now()) {
+            self.scheduler.request_redraw_at(deadline);
+            if redraw_request.wake_now() {
                 self.raw.request_redraw();
             }
-            RedrawRequest::At(at) => {
-                self.scheduler.request_redraw_at(at);
-            }
-            RedrawRequest::Wait => {}
         }
     }
 

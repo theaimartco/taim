@@ -66,7 +66,7 @@ mod title_bar;
 pub mod state;
 
 pub use axis::Axis;
-pub use configuration::Configuration;
+pub use configuration::{Configuration, LayoutError, LayoutStats};
 pub use content::Content;
 pub use controls::Controls;
 pub use direction::Direction;

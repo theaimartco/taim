@@ -1,5 +1,8 @@
+// TAIM enforces a bounded coverage channel before alpha compositing.
+// HDR RGB values remain unbounded: only opacity is normalized.
 fn premultiply(color: vec4<f32>) -> vec4<f32> {
-    return vec4(color.xyz * color.a, color.a);
+    let alpha = clamp(color.a, 0.0, 1.0);
+    return vec4<f32>(color.xyz * alpha, alpha);
 }
 
 fn unpack_color(data: vec2<u32>) -> vec4<f32> {

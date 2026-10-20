@@ -106,8 +106,8 @@ impl FocusMove {
             (Some(index), Direction::Backward) => index.checked_sub(1),
         };
 
-        let pending = u8::from(select.is_some()) * Self::SELECT
-            | u8::from(count.focused.is_some()) * Self::CLEAR;
+        let pending = (u8::from(select.is_some()) * Self::SELECT)
+            | (u8::from(count.focused.is_some()) * Self::CLEAR);
 
         Self {
             select,

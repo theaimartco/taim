@@ -11,6 +11,7 @@ pub use taim_runtime::futures;
 pub mod app;
 pub mod compat;
 pub mod message;
+pub mod native;
 mod preset;
 
 pub use app::*;
@@ -18,7 +19,7 @@ pub use compat::{
     Instance, Program, ProgramAdapter, with_executor, with_scale_factor, with_style,
     with_subscription, with_theme, with_title,
 };
-pub use preset::Preset;
+pub use preset::{Preset, PresetNameError};
 
 use crate::core::Font;
 use crate::core::renderer;

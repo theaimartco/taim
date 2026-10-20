@@ -1,4 +1,5 @@
 //! Distribute content vertically.
+pub(crate) mod placement;
 use crate::core::alignment::{self, Alignment};
 use crate::core::layout;
 use crate::core::mouse;
@@ -464,105 +465,35 @@ where
             .height(self.column.height)
             .shrink(self.column.padding);
 
+        // TAIM separates measurement from placement. Each child is laid out
+        // exactly once; the grouping pass only moves the returned nodes.
+        // Group boundaries are explicit, not inferred from a child's Y value
+        // (which changes under padding and alignment).
         let child_limits = limits.loose();
-        let spacing = self.column.spacing;
-        let horizontal_spacing = self.horizontal_spacing.unwrap_or(spacing);
-        let max_height = limits.max().height;
+        let nodes: Vec<_> = self
+            .column
+            .children
+            .iter_mut()
+            .zip(&mut tree.children)
+            .map(|(element, state)| {
+                element
+                    .as_widget_mut()
+                    .layout(state, renderer, &child_limits)
+            })
+            .collect();
 
-        let mut children = Vec::with_capacity(self.column.children.len());
-        let mut intrinsic_size = Size::ZERO;
-        let mut column_start = 0;
-        let mut column_width = 0.0;
-        let mut x = 0.0;
-        let mut y = 0.0;
+        let (intrinsic, nodes) = placement::arrange(
+            nodes,
+            limits.max().height,
+            self.column.spacing,
+            self.horizontal_spacing.unwrap_or(self.column.spacing),
+            self.column.padding,
+            self.column.align,
+            self.align_y,
+        );
 
-        let align_factor = match self.column.align {
-            Alignment::Start => 0.0,
-            Alignment::Center => 2.0,
-            Alignment::End => 1.0,
-        };
-
-        let align_x = |column_start: std::ops::Range<usize>,
-                       column_width: f32,
-                       children: &mut Vec<layout::Node>| {
-            if align_factor != 0.0 {
-                for node in &mut children[column_start] {
-                    let width = node.size().width;
-
-                    node.translate_mut(Vector::new((column_width - width) / align_factor, 0.0));
-                }
-            }
-        };
-
-        for (i, child) in self.column.children.iter_mut().enumerate() {
-            let node = child
-                .as_widget_mut()
-                .layout(&mut tree.children[i], renderer, &child_limits);
-
-            let child_size = node.size();
-
-            if y != 0.0 && y + child_size.height > max_height {
-                intrinsic_size.height = intrinsic_size.height.max(y - spacing);
-
-                align_x(column_start..i, column_width, &mut children);
-
-                x += column_width + horizontal_spacing;
-                y = 0.0;
-                column_start = i;
-                column_width = 0.0;
-            }
-
-            column_width = column_width.max(child_size.width);
-
-            children
-                .push(node.move_to((x + self.column.padding.left, y + self.column.padding.top)));
-
-            y += child_size.height + spacing;
-        }
-
-        if y != 0.0 {
-            intrinsic_size.height = intrinsic_size.height.max(y - spacing);
-        }
-
-        intrinsic_size.width = x + column_width;
-        align_x(column_start..children.len(), column_width, &mut children);
-
-        let align_factor = match self.align_y {
-            alignment::Vertical::Top => 0.0,
-            alignment::Vertical::Center => 2.0,
-            alignment::Vertical::Bottom => 1.0,
-        };
-
-        if align_factor != 0.0 {
-            let total_height = intrinsic_size.height;
-
-            let mut column_start = 0;
-
-            for i in 0..children.len() {
-                let bounds = children[i].bounds();
-                let column_height = bounds.y + bounds.height;
-
-                let next_y = children
-                    .get(i + 1)
-                    .map(|node| node.bounds().y)
-                    .unwrap_or_default();
-
-                if next_y == 0.0 {
-                    let translation =
-                        Vector::new(0.0, (total_height - column_height) / align_factor);
-
-                    for node in &mut children[column_start..=i] {
-                        node.translate_mut(translation);
-                    }
-
-                    column_start = i + 1;
-                }
-            }
-        }
-
-        let size = limits.resolve(self.column.width, self.column.height, intrinsic_size);
-
-        layout::Node::with_children(size.expand(self.column.padding), children)
+        let size = limits.resolve(self.column.width, self.column.height, intrinsic);
+        layout::Node::with_children(size.expand(self.column.padding), nodes)
     }
 
     fn visit_children(

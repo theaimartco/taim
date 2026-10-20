@@ -21,6 +21,18 @@ pub struct PlatformSpecific {
     pub corner_preference: CornerPreference,
 }
 
+impl PlatformSpecific {
+    /// Windows should apply this shadow override only for an undecorated
+    /// window; decorated frames already receive their OS-managed shadows.
+    ///
+    /// This avoids asking DWM to add the known thin undecorated-shadow
+    /// artifact to otherwise standard titlebar windows.
+    #[inline]
+    pub const fn effective_undecorated_shadow(self, decorations: bool) -> bool {
+        self.undecorated_shadow && !decorations
+    }
+}
+
 impl Default for PlatformSpecific {
     fn default() -> Self {
         Self {
@@ -56,4 +68,18 @@ pub enum CornerPreference {
     ///
     /// Round the corners if appropriate, with a small radius.
     RoundSmall = 3,
+}
+
+#[cfg(test)]
+mod taim_windows_shadow_tests {
+    use super::*;
+
+    #[test]
+    fn custom_shadow_only_applies_to_undecorated_windows() {
+        let mut settings = PlatformSpecific::default();
+        assert!(!settings.effective_undecorated_shadow(false));
+        settings.undecorated_shadow = true;
+        assert!(settings.effective_undecorated_shadow(false));
+        assert!(!settings.effective_undecorated_shadow(true));
+    }
 }

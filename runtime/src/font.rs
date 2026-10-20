@@ -65,6 +65,20 @@ pub fn list() -> Task<Result<Vec<Family>, Error>> {
 pub fn set_defaults<Message>(font: Font, text_size: impl Into<Pixels>) -> Task<Message> {
     task::effect(crate::Action::Font(Action::SetDefaults {
         font,
-        text_size: text_size.into(),
+        // Protect renderer glyph metrics from negative or non-finite sizes.
+        text_size: text_size.into().normalized(),
     }))
+}
+
+#[cfg(test)]
+mod taim_font_size_tests {
+    use crate::core::Pixels;
+
+    #[test]
+    fn renderer_default_size_validation_is_bounded() {
+        assert_eq!(Pixels(12.0).normalized(), Pixels(12.0));
+        assert_eq!(Pixels(-1.0).normalized(), Pixels::ZERO);
+        assert_eq!(Pixels(f32::NAN).normalized(), Pixels::ZERO);
+        assert_eq!(Pixels(f32::INFINITY).normalized(), Pixels::ZERO);
+    }
 }

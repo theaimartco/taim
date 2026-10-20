@@ -402,10 +402,41 @@ pub(super) struct PendingEvents {
     len: usize,
 }
 
+/// Fold only adjacent observations that share one pointer/window identity.
+///
+/// Button transitions, wheel deltas, file drops, compositor timestamps and
+/// focus changes are never merged: they can affect gesture state or observers.
+#[inline]
+fn replaces_previous(previous: &core::Event, new: &core::Event) -> bool {
+    match (previous, new) {
+        (core::Event::Window(before), core::Event::Window(after)) => {
+            after.supersedes_adjacent(before)
+        }
+        (
+            core::Event::Mouse(mouse::Event::CursorMoved { .. }),
+            core::Event::Mouse(mouse::Event::CursorMoved { .. }),
+        ) => true,
+        (
+            core::Event::Touch(crate::core::touch::Event::FingerMoved { id: before, .. }),
+            core::Event::Touch(crate::core::touch::Event::FingerMoved { id: after, .. }),
+        ) => before == after,
+        _ => false,
+    }
+}
+
 impl PendingEvents {
     #[inline]
     pub(super) fn push(&mut self, window: window::Id, event: core::Event) {
-        self.windows.entry(window).or_default().push(event);
+        let queue = self.windows.entry(window).or_default();
+        if let Some(previous) = queue.last_mut() {
+            if replaces_previous(previous, &event) {
+                // Newest location/dimensions win. Unlike dropping events under
+                // a global queue cap, this cannot cross a semantic boundary.
+                *previous = event;
+                return;
+            }
+        }
+        queue.push(event);
         self.len = self.len.saturating_add(1);
     }
 
@@ -446,4 +477,96 @@ pub(super) enum Control {
         scale_factor: f32,
     },
     SetAutomaticWindowTabbing(bool),
+}
+
+
+#[cfg(test)]
+mod taim_event_batch_tests {
+    use super::*;
+    use crate::core::{mouse, touch, Point, Size};
+
+    fn mouse_move(x: f32) -> core::Event {
+        core::Event::Mouse(mouse::Event::CursorMoved {
+            position: Point::new(x, 0.0),
+        })
+    }
+
+    fn finger_move(id: u64, x: f32) -> core::Event {
+        core::Event::Touch(touch::Event::FingerMoved {
+            id: touch::Finger(id),
+            position: Point::new(x, 2.0),
+            metadata: core::pointer::Metadata::NONE,
+        })
+    }
+
+    #[test]
+    fn adjacent_cursor_moves_keep_last_position_without_extra_allocation() {
+        let id = window::Id::unique();
+        let mut queue = PendingEvents::default();
+        queue.push(id, mouse_move(1.0));
+        queue.push(id, mouse_move(2.0));
+        queue.push(id, mouse_move(3.0));
+        assert_eq!(queue.len, 1);
+        assert_eq!(queue.windows[&id], vec![mouse_move(3.0)]);
+    }
+
+    #[test]
+    fn press_and_release_are_gesture_boundaries() {
+        let id = window::Id::unique();
+        let mut queue = PendingEvents::default();
+        queue.push(id, mouse_move(1.0));
+        queue.push(id, core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)));
+        queue.push(id, mouse_move(2.0));
+        queue.push(id, core::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)));
+        queue.push(id, mouse_move(3.0));
+        assert_eq!(queue.windows[&id].len(), 5);
+        assert_eq!(queue.len, 5);
+    }
+
+    #[test]
+    fn different_fingers_must_not_coalesce() {
+        let id = window::Id::unique();
+        let mut queue = PendingEvents::default();
+        queue.push(id, finger_move(1, 1.0));
+        queue.push(id, finger_move(2, 2.0));
+        queue.push(id, finger_move(1, 3.0));
+        queue.push(id, finger_move(1, 4.0));
+        assert_eq!(
+            queue.windows[&id],
+            vec![finger_move(1, 1.0), finger_move(2, 2.0), finger_move(1, 4.0)]
+        );
+    }
+
+    #[test]
+    fn adjacent_resize_coalesces_but_close_request_does_not() {
+        let id = window::Id::unique();
+        let mut queue = PendingEvents::default();
+        queue.push(id, core::Event::Window(window::Event::Resized(Size::new(10.0, 10.0))));
+        queue.push(id, core::Event::Window(window::Event::Resized(Size::new(20.0, 30.0))));
+        assert_eq!(queue.len, 1);
+        queue.push(id, core::Event::Window(window::Event::CloseRequested));
+        queue.push(id, core::Event::Window(window::Event::CloseRequested));
+        assert_eq!(queue.len, 3);
+        assert_eq!(
+            queue.windows[&id][0],
+            core::Event::Window(window::Event::Resized(Size::new(20.0, 30.0)))
+        );
+    }
+
+    #[test]
+    fn separate_windows_keep_independent_tail_events() {
+        let a = window::Id::unique();
+        let b = window::Id::unique();
+        let mut queue = PendingEvents::default();
+        queue.push(a, mouse_move(1.0));
+        queue.push(b, mouse_move(2.0));
+        queue.push(a, mouse_move(3.0));
+        assert_eq!(queue.windows[&a], vec![mouse_move(3.0)]);
+        assert_eq!(queue.windows[&b], vec![mouse_move(2.0)]);
+        assert_eq!(queue.len, 2);
+        queue.windows.get_mut(&a).unwrap().clear();
+        queue.windows.get_mut(&b).unwrap().clear();
+        queue.finish_batch();
+        assert!(queue.is_empty());
+    }
 }

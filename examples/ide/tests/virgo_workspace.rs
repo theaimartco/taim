@@ -995,7 +995,8 @@ fn multi_cursor_cmd_d_and_simultaneous_editing() {
     let file = ide.tree.root.find_by_path("multi.rs").unwrap().id;
     let _ = ide.update(Message::FileSelected(file));
     let doc = ide.docs.active_mut().unwrap();
-    doc.content.move_to(text_editor::Cursor::new(text_editor::Position::new(0, 2)));
+    doc.content
+        .move_to(text_editor::Cursor::new(text_editor::Position::new(0, 2)));
 
     // First Cmd+D selects the word "apple" and finds the next occurrence
     let _ = ide.update(Message::SelectNextOccurrence);
@@ -1045,7 +1046,10 @@ fn large_file_opens_sub_millisecond_via_memory_mapping() {
     let doc = ide.docs.active().unwrap();
     assert!(matches!(
         doc.backing,
-        taim_ide::DocumentBacking::MemoryMapped { is_partial: true, .. }
+        taim_ide::DocumentBacking::MemoryMapped {
+            is_partial: true,
+            ..
+        }
     ));
     assert!(doc.line_count() >= 60_000);
 
