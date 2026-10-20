@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
-import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -27,6 +26,10 @@ def commands(python: str = sys.executable) -> list[tuple[str, list[str]]]:
         ]),
         ("source_gate_tests", [
             python, "-m", "unittest", "discover", "-s", "scripts/audit",
+            "-p", "test_*.py", "-v",
+        ]),
+        ("local_gate_tests", [
+            python, "-m", "unittest", "discover", "-s", "scripts/qa",
             "-p", "test_*.py", "-v",
         ]),
         ("rustfmt", ["cargo", "fmt", "--all", "--", "--check"]),
@@ -87,29 +90,38 @@ def main(argv: list[str] | None = None) -> int:
     needed = sorted({cmd[0] for _, cmd in steps})
     missing = [exe for exe in needed if shutil.which(exe) is None]
     results: list[dict] = []
-    if not missing:
-        for name, cmd in steps:
-            path = evidence / (name + ".log")
-            try:
-                with path.open("w", encoding="utf-8") as out:
-                    run = subprocess.run(
-                        cmd, cwd=root, stdout=out, stderr=subprocess.STDOUT,
-                        check=False, timeout=3600,
-                    )
-                status = "PASS" if run.returncode == 0 else "FAIL"
-                code = run.returncode
-            except subprocess.TimeoutExpired:
-                status, code = "TIMEOUT", None
-            except OSError as exc:
-                status, code = "ERROR", None
-                path.write_text(str(exc) + "\n", encoding="utf-8")
+    for name, cmd in steps:
+        path = evidence / (name + ".log")
+        if shutil.which(cmd[0]) is None:
+            path.write_text("Missing executable: " + cmd[0] + "\n", encoding="utf-8")
             results.append({
-                "name": name, "status": status, "returncode": code,
+                "name": name, "status": "MISSING_TOOL", "returncode": None,
                 "command": cmd, "log": str(path),
             })
-            print(f"{name}: {status}", flush=True)
-            if status != "PASS" and args.stop_on_failure:
+            print(f"{name}: MISSING_TOOL", flush=True)
+            if args.stop_on_failure:
                 break
+            continue
+        try:
+            with path.open("w", encoding="utf-8") as out:
+                run = subprocess.run(
+                    cmd, cwd=root, stdout=out, stderr=subprocess.STDOUT,
+                    check=False, timeout=3600,
+                )
+            status = "PASS" if run.returncode == 0 else "FAIL"
+            code = run.returncode
+        except subprocess.TimeoutExpired:
+            status, code = "TIMEOUT", None
+        except OSError as exc:
+            status, code = "ERROR", None
+            path.write_text(str(exc) + "\n", encoding="utf-8")
+        results.append({
+            "name": name, "status": status, "returncode": code,
+            "command": cmd, "log": str(path),
+        })
+        print(f"{name}: {status}", flush=True)
+        if status != "PASS" and args.stop_on_failure:
+            break
 
     status = classify(results, not missing)
     summary = {
