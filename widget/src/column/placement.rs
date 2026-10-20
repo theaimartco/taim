@@ -112,13 +112,18 @@ pub(super) fn arrange(
     // 2. Assign X offsets. Never add a trailing gutter to intrinsic width.
     let mut x = 0.0;
     let mut total_height = 0.0_f32;
-    for group in &mut groups {
+    for (index, group) in groups.iter_mut().enumerate() {
+        if index != 0 {
+            x = finite_sum(x, gutter);
+        }
         group.x = x;
-        x = finite_sum(x, finite_sum(group.width, gutter));
+        x = finite_sum(x, group.width);
         total_height = total_height.max(group.height);
     }
 
-    let total_width = x - gutter;
+    // Never subtract the terminal gutter from a saturated sum:
+    // MAX + MAX -> MAX, but MAX - MAX incorrectly produces zero width.
+    let total_width = x;
     let align_x = alignment_fraction(horizontal_alignment);
     let align_y = vertical_fraction(vertical_alignment);
 
@@ -208,13 +213,16 @@ pub(crate) fn arrange_rows(
 
     let mut y = 0.0;
     let mut widest = 0.0_f32;
-    for row in &mut groups {
+    for (index, row) in groups.iter_mut().enumerate() {
+        if index != 0 {
+            y = finite_sum(y, gutter);
+        }
         row.y = y;
         widest = widest.max(row.width);
-        y = finite_sum(y, finite_sum(row.height, gutter));
+        y = finite_sum(y, row.height);
     }
 
-    let full_height = y - gutter;
+    let full_height = y;
     let cross_fraction = alignment_fraction(vertical_alignment);
     let row_fraction = match horizontal_alignment {
         alignment::Horizontal::Left => 0.0,
@@ -253,6 +261,34 @@ mod tests {
         Node::new(Size::new(width, height))
     }
 
+
+
+    #[test]
+    fn extreme_intergroup_spacing_never_cancels_intrinsic_extent() {
+        let (size, placed) = arrange(
+            vec![node(10.0, 5.0), node(20.0, 5.0)],
+            6.0,
+            1.0,
+            f32::MAX,
+            Padding::ZERO,
+            Alignment::Start,
+            alignment::Vertical::Top,
+        );
+        assert_eq!(size.width, f32::MAX);
+        assert!(placed.iter().all(|node| node.bounds().x.is_finite()));
+
+        let (size, placed) = arrange_rows(
+            vec![node(5.0, 10.0), node(5.0, 20.0)],
+            6.0,
+            1.0,
+            f32::MAX,
+            Padding::ZERO,
+            Alignment::Start,
+            alignment::Horizontal::Left,
+        );
+        assert_eq!(size.height, f32::MAX);
+        assert!(placed.iter().all(|node| node.bounds().y.is_finite()));
+    }
 
     #[test]
     fn extreme_custom_widget_sizes_never_produce_infinite_positions() {
