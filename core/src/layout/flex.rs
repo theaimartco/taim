@@ -17,17 +17,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// NOTICE (Apache License 2.0 section 4(b)): this file was modified from
-// its original `druid` derivation to (1) store per-item bookkeeping and
-// the resulting nodes in stack-allocated `SmallVec`s instead of `Vec`s,
-// avoiding a heap allocation for the common case of a small, fixed
-// number of children, and (2) compute and attach a first-baseline offset
-// to the produced `Node`, derived from its children's own baselines.
-// The multi-pass constraint-solving algorithm itself is unchanged.
+// NOTICE (Apache License 2.0 section 4(b)): the inherited flex
+// scaffolding still contains upstream-derived cross-axis measurement logic.
+// TAIM replaces the inherited min/max and main-fluid distribution passes
+// with its own bounded deterministic water-filling planner in allocator.rs.
+// Inline SmallVec bookkeeping and first-baseline handling remain modified
+// features. Upstream copyright and license notices remain intact.
 use crate::Element;
 
 use crate::layout::{Limits, Node};
-use crate::length;
 use crate::widget;
 use crate::{Alignment, Length, Padding, Size};
 
@@ -131,6 +129,7 @@ where
     })
 }
 
+mod allocator;
 mod engine;
 
 pub use engine::resolve;
