@@ -18,9 +18,9 @@
 // limitations under the License.
 //
 // NOTICE (Apache License 2.0 section 4(b)): the inherited flex
-// scaffolding still contains upstream-derived cross-axis measurement logic.
-// TAIM replaces the inherited min/max and main-fluid distribution passes
-// with its own bounded deterministic water-filling planner in allocator.rs.
+// scaffold contains upstream-derived layout/lifecycle concepts.
+// TAIM now uses an upfront measurement schedule in plan.rs and a bounded
+// deterministic weighted water-fill planner in allocator.rs.
 // Inline SmallVec bookkeeping and first-baseline handling remain modified
 // features. Upstream copyright and license notices remain intact.
 use crate::Element;
@@ -131,5 +131,6 @@ where
 
 mod allocator;
 mod engine;
+mod plan;
 
 pub use engine::resolve;
