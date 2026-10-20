@@ -1,8 +1,8 @@
 {
   "pack": "TAIM Premium SVG",
-  "edition": "01",
-  "version": "1.0.0",
-  "count": 30,
+  "edition": "01 + 02",
+  "version": "2.0.0",
+  "count": 60,
   "viewBox": "0 0 64 64",
   "palette": {
     "graphite": "#11151d",
@@ -159,7 +159,158 @@
       "name": "edit",
       "label": "Edit",
       "source": "edit.svg"
+    },
+    {
+      "name": "save",
+      "label": "Save",
+      "source": "save.svg"
+    },
+    {
+      "name": "copy",
+      "label": "Copy",
+      "source": "copy.svg"
+    },
+    {
+      "name": "paste",
+      "label": "Paste",
+      "source": "paste.svg"
+    },
+    {
+      "name": "cut",
+      "label": "Cut",
+      "source": "cut.svg"
+    },
+    {
+      "name": "undo",
+      "label": "Undo",
+      "source": "undo.svg"
+    },
+    {
+      "name": "redo",
+      "label": "Redo",
+      "source": "redo.svg"
+    },
+    {
+      "name": "refresh",
+      "label": "Refresh",
+      "source": "refresh.svg"
+    },
+    {
+      "name": "sync",
+      "label": "Sync",
+      "source": "sync.svg"
+    },
+    {
+      "name": "share",
+      "label": "Share",
+      "source": "share.svg"
+    },
+    {
+      "name": "link",
+      "label": "Link",
+      "source": "link.svg"
+    },
+    {
+      "name": "unlink",
+      "label": "Unlink",
+      "source": "unlink.svg"
+    },
+    {
+      "name": "attachment",
+      "label": "Attachment",
+      "source": "attachment.svg"
+    },
+    {
+      "name": "bookmark",
+      "label": "Bookmark",
+      "source": "bookmark.svg"
+    },
+    {
+      "name": "pin",
+      "label": "Pin",
+      "source": "pin.svg"
+    },
+    {
+      "name": "sort",
+      "label": "Sort",
+      "source": "sort.svg"
+    },
+    {
+      "name": "sort_ascending",
+      "label": "Sort Ascending",
+      "source": "sort_ascending.svg"
+    },
+    {
+      "name": "sort_descending",
+      "label": "Sort Descending",
+      "source": "sort_descending.svg"
+    },
+    {
+      "name": "list",
+      "label": "List View",
+      "source": "list.svg"
+    },
+    {
+      "name": "grid",
+      "label": "Grid View",
+      "source": "grid.svg"
+    },
+    {
+      "name": "expand",
+      "label": "Expand",
+      "source": "expand.svg"
+    },
+    {
+      "name": "collapse",
+      "label": "Collapse",
+      "source": "collapse.svg"
+    },
+    {
+      "name": "fullscreen",
+      "label": "Fullscreen",
+      "source": "fullscreen.svg"
+    },
+    {
+      "name": "exit_fullscreen",
+      "label": "Exit Fullscreen",
+      "source": "exit_fullscreen.svg"
+    },
+    {
+      "name": "maximize",
+      "label": "Maximize",
+      "source": "maximize.svg"
+    },
+    {
+      "name": "minimize",
+      "label": "Minimize",
+      "source": "minimize.svg"
+    },
+    {
+      "name": "backspace",
+      "label": "Backspace",
+      "source": "backspace.svg"
+    },
+    {
+      "name": "clear",
+      "label": "Clear",
+      "source": "clear.svg"
+    },
+    {
+      "name": "help",
+      "label": "Help",
+      "source": "help.svg"
+    },
+    {
+      "name": "external_link",
+      "label": "External Link",
+      "source": "external_link.svg"
+    },
+    {
+      "name": "history",
+      "label": "History",
+      "source": "history.svg"
     }
   ],
-  "license": "MIT / TAIM original vector drawings"
+  "license": "MIT / TAIM original vector drawings",
+  "description": "60 independently drawn premium TAIM SVGs: system icons and UI actions"
 }

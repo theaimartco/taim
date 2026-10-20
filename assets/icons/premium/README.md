@@ -1,21 +1,12 @@
-# TAIM Premium Icons — Edition 01
+# TAIM Premium Icons — Editions 01 + 02
 
-**30 standalone, editable premium SVG assets** (not PNGs disguised as SVGs).
-Created as actual geometric vector paths, gradients, circles and rectangles.
-No `<image>`, script, font dependency, external URL, bitmap trace, or CDN.
+**60 native, standalone, editable vector SVG icons** — no raster image wrappers. Each uses a 64×64 transparent coordinate grid with polished graphite/chrome material and TAIM crimson gradients. Batch 02 UI-action icons have independently drawn paths and shapes; PNG previews are not embedded.
 
-## Palette and specification
-- Grid: **64 × 64** units with scalable vector geometry.
-- Material: charcoal anodized metal / restrained steel edge / garnet and crimson.
-- Background: transparent. Each SVG has an accessible title and description.
-- Works as individual documents in Figma, Inkscape, browsers and most design tools.
-- Visually review at 16, 24, 32 and 64 px before adopting for dense UI.
-- Some glossy details intentionally disappear at very small sizes; do not use
-  these as a drop-in replacement for single-color 16 px typography glyphs.
+## Gallery
 
-## Icon gallery
+Browse all 60 in [gallery.html](./gallery.html), or see the actual SVG previews below.
 
-The previews below display the **actual SVG files**, not raster thumbnails.
+### Edition 01 — System & application (30)
 
 | Icon | Icon | Icon | Icon | Icon |
 |:---:|:---:|:---:|:---:|:---:|
@@ -26,66 +17,35 @@ The previews below display the **actual SVG files**, not raster thumbnails.
 |![database](./database.svg)<br>database|![cpu](./cpu.svg)<br>cpu|![code](./code.svg)<br>code|![rocket](./rocket.svg)<br>rocket|![chart](./chart.svg)<br>chart|
 |![globe](./globe.svg)<br>globe|![heart](./heart.svg)<br>heart|![star](./star.svg)<br>star|![trash](./trash.svg)<br>trash|![edit](./edit.svg)<br>edit|
 
-Open [gallery.html](./gallery.html) locally for a responsive dark-background
-showcase of all 30 icons.
+### Edition 02 — UI actions (30)
 
-Validate the pack (stdlib only):
+| Icon | Icon | Icon | Icon | Icon |
+|:---:|:---:|:---:|:---:|:---:|
+|![save](./save.svg)<br>save|![copy](./copy.svg)<br>copy|![paste](./paste.svg)<br>paste|![cut](./cut.svg)<br>cut|![undo](./undo.svg)<br>undo|
+|![redo](./redo.svg)<br>redo|![refresh](./refresh.svg)<br>refresh|![sync](./sync.svg)<br>sync|![share](./share.svg)<br>share|![link](./link.svg)<br>link|
+|![unlink](./unlink.svg)<br>unlink|![attachment](./attachment.svg)<br>attachment|![bookmark](./bookmark.svg)<br>bookmark|![pin](./pin.svg)<br>pin|![sort](./sort.svg)<br>sort|
+|![sort_ascending](./sort_ascending.svg)<br>sort_ascending|![sort_descending](./sort_descending.svg)<br>sort_descending|![list](./list.svg)<br>list|![grid](./grid.svg)<br>grid|![expand](./expand.svg)<br>expand|
+|![collapse](./collapse.svg)<br>collapse|![fullscreen](./fullscreen.svg)<br>fullscreen|![exit_fullscreen](./exit_fullscreen.svg)<br>exit_fullscreen|![maximize](./maximize.svg)<br>maximize|![minimize](./minimize.svg)<br>minimize|
+|![backspace](./backspace.svg)<br>backspace|![clear](./clear.svg)<br>clear|![help](./help.svg)<br>help|![external_link](./external_link.svg)<br>external_link|![history](./history.svg)<br>history|
+
+## Usage and source of truth
+
+```html
+<img src="/assets/icons/save.svg" width="48" height="48" alt="Save">
+<img src="/assets/icons/premium/fullscreen.svg" width="48" height="48" alt="Fullscreen">
+```
+
+Both `assets/icons/<name>.svg` and `assets/icons/premium/<name>.svg` have identical source bytes. Premium files are authoritative; the font builder copies them to root after monochrome glyph regeneration.
+
+The existing `graphics/fonts/Taim-Icons.ttf` and its 36 font codepoints are unchanged. All 30 Batch 02 additions are **SVG-only**, not automatically available as Rust `Icon` glyph constants. Widget integration requires additional work.
+
+At 16px use simpler monochrome alternatives where these detailed bevels lose clarity; manually check visual contrast and accessibility.
+
+## Verify
 
 ```bash
 python3 scripts/assets/validate-premium-icons.py
+bash scripts/design/check-icons.sh
 ```
 
-## Files
-
-1. `home.svg` — Home
-2. `settings.svg` — Settings
-3. `folder.svg` — Files
-4. `search.svg` — Search
-5. `notifications.svg` — Notifications
-6. `user.svg` — Profile
-7. `chat.svg` — Messages
-8. `terminal.svg` — Terminal
-9. `store.svg` — App Store
-10. `power.svg` — Power
-11. `lock.svg` — Lock
-12. `shield.svg` — Shield
-13. `calendar.svg` — Calendar
-14. `clock.svg` — Clock
-15. `camera.svg` — Camera
-16. `image.svg` — Gallery
-17. `music.svg` — Music
-18. `download.svg` — Download
-19. `upload.svg` — Upload
-20. `cloud.svg` — Cloud
-21. `database.svg` — Database
-22. `cpu.svg` — Processor
-23. `code.svg` — Code
-24. `rocket.svg` — Launch
-25. `chart.svg` — Analytics
-26. `globe.svg` — Globe
-27. `heart.svg` — Favorites
-28. `star.svg` — Starred
-29. `trash.svg` — Delete
-30. `edit.svg` — Edit
-
-## Example
-
-```html
-<img src="/assets/icons/premium/settings.svg" width="48" height="48" alt="Settings">
-```
-
-## Source-of-truth boundaries
-
-The existing `assets/icons/*.svg` are generated by
-`scripts/assets/build-icon-font.py` from `scripts/assets/icon_geometry.py`,
-alongside `graphics/fonts/Taim-Icons.ttf`. Replacing those generated files
-without updating their generator would silently undo the replacement.
-The 30 icons have **now been promoted into `assets/icons/*.svg`**:
-12 root SVGs replaced and 18 new ones added. `premium/*.svg` remains
-the source of truth, and `scripts/assets/build-icon-font.py` restores
-all 30 root copies after regenerating monochrome font SVGs. The existing
-`Taim-Icons.ttf` glyphs and codepoints remain unchanged. Runtime component
-migration and visual QA are separate from replacing root asset files.
-
-MIT license applies to these newly authored assets; historical dependency
-license and provenance requirements for the framework remain unchanged.
+MIT project licensing and historical third-party attribution are unchanged.

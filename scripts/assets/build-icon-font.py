@@ -111,8 +111,8 @@ def premium_sources():
     """
     with open(PREMIUM_MANIFEST, encoding="utf-8") as source:
         entries = json.load(source)["icons"]
-    if len(entries) != 30 or len({i["name"] for i in entries}) != 30:
-        raise ValueError("TAIM premium manifest must contain 30 unique icons")
+    if len(entries) != 60 or len({i["name"] for i in entries}) != 60:
+        raise ValueError("TAIM premium manifest must contain 60 unique icons")
     sources = {}
     for icon in entries:
         name = icon["name"]
@@ -199,7 +199,7 @@ def main():
     print(f"svg:      {os.path.relpath(SVG_DIR, ROOT)}/*.svg ({len(ICONS)} files)")
     # The 24px single-color assets are regenerated for the icon font.
     # Premium originals live at premium/*.svg; copy them last into the
-    # assets/icons/ root so regeneration never clobbers the 30 replacements.
+    # assets/icons/ root so regeneration never clobbers the 60 premium exports.
     premium = premium_sources()
     for name, source in sorted(premium.items()):
         shutil.copyfile(source, os.path.join(SVG_DIR, name + ".svg"))

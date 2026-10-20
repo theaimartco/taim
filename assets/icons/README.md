@@ -1,38 +1,20 @@
-# TAIM asset icons
+# TAIM `assets/icons` — 84 SVG assets
 
-This directory contains **54 named SVG assets** after Edition 01 is applied:
-36 pre-existing monochrome UI icons, with **12 premium replacements**,
-plus 18 newly named premium SVG icons.
+This directory contains **84 distinct root SVGs**: 36 original icon-font-compatible glyph names (12 also with premium overrides), 18 new SVG-only names from Premium Edition 01, and 30 new SVG-only names from Premium Edition 02.
 
-## Premium replacements at the root
+**60 premium SVGs** appear as identical root exports, with authoritative sources in [premium/](./premium/) and [premium/manifest.json](./premium/manifest.json). Batch 02 adds Save, Copy, Paste, Cut, Undo, Redo, Refresh, Sync, Share, Link, Unlink, Attachment, Bookmark, Pin, Sort, List, Grid, Fullscreen, Maximize, Minimize, Help, History and other UI controls.
 
-The 30 full-color, 64×64, editable premium SVGs in
-[assets/icons/premium](./premium/) are also exposed directly as
-`assets/icons/<name>.svg`. For example:
-`assets/icons/home.svg`, `assets/icons/terminal.svg` and
-`assets/icons/settings.svg`.
+Edit the `assets/icons/premium/<name>.svg` source for any change; `assets/icons/<name>.svg` is its copy. `scripts/assets/build-icon-font.py` copies premium files *after* regenerating the 36 monochrome glyphs. Existing `graphics/fonts/Taim-Icons.ttf` codepoints remain unchanged.
 
-**Permanent source of truth:** `assets/icons/premium/*.svg`.
-The repository's `scripts/assets/build-icon-font.py` has been updated
-to restore these 30 root SVGs **after** regenerating monochrome icon-font
-artwork. Do not hand-edit the root premium copies; edit the premium source.
+The new 30 Batch 02 SVGs are not automatically installed as codepoints or Rust `Icon` constants. Runtime SVG rendering must be integrated separately.
 
-The existing icon font (`graphics/fonts/Taim-Icons.ttf`) and
-its icon codepoint APIs are intentionally **not** replaced by multicolor
-SVGs. The `assets/icons/manifest.toml` manifest covers icon-font
-supported glyphs only; the premium-only icons are cataloged in
-`premium/manifest.json`.
+View [premium/README.md](./premium/README.md) or [premium/gallery.html](./premium/gallery.html) to review all 60 icons.
 
-The remaining root-only monochrome SVGs continue to follow
-`scripts/assets/icon_geometry.py`.
-
-## Checks (offline)
+## Manual checks
 
 ```bash
 python3 scripts/assets/validate-premium-icons.py
 bash scripts/design/check-icons.sh
 ```
 
-Note: replacing file assets on a feature branch does not automatically
-switch all runtime controls to render them. Check SVG renderer support,
-scaling, accessibility and UI fallback before merging to `main`.
+CI workflows remain disabled at owner request. Manual rendering, small-size contrast and accessibility checks are still necessary.
