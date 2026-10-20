@@ -143,6 +143,30 @@ remain unexecuted. See
 CI is intentionally disabled at owner's request; this is a **release
 NO-GO**, not a successful verification result.
 
+## TAIM independent-source and executable verification checkpoint
+
+Current development branch `feature/taim-release-hardening-20261020`
+corrects documentation and optional API/strict lint issues, invalid touch
+coalescing, and non-finite popup-width layouts; it adds the **manual**
+`python3 scripts/qa/verify-taim.py` gate. The owner-requested GitHub
+Actions workflow remains fully commented out.
+
+Complete Git-tree hashes against historical Iced show **0 identical
+source blobs even when comparing across different paths**; however a
+sampled normalized token-multiset comparison identifies approximately
+**90.6% overlap for `widget/src/column.rs`** with the historical fork.
+Such overlap is a source-lineage **review flag, not proof of clean-room
+authorship or infringement**. Full strict heuristic scan is still
+unexecuted here because the private checkout/Rust toolchain is not
+available in this execution environment.
+
+NO-GO: CodeRabbit reports PR #13 draft is not automatically reviewed.
+No passing Rust build, Clippy, tests, shader validation, physical
+Wayland/VYOM acceptance, or independent manual code-origin review.
+Further substantive framework architecture and widget implementation
+rewrites are needed to establish TAIM's distinct implementation.
+See `docs/audit/taim-originality-and-build-gate-20261020.md`.
+
 ## Verification lanes
 
 - Hosted CI: DISABLED at owner request — verification.yml is fully commented;
