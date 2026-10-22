@@ -4,6 +4,7 @@ use super::frame;
 use super::inbox::Inbox;
 use super::protocol::{NativeWindow, Request, Signal};
 use super::views::{self, Views};
+use crate::Proxy;
 use crate::clipboard::Clipboard;
 use crate::conversion;
 use crate::core::time::Instant;
@@ -16,7 +17,7 @@ use crate::futures::{Runtime, subscription};
 use crate::graphics::{Compositor, Shell, compositor};
 use crate::program::{self, App, AppRunner};
 use crate::runtime::{self, Action, user_interface};
-use crate::{Proxy, window::Manager};
+use crate::window::{Manager, Window};
 
 use std::borrow::Cow;
 use winit::event::{StartCause, WindowEvent};
@@ -323,7 +324,7 @@ where
 
         let is_first = self.windows.is_empty();
         let compositor = self.compositor.as_mut().expect("compositor created above");
-        let window = self.windows.insert(
+        let window = Window::open(
             id,
             raw,
             runner,
@@ -333,6 +334,7 @@ where
             exit_on_close_request,
             self.system_theme,
         );
+        let window = self.windows.insert(id, window);
 
         self.frames
             .track_window(id, window.raw.scale_factor() as f32);

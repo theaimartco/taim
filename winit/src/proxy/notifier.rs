@@ -1,3 +1,4 @@
+//! How the renderer asks the shell for work.
 use super::Proxy;
 use crate::graphics::shell;
 use crate::runtime::{Action, window};

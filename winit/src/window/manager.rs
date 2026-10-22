@@ -1,32 +1,29 @@
-//! Window ownership, platform-id routing, and compositor resources.
-
-use super::{State, Window};
-use crate::Proxy;
-use crate::core;
-use crate::core::mouse;
-use crate::core::renderer;
-use crate::core::shell;
+//! The set of open windows, addressable by TAIM id or by platform id.
+use super::Window;
 use crate::core::theme;
 use crate::core::time::Instant;
 use crate::core::window::Id;
 use crate::graphics::Compositor;
-use crate::program::{App, AppRunner};
-use crate::runtime::frame_scheduler::Scheduler;
+use crate::program::App;
 
 use rustc_hash::FxHashMap;
 use std::collections::BTreeMap;
-use std::sync::Arc;
 use winit::monitor::MonitorHandle;
+use winit::window::WindowId as PlatformId;
 
-/// Owns live windows and maps platform identifiers to stable TAIM identifiers.
+/// Open windows in creation order (TAIM ids are monotonic), plus the
+/// platform-id index the event loop routes by.
+///
+/// The two maps are kept a bijection: re-inserting either id evicts whatever
+/// it pointed to before.
 pub struct Manager<A, C>
 where
     A: App,
     C: Compositor<Renderer = A::Renderer>,
     A::Theme: theme::Base,
 {
-    aliases: FxHashMap<winit::window::WindowId, Id>,
-    entries: BTreeMap<Id, Window<A, C>>,
+    windows: BTreeMap<Id, Window<A, C>>,
+    by_platform: FxHashMap<PlatformId, Id>,
 }
 
 impl<A, C> Manager<A, C>
@@ -37,152 +34,95 @@ where
 {
     pub fn new() -> Self {
         Self {
-            aliases: FxHashMap::default(),
-            entries: BTreeMap::new(),
+            windows: BTreeMap::new(),
+            by_platform: FxHashMap::default(),
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn insert(
-        &mut self,
-        id: Id,
-        window: Arc<winit::window::Window>,
-        runner: &AppRunner<A>,
-        compositor: &mut C,
-        proxy: Proxy<A::Message>,
-        renderer_settings: renderer::Settings,
-        exit_on_close_request: bool,
-        system_theme: theme::Mode,
-    ) -> &mut Window<A, C> {
-        // Maintain a strict bijection when callers reuse either identifier.
-        if let Some(previous) = self.entries.remove(&id) {
-            let _ = self.aliases.remove(&previous.raw.id());
+    /// Adds `window` under `id` and returns it.
+    pub fn insert(&mut self, id: Id, window: Window<A, C>) -> &mut Window<A, C> {
+        let platform_id = window.raw.id();
+
+        if let Some(evicted) = self.windows.remove(&id) {
+            let _ = self.by_platform.remove(&evicted.raw.id());
         }
-        if let Some(previous_id) = self.aliases.remove(&window.id())
-            && previous_id != id
+
+        if let Some(stale) = self.by_platform.insert(platform_id, id)
+            && stale != id
         {
-            let _ = self.entries.remove(&previous_id);
+            let _ = self.windows.remove(&stale);
         }
 
-        let state = State::new(runner, id, &window, system_theme);
-        let surface_size = state.physical_size();
-        let surface_version = state.surface_version();
-        let surface =
-            compositor.create_surface(window.clone(), surface_size.width, surface_size.height);
-        let renderer = compositor.create_renderer(renderer_settings);
-        let is_zero_sized = surface_size.width == 0 || surface_size.height == 0;
-        let mut scheduler = Scheduler::new();
-        if is_zero_sized {
-            scheduler.suspend();
-        }
+        self.windows.entry(id).insert_entry(window).into_mut()
+    }
 
-        let waker = shell::Waker::new_tagged(move |reactive| {
-            proxy.send_action(taim_runtime::Action::Event {
-                window: id,
-                event: reactive.map_or(core::Event::Waken, core::Event::Reactive),
-            });
-        });
+    pub fn remove(&mut self, id: Id) -> Option<Window<A, C>> {
+        let window = self.windows.remove(&id)?;
+        let _ = self.by_platform.remove(&window.raw.id());
 
-        let accessibility =
-            taim_accessibility::Session::new(taim_accessibility::atspi::adapter::Adapter::new());
-
-        #[cfg(feature = "accessibility")]
-        let accessibility_bridge = taim_accessibility::atspi::bridge::Bridge::spawn(
-            accessibility.adapter().store().clone(),
-            accessibility.adapter().events().clone(),
-            window.title(),
-        );
-
-        let platform_id = window.id();
-        let _ = self.aliases.insert(platform_id, id);
-        let _ = self.entries.insert(
-            id,
-            Window {
-                raw: window,
-                waker,
-                state,
-                exit_on_close_request,
-                surface,
-                surface_version,
-                renderer,
-                mouse_interaction: mouse::Interaction::None,
-                hit_test_index: None,
-                scheduler,
-                is_occluded: false,
-                is_zero_sized,
-                accessibility,
-                #[cfg(feature = "accessibility")]
-                _accessibility_bridge: accessibility_bridge,
-                preedit: None,
-                ime_state: None,
-            },
-        );
-
-        self.entries
-            .get_mut(&id)
-            .expect("the window inserted immediately above must exist")
+        Some(window)
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.windows.is_empty()
     }
 
+    /// Whether no window's frame clock has anything scheduled.
     pub fn is_idle(&self) -> bool {
-        self.entries
+        self.windows
             .values()
             .all(|window| window.scheduler.is_idle())
     }
 
+    /// The earliest frame deadline across all windows.
     pub fn redraw_at(&self) -> Option<Instant> {
-        self.entries
+        self.windows
             .values()
             .filter_map(|window| window.scheduler.deadline())
             .min()
     }
 
+    /// The oldest window.
     pub fn first(&self) -> Option<&Window<A, C>> {
-        self.entries.first_key_value().map(|(_, window)| window)
+        self.windows.values().next()
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Id, &mut Window<A, C>)> {
-        self.entries.iter_mut().map(|(id, window)| (*id, window))
+    /// The monitor of the newest window, where new windows should open.
+    pub fn last_monitor(&self) -> Option<MonitorHandle> {
+        self.windows.values().next_back()?.raw.current_monitor()
     }
 
     pub fn get(&self, id: Id) -> Option<&Window<A, C>> {
-        self.entries.get(&id)
+        self.windows.get(&id)
     }
 
     pub fn get_mut(&mut self, id: Id) -> Option<&mut Window<A, C>> {
-        self.entries.get_mut(&id)
+        self.windows.get_mut(&id)
     }
 
-    pub fn get_mut_alias(
-        &mut self,
-        platform_id: winit::window::WindowId,
-    ) -> Option<(Id, &mut Window<A, C>)> {
-        let id = self.aliases.get(&platform_id).copied()?;
-        Some((id, self.entries.get_mut(&id)?))
+    /// The TAIM id of a platform window.
+    pub fn get_alias(&self, platform_id: PlatformId) -> Option<Id> {
+        self.by_platform.get(&platform_id).copied()
     }
 
-    pub fn get_alias(&self, id: winit::window::WindowId) -> Option<Id> {
-        self.aliases.get(&id).copied()
+    /// Looks a window up by its platform id.
+    pub fn get_mut_alias(&mut self, platform_id: PlatformId) -> Option<(Id, &mut Window<A, C>)> {
+        let id = self.get_alias(platform_id)?;
+
+        Some((id, self.windows.get_mut(&id)?))
     }
 
-    pub fn last_monitor(&self) -> Option<MonitorHandle> {
-        self.entries.values().last()?.raw.current_monitor()
+    /// Windows oldest first.
+    pub fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = (Id, &mut Window<A, C>)> {
+        self.windows.iter_mut().map(|(id, window)| (*id, window))
     }
 
-    pub fn remove(&mut self, id: Id) -> Option<Window<A, C>> {
-        let window = self.entries.remove(&id)?;
-        let _ = self.aliases.remove(&window.raw.id());
-        Some(window)
-    }
-
-    pub fn replace_with(&mut self, mut f: impl FnMut(Window<A, C>) -> Window<A, C>) {
-        self.entries = std::mem::take(&mut self.entries)
+    /// Rebuilds every window by value (for example onto a new GPU device).
+    pub fn replace_with(&mut self, mut rebuild: impl FnMut(Window<A, C>) -> Window<A, C>) {
+        self.windows = std::mem::take(&mut self.windows)
             .into_iter()
-            .map(|(id, window)| (id, f(window)))
+            .map(|(id, window)| (id, rebuild(window)))
             .collect();
     }
 }
