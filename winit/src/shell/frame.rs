@@ -3,8 +3,10 @@ use super::engine::Engine;
 use super::views::Views;
 use crate::Proxy;
 use crate::clipboard::Clipboard;
+#[cfg(feature = "hinting")]
+use crate::core::Renderer as _;
 use crate::core::time::Instant;
-use crate::core::{self, Renderer as _, Size, renderer, theme, window};
+use crate::core::{self, Size, renderer, theme, window};
 use crate::debug;
 use crate::frame_gate::{DirtyFlags, PlatformEvent};
 use crate::futures::subscription;

@@ -138,6 +138,7 @@ taim_futures.workspace = true
 taim_renderer.workspace = true
 taim_runtime.workspace = true
 taim-signal.workspace = true
+taim-view.workspace = true
 taim_widget.workspace = true
 taim_winit.workspace = true
 
@@ -287,8 +288,10 @@ members = [
     "taim-signal",
     "taim-showcase",
     "taim-text-gpu",
+    "view",
     "core",
     "debug",
+    "examples/counter",
     "examples/ide",
     "examples/mobile_shell",
     "examples/trivial",
@@ -330,6 +333,7 @@ taim-platform-vyom = { version = "0.15.0-dev", path = "taim-platform-vyom" }
 taim-profiler = { version = "0.15.0-dev", path = "taim-profiler" }
 taim-raster = { version = "0.15.0-dev", path = "taim-raster" }
 taim-signal = { version = "0.15.0-dev", path = "taim-signal" }
+taim-view = { version = "0.15.0-dev", path = "view" }
 taim_text_gpu = { version = "0.15.0-dev", path = "taim-text-gpu" }
 # `default-features = false` here rather than at the dev-dependency, because
 # Cargo forbids an inherited dependency from overriding it. See the

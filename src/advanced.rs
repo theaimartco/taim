@@ -30,8 +30,8 @@ pub use widget::Widget;
 pub mod native_contracts {
     /// Event-queue coalescing policy: lifecycle events must not be lost.
     pub use crate::core::event::Coalescing;
-    /// Per-window redraw deadlines selected by the TAIM frame scheduler.
-    pub use crate::core::window::RedrawRequest;
     /// Cross-device mouse/touch/pen gesture identity and lifecycle.
     pub use crate::core::pointer::{Id as PointerId, Phase as PointerPhase, Pointer};
+    /// Per-window redraw deadlines selected by the TAIM frame scheduler.
+    pub use crate::core::window::RedrawRequest;
 }

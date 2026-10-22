@@ -73,6 +73,7 @@ use taim_winit::{core, program, runtime};
 mod entry;
 mod error;
 mod facade;
+mod launch;
 
 pub mod application;
 
@@ -88,4 +89,8 @@ pub mod window;
 pub mod advanced;
 
 pub use entry::{run, run_app};
+pub use launch::{launch, prelude};
+
 pub use facade::*;
+/// The TAIM view API: views, state handles and their contracts.
+pub use taim_view as view;

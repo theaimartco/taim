@@ -1,0 +1,20 @@
+[package]
+name = "taim-view"
+description = "The TAIM view contract: signal-driven views without message types"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+categories.workspace = true
+keywords.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+taim_core.workspace = true
+taim_renderer.workspace = true
+taim-signal.workspace = true
