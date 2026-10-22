@@ -1,7 +1,7 @@
 //! The view contract.
 use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::{Constraints, Sizing};
-use crate::{Event, Point, Rectangle, Size, mouse, semantics};
+use crate::{Event, Point, Rectangle, Size, Vector, mouse, semantics};
 
 /// A piece of user interface.
 ///
@@ -25,6 +25,10 @@ pub trait View: 'static {
     /// Paints the view itself. Children are painted afterwards, on top.
     fn paint(&self, cx: &mut PaintCx<'_>);
 
+    /// Paints on top of the children (scrollbars, overlays, focus rings
+    /// around containers). Not clipped by the view's own clipping.
+    fn paint_over(&self, _cx: &mut PaintCx<'_>) {}
+
     /// Reacts to `event`. Children see every event first; a view only sees
     /// events none of its children handled.
     fn event(&mut self, _cx: &mut EventCx<'_>, _event: &Event) -> Handled {
@@ -40,6 +44,22 @@ pub trait View: 'static {
     /// The cursor to show while the pointer is over this view, if it cares.
     fn cursor(&self) -> Option<mouse::Interaction> {
         None
+    }
+
+    /// Whether the view can take keyboard focus (and be reached with Tab).
+    fn focusable(&self) -> bool {
+        false
+    }
+
+    /// Whether children are clipped to this view's bounds.
+    fn clips(&self) -> bool {
+        false
+    }
+
+    /// How far the children are scrolled: they are drawn and hit-tested
+    /// shifted by minus this amount.
+    fn scroll_offset(&self) -> Vector {
+        Vector::ZERO
     }
 
     /// Hands each child to `visit`, in paint order.

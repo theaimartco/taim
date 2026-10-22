@@ -280,6 +280,19 @@ where
     }
 }
 
+/// A state handle used as a property follows the state.
+impl<T: Clone + Send + Sync + 'static> IntoProp<T> for State<T> {
+    fn into_prop(self) -> Prop<T> {
+        Prop::live(move || self.get())
+    }
+}
+
+impl IntoProp<f32> for f32 {
+    fn into_prop(self) -> Prop<f32> {
+        Prop::fixed(self)
+    }
+}
+
 impl IntoProp<String> for &str {
     fn into_prop(self) -> Prop<String> {
         Prop::fixed(self.to_owned())

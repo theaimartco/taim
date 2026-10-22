@@ -28,6 +28,7 @@ pub struct PaintCx<'a> {
     pub(crate) bounds: Rectangle,
     pub(crate) pointer: Option<Point>,
     pub(crate) text_color: Color,
+    pub(crate) focused: bool,
 }
 
 impl PaintCx<'_> {
@@ -44,6 +45,11 @@ impl PaintCx<'_> {
     /// The active theme.
     pub fn theme(&self) -> &Theme {
         self.theme
+    }
+
+    /// Whether this view has keyboard focus.
+    pub fn has_focus(&self) -> bool {
+        self.focused
     }
 
     /// Text color where a view does not choose one.
@@ -74,13 +80,26 @@ pub struct EventCx<'a> {
     pub(crate) bounds: Rectangle,
     pub(crate) pointer: Option<Point>,
     pub(crate) requests: &'a mut Requests,
+    pub(crate) focus: &'a mut Focus,
+    pub(crate) path: &'a [u16],
 }
 
 /// What views asked for while handling events.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct Requests {
     pub paint: bool,
     pub layout: bool,
+    pub animate: bool,
+    pub copy: Option<String>,
+    pub paste: bool,
+}
+
+/// Which view has keyboard focus, as a path of child indices from the root.
+#[derive(Debug, Default)]
+pub(crate) struct Focus {
+    pub current: Option<Vec<u16>>,
+    /// Set when a view took focus during the current dispatch.
+    pub taken: bool,
 }
 
 impl EventCx<'_> {
@@ -108,11 +127,50 @@ impl EventCx<'_> {
     pub fn request_layout(&mut self) {
         self.requests.layout = true;
     }
+
+    /// Keep painting frames while an animation runs.
+    pub fn request_animation(&mut self) {
+        self.requests.animate = true;
+        self.requests.paint = true;
+    }
+
+    /// Whether this view has keyboard focus.
+    pub fn has_focus(&self) -> bool {
+        self.focus.current.as_deref() == Some(self.path)
+    }
+
+    /// Takes keyboard focus.
+    pub fn request_focus(&mut self) {
+        if !self.has_focus() {
+            self.requests.paint = true;
+        }
+        self.focus.current = Some(self.path.to_vec());
+        self.focus.taken = true;
+    }
+
+    /// Gives keyboard focus up, if this view has it.
+    pub fn release_focus(&mut self) {
+        if self.has_focus() {
+            self.focus.current = None;
+            self.requests.paint = true;
+        }
+    }
+
+    /// Puts `text` on the clipboard.
+    pub fn copy(&mut self, text: impl Into<String>) {
+        self.requests.copy = Some(text.into());
+    }
+
+    /// Asks for the clipboard text; it arrives as a clipboard event.
+    pub fn paste(&mut self) {
+        self.requests.paste = true;
+    }
 }
 
 /// Available while describing a view to assistive technology.
 pub struct DescribeCx<'a> {
     pub(crate) bounds: Rectangle,
+    pub(crate) focused: bool,
     pub(crate) _marker: std::marker::PhantomData<&'a ()>,
 }
 
@@ -120,6 +178,11 @@ impl DescribeCx<'_> {
     /// Where this view is, in window coordinates.
     pub fn bounds(&self) -> Rectangle {
         self.bounds
+    }
+
+    /// Whether this view has keyboard focus.
+    pub fn has_focus(&self) -> bool {
+        self.focused
     }
 }
 

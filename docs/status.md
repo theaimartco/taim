@@ -234,9 +234,10 @@ Verified in this checkpoint: `cargo check --workspace --all-targets
 0 failed), clippy on `taim_winit` with no findings, and the `trivial` and
 `mobile_shell` examples running under Xvfb with the tiny-skia backend
 (render, tab/chip/bottom-nav clicks; pixel-identical before and after the
-window-layer rewrite). Typed text does not appear in `mobile_shell`'s
-search field under Xvfb + xdotool with either the old or new shell; that
-is pre-existing and unresolved. Physical-device, Wayland, Windows, macOS
+window-layer rewrite). Typing into `mobile_shell`'s search field also
+works once the test harness gives the window X keyboard focus (Xvfb runs
+without a window manager, so `xdotool windowfocus` is required).
+Physical-device, Wayland, Windows, macOS
 and web runs remain unverified.
 
 ## Verification lanes
