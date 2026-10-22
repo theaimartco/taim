@@ -48,6 +48,8 @@ struct Model {
     query: State<String>,
     filters: [State<bool>; 3],
     mode: State<usize>,
+    size: State<&'static str>,
+    country: State<Option<usize>>,
 
     tab: State<usize>,
     page: State<usize>,
@@ -60,6 +62,7 @@ struct Model {
 
     drawer: State<bool>,
     sheet: State<bool>,
+    dialog: State<bool>,
     notice: State<Option<String>>,
 }
 
@@ -79,6 +82,8 @@ pub fn build(cx: &mut Scope) -> AnyView {
         query: cx.signal(String::new()),
         filters: [cx.signal(true), cx.signal(false), cx.signal(false)],
         mode: cx.signal(0),
+        size: cx.signal("Medium"),
+        country: cx.signal(None),
 
         tab: cx.signal(0),
         page: cx.signal(0),
@@ -91,6 +96,7 @@ pub fn build(cx: &mut Scope) -> AnyView {
 
         drawer: cx.signal(false),
         sheet: cx.signal(false),
+        dialog: cx.signal(false),
         notice: cx.signal(None),
     };
 
@@ -117,6 +123,9 @@ pub fn build(cx: &mut Scope) -> AnyView {
             icon(Icon::HOME).size(20),
             text("Taim Showcase").size(20),
             space(),
+            icon_button(Icon::SETTINGS).on_press(move || {
+                let _ = model.drawer.set(true);
+            }),
             switch("Dark", model.dark),
         ])
         .gap(16.0)
@@ -147,6 +156,25 @@ pub fn build(cx: &mut Scope) -> AnyView {
             model.sheet,
         )
         .detents([0.35, 0.8]),
+        dialog(
+            model.dialog,
+            column(views![
+                text("Discard draft?").size(20),
+                text("This cannot be undone.").size(13),
+                row(views![
+                    space(),
+                    button("Cancel").on_press(move || {
+                        let _ = model.dialog.set(false);
+                    }),
+                    button("Discard").on_press(move || {
+                        let _ = model.dialog.set(false);
+                    }),
+                ])
+                .gap(8.0)
+                .fill_width(),
+            ])
+            .gap(12.0),
+        ),
         snackbar(model.notice),
     ])
     .into()
@@ -247,6 +275,13 @@ fn controls(model: Model) -> AnyView {
         ])
         .gap(24.0)
         .align(Align::Center),
+        heading("Radio buttons"),
+        row(["Small", "Medium", "Large"]
+            .into_iter()
+            .map(|size| radio(size, size, model.size).into()))
+        .gap(16.0),
+        heading("Dropdown"),
+        dropdown(["India", "Japan", "Kenya", "Peru"], model.country).placeholder("Country"),
         heading("Segmented control"),
         segmented(["List", "Grid", "Compact"], model.mode),
         heading("Chips"),
@@ -344,6 +379,23 @@ fn collections(model: Model) -> AnyView {
             model.page,
         ))
         .fill_width(),
+        heading("List tiles"),
+        list_tile(
+            Some(Icon::HOME),
+            "Home",
+            Some("Where it all starts".to_owned())
+        ),
+        list_tile(Some(Icon::SETTINGS), "Settings", None),
+        heading("Grid"),
+        grid(
+            3,
+            (1..=6).map(|cell| {
+                container(text(format!("Cell {cell}")).size(14))
+                    .padding(12.0)
+                    .into()
+            }),
+        )
+        .gap(8.0),
         heading("Accordion"),
         accordion(
             [
@@ -398,6 +450,9 @@ fn surfaces(model: Model) -> AnyView {
             let _ = model.sheet.set(true);
         }),
         text("Drag its handle between detents, or fling it down.").size(12),
+        button("Open dialog").on_press(move || {
+            let _ = model.dialog.set(true);
+        }),
         button("Show snackbar").on_press(notify(model, "Something happened")),
         text("It dismisses itself after four seconds.").size(12),
     ])

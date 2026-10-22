@@ -53,6 +53,13 @@ impl Button {
         self
     }
 
+    /// Shows `label` instead of the text label; the name given to
+    /// [`button`] is still what assistive technology announces.
+    pub fn label_view(mut self, label: impl Into<crate::AnyView>) -> Self {
+        self.label = Child::new(label.into());
+        self
+    }
+
     fn is_active(&self) -> bool {
         self.on_press.is_some() && self.enabled.get()
     }

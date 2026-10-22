@@ -3,6 +3,7 @@ mod button;
 mod container;
 mod disclosure;
 mod dynamic;
+mod forms;
 mod icon;
 mod layers;
 mod look;
@@ -23,6 +24,9 @@ pub use disclosure::{
     Accordion, Carousel, Stepper, Tooltip, accordion, carousel, stepper, tooltip,
 };
 pub use dynamic::{Each, Rebuild, each, rebuild, when};
+pub use forms::{
+    Dialog, Dropdown, Grid, Radio, app_bar, dialog, dropdown, grid, icon_button, list_tile, radio,
+};
 pub use icon::{Icon, icon};
 pub use layers::{Layers, layers};
 pub use mobile::{

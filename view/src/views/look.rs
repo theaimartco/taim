@@ -62,6 +62,7 @@ pub(crate) fn interactive_state(enabled: bool, focused: bool) -> semantics::Stat
 pub(crate) struct Label {
     content: String,
     size: Option<crate::Pixels>,
+    font: Option<taim_core::Font>,
     shaped: Option<<crate::Renderer as taim_core::text::Renderer>::Paragraph>,
 }
 
@@ -70,7 +71,16 @@ impl Label {
         Self {
             content: content.into(),
             size: size.map(crate::Pixels),
+            font: None,
             shaped: None,
+        }
+    }
+
+    /// A label showing one icon glyph.
+    pub(crate) fn glyph(icon: super::Icon, size: f32) -> Self {
+        Self {
+            font: Some(super::Icon::FONT),
+            ..Self::new(icon.codepoint(), Some(size))
         }
     }
 
@@ -104,7 +114,7 @@ impl Label {
                 bounds: crate::Size::INFINITE,
                 size: self.size.unwrap_or_else(|| renderer.default_size()),
                 line_height: text::LineHeight::default(),
-                font: renderer.default_font(),
+                font: self.font.unwrap_or_else(|| renderer.default_font()),
                 align_x: text::Alignment::Left,
                 align_y: taim_core::alignment::Vertical::Top,
                 shaping: text::Shaping::default(),
