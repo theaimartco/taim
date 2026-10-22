@@ -45,6 +45,8 @@ where
         show,
     )
     .title(title)
+    .theme(|root: &RefCell<Root>| root.borrow().theme())
+    .scale_factor(|root: &RefCell<Root>| root.borrow().scale())
     .run()
 }
 

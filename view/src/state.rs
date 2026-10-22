@@ -92,6 +92,15 @@ fn registry() -> std::sync::MutexGuard<'static, Vec<Slot>> {
 pub struct Scope {
     slots: Vec<u32>,
     invalidation: Arc<Invalidation>,
+    pub(crate) settings: Settings,
+}
+
+/// Window-wide settings an application may bind to state.
+#[derive(Default)]
+pub(crate) struct Settings {
+    pub theme: Option<Prop<crate::Theme>>,
+    pub scale: Option<Prop<f32>>,
+    pub reduced_motion: Option<Prop<bool>>,
 }
 
 impl Scope {
@@ -99,7 +108,23 @@ impl Scope {
         Self {
             slots: Vec::new(),
             invalidation,
+            settings: Settings::default(),
         }
+    }
+
+    /// The window's theme; a closure or state handle follows state.
+    pub fn theme(&mut self, theme: impl IntoProp<crate::Theme>) {
+        self.settings.theme = Some(self.build(|_| theme.into_prop()));
+    }
+
+    /// Zoom applied to the whole window (1.0 is unscaled).
+    pub fn scale(&mut self, scale: impl IntoProp<f32>) {
+        self.settings.scale = Some(self.build(|_| scale.into_prop()));
+    }
+
+    /// Whether views should skip their transition animations.
+    pub fn reduced_motion(&mut self, reduced: impl IntoProp<bool>) {
+        self.settings.reduced_motion = Some(self.build(|_| reduced.into_prop()));
     }
 
     /// Creates a value owned by this scope.
@@ -285,6 +310,22 @@ impl<T: Clone + Send + Sync + 'static> Prop<T> {
     }
 }
 
+/// A copy reads the same value; only the original asks the window for
+/// layout when it changes.
+impl<T: Clone> Clone for Prop<T> {
+    fn clone(&self) -> Self {
+        Self {
+            source: match &self.source {
+                Source::Fixed(value) => Source::Fixed(value.clone()),
+                Source::Live { memo, .. } => Source::Live {
+                    memo: memo.clone(),
+                    _follow: None,
+                },
+            },
+        }
+    }
+}
+
 impl<T> std::fmt::Debug for Prop<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self.source {
@@ -422,3 +463,15 @@ mod tests {
         assert_eq!((|| 7_u8).into_prop().get(), 7);
     }
 }
+
+/// Whether transitions should be skipped, as set by the window's
+/// [`Scope::reduced_motion`].
+pub(crate) fn motion_reduced() -> bool {
+    REDUCED_MOTION.load(Ordering::Relaxed)
+}
+
+pub(crate) fn set_motion_reduced(reduced: bool) {
+    REDUCED_MOTION.store(reduced, Ordering::Relaxed);
+}
+
+static REDUCED_MOTION: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);

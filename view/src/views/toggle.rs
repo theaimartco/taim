@@ -1,5 +1,5 @@
 use super::look;
-use super::text::text;
+use super::text::Text;
 use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::Constraints;
 use crate::state::{IntoProp, Prop, State};
@@ -37,6 +37,7 @@ impl Shape {
 pub struct Toggle {
     shape: Shape,
     label: Child,
+    name: Prop<String>,
     value: State<bool>,
     shown: Prop<bool>,
     enabled: Prop<bool>,
@@ -47,9 +48,12 @@ pub struct Toggle {
 
 impl Toggle {
     fn new(shape: Shape, label: impl IntoProp<String>, value: State<bool>) -> Self {
+        let name = label.into_prop();
+
         Self {
             shape,
-            label: Child::new(text(label)),
+            label: Child::new(Text::from_prop(name.clone())),
+            name,
             value,
             shown: value.into_prop(),
             enabled: Prop::fixed(true),
@@ -203,7 +207,9 @@ impl View for Toggle {
 
         Some(
             semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::Checkbox)
-                .with_state(state),
+                .with_name(self.name.get())
+                .with_state(state)
+                .with_actions(semantics::Actions::ACTIVATE),
         )
     }
 

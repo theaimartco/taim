@@ -34,9 +34,11 @@ pub type Renderer = taim_renderer::Renderer;
 pub mod prelude {
     pub use crate::views;
     pub use crate::views::{
-        Align, avatar, badge, button, checkbox, chip, column, container, drawer, each, layers,
-        nav_bar, progress, pull_to_refresh, rebuild, row, rule, scaffold, scroll, search, sheet,
-        skeleton, slider, snackbar, space, switch, tabs, text, text_field, when,
+        Align, Date, Icon, Time, accordion, avatar, badge, button, carousel, checkbox, chip,
+        column, container, date_picker, drawer, each, icon, layers, nav_bar, progress,
+        pull_to_refresh, rebuild, row, rule, scaffold, scroll, search, segmented, sheet, skeleton,
+        slider, snackbar, space, stepper, switch, tabs, text, text_field, time_picker, tooltip,
+        when,
     };
     pub use crate::{AnyView, Scope, State, View, spawn};
 }

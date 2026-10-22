@@ -74,6 +74,13 @@ impl Label {
         }
     }
 
+    /// The shaped size (zero before the first measure).
+    pub(crate) fn size(&self) -> crate::Size {
+        self.shaped
+            .as_ref()
+            .map_or(crate::Size::ZERO, taim_core::text::Paragraph::min_bounds)
+    }
+
     pub(crate) fn text(&self) -> String {
         self.content.clone()
     }
@@ -145,7 +152,12 @@ impl Tween {
     }
 
     pub(crate) fn go(&mut self, target: f32, now: crate::Instant) {
-        self.animation.go_mut(target, now);
+        if crate::state::motion_reduced() {
+            // Jump straight to the target.
+            self.animation = taim_core::animation::Animation::new(target).quick();
+        } else {
+            self.animation.go_mut(target, now);
+        }
     }
 
     pub(crate) fn value(&self, now: crate::Instant) -> f32 {

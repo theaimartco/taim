@@ -37,10 +37,24 @@ pub fn nav_bar<G: Into<String>, L: Into<String>>(
     )
 }
 
+/// A segmented control: a row of joined buttons, one of them chosen,
+/// bound to `selected`.
+pub fn segmented<S: Into<String>>(
+    labels: impl IntoIterator<Item = S>,
+    selected: State<usize>,
+) -> Segments {
+    Segments::new(
+        Look::Boxed,
+        labels.into_iter().map(|label| (None, label.into())),
+        selected,
+    )
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Look {
     Underline,
     Pill,
+    Boxed,
 }
 
 struct Segment {
@@ -68,6 +82,7 @@ impl Segments {
         let (glyph_size, label_size) = match look {
             Look::Underline => (None, Some(14.0)),
             Look::Pill => (Some(20.0), Some(11.0)),
+            Look::Boxed => (None, Some(13.0)),
         };
 
         Self {
@@ -124,6 +139,7 @@ impl View for Segments {
         let padding = match self.look {
             Look::Underline => 28.0,
             Look::Pill => 16.0,
+            Look::Boxed => 14.0,
         };
         let sized = constraints.with_sizing(self.sizing());
         let width = if sized.max.width.is_finite() {
@@ -152,6 +168,22 @@ impl View for Segments {
                     Border::default().rounded(1.5),
                 );
             }
+            Look::Boxed => {
+                let radius = 8.0;
+                cx.fill(
+                    bounds,
+                    palette.background.weak.color,
+                    Border::default()
+                        .width(1.0)
+                        .color(palette.background.strong.color)
+                        .rounded(radius),
+                );
+                cx.fill(
+                    indicator.shrink(2.0),
+                    palette.primary.base.color,
+                    Border::default().rounded(radius - 2.0),
+                );
+            }
             Look::Pill => {
                 cx.fill(bounds, palette.background.weak.color, Border::default());
                 let pill = Rectangle::new(
@@ -170,7 +202,7 @@ impl View for Segments {
             let slot = self.slot(bounds, index as f32);
             let chosen = index == selected;
             let color = match (self.look, chosen) {
-                (Look::Pill, true) => palette.primary.base.text,
+                (Look::Pill | Look::Boxed, true) => palette.primary.base.text,
                 (Look::Underline, true) => palette.primary.base.color,
                 (_, false) => palette.background.strongest.color,
             };

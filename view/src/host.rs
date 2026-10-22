@@ -27,6 +27,8 @@ pub struct Root {
     theme: Theme,
     waker_installed: bool,
     focus: Focus,
+    /// Theme name and scale the runtime last applied.
+    applied: Option<(String, f32)>,
     id: widget::Id,
 }
 
@@ -44,14 +46,79 @@ impl Root {
             theme: Theme::Light,
             waker_installed: false,
             focus: Focus::default(),
+            applied: None,
             id: widget::Id::unique(),
         }
+    }
+}
+
+impl Root {
+    /// The theme the application chose, if it chose one.
+    pub fn theme(&self) -> Option<Theme> {
+        self.scope().settings.theme.as_ref().map(crate::Prop::get)
+    }
+
+    /// The window zoom the application chose (1.0 by default).
+    pub fn scale(&self) -> f32 {
+        self.scope()
+            .settings
+            .scale
+            .as_ref()
+            .map_or(1.0, crate::Prop::get)
+    }
+
+    fn scope(&self) -> &Scope {
+        &self._scope
+    }
+
+    /// Whether theme or scale changed since the runtime last applied them.
+    fn settings_changed(&mut self) -> bool {
+        use taim_core::theme::Base as _;
+
+        if let Some(reduced) = &self.scope().settings.reduced_motion {
+            crate::state::set_motion_reduced(reduced.get());
+        }
+
+        let current = (
+            self.theme()
+                .map(|theme| theme.name().to_owned())
+                .unwrap_or_default(),
+            self.scale(),
+        );
+        let changed = self.applied.as_ref() != Some(&current);
+        self.applied = Some(current);
+        changed
     }
 }
 
 impl std::fmt::Debug for Root {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Root").finish_non_exhaustive()
+    }
+}
+
+/// A described view, handed to the runtime's semantic walk.
+struct Described(semantics::Node);
+
+impl widget::visit::Visit for Described {
+    fn semantics(&mut self) -> Option<semantics::Node> {
+        let mut own = self.0.clone();
+        own.children.clear();
+        Some(own)
+    }
+
+    fn contains(&self, point: Point) -> bool {
+        self.0.bounds.contains(point)
+    }
+
+    fn bounds(&self) -> Rectangle {
+        self.0.bounds
+    }
+
+    fn children(&mut self, visit: &mut dyn FnMut(&mut dyn widget::visit::Visit)) {
+        for child in &self.0.children {
+            visit(&mut Described(child.clone()));
+        }
     }
 }
 
@@ -67,13 +134,13 @@ impl<'a> Host<'a> {
     }
 }
 
-impl<'a, Message: 'a> From<Host<'a>> for Element<'a, Message, Theme, Renderer> {
+impl<'a> From<Host<'a>> for Element<'a, (), Theme, Renderer> {
     fn from(host: Host<'a>) -> Self {
         Element::new(host)
     }
 }
 
-impl<Message> Widget<Message, Theme, Renderer> for Host<'_> {
+impl Widget<(), Theme, Renderer> for Host<'_> {
     fn size(&self) -> Size<Length> {
         Size::new(Length::Fill, Length::Fill)
     }
@@ -139,7 +206,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Host<'_> {
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         _renderer: &Renderer,
-        shell: &mut Shell<'_, Message>,
+        shell: &mut Shell<'_, ()>,
         _viewport: &Rectangle,
     ) {
         let mut root = self.root.borrow_mut();
@@ -233,6 +300,12 @@ impl<Message> Widget<Message, Theme, Renderer> for Host<'_> {
             shell.request_redraw();
         }
 
+        // Theme and zoom are applied by the runtime after a message; send
+        // an empty one when they change.
+        if root.settings_changed() {
+            shell.publish(());
+        }
+
         let owed = root.invalidation.take();
         if requests.layout || owed & Invalidation::LAYOUT != 0 {
             shell.invalidate_layout();
@@ -259,19 +332,39 @@ impl<Message> Widget<Message, Theme, Renderer> for Host<'_> {
     }
 
     fn semantics(&self, _tree: &Tree, layout: Layout<'_>) -> Option<semantics::Node> {
-        let mut root = self.root.borrow_mut();
-        let root = &mut *root;
-        let mut nodes = Vec::new();
-        tree::describe(
-            &mut root.child,
-            layout.position(),
-            &mut Vec::new(),
-            root.focus.current.as_deref(),
-            &mut nodes,
-        );
+        // The window's own node; the views are published through
+        // `visit_children`, which the runtime walks on every frame.
+        let root = self.root.borrow();
+        Some(semantics::Node::new(
+            root.id.clone(),
+            layout.bounds(),
+            semantics::Role::Group,
+        ))
+    }
 
-        let window = semantics::Node::new(root.id.clone(), layout.bounds(), semantics::Role::Group);
-        Some(nodes.into_iter().fold(window, semantics::Node::with_child))
+    fn visit_children(
+        &mut self,
+        _tree: &mut Tree,
+        layout: Layout<'_>,
+        visit: &mut dyn FnMut(&mut dyn widget::visit::Visit),
+    ) {
+        let nodes = {
+            let mut root = self.root.borrow_mut();
+            let root = &mut *root;
+            let mut nodes = Vec::new();
+            tree::describe(
+                &mut root.child,
+                layout.position(),
+                &mut Vec::new(),
+                root.focus.current.as_deref(),
+                &mut nodes,
+            );
+            nodes
+        };
+
+        for node in nodes {
+            visit(&mut Described(node));
+        }
     }
 }
 

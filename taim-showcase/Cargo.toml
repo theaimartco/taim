@@ -18,18 +18,13 @@ taim.features = [
     "x11",
     "wayland",
     "fira-sans",
-    # `Showcase`'s view methods are generic over the renderer (see
-    # `src/lib.rs`), so they need the `advanced` re-exports of the core
-    # renderer traits to state that bound without depending on
-    # `taim_core`/`taim_widget` directly.
-    "advanced",
 ]
 
 [dev-dependencies]
-# `tests/headless_semantics.rs` builds a `UserInterface` directly, the way
-# `tests/golden/harness.rs` and `tests/accessibility/user_interface.rs` do
-# at the workspace root -- it needs the runtime and core vocabulary
-# straight from their crates, not the `taim` facade.
+# `tests/headless_semantics.rs` runs the showcase's view tree inside a
+# `UserInterface` with a headless CPU renderer, so it needs the runtime and
+# core vocabulary straight from their crates.
 taim_core.workspace = true
 taim_runtime.workspace = true
 taim-accessibility.workspace = true
+futures.workspace = true

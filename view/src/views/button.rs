@@ -1,4 +1,4 @@
-use super::text::{Text, text};
+use super::text::Text;
 use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::Constraints;
 use crate::state::{IntoProp, Prop};
@@ -8,8 +8,11 @@ use taim_core::widget;
 
 /// A clickable button with a text label.
 pub fn button(label: impl IntoProp<String>) -> Button {
+    let name = label.into_prop();
+
     Button {
-        label: Child::new(text(label)),
+        label: Child::new(Text::from_prop(name.clone())),
+        name,
         on_press: None,
         enabled: Prop::fixed(true),
         padding: Padding::from([6.0, 14.0]),
@@ -22,6 +25,7 @@ pub fn button(label: impl IntoProp<String>) -> Button {
 /// See [`button`].
 pub struct Button {
     label: Child,
+    name: Prop<String>,
     on_press: Option<Box<dyn Fn()>>,
     enabled: Prop<bool>,
     padding: Padding,
@@ -118,11 +122,17 @@ impl View for Button {
     }
 
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
-        Some(semantics::Node::new(
-            self.id.clone(),
-            cx.bounds(),
-            semantics::Role::Button,
-        ))
+        let enabled = self.is_active();
+        Some(
+            semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::Button)
+                .with_name(self.name.get())
+                .with_state(super::look::interactive_state(enabled, cx.has_focus()))
+                .with_actions(if enabled {
+                    semantics::Actions::ACTIVATE
+                } else {
+                    semantics::Actions::empty()
+                }),
+        )
     }
 
     fn cursor(&self) -> Option<mouse::Interaction> {

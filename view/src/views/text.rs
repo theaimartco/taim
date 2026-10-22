@@ -12,12 +12,19 @@ type Paragraph = <Renderer as text::Renderer>::Paragraph;
 /// A line or paragraph of text: `text("Hello")`, or
 /// `text(move || format!("{}", count.get()))` to follow state.
 pub fn text(content: impl IntoProp<String>) -> Text {
-    Text {
-        content: content.into_prop(),
-        size: None,
-        color: None,
-        shaped: None,
-        id: widget::Id::unique(),
+    Text::from_prop(content.into_prop())
+}
+
+impl Text {
+    pub(crate) fn from_prop(content: Prop<String>) -> Self {
+        Self {
+            content,
+            size: None,
+            color: None,
+            font: None,
+            shaped: None,
+            id: widget::Id::unique(),
+        }
     }
 }
 
@@ -26,6 +33,7 @@ pub struct Text {
     content: Prop<String>,
     size: Option<Pixels>,
     color: Option<Color>,
+    font: Option<taim_core::Font>,
     shaped: Option<Paragraph>,
     id: widget::Id,
 }
@@ -34,6 +42,12 @@ impl Text {
     /// Font size in logical pixels.
     pub fn size(mut self, size: impl Into<Pixels>) -> Self {
         self.size = Some(size.into());
+        self
+    }
+
+    /// The font; the renderer's default when unset.
+    pub fn font(mut self, font: taim_core::Font) -> Self {
+        self.font = Some(font);
         self
     }
 
@@ -54,7 +68,7 @@ impl View for Text {
             bounds: constraints.max,
             size: self.size.unwrap_or_else(|| renderer.default_size()),
             line_height: text::LineHeight::default(),
-            font: renderer.default_font(),
+            font: self.font.unwrap_or_else(|| renderer.default_font()),
             align_x: text::Alignment::Default,
             align_y: taim_core::alignment::Vertical::Top,
             shaping: text::Shaping::default(),

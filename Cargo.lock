@@ -4028,6 +4028,7 @@ dependencies = [
 name = "taim-showcase"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "taim",
  "taim-accessibility",
  "taim_core",
