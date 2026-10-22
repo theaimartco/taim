@@ -1,6 +1,7 @@
 //! The built-in views.
 mod button;
 mod container;
+mod dynamic;
 mod layers;
 mod look;
 mod range;
@@ -13,6 +14,7 @@ mod toggle;
 
 pub use button::{Button, button};
 pub use container::{Container, container};
+pub use dynamic::{Each, Rebuild, each, rebuild, when};
 pub use layers::{Layers, layers};
 pub use range::{Progress, Rule, Slider, progress, rule, slider};
 pub use scroll::{Scroll, scroll};

@@ -293,6 +293,7 @@ members = [
     "debug",
     "examples/counter",
     "examples/gallery",
+    "examples/todos",
     "examples/ide",
     "examples/mobile_shell",
     "examples/trivial",

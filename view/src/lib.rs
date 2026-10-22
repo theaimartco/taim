@@ -16,7 +16,7 @@ pub mod views;
 pub use cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 pub use host::Host;
 pub use layout::{Axis, Constraints, Sizing};
-pub use state::{IntoProp, Invalidation, Prop, Scope, State};
+pub use state::{IntoProp, Invalidation, Prop, Scope, State, spawn};
 pub use view::{AnyView, Child, Handled, View};
 
 pub use taim_core::{
@@ -31,8 +31,8 @@ pub type Renderer = taim_renderer::Renderer;
 pub mod prelude {
     pub use crate::views;
     pub use crate::views::{
-        Align, button, checkbox, column, container, layers, progress, row, rule, scroll, slider,
-        space, switch, text, text_field,
+        Align, button, checkbox, column, container, each, layers, progress, rebuild, row, rule,
+        scroll, slider, space, switch, text, text_field, when,
     };
-    pub use crate::{AnyView, Scope, State, View};
+    pub use crate::{AnyView, Scope, State, View, spawn};
 }

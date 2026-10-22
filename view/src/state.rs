@@ -133,6 +133,11 @@ impl Scope {
         }
     }
 
+    /// Runs `future` in the background; see [`spawn`].
+    pub fn spawn(&self, future: impl std::future::Future<Output = ()> + Send + 'static) {
+        spawn(future);
+    }
+
     /// Runs `build` with this scope as the one reactive properties report
     /// to.
     pub(crate) fn build<R>(&mut self, build: impl FnOnce(&mut Self) -> R) -> R {
@@ -165,6 +170,32 @@ impl std::fmt::Debug for Scope {
 
 thread_local! {
     static BUILDING: RefCell<Option<Arc<Invalidation>>> = const { RefCell::new(None) };
+}
+
+/// Runs `future` in the background. It may read and write state handles;
+/// views following that state update, and their window wakes, when it does.
+pub fn spawn(future: impl std::future::Future<Output = ()> + Send + 'static) {
+    let spawned = std::thread::Builder::new()
+        .name("taim-task".into())
+        .spawn(move || futures::executor::block_on(future));
+
+    if let Err(error) = spawned {
+        log::error!("could not start a background task: {error}");
+    }
+}
+
+/// The window currently being built, if any.
+pub(crate) fn building() -> Option<Arc<Invalidation>> {
+    BUILDING.with(|current| current.borrow().clone())
+}
+
+/// Runs `build` as if `window` were being built, so reactive properties
+/// created inside report to it. Used by views that rebuild subtrees later.
+pub(crate) fn rebuilding<R>(window: Option<&Arc<Invalidation>>, build: impl FnOnce() -> R) -> R {
+    let previous = BUILDING.with(|current| current.replace(window.cloned()));
+    let result = build();
+    BUILDING.with(|current| *current.borrow_mut() = previous);
+    result
 }
 
 /// Work a window owes because state changed, plus how to wake it.

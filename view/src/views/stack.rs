@@ -58,6 +58,22 @@ impl Stack {
         self
     }
 
+    pub(crate) fn take_children(&mut self) -> Vec<Child> {
+        std::mem::take(&mut self.children)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn children_ptrs(&self) -> Vec<*const ()> {
+        self.children
+            .iter()
+            .map(|child| std::ptr::from_ref(child.view()).cast::<()>())
+            .collect()
+    }
+
+    pub(crate) fn set_children(&mut self, children: Vec<Child>) {
+        self.children = children;
+    }
+
     /// Space between consecutive children.
     pub fn gap(mut self, gap: f32) -> Self {
         self.gap = gap.max(0.0);
@@ -121,16 +137,19 @@ impl View for Stack {
     fn measure(&mut self, cx: &mut MeasureCx<'_>, constraints: Constraints) -> Size {
         let inner = constraints.with_sizing(self.sizing).inset(self.padding);
         let (max_along, max_across) = self.split(inner.max);
-        let gaps = self.gap * self.children.len().saturating_sub(1) as f32;
+        // Gaps only separate children that take up room: a hidden `when`
+        // or an empty list must not leave a hole.
+        let mut occupied = 0_usize;
 
         // First pass: everything that does not fill, with unbounded length.
-        let mut used = gaps;
+        let mut used = 0.0;
         let mut across: f32 = 0.0;
         let mut total_weight = 0_u32;
 
         for index in 0..self.children.len() {
             if let Some(weight) = self.fill_weight(&self.children[index]) {
                 total_weight += u32::from(weight);
+                occupied += 1;
                 continue;
             }
 
@@ -139,7 +158,10 @@ impl View for Stack {
             let (length, thickness) = self.split(size);
             used += length;
             across = across.max(thickness);
+            occupied += usize::from(length > 0.0);
         }
+
+        used += self.gap * occupied.saturating_sub(1) as f32;
 
         // Second pass: fill children share what is left, in proportion.
         let left = if max_along.is_finite() {
@@ -179,7 +201,9 @@ impl View for Stack {
                 self.padding.left + local.width,
                 self.padding.top + local.height,
             ));
-            cursor += length + self.gap;
+            if length > 0.0 {
+                cursor += length + self.gap;
+            }
         }
 
         let content = self.join(used.max(min_along), across);

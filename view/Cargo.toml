@@ -19,3 +19,5 @@ taim_core.workspace = true
 taim_renderer.workspace = true
 taim-signal.workspace = true
 unicode-segmentation.workspace = true
+futures = { workspace = true, features = ["executor"] }
+log.workspace = true
