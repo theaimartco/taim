@@ -230,7 +230,7 @@ enum variant names, trait method signatures, `arboard` and `winit` calls.
 It is a similarity measure, not an originality percentage.
 
 Verified in this checkpoint: `cargo check --workspace --all-targets
---all-features`, `cargo test --workspace --all-features` (2,273 passed,
+--all-features`, `cargo test --workspace --all-features` (2,279 passed,
 0 failed), clippy on `taim_winit` with no findings, and the `trivial` and
 `mobile_shell` examples running under Xvfb with the tiny-skia backend
 (render, tab/chip/bottom-nav clicks; pixel-identical before and after the
