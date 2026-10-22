@@ -5,8 +5,11 @@ use crate::{Color, Vector};
 /// Shadows are paint effects, not layout extents.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Shadow {
+    /// Color of the shadow.
     pub color: Color,
+    /// Displacement of the shadow from the casting shape.
     pub offset: Vector,
+    /// Blur radius in logical pixels; zero gives a hard edge.
     pub blur_radius: f32,
 }
 

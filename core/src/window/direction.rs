@@ -3,13 +3,21 @@
 /// Cardinal/corner edges relative to the center of a window.
 #[derive(Debug, Clone, Copy)]
 pub enum Direction {
+    /// The top edge.
     North,
+    /// The bottom edge.
     South,
+    /// The right edge.
     East,
+    /// The left edge.
     West,
+    /// The top-right corner.
     NorthEast,
+    /// The top-left corner.
     NorthWest,
+    /// The bottom-right corner.
     SouthEast,
+    /// The bottom-left corner.
     SouthWest,
 }
 

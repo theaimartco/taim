@@ -148,7 +148,7 @@ impl Tracker {
                 }
             };
 
-            self.active.insert(identity, Execution {
+            let _ = self.active.insert(identity, Execution {
                 _cancel_on_drop: cancel_on_drop,
                 event_sink: Some(event_sink),
                 observed_epoch: epoch,

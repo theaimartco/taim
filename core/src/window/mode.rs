@@ -6,8 +6,11 @@
 /// Runtime presentation mode of a window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
+    /// A regular, decorated desktop window.
     Windowed,
+    /// A borderless window covering the whole monitor.
     Fullscreen,
+    /// The window exists but is not mapped on screen.
     Hidden,
 }
 

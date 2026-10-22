@@ -3,16 +3,22 @@
 /// The physical key zone from the operating-system keyboard event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Location {
+    /// Not tied to a particular side or zone of the keyboard.
     Standard,
+    /// The left copy of a key that appears twice, such as Left Shift.
     Left,
+    /// The right copy of a key that appears twice, such as Right Shift.
     Right,
+    /// A key on the numeric keypad.
     Numpad,
 }
 
 /// Whether a physical key is on a distinct side of the modifier cluster.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Side {
+    /// The left-hand side.
     Left,
+    /// The right-hand side.
     Right,
 }
 

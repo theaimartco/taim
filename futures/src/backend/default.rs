@@ -23,6 +23,7 @@ mod platform {
     // error: silently dropping task messages would make apps appear hung.
     #[cfg(not(any(feature = "tokio", feature = "smol", feature = "thread-pool")))]
     mod missing {
+        /// Placeholder that refuses to start until an async backend is enabled.
         #[derive(Debug)]
         pub struct Executor;
 
