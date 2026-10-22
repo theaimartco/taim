@@ -1,233 +1,209 @@
+//! The plain-data description of a paragraph and the policies it carries.
 use super::*;
 
-/// A paragraph.
+/// Everything needed to shape and lay out one paragraph.
+///
+/// `Content` is usually a string or a slice of [`Span`]s.
 #[derive(Debug, Clone, Copy)]
 pub struct Text<Content = String, Font = crate::Font> {
-    /// The content of the paragraph.
+    /// What to draw.
     pub content: Content,
-
-    /// The bounds of the paragraph.
+    /// The box the paragraph lays out in; wrapping happens at its width.
     pub bounds: Size,
-
-    /// The size of the [`Text`] in logical pixels.
+    /// Font size in logical pixels.
     pub size: Pixels,
-
-    /// The line height of the [`Text`].
+    /// Distance between baselines.
     pub line_height: LineHeight,
-
-    /// The font of the [`Text`].
+    /// Font used where a span does not choose one.
     pub font: Font,
-
-    /// The horizontal alignment of the [`Text`].
+    /// Horizontal placement of each line inside `bounds`.
     pub align_x: Alignment,
-
-    /// The vertical alignment of the [`Text`].
+    /// Vertical placement of the block of lines inside `bounds`.
     pub align_y: alignment::Vertical,
-
-    /// The [`Shaping`] strategy of the [`Text`].
+    /// How much shaping work to do.
     pub shaping: Shaping,
-
-    /// The [`Wrapping`] strategy of the [`Text`].
+    /// Where lines may break.
     pub wrapping: Wrapping,
-
-    /// The [`Ellipsis`] strategy of the [`Text`].
+    /// Where to elide text that does not fit.
     pub ellipsis: Ellipsis,
-
-    /// The scale factor that may be used to internally scale the layout
-    /// calculation of the [`Paragraph`] and leverage metrics hinting.
+    /// Metrics-hinting scale.
     ///
-    /// Effectively, this defines the "base" layout that will be used for
-    /// linear scaling.
-    ///
-    /// If `None`, hinting will be disabled and subpixel positioning will be
-    /// performed.
+    /// With `Some(factor)` the paragraph is laid out once at that scale and
+    /// scaled linearly from there, which lets the renderer snap glyph metrics
+    /// to the pixel grid. With `None` there is no hinting and glyphs are
+    /// positioned at subpixel precision.
     pub hint_factor: Option<f32>,
 }
 
-impl<Content, Font> Text<Content, Font>
-where
-    Font: Copy,
-{
-    /// Returns a new [`Text`] replacing only the content with the
-    /// given value.
-    pub fn with_content<T>(&self, content: T) -> Text<T, Font> {
+impl<Content, Font: Copy> Text<Content, Font> {
+    /// The same paragraph settings with different content.
+    pub fn with_content<Other>(&self, content: Other) -> Text<Other, Font> {
+        let Self {
+            content: _,
+            bounds,
+            size,
+            line_height,
+            font,
+            align_x,
+            align_y,
+            shaping,
+            wrapping,
+            ellipsis,
+            hint_factor,
+        } = *self;
+
         Text {
             content,
-            bounds: self.bounds,
-            size: self.size,
-            line_height: self.line_height,
-            font: self.font,
-            align_x: self.align_x,
-            align_y: self.align_y,
-            shaping: self.shaping,
-            wrapping: self.wrapping,
-            ellipsis: self.ellipsis,
-            hint_factor: self.hint_factor,
+            bounds,
+            size,
+            line_height,
+            font,
+            align_x,
+            align_y,
+            shaping,
+            wrapping,
+            ellipsis,
+            hint_factor,
         }
     }
 }
 
-impl<Content, Font> Text<Content, Font>
-where
-    Content: AsRef<str>,
-    Font: Copy,
-{
-    /// Returns a borrowed version of [`Text`].
+impl<Content: AsRef<str>, Font: Copy> Text<Content, Font> {
+    /// Borrows the content as a `&str`.
     pub fn as_ref(&self) -> Text<&str, Font> {
         self.with_content(self.content.as_ref())
     }
 }
 
-/// The alignment of some text.
+/// Horizontal placement of lines of text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Alignment {
-    /// No specific alignment.
-    ///
-    /// Left-to-right text will be aligned to the left, while
-    /// right-to-left text will be aligned to the right.
+    /// Follow the writing direction: left for left-to-right scripts, right
+    /// for right-to-left ones.
     #[default]
     Default,
-    /// Align text to the left.
+    /// Flush left.
     Left,
-    /// Center text.
+    /// Centered.
     Center,
-    /// Align text to the right.
+    /// Flush right.
     Right,
-    /// Justify text.
+    /// Stretched to both edges.
     Justified,
 }
 
 impl From<alignment::Horizontal> for Alignment {
-    fn from(alignment: alignment::Horizontal) -> Self {
-        match alignment {
-            alignment::Horizontal::Left => Self::Left,
-            alignment::Horizontal::Center => Self::Center,
-            alignment::Horizontal::Right => Self::Right,
+    fn from(horizontal: alignment::Horizontal) -> Self {
+        use alignment::Horizontal as H;
+
+        match horizontal {
+            H::Left => Self::Left,
+            H::Center => Self::Center,
+            H::Right => Self::Right,
         }
     }
 }
 
 impl From<crate::Alignment> for Alignment {
     fn from(alignment: crate::Alignment) -> Self {
+        use crate::Alignment as A;
+
         match alignment {
-            crate::Alignment::Start => Self::Left,
-            crate::Alignment::Center => Self::Center,
-            crate::Alignment::End => Self::Right,
+            A::Start => Self::Left,
+            A::Center => Self::Center,
+            A::End => Self::Right,
         }
     }
 }
 
+/// The closest box alignment; justified and direction-following text start
+/// at the left edge.
 impl From<Alignment> for alignment::Horizontal {
     fn from(alignment: Alignment) -> Self {
         match alignment {
-            Alignment::Default | Alignment::Left | Alignment::Justified => {
-                alignment::Horizontal::Left
-            }
-            Alignment::Center => alignment::Horizontal::Center,
-            Alignment::Right => alignment::Horizontal::Right,
+            Alignment::Center => Self::Center,
+            Alignment::Right => Self::Right,
+            Alignment::Default | Alignment::Left | Alignment::Justified => Self::Left,
         }
     }
 }
 
-/// The shaping strategy of some text.
+/// How much work goes into turning characters into positioned glyphs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Shaping {
-    /// Auto-detect the best shaping strategy from the text.
-    ///
-    /// This strategy will use [`Basic`](Self::Basic) shaping if the
-    /// text consists of only ASCII characters; otherwise, it will
-    /// use [`Advanced`](Self::Advanced) shaping.
-    ///
-    /// This is the default, if neither the `basic-shaping` nor `advanced-shaping`
-    /// features are enabled.
+    /// [`Basic`](Self::Basic) for pure ASCII, [`Advanced`](Self::Advanced)
+    /// for anything else.
     Auto,
-    /// No shaping and no font fallback.
-    ///
-    /// This shaping strategy is very cheap, but it will not display complex
-    /// scripts properly nor try to find missing glyphs in your system fonts.
-    ///
-    /// You should use this strategy when you have complete control of the text
-    /// and the font you are displaying in your application.
-    ///
-    /// This will be the default if the `basic-shaping` feature is enabled and
-    /// the `advanced-shaping` feature is disabled.
+    /// One glyph per character from the chosen font, with no ligatures,
+    /// complex-script handling or fallback fonts. Cheap; right only when the
+    /// text and font are fully under the application's control.
     Basic,
-    /// Advanced text shaping and font fallback.
-    ///
-    /// You will need to enable this flag if the text contains a complex
-    /// script, the font used needs it, and/or multiple fonts in your system
-    /// may be needed to display all of the glyphs.
-    ///
-    /// Advanced shaping is expensive! You should only enable it when necessary.
-    ///
-    /// This will be the default if the `advanced-shaping` feature is enabled.
+    /// Full shaping (ligatures, complex scripts, bidirectional text) with
+    /// fallback to system fonts for missing glyphs. Correct for any text;
+    /// noticeably more expensive.
     Advanced,
 }
 
+/// `Advanced` with the `advanced-shaping` feature, else `Basic` with
+/// `basic-shaping`, else `Auto`.
 impl Default for Shaping {
     fn default() -> Self {
-        if cfg!(feature = "advanced-shaping") {
-            Self::Advanced
-        } else if cfg!(feature = "basic-shaping") {
-            Self::Basic
-        } else {
-            Self::Auto
+        match (cfg!(feature = "advanced-shaping"), cfg!(feature = "basic-shaping")) {
+            (true, _) => Self::Advanced,
+            (false, true) => Self::Basic,
+            (false, false) => Self::Auto,
         }
     }
 }
 
-/// The wrapping strategy of some text.
+/// Where a line of text may break when it reaches the paragraph width.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Wrapping {
-    /// No wrapping.
+    /// Never; lines run past the width.
     None,
-    /// Wraps at the word level.
-    ///
-    /// This is the default.
+    /// Between words (the default).
     #[default]
     Word,
-    /// Wraps at the glyph level.
+    /// Between any two glyphs.
     Glyph,
-    /// Wraps at the word level, or fallback to glyph level if a word can't fit on a line by itself.
+    /// Between words, and inside a word only if it is wider than a line.
     WordOrGlyph,
 }
 
+/// Where text that does not fit in the last visible line is elided.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-/// The ellipsis strategy of some text.
 pub enum Ellipsis {
-    /// No ellipsis.
-    ///
-    /// This is the default.
+    /// Nowhere; the text is clipped (the default).
     #[default]
     None,
-    /// Ellipsize the start of the last visual line in the text.
+    /// At the start of the line: "…end of text".
     Start,
-    /// Ellipsize the middle of the last visual line in the text.
+    /// In the middle of the line: "start…end".
     Middle,
-    /// Ellipsize the end of the last visual line in the text.
+    /// At the end of the line: "Start of text…".
     End,
 }
 
-/// The height of a line of text in a paragraph.
+/// Distance between consecutive baselines.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LineHeight {
-    /// A factor of the size of the text.
+    /// A multiple of the font size.
     Relative(f32),
-
-    /// An absolute height in logical pixels.
+    /// A fixed distance in logical pixels.
     Absolute(Pixels),
 }
 
 impl LineHeight {
-    /// Returns the [`LineHeight`] in absolute logical pixels.
+    /// The line height for text of `text_size`, in logical pixels.
     pub fn to_absolute(self, text_size: Pixels) -> Pixels {
         match self {
-            Self::Relative(factor) => Pixels(factor * text_size.0),
-            Self::Absolute(pixels) => pixels,
+            Self::Absolute(height) => height,
+            Self::Relative(factor) => Pixels(text_size.0 * factor),
         }
     }
 }
 
+/// 1.3 × the font size.
 impl Default for LineHeight {
     fn default() -> Self {
         Self::Relative(1.3)
@@ -241,65 +217,105 @@ impl From<f32> for LineHeight {
 }
 
 impl From<Pixels> for LineHeight {
-    fn from(pixels: Pixels) -> Self {
-        Self::Absolute(pixels)
+    fn from(height: Pixels) -> Self {
+        Self::Absolute(height)
     }
 }
 
+/// Hashes the exact bit pattern, so the hash agrees with `==` for every
+/// value except `NaN` (which is never a meaningful line height).
 impl Hash for LineHeight {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            Self::Relative(factor) => {
-                state.write_u8(0);
-                factor.to_bits().hash(state);
-            }
-            Self::Absolute(pixels) => {
-                state.write_u8(1);
-                f32::from(*pixels).to_bits().hash(state);
-            }
-        }
+        let (tag, value) = match *self {
+            Self::Relative(factor) => (0_u8, factor),
+            Self::Absolute(Pixels(height)) => (1_u8, height),
+        };
+
+        state.write_u8(tag);
+        value.to_bits().hash(state);
     }
 }
 
-/// The result of hit testing on text.
+/// What a point on a paragraph landed on.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Hit {
-    /// The point was within the bounds of the returned character index.
+    /// The character at this offset.
     CharOffset(usize),
 }
 
 impl Hit {
-    /// Computes the cursor position of the [`Hit`] .
+    /// The caret position the hit corresponds to.
     pub fn cursor(self) -> usize {
-        match self {
-            Self::CharOffset(i) => i,
-        }
+        let Self::CharOffset(offset) = self;
+        offset
     }
 }
 
-/// The difference detected in some text.
-///
-/// You will obtain a [`Difference`] when you [`compare`] a [`Paragraph`] with some
-/// [`Text`].
-///
-/// [`compare`]: Paragraph::compare
+/// How much of a shaped [`Paragraph`] survives a change to its [`Text`],
+/// as reported by [`Paragraph::compare`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Difference {
-    /// No difference.
-    ///
-    /// The text can be reused as it is!
+    /// Nothing changed; reuse the paragraph as is.
     None,
-
-    /// A bounds difference.
-    ///
-    /// This normally means a relayout is necessary, but the shape of the text can
-    /// be reused.
+    /// Only the bounds changed; keep the shaped glyphs, redo line layout.
     Bounds,
-
-    /// A shape difference.
-    ///
-    /// The contents, alignment, sizes, fonts, or any other essential attributes
-    /// of the shape of the text have changed. A complete reshape and relayout of
-    /// the text is necessary.
+    /// Content, fonts, sizes or other shaping inputs changed; shape and lay
+    /// out again from scratch.
     Shape,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::hash_map::DefaultHasher;
+
+    fn hash(value: LineHeight) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    #[test]
+    fn line_height_resolves_against_text_size() {
+        assert_eq!(LineHeight::default().to_absolute(Pixels(10.0)), Pixels(13.0));
+        assert_eq!(LineHeight::from(Pixels(7.0)).to_absolute(Pixels(99.0)), Pixels(7.0));
+    }
+
+    #[test]
+    fn relative_and_absolute_hash_apart() {
+        assert_ne!(hash(LineHeight::Relative(2.0)), hash(LineHeight::Absolute(Pixels(2.0))));
+        assert_eq!(hash(LineHeight::Relative(2.0)), hash(LineHeight::Relative(2.0)));
+    }
+
+    #[test]
+    fn justified_and_default_start_at_the_left() {
+        for alignment in [Alignment::Default, Alignment::Justified, Alignment::Left] {
+            assert_eq!(alignment::Horizontal::from(alignment), alignment::Horizontal::Left);
+        }
+        assert_eq!(Alignment::from(crate::Alignment::End), Alignment::Right);
+    }
+
+    #[test]
+    fn with_content_keeps_every_setting() {
+        let text = Text {
+            content: String::from("a"),
+            bounds: Size::new(10.0, 20.0),
+            size: Pixels(12.0),
+            line_height: LineHeight::Relative(1.5),
+            font: crate::Font::MONOSPACE,
+            align_x: Alignment::Center,
+            align_y: alignment::Vertical::Bottom,
+            shaping: Shaping::Basic,
+            wrapping: Wrapping::Glyph,
+            ellipsis: Ellipsis::Middle,
+            hint_factor: Some(2.0),
+        };
+        let borrowed = text.as_ref();
+
+        assert_eq!(borrowed.content, "a");
+        assert_eq!(borrowed.bounds, text.bounds);
+        assert_eq!(borrowed.align_x, Alignment::Center);
+        assert_eq!(borrowed.ellipsis, Ellipsis::Middle);
+        assert_eq!(borrowed.hint_factor, Some(2.0));
+    }
 }

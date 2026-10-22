@@ -1,4 +1,4 @@
-//! Query or update internal widget state.
+//! Walking the widget tree to query or update widget state.
 pub mod focusable;
 pub mod scrollable;
 pub mod text_input;
@@ -16,21 +16,22 @@ use crate::{Rectangle, Vector};
 use std::any::Any;
 use std::fmt;
 
-/// A piece of logic that can traverse the widget tree of an application in
-/// order to query or update some widget state.
+/// A visitor that walks the widget tree to read or change widget state:
+/// focus, scroll offsets, text-input cursors, or anything custom.
+///
+/// Widgets call the visit method matching what they are (a container, a
+/// scrollable, a focusable…) and then hand the operation to their children
+/// through [`traverse`](Self::traverse). Every visit method does nothing by
+/// default, so an operation only implements the visits it cares about.
 pub trait Operation<T = ()>: Send {
-    /// Requests further traversal of the widget tree to keep operating.
-    ///
-    /// The provided `operate` closure may be called by an [`Operation`]
-    /// to return control to the widget tree and keep traversing it. If
-    /// the closure is not called, the children of the widget asking for
-    /// traversal will be skipped.
+    /// Visits the children of the current widget by calling `operate` on
+    /// this operation. Not calling it prunes the subtree.
     fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>));
 
-    /// Operates on a widget that contains other widgets.
+    /// Visits a widget that groups other widgets.
     fn container(&mut self, _id: Option<&Id>, _bounds: Rectangle) {}
 
-    /// Operates on a widget that can be scrolled.
+    /// Visits a widget that scrolls its content by `translation`.
     fn scrollable(
         &mut self,
         _id: Option<&Id>,
@@ -41,90 +42,94 @@ pub trait Operation<T = ()>: Send {
     ) {
     }
 
-    /// Operates on a widget that can be focused.
+    /// Visits a widget that can take keyboard focus.
     fn focusable(&mut self, _id: Option<&Id>, _bounds: Rectangle, _state: &mut dyn Focusable) {}
 
-    /// Operates on a widget that has text input.
+    /// Visits a widget that edits text.
     fn text_input(&mut self, _id: Option<&Id>, _bounds: Rectangle, _state: &mut dyn TextInput) {}
 
-    /// Operates on a widget that contains some text.
+    /// Visits a widget that displays text.
     fn text(&mut self, _id: Option<&Id>, _bounds: Rectangle, _text: &str) {}
 
-    /// Operates on a custom widget with some state.
+    /// Visits a widget exposing state of its own type.
     fn custom(&mut self, _id: Option<&Id>, _bounds: Rectangle, _state: &mut dyn Any) {}
 
-    /// Finishes the [`Operation`] and returns its [`Outcome`].
+    /// What the walk produced. Called once the whole tree was visited.
     fn finish(&self) -> Outcome<T> {
         Outcome::None
     }
 }
+
+/// Implements every visit method of [`Operation`] (all but `traverse` and
+/// `finish`) by forwarding it to `$inner`.
+macro_rules! forward_visits {
+    ($self:ident => $inner:expr) => {
+        fn container(&mut $self, id: Option<&Id>, bounds: Rectangle) {
+            $inner.container(id, bounds);
+        }
+
+        fn scrollable(
+            &mut $self,
+            id: Option<&Id>,
+            bounds: Rectangle,
+            content_bounds: Rectangle,
+            translation: Vector,
+            state: &mut dyn Scrollable,
+        ) {
+            $inner.scrollable(id, bounds, content_bounds, translation, state);
+        }
+
+        fn focusable(&mut $self, id: Option<&Id>, bounds: Rectangle, state: &mut dyn Focusable) {
+            $inner.focusable(id, bounds, state);
+        }
+
+        fn text_input(&mut $self, id: Option<&Id>, bounds: Rectangle, state: &mut dyn TextInput) {
+            $inner.text_input(id, bounds, state);
+        }
+
+        fn text(&mut $self, id: Option<&Id>, bounds: Rectangle, text: &str) {
+            $inner.text(id, bounds, text);
+        }
+
+        fn custom(&mut $self, id: Option<&Id>, bounds: Rectangle, state: &mut dyn Any) {
+            $inner.custom(id, bounds, state);
+        }
+    };
+}
+
+use forward_visits;
 
 impl<T, O> Operation<O> for Box<T>
 where
     T: Operation<O> + ?Sized,
 {
     fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<O>)) {
-        self.as_mut().traverse(operate);
+        (**self).traverse(operate);
     }
 
-    fn container(&mut self, id: Option<&Id>, bounds: Rectangle) {
-        self.as_mut().container(id, bounds);
-    }
-
-    fn focusable(&mut self, id: Option<&Id>, bounds: Rectangle, state: &mut dyn Focusable) {
-        self.as_mut().focusable(id, bounds, state);
-    }
-
-    fn scrollable(
-        &mut self,
-        id: Option<&Id>,
-        bounds: Rectangle,
-        content_bounds: Rectangle,
-        translation: Vector,
-        state: &mut dyn Scrollable,
-    ) {
-        self.as_mut()
-            .scrollable(id, bounds, content_bounds, translation, state);
-    }
-
-    fn text_input(&mut self, id: Option<&Id>, bounds: Rectangle, state: &mut dyn TextInput) {
-        self.as_mut().text_input(id, bounds, state);
-    }
-
-    fn text(&mut self, id: Option<&Id>, bounds: Rectangle, text: &str) {
-        self.as_mut().text(id, bounds, text);
-    }
-
-    fn custom(&mut self, id: Option<&Id>, bounds: Rectangle, state: &mut dyn Any) {
-        self.as_mut().custom(id, bounds, state);
-    }
+    forward_visits!(self => (**self));
 
     fn finish(&self) -> Outcome<O> {
-        self.as_ref().finish()
+        (**self).finish()
     }
 }
 
-/// The result of an [`Operation`].
+/// What an [`Operation`] produced.
 pub enum Outcome<T> {
-    /// The [`Operation`] produced no result.
+    /// Nothing.
     None,
-
-    /// The [`Operation`] produced some result.
+    /// A value.
     Some(T),
-
-    /// The [`Operation`] needs to be followed by another [`Operation`].
+    /// Another operation that must walk the tree next.
     Chain(Box<dyn Operation<T>>),
 }
 
-impl<T> fmt::Debug for Outcome<T>
-where
-    T: fmt::Debug,
-{
+impl<T: fmt::Debug> fmt::Debug for Outcome<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::None => write!(f, "Outcome::None"),
-            Self::Some(output) => write!(f, "Outcome::Some({output:?})"),
-            Self::Chain(_) => write!(f, "Outcome::Chain(...)"),
+            Self::None => f.write_str("Outcome::None"),
+            Self::Some(value) => f.debug_tuple("Outcome::Some").field(value).finish(),
+            Self::Chain(_) => f.write_str("Outcome::Chain(..)"),
         }
     }
 }

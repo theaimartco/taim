@@ -1,3 +1,4 @@
+//! Type-erased widgets.
 use crate::widget;
 use crate::{Color, Widget};
 
@@ -9,21 +10,17 @@ mod map;
 use explain::Explain;
 use map::Map;
 
-/// A generic [`Widget`].
+/// Any [`Widget`], boxed behind one type.
 ///
-/// It is useful to build composable user interfaces that do not leak
-/// implementation details in their __view logic__.
-///
-/// If you have a [built-in widget], you should be able to use `Into<Element>`
-/// to turn it into an [`Element`].
-///
-/// [built-in widget]: crate::widget
+/// Views return `Element`s so a parent never needs to know which concrete
+/// widgets its children are. Every built-in widget converts into one with
+/// `.into()`.
 pub struct Element<'a, Message, Theme, Renderer> {
     widget: Box<dyn Widget<Message, Theme, Renderer> + 'a>,
 }
 
 impl<'a, Message, Theme, Renderer> Element<'a, Message, Theme, Renderer> {
-    /// Creates a new [`Element`] containing the given [`Widget`].
+    /// Boxes `widget`.
     pub fn new(widget: impl Widget<Message, Theme, Renderer> + 'a) -> Self
     where
         Renderer: crate::Renderer,
@@ -33,153 +30,36 @@ impl<'a, Message, Theme, Renderer> Element<'a, Message, Theme, Renderer> {
         }
     }
 
-    /// Returns a reference to the [`Widget`] of the [`Element`],
+    /// The boxed widget.
     pub fn as_widget(&self) -> &dyn Widget<Message, Theme, Renderer> {
-        self.widget.as_ref()
+        &*self.widget
     }
 
-    /// Returns a mutable reference to the [`Widget`] of the [`Element`],
+    /// The boxed widget, mutably.
     pub fn as_widget_mut(&mut self) -> &mut dyn Widget<Message, Theme, Renderer> {
-        self.widget.as_mut()
+        &mut *self.widget
     }
 
-    /// Applies a transformation to the produced message of the [`Element`].
+    /// Converts every message the element produces with `f`.
     ///
-    /// This method is useful when you want to decouple different parts of your
-    /// UI and make them __composable__.
-    ///
-    /// # Example
-    /// Imagine we want to use [our counter](index.html#usage). But instead of
-    /// showing a single counter, we want to display many of them. We can reuse
-    /// the `Counter` type as it is!
-    ///
-    /// We use composition to model the __state__ of our new application:
+    /// This is how a reusable component plugs into a larger application: the
+    /// component speaks its own message type, and the parent wraps those
+    /// messages into its own.
     ///
     /// ```
-    /// # mod counter {
-    /// #     pub struct Counter;
-    /// # }
-    /// use counter::Counter;
-    ///
-    /// struct ManyCounters {
-    ///     counters: Vec<Counter>,
-    /// }
-    /// ```
-    ///
-    /// We can store the state of multiple counters now. However, the
-    /// __messages__ we implemented before describe the user interactions
-    /// of a __single__ counter. Right now, we need to also identify which
-    /// counter is receiving user interactions. Can we use composition again?
-    /// Yes.
-    ///
-    /// ```
-    /// # mod counter {
-    /// #     #[derive(Debug, Clone, Copy)]
-    /// #     pub enum Message {}
-    /// # }
-    /// #[derive(Debug, Clone, Copy)]
-    /// pub enum Message {
-    ///     Counter(usize, counter::Message)
-    /// }
-    /// ```
-    ///
-    /// We compose the previous __messages__ with the index of the counter
-    /// producing them. Let's implement our __view logic__ now:
-    ///
-    /// ```no_run
-    /// # mod taim {
-    /// #     pub use taim_core::Function;
-    /// #     pub type Element<'a, Message> = taim_core::Element<'a, Message, taim_core::Theme, ()>;
-    /// #
-    /// #     pub mod widget {
-    /// #         pub fn row<'a, Message>(iter: impl IntoIterator<Item = super::Element<'a, Message>>) -> super::Element<'a, Message> {
-    /// #             unimplemented!()
-    /// #         }
-    /// #     }
-    /// # }
-    /// #
-    /// # mod counter {
-    /// #     #[derive(Debug, Clone, Copy)]
-    /// #     pub enum Message {}
-    /// #     pub struct Counter;
-    /// #
-    /// #     pub type Element<'a, Message> = taim_core::Element<'a, Message, taim_core::Theme, ()>;
-    /// #
-    /// #     impl Counter {
-    /// #         pub fn view(&self) -> Element<Message> {
-    /// #             unimplemented!()
-    /// #         }
-    /// #     }
-    /// # }
-    /// #
-    /// use counter::Counter;
-    ///
-    /// use taim::widget::row;
-    /// use taim::{Element, Function};
-    ///
-    /// struct ManyCounters {
-    ///     counters: Vec<Counter>,
+    /// # type Element<'a, M> = taim_core::Element<'a, M, taim_core::Theme, ()>;
+    /// mod slider {
+    ///     #[derive(Debug, Clone)]
+    ///     pub enum Message { Moved(f32) }
     /// }
     ///
-    /// #[derive(Debug, Clone, Copy)]
-    /// pub enum Message {
-    ///     Counter(usize, counter::Message),
+    /// #[derive(Debug, Clone)]
+    /// enum Message {
+    ///     Volume(slider::Message),
     /// }
     ///
-    /// impl ManyCounters {
-    ///     pub fn view(&self) -> Element<Message> {
-    ///         // We can quickly populate a `row` by mapping our counters
-    ///         row(
-    ///             self.counters
-    ///                 .iter()
-    ///                 .map(Counter::view)
-    ///                 .enumerate()
-    ///                 .map(|(index, counter)| {
-    ///                     // Here we turn our `Element<counter::Message>` into
-    ///                     // an `Element<Message>` by combining the `index` and the
-    ///                     // message of the `element`.
-    ///                     counter.map(Message::Counter.with(index))
-    ///                 }),
-    ///         )
-    ///         .into()
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// Finally, our __update logic__ is pretty straightforward: simple
-    /// delegation.
-    ///
-    /// ```
-    /// # mod counter {
-    /// #     #[derive(Debug, Clone, Copy)]
-    /// #     pub enum Message {}
-    /// #     pub struct Counter;
-    /// #
-    /// #     impl Counter {
-    /// #         pub fn update(&mut self, _message: Message) {}
-    /// #     }
-    /// # }
-    /// #
-    /// # use counter::Counter;
-    /// #
-    /// # struct ManyCounters {
-    /// #     counters: Vec<Counter>,
-    /// # }
-    /// #
-    /// # #[derive(Debug, Clone, Copy)]
-    /// # pub enum Message {
-    /// #    Counter(usize, counter::Message)
-    /// # }
-    /// impl ManyCounters {
-    ///     pub fn update(&mut self, message: Message) {
-    ///         match message {
-    ///             Message::Counter(index, counter_msg) => {
-    ///                 if let Some(counter) = self.counters.get_mut(index) {
-    ///                     counter.update(counter_msg);
-    ///                 }
-    ///             }
-    ///         }
-    ///     }
+    /// fn volume<'a>(slider: Element<'a, slider::Message>) -> Element<'a, Message> {
+    ///     slider.map(Message::Volume)
     /// }
     /// ```
     pub fn map<B>(self, f: impl Fn(Message) -> B + 'a) -> Element<'a, B, Theme, Renderer>
@@ -192,73 +72,69 @@ impl<'a, Message, Theme, Renderer> Element<'a, Message, Theme, Renderer> {
         Element::new(Map::new(self.widget, f))
     }
 
-    /// Marks the [`Element`] as _to-be-explained_.
-    ///
-    /// The [`Renderer`] will explain the layout of the [`Element`] graphically.
-    /// This can be very useful for debugging your layout!
-    ///
-    /// [`Renderer`]: crate::Renderer
-    pub fn explain<C: Into<Color>>(self, color: C) -> Element<'a, Message, Theme, Renderer>
+    /// Outlines the element and all of its descendants in `color`, to debug
+    /// layout.
+    pub fn explain(self, color: impl Into<Color>) -> Element<'a, Message, Theme, Renderer>
     where
         Message: 'a,
         Theme: 'a,
         Renderer: crate::Renderer + 'a,
     {
+        let color = color.into();
+
         Element {
-            widget: Box::new(Explain::new(self, color.into())),
+            widget: Box::new(Explain::new(self, color)),
         }
     }
 }
 
-impl<'a, Message, Theme, Renderer> Borrow<dyn Widget<Message, Theme, Renderer> + 'a>
-    for Element<'a, Message, Theme, Renderer>
-{
-    fn borrow(&self) -> &(dyn Widget<Message, Theme, Renderer> + 'a) {
-        self.widget.borrow()
-    }
+/// Lets widget-tree helpers accept elements, element references and plain
+/// widget references interchangeably.
+macro_rules! borrow_widget {
+    ($($holder:ty => $($mutable:ident)?;)+) => {
+        $(
+            impl<'a, Message, Theme, Renderer> Borrow<dyn Widget<Message, Theme, Renderer> + 'a>
+                for $holder
+            {
+                fn borrow(&self) -> &(dyn Widget<Message, Theme, Renderer> + 'a) {
+                    &*self.widget
+                }
+            }
+
+            $(
+                borrow_widget!(@$mutable $holder);
+            )?
+        )+
+    };
+    (@mutable $holder:ty) => {
+        impl<'a, Message, Theme, Renderer> BorrowMut<dyn Widget<Message, Theme, Renderer> + 'a>
+            for $holder
+        {
+            fn borrow_mut(&mut self) -> &mut (dyn Widget<Message, Theme, Renderer> + 'a) {
+                &mut *self.widget
+            }
+        }
+    };
 }
 
-impl<'a, Message, Theme, Renderer> Borrow<dyn Widget<Message, Theme, Renderer> + 'a>
-    for &Element<'a, Message, Theme, Renderer>
-{
-    fn borrow(&self) -> &(dyn Widget<Message, Theme, Renderer> + 'a) {
-        self.widget.borrow()
-    }
+borrow_widget! {
+    Element<'a, Message, Theme, Renderer> => mutable;
+    &Element<'a, Message, Theme, Renderer> => ;
+    &mut Element<'a, Message, Theme, Renderer> => mutable;
 }
 
-impl<'a, Message, Theme, Renderer> Borrow<dyn Widget<Message, Theme, Renderer> + 'a>
-    for &mut Element<'a, Message, Theme, Renderer>
-{
-    fn borrow(&self) -> &(dyn Widget<Message, Theme, Renderer> + 'a) {
-        self.widget.borrow()
-    }
-}
-
-impl<'a, Message, Theme, Renderer> BorrowMut<dyn Widget<Message, Theme, Renderer> + 'a>
-    for Element<'a, Message, Theme, Renderer>
-{
-    fn borrow_mut(&mut self) -> &mut (dyn Widget<Message, Theme, Renderer> + 'a) {
-        self.widget.borrow_mut()
-    }
-}
-
-impl<'a, Message, Theme, Renderer> BorrowMut<dyn Widget<Message, Theme, Renderer> + 'a>
-    for &mut Element<'a, Message, Theme, Renderer>
-{
-    fn borrow_mut(&mut self) -> &mut (dyn Widget<Message, Theme, Renderer> + 'a) {
-        self.widget.borrow_mut()
-    }
-}
-
+/// `None` becomes an empty, zero-sized element, so optional children can be
+/// passed straight into containers.
 impl<'a, T, Message, Theme, Renderer> From<Option<T>> for Element<'a, Message, Theme, Renderer>
 where
     T: Into<Self>,
     Renderer: crate::Renderer,
 {
-    fn from(value: Option<T>) -> Self {
-        value
-            .map(T::into)
-            .unwrap_or_else(|| Element::new(widget::Void))
+    fn from(child: Option<T>) -> Self {
+        match child {
+            Some(child) => child.into(),
+            None => Element::new(widget::Void),
+        }
     }
 }
 
