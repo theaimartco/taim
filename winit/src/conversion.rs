@@ -1,24 +1,18 @@
-//! Convert [`winit`] types into [`taim_runtime`] types, and viceversa.
+//! Translation between `winit` types and TAIM types.
 //!
-//! [`winit`]: https://github.com/rust-windowing/winit
-//! [`taim_runtime`]: https://github.com/theaimartco/taim/tree/master/runtime
+//! Every submodule covers one vocabulary: `keymap` for keys, `pointer` for
+//! buttons, cursors and modifiers, `event` for whole window events,
+//! `platform_window` for window creation and window state, `misc` for the
+//! remaining small enums.
 mod event;
-
-pub use event::{cursor_position, window_event};
-
-use crate::core::Size;
-use crate::core::input_method;
-use crate::core::keyboard;
-use crate::core::mouse;
-use crate::core::theme;
-use crate::core::window;
-
-#[path = "conversion/keyboard.rs"]
 mod keymap;
 mod misc;
 mod platform_window;
 mod pointer;
 
+use crate::core::{Size, input_method, keyboard, mouse, theme, window};
+
+pub use event::{cursor_position, window_event};
 pub use keymap::{key, key_code, native_key_code, physical_key};
 pub use misc::{icon, ime_purpose, resize_direction, user_attention};
 pub use platform_window::{

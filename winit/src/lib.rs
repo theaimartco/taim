@@ -1,19 +1,17 @@
-//! A windowing shell for Taim, on top of [`winit`].
+//! The TAIM desktop shell, on top of [`winit`].
 //!
-//! ![The native path of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/native.svg?raw=true)
+//! ![The native path of the TAIM ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/native.svg?raw=true)
 //!
-//! `taim_winit` offers some convenient abstractions on top of [`taim_runtime`]
-//! to quickstart development when using [`winit`].
+//! Start an application with [`run_app`] (native TAIM [`App`]s) or [`run`]
+//! (the compatibility [`Program`] path, adapted onto the same engine). See
+//! the `shell` module docs for how the event-loop host and the application
+//! engine divide the work.
 //!
-//! Applications are driven through [`run_app`] (native TAIM [`App`]s) or
-//! [`run`] (the compatibility [`Program`] path, adapted onto the same engine).
+//! The [`conversion`] module translates `winit` input and window types into
+//! TAIM's vocabulary for anyone writing their own event loop, and
+//! [`frame_gate`] exposes the per-window frame-production policy.
 //!
-//! Additionally, a [`conversion`] module is available for users that decide to
-//! implement a custom event loop.
-//!
-//! [`taim_runtime`]: https://github.com/theaimartco/taim/tree/master/runtime
 //! [`winit`]: https://github.com/rust-windowing/winit
-//! [`conversion`]: crate::conversion
 //! [`App`]: program::App
 //! [`Program`]: program::Program
 #![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]

@@ -18,7 +18,7 @@ use flow::Flow;
 /// - [`send_action`](Self::send_action) wakes the event loop directly. The
 ///   four framework "pulse" actions (tick, redraw-all, relayout-all, reload)
 ///   are coalesced: while one is queued, sending it again is free.
-/// - The [`Sink`](futures::Sink) implementation is bounded. Streams feeding
+/// - The [`Sink`](crate::futures::futures::Sink) implementation is bounded. Streams feeding
 ///   it are back-pressured until the shell reports, via
 ///   [`free_slots`](Self::free_slots), that it consumed earlier actions.
 #[derive(Debug)]
@@ -95,7 +95,7 @@ impl<T: 'static> Proxy<T> {
         )
     }
 
-    /// A bounded sender into the same queue the [`Sink`](futures::Sink)
+    /// A bounded sender into the same queue the [`Sink`](crate::futures::futures::Sink)
     /// implementation uses.
     pub fn input(&self) -> mpsc::Sender<Action<T>> {
         self.queue.clone()

@@ -213,6 +213,32 @@ cross-target rendering and actual device verification remain NO-GO
 until run. CI workflows are still fully commented at owner request.
 See `docs/audit/taim-native-flex-20261020.md`.
 
+## TAIM-native winit shell — 2026-10-22
+
+`winit/` is rewritten around a TAIM host/engine split (see
+`winit/src/shell.rs`): the host is the only code touching the `winit`
+event loop; the engine owns the application, windows and runtime as one
+cooperative task; they exchange `Signal`s and `Request`s. Keyboard,
+pointer, event and window-attribute conversions, window state, the IME
+overlay, the window manager and the proxy were rewritten with it.
+
+Line-level overlap with the recorded Iced fork point (normalized lines of
+25+ characters that also occur anywhere in the fork tree) fell from
+1,675 / 2,855 (58.7%) to 390 / 2,732 (14.3%). What remains is mostly
+shared vocabulary that any `winit` adapter contains: `cfg` attributes,
+enum variant names, trait method signatures, `arboard` and `winit` calls.
+It is a similarity measure, not an originality percentage.
+
+Verified in this checkpoint: `cargo check --workspace --all-targets
+--all-features`, `cargo test --workspace --all-features` (2,273 passed,
+0 failed), clippy on `taim_winit` with no findings, and the `trivial` and
+`mobile_shell` examples running under Xvfb with the tiny-skia backend
+(render, tab/chip/bottom-nav clicks; pixel-identical before and after the
+window-layer rewrite). Typed text does not appear in `mobile_shell`'s
+search field under Xvfb + xdotool with either the old or new shell; that
+is pre-existing and unresolved. Physical-device, Wayland, Windows, macOS
+and web runs remain unverified.
+
 ## Verification lanes
 
 - Hosted CI: DISABLED at owner request — verification.yml is fully commented;
