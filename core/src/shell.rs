@@ -1,4 +1,4 @@
-//! Communicate with the taim runtime from widgets.
+//! How a widget talks back to the runtime while it handles an event.
 use crate::clipboard;
 use crate::damage;
 use crate::event;
@@ -7,42 +7,69 @@ use crate::{Clipboard, InputMethod, Window};
 
 use std::sync::Arc;
 
-/// A connection to the state of a shell.
+/// The channel from a widget back to the runtime during one update.
 ///
-/// A [`Widget`] can leverage a [`Shell`] to trigger changes in an application,
-/// like publishing messages or invalidating the current layout.
-///
-/// [`Widget`]: crate::Widget
+/// Through it a widget publishes messages, captures the event, and asks for
+/// side effects: a redraw, a relayout, a rebuilt widget tree, recomputed
+/// semantics, clipboard access, an input method. Parents that run children
+/// against a [`local`](Self::local) shell fold the child's effects back with
+/// [`merge`](Self::merge).
 #[derive(Debug)]
 pub struct Shell<'a, Message> {
     window: &'a dyn Window,
-    messages: &'a mut Vec<Message>,
     waker: Waker,
+    messages: &'a mut Vec<Message>,
     event_status: event::Status,
-    redraw_request: window::RedrawRequest,
+    effects: Effects,
     input_method: InputMethod,
-    is_layout_invalid: Option<Diff>,
-    are_widgets_invalid: bool,
-    is_semantics_invalid: bool,
-    damage_requests: Vec<damage::Request>,
-    is_animating: bool,
     clipboard: Clipboard,
 }
 
+/// Everything a widget can ask the runtime to do besides publishing
+/// messages; combined field by field when shells merge.
+#[derive(Debug)]
+struct Effects {
+    redraw: window::RedrawRequest,
+    animating: bool,
+    layout: Option<Diff>,
+    widgets: bool,
+    semantics: bool,
+    damage: Vec<damage::Request>,
+}
+
+impl Effects {
+    fn none() -> Self {
+        Self {
+            redraw: window::RedrawRequest::Wait,
+            animating: false,
+            layout: None,
+            widgets: false,
+            semantics: false,
+            damage: Vec::new(),
+        }
+    }
+
+    /// The union of both sets of effects: the soonest redraw, the strongest
+    /// layout diff, and every flag or damage request either side raised.
+    fn absorb(&mut self, other: &mut Self) {
+        self.redraw = self.redraw.min(other.redraw);
+        self.animating |= other.animating;
+        self.layout = self.layout.max(other.layout);
+        self.widgets |= other.widgets;
+        self.semantics |= other.semantics;
+        self.damage.append(&mut other.damage);
+    }
+}
+
 impl<'a, Message> Shell<'a, Message> {
-    /// Creates a new [`Shell`] with the provided buffer of messages.
+    /// A shell collecting messages into `messages`.
     pub fn new(window: &'a dyn Window, waker: Waker, messages: &'a mut Vec<Message>) -> Self {
         Self {
             window,
-            messages,
             waker,
+            messages,
             event_status: event::Status::Ignored,
-            redraw_request: window::RedrawRequest::Wait,
-            is_layout_invalid: None,
-            are_widgets_invalid: false,
-            is_semantics_invalid: false,
-            damage_requests: Vec::new(),
-            is_animating: false,
+            effects: Effects::none(),
             input_method: InputMethod::Disabled,
             clipboard: Clipboard {
                 reads: Vec::new(),
@@ -51,7 +78,8 @@ impl<'a, Message> Shell<'a, Message> {
         }
     }
 
-    /// Creates a new [`Shell`] from the current one with the given list of local messages.
+    /// A fresh shell for the same window, collecting messages of another
+    /// type into `messages`. Merge it back with [`merge`](Self::merge).
     pub fn local<'b, A>(&self, messages: &'b mut Vec<A>) -> Shell<'b, A>
     where
         'a: 'b,
@@ -59,229 +87,187 @@ impl<'a, Message> Shell<'a, Message> {
         Shell::new(self.window, self.waker.clone(), messages)
     }
 
-    /// Returns the [`Window`] of the [`Shell`].
+    /// The window the event belongs to.
     pub fn window(&self) -> &'a dyn Window {
         self.window
     }
 
-    /// Returns the [`Waker`] of the [`Shell`].
+    /// A handle that wakes the runtime from any thread.
     pub fn waker(&self) -> &Waker {
         &self.waker
     }
 
-    /// Returns true if the [`Shell`] contains no published messages
+    /// Whether nothing has been published yet.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.messages.is_empty()
     }
 
-    /// Publish the given `Message` for an application to process it.
+    /// Sends `message` to the application's update.
     pub fn publish(&mut self, message: Message) {
         self.messages.push(message);
     }
 
-    /// Marks the current event as captured. Prevents "event bubbling".
-    ///
-    /// A widget should capture an event when no ancestor should
-    /// handle it.
+    /// Claims the event so no ancestor handles it.
     pub fn capture_event(&mut self) {
         self.event_status = event::Status::Captured;
     }
 
-    /// Returns the current [`event::Status`] of the [`Shell`].
+    /// Whether the event was claimed.
     #[must_use]
     pub fn event_status(&self) -> event::Status {
         self.event_status
     }
 
-    /// Returns whether the current event has been captured.
+    /// Shorthand for `event_status() == Captured`.
     #[must_use]
     pub fn is_event_captured(&self) -> bool {
         self.event_status == event::Status::Captured
     }
 
-    /// Requests a new frame to be drawn as soon as possible.
+    /// Asks for the next frame.
     pub fn request_redraw(&mut self) {
-        self.redraw_request = window::RedrawRequest::NextFrame;
+        self.effects.redraw = window::RedrawRequest::NextFrame;
     }
 
-    /// Requests a new frame to be drawn at the given [`window::RedrawRequest`].
-    pub fn request_redraw_at(&mut self, redraw_request: impl Into<window::RedrawRequest>) {
-        self.redraw_request = self.redraw_request.min(redraw_request.into());
+    /// Asks for a frame at `request`, keeping an earlier request if there
+    /// is one.
+    pub fn request_redraw_at(&mut self, request: impl Into<window::RedrawRequest>) {
+        self.effects.redraw = self.effects.redraw.min(request.into());
     }
 
-    /// Returns the request a redraw should happen, if any.
+    /// The soonest frame anything asked for.
     #[must_use]
     pub fn redraw_request(&self) -> window::RedrawRequest {
-        self.redraw_request
+        self.effects.redraw
     }
 
-    /// Replaces the redraw request of the [`Shell`]; without conflict resolution.
-    ///
-    /// This is useful if you want to overwrite the redraw request to a previous value.
-    /// Since it's a fairly advanced use case and should rarely be used, it is a static
-    /// method.
-    pub fn replace_redraw_request(shell: &mut Self, redraw_request: window::RedrawRequest) {
-        shell.redraw_request = redraw_request;
+    /// Overwrites the redraw request, ignoring what was asked before. For
+    /// containers that must undo a child's request; deliberately not a
+    /// method so it is not reached for by accident.
+    pub fn replace_redraw_request(shell: &mut Self, request: window::RedrawRequest) {
+        shell.effects.redraw = request;
     }
 
-    /// Declares that continuous redraws are needed (e.g. an in-progress
-    /// animation), rather than a single one-shot redraw.
+    /// Declares that frames are needed continuously, not just once.
     ///
-    /// This is the "widgets never create independent render loops" rule
-    /// (`phase.md` Phase 6) made explicit: a widget with an active
-    /// animation calls this every time it updates (alongside
-    /// [`Shell::request_redraw`], which it should still call to get the
-    /// next frame scheduled) so a frame scheduler
-    /// (`runtime::frame_scheduler::Scheduler`) can tell "one more frame
-    /// is needed" apart from "frames are needed continuously until this
-    /// stops being called," instead of inferring a loop from the mere
-    /// repetition of one-shot requests.
+    /// Widgets never run their own render loop: a widget with a running
+    /// animation calls this on every update (alongside
+    /// [`request_redraw`](Self::request_redraw)), and the frame scheduler
+    /// keeps producing frames until a whole update passes without it.
     pub fn request_animation(&mut self) {
-        self.is_animating = true;
+        self.effects.animating = true;
     }
 
-    /// Returns whether continuous redraws have been requested on this
-    /// [`Shell`] (see [`Shell::request_animation`]).
+    /// Whether continuous frames were requested.
     #[must_use]
     pub fn is_animating(&self) -> bool {
-        self.is_animating
+        self.effects.animating
     }
 
-    /// Requests the runtime to read the clipboard contents expecting the given [`clipboard::Kind`].
-    ///
-    /// The runtime will produce a [`clipboard::Event::Read`] when the contents have been read.
+    /// Asks for the clipboard contents of `kind`; they arrive later as a
+    /// [`clipboard::Event::Read`].
     pub fn read_clipboard(&mut self, kind: clipboard::Kind) {
         self.clipboard.reads.push(kind);
     }
 
-    /// Requests the runtime to write the given [`clipboard::Content`] to the clipboard.
-    ///
-    /// The runtime will produce a [`clipboard::Event::Written`] when the contents have been written.
+    /// Asks for `content` to be put on the clipboard; completion arrives as
+    /// a [`clipboard::Event::Written`].
     pub fn write_clipboard(&mut self, content: clipboard::Content) {
         self.clipboard.write = Some(content);
     }
 
-    /// Returns the [`Clipboard`] requests of the [`Shell`], mutably.
+    /// Pending clipboard requests.
     pub fn clipboard_mut(&mut self) -> &mut Clipboard {
         &mut self.clipboard
     }
 
-    /// Requests the current [`InputMethod`] strategy.
-    ///
-    /// __Important__: This request will only be honored by the
-    /// [`Shell`] only during a [`window::Event::RedrawRequested`].
+    /// Asks for an input method. Honored only while handling
+    /// [`window::Event::RedrawRequested`].
     pub fn request_input_method<T: AsRef<str>>(&mut self, ime: &InputMethod<T>) {
         self.input_method.merge(ime);
     }
 
-    /// Returns the current [`InputMethod`] strategy.
+    /// The input method requested so far.
     #[must_use]
     pub fn input_method(&self) -> &InputMethod {
         &self.input_method
     }
 
-    /// Returns the current [`InputMethod`] strategy.
+    /// The input method requested so far, mutably.
     #[must_use]
     pub fn input_method_mut(&mut self) -> &mut InputMethod {
         &mut self.input_method
     }
 
-    /// Returns whether the current layout is invalid or not.
+    /// Whether layout must run again, and with which [`Diff`].
     #[must_use]
     pub fn is_layout_invalid(&self) -> Option<Diff> {
-        self.is_layout_invalid
+        self.effects.layout
     }
 
-    /// Invalidates the current application layout.
-    ///
-    /// The shell will relayout the application widgets.
+    /// Asks for a relayout of the existing widget tree.
     pub fn invalidate_layout(&mut self) {
         self.invalidate_layout_with(Diff::Skip);
     }
 
-    /// Invalidates the current application layout with the following [`Diff`] strategy.
+    /// Asks for a relayout, diffing the tree first if `diff` says so.
     pub fn invalidate_layout_with(&mut self, diff: Diff) {
-        self.is_layout_invalid = Some(diff);
+        self.effects.layout = Some(diff);
     }
 
-    /// Triggers the given function if the layout is invalid, cleaning it in the
-    /// process.
-    pub fn revalidate_layout(&mut self, f: impl FnOnce(Diff)) {
-        if let Some(diff) = self.is_layout_invalid.take() {
-            f(diff);
+    /// Runs `relayout` if layout was invalidated, clearing the request.
+    pub fn revalidate_layout(&mut self, relayout: impl FnOnce(Diff)) {
+        if let Some(diff) = self.effects.layout.take() {
+            relayout(diff);
         }
     }
 
-    /// Returns whether the widgets of the current application have been
-    /// invalidated.
+    /// Whether the widget tree must be rebuilt.
     #[must_use]
     pub fn are_widgets_invalid(&self) -> bool {
-        self.are_widgets_invalid
+        self.effects.widgets
     }
 
-    /// Invalidates the current application widgets.
-    ///
-    /// The shell will rebuild and relayout the widget tree.
+    /// Asks for the widget tree to be rebuilt from the view and laid out.
     pub fn invalidate_widgets(&mut self) {
-        self.are_widgets_invalid = true;
+        self.effects.widgets = true;
     }
 
-    /// Returns whether the semantic tree of the current application has
-    /// been invalidated.
+    /// Whether the semantic tree must be recomputed.
     #[must_use]
     pub fn is_semantics_invalid(&self) -> bool {
-        self.is_semantics_invalid
+        self.effects.semantics
     }
 
-    /// Invalidates the current application's semantic tree (see
-    /// [`crate::semantics`]).
-    ///
-    /// The shell will recompute semantics before the next presentation to
-    /// assistive technology. There is no consumer of this yet -- Phase
-    /// 13 is the first phase that reads [`Shell::is_semantics_invalid`];
-    /// until then, calling this only records the request.
+    /// Asks for the [semantic tree](crate::semantics) to be recomputed
+    /// before assistive technology is next updated.
     pub fn invalidate_semantics(&mut self) {
-        self.is_semantics_invalid = true;
+        self.effects.semantics = true;
     }
 
-    /// Requests that the given [`damage::Request`] be applied.
+    /// Records `request` and asks for the next frame.
     ///
-    /// Until Phase 4 lands real damage-region tracking, every
-    /// [`damage::Request`] conservatively invalidates the entire redraw
-    /// path (equivalent to calling [`Shell::request_redraw`]) rather
-    /// than attempting to track precise regions -- the request is still
-    /// recorded (see [`Shell::damage_requests`]) so a later phase can
-    /// switch this method's body over to precise tracking without
-    /// changing any widget's call site.
+    /// Requests are kept (see [`damage_requests`](Self::damage_requests))
+    /// for precise damage tracking; until a consumer uses the regions,
+    /// every request also schedules a full redraw.
     pub fn request_damage(&mut self, request: damage::Request) {
-        self.damage_requests.push(request);
+        self.effects.damage.push(request);
         self.request_redraw();
     }
 
-    /// Returns every [`damage::Request`] accumulated on this [`Shell`]
-    /// so far.
-    ///
-    /// No runtime consumes this yet; it exists so damage requests are
-    /// not silently dropped once widgets start producing them, ahead of
-    /// Phase 4 wiring a real consumer.
+    /// Every damage request recorded so far.
     pub fn damage_requests(&self) -> &[damage::Request] {
-        &self.damage_requests
+        &self.effects.damage
     }
 
-    /// Merges the current [`Shell`] with another one by applying the given
-    /// function to the messages of the latter.
-    ///
-    /// This method is useful for composition.
+    /// Folds a child shell back in, converting its messages with `f`.
     pub fn merge<B>(&mut self, other: Shell<'_, B>, mut f: impl FnMut(B) -> Message) {
         self.merge_map(other, |message| Some(f(message)));
     }
 
-    /// Merges another shell while allowing local messages to be filtered.
-    ///
-    /// This is useful for encapsulated components whose local update can
-    /// intentionally consume an event without publishing a parent message.
-    /// All non-message effects are still preserved.
+    /// Like [`merge`](Self::merge), but `f` may drop a message. Every other
+    /// effect of the child is kept.
     pub fn merge_map<B>(
         &mut self,
         mut other: Shell<'_, B>,
@@ -290,58 +276,45 @@ impl<'a, Message> Shell<'a, Message> {
         self.messages
             .extend(other.messages.drain(..).filter_map(&mut f));
 
-        self.is_layout_invalid = match (self.is_layout_invalid, other.is_layout_invalid) {
-            (Some(a), Some(b)) => Some(a.max(b)),
-            _ => self.is_layout_invalid.or(other.is_layout_invalid),
-        };
-
-        self.are_widgets_invalid = self.are_widgets_invalid || other.are_widgets_invalid;
-        self.is_semantics_invalid = self.is_semantics_invalid || other.is_semantics_invalid;
-        self.is_animating = self.is_animating || other.is_animating;
-        self.damage_requests.append(&mut other.damage_requests);
-        self.redraw_request = self.redraw_request.min(other.redraw_request);
         self.event_status = self.event_status.merge(other.event_status);
-
+        self.effects.absorb(&mut other.effects);
         self.input_method.merge(&other.input_method);
         self.clipboard.merge(&mut other.clipboard);
     }
 }
 
-/// A waker can be used to wake up the taim runtime and, consequently, trigger
-/// wake events concurrently from widget logic.
+/// Wakes the runtime from outside an update, for example from a worker
+/// thread or a reactive signal.
 #[derive(Clone)]
 pub struct Waker {
     wake: Arc<dyn Fn(Option<u64>) + Send + Sync + 'static>,
 }
 
 impl Waker {
-    /// Creates a new [`Waker`] with the given `wake` function.
+    /// A waker that calls `wake`.
     pub fn new(wake: impl Fn() + Send + Sync + 'static) -> Self {
-        Self {
-            wake: Arc::new(move |_| wake()),
-        }
+        Self::new_tagged(move |_| wake())
     }
 
-    /// Creates a waker that preserves an optional reactive routing token.
+    /// A waker that also receives the reactive source that caused the wake,
+    /// or `None` for a plain wake.
     pub fn new_tagged(wake: impl Fn(Option<u64>) + Send + Sync + 'static) -> Self {
         Self {
             wake: Arc::new(wake),
         }
     }
 
-    /// Creates a new [`Waker`] that does nothing.
+    /// A waker that does nothing.
     pub fn noop() -> Self {
-        Self::new(|| {})
+        Self::new_tagged(|_| {})
     }
 
-    /// Wakes up the taim runtime as soon as possible.
-    ///
-    /// You normally want to call this concurrently (e.g. from a different thread).
+    /// Wakes the runtime.
     pub fn wake(&self) {
         (self.wake)(None);
     }
 
-    /// Wakes the runtime for one process-local reactive source.
+    /// Wakes the runtime on behalf of the reactive source `source`.
     pub fn wake_reactive(&self, source: u64) {
         (self.wake)(Some(source));
     }
@@ -349,16 +322,17 @@ impl Waker {
 
 impl std::fmt::Debug for Waker {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Waker").finish()
+        f.write_str("Waker")
     }
 }
 
-/// The diffing strategy to follow when invalidating some layout.
+/// Whether a relayout must diff the widget tree first. `Perform` is the
+/// stronger request and wins when two are merged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Diff {
-    /// Skips the diffing step.
+    /// Lay out the existing tree.
     Skip,
-    /// Performs diffing again before layouting.
+    /// Diff the tree against the view, then lay out.
     Perform,
 }
 
@@ -493,5 +467,30 @@ mod tests {
         main_shell.merge(other, |message| message);
 
         assert!(!main_shell.is_animating());
+    }
+
+    #[test]
+    fn merge_keeps_the_strongest_layout_request() {
+        for (mine, theirs, expected) in [
+            (None, None, None),
+            (Some(Diff::Skip), None, Some(Diff::Skip)),
+            (None, Some(Diff::Perform), Some(Diff::Perform)),
+            (Some(Diff::Perform), Some(Diff::Skip), Some(Diff::Perform)),
+        ] {
+            let mut messages_a = Vec::new();
+            let mut main_shell = shell(&mut messages_a);
+            let mut messages_b = Vec::new();
+            let mut other = shell(&mut messages_b);
+
+            if let Some(diff) = mine {
+                main_shell.invalidate_layout_with(diff);
+            }
+            if let Some(diff) = theirs {
+                other.invalidate_layout_with(diff);
+            }
+
+            main_shell.merge(other, |message| message);
+            assert_eq!(main_shell.is_layout_invalid(), expected);
+        }
     }
 }

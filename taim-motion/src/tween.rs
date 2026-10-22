@@ -37,6 +37,10 @@ pub enum Easing {
     EaseOut,
     /// Quadratic acceleration then deceleration.
     EaseInOut,
+    /// Half a cosine wave: a gentler start and stop than [`EaseInOut`].
+    ///
+    /// [`EaseInOut`]: Self::EaseInOut
+    EaseInOutSine,
 }
 
 impl Easing {
@@ -53,6 +57,9 @@ impl Easing {
                 let inverse = -2.0 * progress + 2.0;
                 1.0 - inverse * inverse / 2.0
             }
+            // Pinned at both ends: `cos(π)` is not exactly -1 in `f32`.
+            Self::EaseInOutSine if progress >= 1.0 => 1.0,
+            Self::EaseInOutSine => (1.0 - libm::cosf(core::f32::consts::PI * progress)) / 2.0,
         }
     }
 }
