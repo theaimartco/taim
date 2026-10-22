@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn capacity_one_preserves_order_under_backpressure() {
         let collected = futures::executor::block_on(
-            channel(1, |mut sender| async move {
+            channel(1, |mut sender: mpsc::Sender<i32>| async move {
                 for value in 0..128 {
                     sender.send(value).await.expect("consumer alive");
                 }
@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn a_producer_error_does_not_overtake_queued_successes() {
         let collected = futures::executor::block_on(
-            try_channel(2, |mut sender| async move {
+            try_channel(2, |mut sender: mpsc::Sender<i32>| async move {
                 for value in 0..16 {
                     sender.send(value).await.expect("consumer alive");
                 }
@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn successful_fallible_producer_does_not_emit_phantom_error() {
         let collected = futures::executor::block_on(
-            try_channel(1, |mut sender| async move {
+            try_channel(1, |mut sender: mpsc::Sender<u8>| async move {
                 sender.send(7_u8).await.expect("consumer alive");
                 Ok::<(), &'static str>(())
             })
@@ -192,7 +192,7 @@ mod tests {
 
     impl Drop for DropSignal {
         fn drop(&mut self) {
-            self.0.fetch_add(1, Ordering::SeqCst);
+            let _ = self.0.fetch_add(1, Ordering::SeqCst);
         }
     }
 
@@ -201,7 +201,7 @@ mod tests {
         let cancelled = Arc::new(AtomicUsize::new(0));
         let tracker = Arc::clone(&cancelled);
 
-        let mut stream = Box::pin(channel(1, move |mut sender| async move {
+        let mut stream = Box::pin(channel(1, move |mut sender: mpsc::Sender<u8>| async move {
             let _signal = DropSignal(tracker);
             sender.send(5_u8).await.expect("consumer alive");
             futures::future::pending::<()>().await;

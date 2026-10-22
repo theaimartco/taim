@@ -125,7 +125,10 @@ mod native_message_tests {
 
     #[test]
     fn untouched_native_message_does_not_dirty_a_frame() {
-        assert_eq!(after_message_batch(true, false, StateDelta::clean()), DirtyFlags::CLEAN);
+        assert_eq!(
+            after_message_batch(true, false, StateDelta::clean()),
+            DirtyFlags::CLEAN
+        );
     }
 
     #[test]
@@ -151,8 +154,10 @@ mod native_message_tests {
 
     #[test]
     fn stale_ui_requires_paint_even_for_clean_native_message() {
-        assert!(after_message_batch(true, true, StateDelta::clean())
-            .intersects(DirtyFlags::PAINT_DIRTY));
+        assert!(
+            after_message_batch(true, true, StateDelta::clean())
+                .intersects(DirtyFlags::PAINT_DIRTY)
+        );
     }
 
     #[test]

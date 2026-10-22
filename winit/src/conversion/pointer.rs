@@ -1,72 +1,102 @@
+//! Pointer and modifier vocabulary between TAIM and `winit`.
 use super::*;
 
-/// Converts a [`mouse::Interaction`] into a [`winit`] cursor icon.
-///
-/// [`winit`]: https://github.com/rust-windowing/winit
-pub fn mouse_interaction(interaction: mouse::Interaction) -> Option<winit::window::CursorIcon> {
-    use mouse::Interaction;
+use winit::window::CursorIcon as Icon;
 
-    let icon = match interaction {
-        Interaction::Hidden => {
-            return None;
-        }
-        Interaction::None | Interaction::Idle => winit::window::CursorIcon::Default,
-        Interaction::ContextMenu => winit::window::CursorIcon::ContextMenu,
-        Interaction::Help => winit::window::CursorIcon::Help,
-        Interaction::Pointer => winit::window::CursorIcon::Pointer,
-        Interaction::Progress => winit::window::CursorIcon::Progress,
-        Interaction::Wait => winit::window::CursorIcon::Wait,
-        Interaction::Cell => winit::window::CursorIcon::Cell,
-        Interaction::Crosshair => winit::window::CursorIcon::Crosshair,
-        Interaction::Text => winit::window::CursorIcon::Text,
-        Interaction::Alias => winit::window::CursorIcon::Alias,
-        Interaction::Copy => winit::window::CursorIcon::Copy,
-        Interaction::Move => winit::window::CursorIcon::Move,
-        Interaction::NoDrop => winit::window::CursorIcon::NoDrop,
-        Interaction::NotAllowed => winit::window::CursorIcon::NotAllowed,
-        Interaction::Grab => winit::window::CursorIcon::Grab,
-        Interaction::Grabbing => winit::window::CursorIcon::Grabbing,
-        Interaction::ResizingHorizontally => winit::window::CursorIcon::EwResize,
-        Interaction::ResizingVertically => winit::window::CursorIcon::NsResize,
-        Interaction::ResizingDiagonallyUp => winit::window::CursorIcon::NeswResize,
-        Interaction::ResizingDiagonallyDown => winit::window::CursorIcon::NwseResize,
-        Interaction::ResizingColumn => winit::window::CursorIcon::ColResize,
-        Interaction::ResizingRow => winit::window::CursorIcon::RowResize,
-        Interaction::AllScroll => winit::window::CursorIcon::AllScroll,
-        Interaction::ZoomIn => winit::window::CursorIcon::ZoomIn,
-        Interaction::ZoomOut => winit::window::CursorIcon::ZoomOut,
-    };
+/// The system cursor TAIM shows for `interaction`, or `None` to hide it.
+pub fn mouse_interaction(interaction: mouse::Interaction) -> Option<Icon> {
+    use mouse::Interaction as I;
 
-    Some(icon)
+    Some(match interaction {
+        I::Hidden => return None,
+        I::None | I::Idle => Icon::Default,
+
+        // Status
+        I::ContextMenu => Icon::ContextMenu,
+        I::Help => Icon::Help,
+        I::Progress => Icon::Progress,
+        I::Wait => Icon::Wait,
+
+        // Selection and activation
+        I::Pointer => Icon::Pointer,
+        I::Cell => Icon::Cell,
+        I::Crosshair => Icon::Crosshair,
+        I::Text => Icon::Text,
+
+        // Drag and drop
+        I::Alias => Icon::Alias,
+        I::Copy => Icon::Copy,
+        I::Move => Icon::Move,
+        I::NoDrop => Icon::NoDrop,
+        I::NotAllowed => Icon::NotAllowed,
+        I::Grab => Icon::Grab,
+        I::Grabbing => Icon::Grabbing,
+        I::AllScroll => Icon::AllScroll,
+
+        // Resizing: TAIM names the gesture, the platform names the arrow.
+        I::ResizingHorizontally => Icon::EwResize,
+        I::ResizingVertically => Icon::NsResize,
+        I::ResizingDiagonallyUp => Icon::NeswResize,
+        I::ResizingDiagonallyDown => Icon::NwseResize,
+        I::ResizingColumn => Icon::ColResize,
+        I::ResizingRow => Icon::RowResize,
+
+        // Magnification
+        I::ZoomIn => Icon::ZoomIn,
+        I::ZoomOut => Icon::ZoomOut,
+    })
 }
 
-/// Converts a `MouseButton` from [`winit`] to an [`taim`] mouse button.
-///
-/// [`winit`]: https://github.com/rust-windowing/winit
-/// [`taim`]: https://github.com/theaimartco/taim/tree/0.12
-pub fn mouse_button(mouse_button: winit::event::MouseButton) -> mouse::Button {
-    match mouse_button {
-        winit::event::MouseButton::Left => mouse::Button::Left,
-        winit::event::MouseButton::Right => mouse::Button::Right,
-        winit::event::MouseButton::Middle => mouse::Button::Middle,
-        winit::event::MouseButton::Back => mouse::Button::Back,
-        winit::event::MouseButton::Forward => mouse::Button::Forward,
-        winit::event::MouseButton::Other(other) => mouse::Button::Other(other),
+/// Translates a platform mouse button.
+pub fn mouse_button(button: winit::event::MouseButton) -> mouse::Button {
+    use winit::event::MouseButton as B;
+
+    match button {
+        B::Left => mouse::Button::Left,
+        B::Right => mouse::Button::Right,
+        B::Middle => mouse::Button::Middle,
+        B::Back => mouse::Button::Back,
+        B::Forward => mouse::Button::Forward,
+        B::Other(code) => mouse::Button::Other(code),
     }
 }
 
-/// Converts some `ModifiersState` from [`winit`] to an [`taim`] modifiers
-/// state.
-///
-/// [`winit`]: https://github.com/rust-windowing/winit
-/// [`taim`]: https://github.com/theaimartco/taim/tree/0.12
-pub fn modifiers(modifiers: winit::keyboard::ModifiersState) -> keyboard::Modifiers {
-    let mut result = keyboard::Modifiers::empty();
+/// Translates the platform's held-modifier state.
+pub fn modifiers(state: winit::keyboard::ModifiersState) -> keyboard::Modifiers {
+    use keyboard::Modifiers as M;
 
-    result.set(keyboard::Modifiers::SHIFT, modifiers.shift_key());
-    result.set(keyboard::Modifiers::CTRL, modifiers.control_key());
-    result.set(keyboard::Modifiers::ALT, modifiers.alt_key());
-    result.set(keyboard::Modifiers::LOGO, modifiers.super_key());
+    [
+        (M::SHIFT, state.shift_key()),
+        (M::CTRL, state.control_key()),
+        (M::ALT, state.alt_key()),
+        (M::LOGO, state.super_key()),
+    ]
+    .into_iter()
+    .filter(|(_, held)| *held)
+    .fold(M::empty(), |held, (modifier, _)| held | modifier)
+}
 
-    result
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use winit::keyboard::ModifiersState;
+
+    #[test]
+    fn hidden_cursor_has_no_icon() {
+        assert_eq!(mouse_interaction(mouse::Interaction::Hidden), None);
+        assert_eq!(
+            mouse_interaction(mouse::Interaction::Idle),
+            Some(Icon::Default)
+        );
+    }
+
+    #[test]
+    fn modifiers_keep_every_held_key() {
+        let held = modifiers(ModifiersState::SHIFT | ModifiersState::SUPER);
+
+        assert!(held.shift());
+        assert!(held.logo());
+        assert!(!held.control());
+        assert!(!held.alt());
+    }
 }

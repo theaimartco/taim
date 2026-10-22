@@ -131,8 +131,10 @@ pub fn physical_key(physical_key: wk::PhysicalKey) -> keyboard::key::Physical {
     use keyboard::key::{NativeCode, Physical};
 
     match physical_key {
-        wk::PhysicalKey::Code(code) => key_code(code)
-            .map_or(Physical::Unidentified(NativeCode::Unidentified), Physical::Code),
+        wk::PhysicalKey::Code(code) => key_code(code).map_or(
+            Physical::Unidentified(NativeCode::Unidentified),
+            Physical::Code,
+        ),
         wk::PhysicalKey::Unidentified(native) => Physical::Unidentified(native_key_code(native)),
     }
 }
@@ -161,8 +163,14 @@ mod tests {
 
     #[test]
     fn shared_names_round_trip() {
-        assert_eq!(named_key(wk::NamedKey::Enter), Some(keyboard::key::Named::Enter));
-        assert_eq!(named_key(wk::NamedKey::F35), Some(keyboard::key::Named::F35));
+        assert_eq!(
+            named_key(wk::NamedKey::Enter),
+            Some(keyboard::key::Named::Enter)
+        );
+        assert_eq!(
+            named_key(wk::NamedKey::F35),
+            Some(keyboard::key::Named::F35)
+        );
         assert_eq!(key_code(wk::KeyCode::KeyA), Some(keyboard::key::Code::KeyA));
         assert_eq!(key_code(wk::KeyCode::F35), Some(keyboard::key::Code::F35));
     }

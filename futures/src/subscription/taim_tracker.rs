@@ -254,7 +254,7 @@ mod tests {
     fn epoch_rollover_does_not_resurrect_omitted_recipes() {
         let (sink, _receiver) = mpsc::channel::<u32>(10);
         let mut tracker = Tracker::new();
-        tracker.update(batch(&[1, 2]), sink.clone());
+        let _ = tracker.update(batch(&[1, 2]), sink.clone());
         tracker.epoch = u64::MAX;
         assert_eq!(tracker.update(batch(&[2]), sink).len(), 0);
         assert_eq!(tracker.generation(), 1);
@@ -267,7 +267,7 @@ mod tests {
         let mut tracker = Tracker::new();
         let mut tasks = tracker.update(batch(&[99]), sink.clone());
         assert_eq!(tasks.len(), 1);
-        tracker.update(batch(&[]), sink);
+        let _ = tracker.update(batch(&[]), sink);
         futures::executor::block_on(tasks.pop().expect("one task"));
         assert!(matches!(receiver.try_next(), Ok(None) | Err(_)));
     }
@@ -292,9 +292,9 @@ mod tests {
     fn broadcast_with_canceled_membership_does_not_panic() {
         let (sink, _receiver) = mpsc::channel::<u32>(2);
         let mut tracker = Tracker::new();
-        tracker.update(batch(&[11, 22]), sink.clone());
+        let _ = tracker.update(batch(&[11, 22]), sink.clone());
         tracker.broadcast(Event::SystemThemeChanged(theme::Mode::Dark));
-        tracker.update(batch(&[22]), sink);
+        let _ = tracker.update(batch(&[22]), sink);
         tracker.broadcast(Event::SystemThemeChanged(theme::Mode::Light));
         assert_eq!(tracker.len(), 1);
     }

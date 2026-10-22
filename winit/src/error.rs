@@ -30,7 +30,8 @@ mod taim_window_error_chain_tests {
     #[test]
     fn async_initialization_error_has_a_root_cause() {
         use std::error::Error as _;
-        let err = Error::ExecutorCreationFailed(futures::io::Error::other("worker backend unavailable"));
+        let err =
+            Error::ExecutorCreationFailed(futures::io::Error::other("worker backend unavailable"));
         assert!(err.to_string().contains("worker backend unavailable"));
         assert!(err.source().is_some());
     }

@@ -166,7 +166,7 @@ impl Node {
             min_size,
             bounds,
             |id, region| {
-                regions.insert(id, region);
+                let _ = regions.insert(id, region);
             },
             |_, _, _, _| {},
         );
@@ -187,7 +187,7 @@ impl Node {
             bounds,
             |_, _| {},
             |id, axis, region, ratio| {
-                splits.insert(id, (axis, region, ratio));
+                let _ = splits.insert(id, (axis, region, ratio));
             },
         );
         splits

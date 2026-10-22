@@ -49,8 +49,8 @@ struct InFlight(Arc<Counters>);
 
 impl Drop for InFlight {
     fn drop(&mut self) {
-        self.0.active.fetch_sub(1, Ordering::AcqRel);
-        self.0.terminated.fetch_add(1, Ordering::Relaxed);
+        let _ = self.0.active.fetch_sub(1, Ordering::AcqRel);
+        let _ = self.0.terminated.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -75,8 +75,8 @@ impl crate::Executor for Executor {
     }
 
     fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
-        self.counters.submitted.fetch_add(1, Ordering::Relaxed);
-        self.counters.active.fetch_add(1, Ordering::Release);
+        let _ = self.counters.submitted.fetch_add(1, Ordering::Relaxed);
+        let _ = self.counters.active.fetch_add(1, Ordering::Release);
 
         // Construct the guard before scheduling. It is then owned by the
         // submitted future even if the pool cancels it before first poll.

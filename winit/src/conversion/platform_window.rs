@@ -1,251 +1,278 @@
+//! Window creation attributes and window-state vocabulary.
+//!
+//! [`window_attributes`] assembles a native window description in layers:
+//! appearance and behavior shared by every platform, placement on a monitor,
+//! size limits, then whatever the target platform adds on top.
 use super::*;
 
-/// Converts some [`window::Settings`] into some `WindowAttributes` from `winit`.
+use winit::dpi::{LogicalPosition, LogicalSize, PhysicalPosition};
+use winit::window::{Fullscreen, WindowAttributes, WindowButtons};
+
+/// Describes the native window for `settings`.
+///
+/// Sizes are in TAIM logical units multiplied by the application's
+/// `scale_factor`; `application_id` names the app to BSD Wayland compositors.
 pub fn window_attributes(
     settings: window::Settings,
     title: &str,
     scale_factor: f32,
     primary_monitor: Option<winit::monitor::MonitorHandle>,
-    _id: Option<String>,
-) -> winit::window::WindowAttributes {
-    let settings = settings.normalized();
-    let scale_factor = valid_application_scale(scale_factor);
-    let requested_size = scaled_size(settings.size, scale_factor);
-    let mut attributes = winit::window::WindowAttributes::default();
+    application_id: Option<String>,
+) -> WindowAttributes {
+    let mut settings = settings.normalized();
+    let window_icon = settings.icon.take().and_then(icon);
+    let scale = sanitized_scale(scale_factor);
+    let inner_size = logical(scaled(settings.size, scale));
 
-    let mut buttons = winit::window::WindowButtons::empty();
+    let mut attributes =
+        shared_attributes(&settings, title, inner_size).with_window_icon(window_icon);
 
-    if settings.resizable {
-        buttons |= winit::window::WindowButtons::MAXIMIZE;
+    if let Some(origin) = position(
+        primary_monitor.as_ref(),
+        scaled(settings.size, scale),
+        settings.position,
+    ) {
+        attributes = attributes.with_position(origin);
     }
 
-    if settings.closeable {
-        buttons |= winit::window::WindowButtons::CLOSE;
+    if let Some(min) = settings.min_size {
+        attributes = attributes.with_min_inner_size(logical(scaled(min, scale)));
     }
 
-    if settings.minimizable {
-        buttons |= winit::window::WindowButtons::MINIMIZE;
+    if let Some(max) = settings.max_size {
+        attributes = attributes.with_max_inner_size(logical(scaled(max, scale)));
     }
 
-    attributes = attributes
+    platform_attributes(attributes, &settings, application_id)
+}
+
+/// Appearance and behavior every platform understands.
+fn shared_attributes(
+    settings: &window::Settings,
+    title: &str,
+    inner_size: LogicalSize<f32>,
+) -> WindowAttributes {
+    let buttons = [
+        (WindowButtons::MAXIMIZE, settings.resizable),
+        (WindowButtons::CLOSE, settings.closeable),
+        (WindowButtons::MINIMIZE, settings.minimizable),
+    ]
+    .into_iter()
+    .filter(|(_, enabled)| *enabled)
+    .fold(WindowButtons::empty(), |all, (button, _)| all | button);
+
+    WindowAttributes::default()
         .with_title(title)
-        .with_inner_size(winit::dpi::LogicalSize {
-            width: requested_size.width,
-            height: requested_size.height,
-        })
+        .with_inner_size(inner_size)
         .with_maximized(settings.maximized)
-        .with_fullscreen(
-            settings
-                .fullscreen
-                .then_some(winit::window::Fullscreen::Borderless(None)),
-        )
+        .with_fullscreen(settings.fullscreen.then_some(Fullscreen::Borderless(None)))
         .with_resizable(settings.resizable)
         .with_enabled_buttons(buttons)
         .with_decorations(settings.decorations)
         .with_transparent(settings.transparent)
         .with_blur(settings.blur)
-        .with_window_icon(settings.icon.and_then(icon))
         .with_window_level(window_level(settings.level))
-        .with_visible(settings.visible);
+        .with_visible(settings.visible)
+}
 
-    if let Some(position) = position(primary_monitor.as_ref(), requested_size, settings.position) {
-        attributes = attributes.with_position(position);
-    }
+#[cfg(target_os = "windows")]
+fn platform_attributes(
+    attributes: WindowAttributes,
+    settings: &window::Settings,
+    _application_id: Option<String>,
+) -> WindowAttributes {
+    use window::settings::platform::CornerPreference as Corners;
+    use winit::platform::windows::{CornerPreference, WindowAttributesExtWindows};
 
-    if let Some(min_size) = settings.min_size {
-        let min_size = scaled_size(min_size, scale_factor);
-        attributes = attributes.with_min_inner_size(winit::dpi::LogicalSize {
-            width: min_size.width,
-            height: min_size.height,
-        });
-    }
+    let windows = &settings.platform_specific;
+    let corners = match windows.corner_preference {
+        Corners::Default => CornerPreference::Default,
+        Corners::DoNotRound => CornerPreference::DoNotRound,
+        Corners::Round => CornerPreference::Round,
+        Corners::RoundSmall => CornerPreference::RoundSmall,
+    };
 
-    if let Some(max_size) = settings.max_size {
-        let max_size = scaled_size(max_size, scale_factor);
-        attributes = attributes.with_max_inner_size(winit::dpi::LogicalSize {
-            width: max_size.width,
-            height: max_size.height,
-        });
-    }
+    attributes
+        .with_drag_and_drop(windows.drag_and_drop)
+        .with_skip_taskbar(windows.skip_taskbar)
+        .with_undecorated_shadow(windows.effective_undecorated_shadow(settings.decorations))
+        .with_corner_preference(corners)
+}
 
-    #[cfg(any(
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "openbsd"
-    ))]
-    {
-        use ::winit::platform::wayland::WindowAttributesExtWayland;
+#[cfg(target_os = "macos")]
+fn platform_attributes(
+    attributes: WindowAttributes,
+    settings: &window::Settings,
+    _application_id: Option<String>,
+) -> WindowAttributes {
+    use winit::platform::macos::WindowAttributesExtMacOS;
 
-        if let Some(id) = _id {
-            attributes = attributes.with_name(id.clone(), id);
+    let titlebar = settings.platform_specific.normalized(settings.decorations);
+
+    attributes
+        .with_title_hidden(titlebar.title_hidden)
+        .with_titlebar_transparent(titlebar.titlebar_transparent)
+        .with_fullsize_content_view(titlebar.fullsize_content_view)
+}
+
+#[cfg(target_os = "linux")]
+fn platform_attributes(
+    attributes: WindowAttributes,
+    settings: &window::Settings,
+    _application_id: Option<String>,
+) -> WindowAttributes {
+    let linux = &settings.platform_specific;
+    let _class = linux.valid_application_id();
+
+    #[cfg(feature = "x11")]
+    let attributes = {
+        use winit::platform::x11::WindowAttributesExtX11;
+
+        let attributes = attributes.with_override_redirect(linux.override_redirect);
+        match _class {
+            Some(class) => attributes.with_name(class, class),
+            None => attributes,
         }
-    }
+    };
 
-    #[cfg(target_os = "windows")]
-    {
-        use window::settings::platform;
-        use winit::platform::windows::{CornerPreference, WindowAttributesExtWindows};
+    #[cfg(feature = "wayland")]
+    let attributes = {
+        use winit::platform::wayland::WindowAttributesExtWayland;
 
-        attributes = attributes.with_drag_and_drop(settings.platform_specific.drag_and_drop);
-
-        attributes = attributes.with_skip_taskbar(settings.platform_specific.skip_taskbar);
-
-        attributes =
-            attributes.with_undecorated_shadow(
-                settings
-                    .platform_specific
-                    .effective_undecorated_shadow(settings.decorations),
-            );
-
-        attributes =
-            attributes.with_corner_preference(match settings.platform_specific.corner_preference {
-                platform::CornerPreference::Default => CornerPreference::Default,
-                platform::CornerPreference::DoNotRound => CornerPreference::DoNotRound,
-                platform::CornerPreference::Round => CornerPreference::Round,
-                platform::CornerPreference::RoundSmall => CornerPreference::RoundSmall,
-            });
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        use winit::platform::macos::WindowAttributesExtMacOS;
-
-        let macos = settings
-            .platform_specific
-            .normalized(settings.decorations);
-        attributes = attributes
-            .with_title_hidden(macos.title_hidden)
-            .with_titlebar_transparent(macos.titlebar_transparent)
-            .with_fullsize_content_view(macos.fullsize_content_view);
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        #[cfg(feature = "x11")]
-        {
-            use winit::platform::x11::WindowAttributesExtX11;
-
-            attributes =
-                attributes.with_override_redirect(settings.platform_specific.override_redirect);
-            if let Some(id) = settings.platform_specific.valid_application_id() {
-                attributes = attributes.with_name(id, id);
-            }
+        match _class {
+            Some(app_id) => attributes.with_name(app_id, app_id),
+            None => attributes,
         }
-        #[cfg(feature = "wayland")]
-        {
-            use winit::platform::wayland::WindowAttributesExtWayland;
-
-            if let Some(id) = settings.platform_specific.valid_application_id() {
-                attributes = attributes.with_name(id, id);
-            }
-        }
-    }
+    };
 
     attributes
 }
 
-/// Converts a [`window::Level`] into a [`winit`] window level.
-///
-/// [`winit`]: https://github.com/rust-windowing/winit
-pub fn window_level(level: window::Level) -> winit::window::WindowLevel {
-    match level {
-        window::Level::Normal => winit::window::WindowLevel::Normal,
-        window::Level::AlwaysOnBottom => winit::window::WindowLevel::AlwaysOnBottom,
-        window::Level::AlwaysOnTop => winit::window::WindowLevel::AlwaysOnTop,
+#[cfg(any(
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
+fn platform_attributes(
+    attributes: WindowAttributes,
+    _settings: &window::Settings,
+    application_id: Option<String>,
+) -> WindowAttributes {
+    use winit::platform::wayland::WindowAttributesExtWayland;
+
+    match application_id {
+        Some(app_id) => attributes.with_name(app_id.clone(), app_id),
+        None => attributes,
     }
 }
 
-/// Converts a [`window::Position`] into a [`winit`] logical position for a given monitor.
+#[cfg(not(any(
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+)))]
+fn platform_attributes(
+    attributes: WindowAttributes,
+    _settings: &window::Settings,
+    _application_id: Option<String>,
+) -> WindowAttributes {
+    attributes
+}
+
+/// Translates a stacking level.
+pub fn window_level(level: window::Level) -> winit::window::WindowLevel {
+    use winit::window::WindowLevel as Stack;
+
+    match level {
+        window::Level::Normal => Stack::Normal,
+        window::Level::AlwaysOnBottom => Stack::AlwaysOnBottom,
+        window::Level::AlwaysOnTop => Stack::AlwaysOnTop,
+    }
+}
+
+/// Where a window of logical `size` should appear, given `monitor`.
 ///
-/// [`winit`]: https://github.com/rust-windowing/winit
+/// Positions TAIM resolves globally stay logical; positions relative to the
+/// monitor are converted with that monitor's own scale and offset from its
+/// physical origin, so they land on the right screen in mixed-DPI setups.
 pub fn position(
     monitor: Option<&winit::monitor::MonitorHandle>,
     size: Size,
     position: window::Position,
 ) -> Option<winit::dpi::Position> {
-    let monitor_extent = monitor.map(|monitor| {
-        let logical: winit::dpi::LogicalSize<f32> =
-            monitor.size().to_logical(monitor.scale_factor());
-        Size::new(logical.width, logical.height)
+    let monitor_size = monitor.map(|monitor| {
+        let extent: LogicalSize<f32> = monitor.size().to_logical(monitor.scale_factor());
+        Size::new(extent.width, extent.height)
     });
 
-    match position.resolve(size, monitor_extent)? {
-        window::ResolvedPosition::Global(global) => {
-            Some(winit::dpi::Position::Logical(winit::dpi::LogicalPosition {
-                x: f64::from(global.x),
-                y: f64::from(global.y),
-            }))
-        }
-        window::ResolvedPosition::MonitorRelative(local) => {
+    let point = |x: f32, y: f32| LogicalPosition::new(f64::from(x), f64::from(y));
+
+    match position.resolve(size, monitor_size)? {
+        window::ResolvedPosition::Global(at) => Some(point(at.x, at.y).into()),
+        window::ResolvedPosition::MonitorRelative(offset) => {
             let monitor = monitor?;
             let origin = monitor.position();
-            let physical: winit::dpi::PhysicalPosition<i32> =
-                winit::dpi::LogicalPosition {
-                    x: f64::from(local.x),
-                    y: f64::from(local.y),
-                }
-                .to_physical(monitor.scale_factor());
+            let offset: PhysicalPosition<i32> =
+                point(offset.x, offset.y).to_physical(monitor.scale_factor());
 
-            Some(winit::dpi::Position::Physical(
-                winit::dpi::PhysicalPosition {
-                    x: origin.x.saturating_add(physical.x),
-                    y: origin.y.saturating_add(physical.y),
-                },
-            ))
+            Some(
+                PhysicalPosition::new(
+                    origin.x.saturating_add(offset.x),
+                    origin.y.saturating_add(offset.y),
+                )
+                .into(),
+            )
         }
     }
 }
 
-/// Converts a [`window::Mode`] into a [`winit`] fullscreen mode.
-///
-/// [`winit`]: https://github.com/rust-windowing/winit
+/// The borderless fullscreen request for `mode`, if it asks for fullscreen.
 pub fn fullscreen(
     monitor: Option<winit::monitor::MonitorHandle>,
     mode: window::Mode,
-) -> Option<winit::window::Fullscreen> {
+) -> Option<Fullscreen> {
     mode.requests_fullscreen()
-        .then_some(winit::window::Fullscreen::Borderless(monitor))
+        .then_some(Fullscreen::Borderless(monitor))
 }
 
-/// Converts a [`window::Mode`] into a visibility flag.
+/// Whether a window in `mode` is mapped on screen.
 pub fn visible(mode: window::Mode) -> bool {
     mode.is_visible()
 }
 
-/// Converts a [`winit`] fullscreen mode into a [`window::Mode`].
-///
-/// [`winit`]: https://github.com/rust-windowing/winit
-pub fn mode(mode: Option<winit::window::Fullscreen>) -> window::Mode {
-    match mode {
-        None => window::Mode::Windowed,
-        Some(_) => window::Mode::Fullscreen,
+/// The presentation mode of a visible window from its fullscreen state.
+pub fn mode(fullscreen: Option<Fullscreen>) -> window::Mode {
+    if fullscreen.is_some() {
+        window::Mode::Fullscreen
+    } else {
+        window::Mode::Windowed
     }
 }
 
-/// Converts a [`winit`] window theme into a [`theme::Mode`].
-///
-/// [`winit`]: https://github.com/rust-windowing/winit
+/// Translates a platform color scheme.
 pub fn theme_mode(theme: winit::window::Theme) -> theme::Mode {
     match theme {
-        winit::window::Theme::Light => theme::Mode::Light,
         winit::window::Theme::Dark => theme::Mode::Dark,
+        winit::window::Theme::Light => theme::Mode::Light,
     }
 }
 
-/// Converts a [`theme::Mode`] into a window theme.
-///
-/// [`winit`]: https://github.com/rust-windowing/winit
+/// The platform color scheme to request for `mode`; `None` follows the system.
 pub fn window_theme(mode: theme::Mode) -> Option<winit::window::Theme> {
-    match mode {
-        theme::Mode::None => None,
-        theme::Mode::Light => Some(winit::window::Theme::Light),
-        theme::Mode::Dark => Some(winit::window::Theme::Dark),
-    }
+    Some(match mode {
+        theme::Mode::Dark => winit::window::Theme::Dark,
+        theme::Mode::Light => winit::window::Theme::Light,
+        theme::Mode::None => return None,
+    })
 }
 
 #[inline]
-fn valid_application_scale(scale_factor: f32) -> f32 {
+fn sanitized_scale(scale_factor: f32) -> f32 {
     if scale_factor.is_finite() && scale_factor > 0.0 {
         scale_factor
     } else {
@@ -253,19 +280,46 @@ fn valid_application_scale(scale_factor: f32) -> f32 {
     }
 }
 
+/// `size * scale`, with non-finite or negative dimensions collapsed to zero.
 #[inline]
-fn scaled_size(size: Size, scale_factor: f32) -> Size {
+fn scaled(size: Size, scale: f32) -> Size {
+    let dimension = |value: f32| {
+        if value.is_finite() {
+            value.max(0.0)
+        } else {
+            0.0
+        }
+    };
+
     Size::new(
-        finite_dimension(size.width * scale_factor),
-        finite_dimension(size.height * scale_factor),
+        dimension(size.width * scale),
+        dimension(size.height * scale),
     )
 }
 
 #[inline]
-fn finite_dimension(dimension: f32) -> f32 {
-    if dimension.is_finite() {
-        dimension.max(0.0)
-    } else {
-        0.0
+fn logical(size: Size) -> LogicalSize<f32> {
+    LogicalSize::new(size.width, size.height)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scaling_never_produces_negative_or_infinite_sizes() {
+        assert_eq!(scaled(Size::new(10.0, 20.0), 2.0), Size::new(20.0, 40.0));
+        assert_eq!(scaled(Size::new(-5.0, f32::NAN), 1.0), Size::new(0.0, 0.0));
+        assert_eq!(scaled(Size::new(f32::MAX, 1.0), 4.0), Size::new(0.0, 4.0));
+        assert_eq!(sanitized_scale(0.0), 1.0);
+        assert_eq!(sanitized_scale(1.5), 1.5);
+    }
+
+    #[test]
+    fn theme_vocabulary_round_trips() {
+        for theme in [winit::window::Theme::Light, winit::window::Theme::Dark] {
+            assert_eq!(window_theme(theme_mode(theme)), Some(theme));
+        }
+        assert_eq!(window_theme(theme::Mode::None), None);
     }
 }

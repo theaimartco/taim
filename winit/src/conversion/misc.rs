@@ -1,44 +1,49 @@
+//! Small window-management vocabulary between TAIM and `winit`.
 use super::*;
 
-/// Converts some [`UserAttention`] into its `winit` counterpart.
-///
-/// [`UserAttention`]: window::UserAttention
-pub fn user_attention(user_attention: window::UserAttention) -> winit::window::UserAttentionType {
-    if user_attention.is_critical() {
-        winit::window::UserAttentionType::Critical
+/// Translates how insistently the window asks for the user's attention.
+pub fn user_attention(attention: window::UserAttention) -> winit::window::UserAttentionType {
+    use winit::window::UserAttentionType as Urgency;
+
+    if attention.is_critical() {
+        Urgency::Critical
     } else {
-        winit::window::UserAttentionType::Informational
+        Urgency::Informational
     }
 }
 
-/// Converts some [`window::Direction`] into a [`winit::window::ResizeDirection`].
-pub fn resize_direction(resize_direction: window::Direction) -> winit::window::ResizeDirection {
-    match resize_direction {
-        window::Direction::North => winit::window::ResizeDirection::North,
-        window::Direction::South => winit::window::ResizeDirection::South,
-        window::Direction::East => winit::window::ResizeDirection::East,
-        window::Direction::West => winit::window::ResizeDirection::West,
-        window::Direction::NorthEast => winit::window::ResizeDirection::NorthEast,
-        window::Direction::NorthWest => winit::window::ResizeDirection::NorthWest,
-        window::Direction::SouthEast => winit::window::ResizeDirection::SouthEast,
-        window::Direction::SouthWest => winit::window::ResizeDirection::SouthWest,
+/// Translates the edge or corner of an interactive resize.
+pub fn resize_direction(direction: window::Direction) -> winit::window::ResizeDirection {
+    use window::Direction as D;
+    use winit::window::ResizeDirection as Edge;
+
+    match direction {
+        D::North => Edge::North,
+        D::South => Edge::South,
+        D::East => Edge::East,
+        D::West => Edge::West,
+        D::NorthEast => Edge::NorthEast,
+        D::NorthWest => Edge::NorthWest,
+        D::SouthEast => Edge::SouthEast,
+        D::SouthWest => Edge::SouthWest,
     }
 }
 
-/// Converts some [`window::Icon`] into its `winit` counterpart.
-///
-/// Returns `None` if there is an error during the conversion.
+/// Builds a platform window icon, or `None` if the pixels are rejected.
 pub fn icon(icon: window::Icon) -> Option<winit::window::Icon> {
-    let (pixels, size) = icon.into_raw();
+    let (rgba, size) = icon.into_raw();
 
-    winit::window::Icon::from_rgba(pixels, size.width, size.height).ok()
+    winit::window::Icon::from_rgba(rgba, size.width, size.height).ok()
 }
 
-/// Converts some [`input_method::Purpose`] into its `winit` counterpart.
+/// Translates what kind of text an input method is composing.
 pub fn ime_purpose(purpose: input_method::Purpose) -> winit::window::ImePurpose {
+    use winit::window::ImePurpose as Ime;
+
     match purpose {
-        input_method::Purpose::Normal => winit::window::ImePurpose::Normal,
-        input_method::Purpose::Secure => winit::window::ImePurpose::Password,
-        input_method::Purpose::Terminal => winit::window::ImePurpose::Terminal,
+        input_method::Purpose::Normal => Ime::Normal,
+        // TAIM calls it "secure"; platforms call it "password".
+        input_method::Purpose::Secure => Ime::Password,
+        input_method::Purpose::Terminal => Ime::Terminal,
     }
 }

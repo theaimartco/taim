@@ -169,13 +169,13 @@ mod tests {
 
     impl Notifier for CountNotifier {
         fn tick(&self) {
-            self.0.tick.fetch_add(1, Ordering::Relaxed);
+            let _ = self.0.tick.fetch_add(1, Ordering::Relaxed);
         }
         fn request_redraw(&self) {
-            self.0.paint.fetch_add(1, Ordering::Relaxed);
+            let _ = self.0.paint.fetch_add(1, Ordering::Relaxed);
         }
         fn invalidate_layout(&self) {
-            self.0.layout.fetch_add(1, Ordering::Relaxed);
+            let _ = self.0.layout.fetch_add(1, Ordering::Relaxed);
         }
     }
 

@@ -78,7 +78,7 @@ mod tests {
             let counter = counter.clone();
             let barrier = barrier.clone();
             workers.push(std::thread::spawn(move || {
-                barrier.wait();
+                let _ = barrier.wait();
                 (0..PER_THREAD)
                     .map(|_| Id::allocate(&counter).expect("no overflow"))
                     .collect::<Vec<_>>()

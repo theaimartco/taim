@@ -7,7 +7,7 @@ pub use manager::Manager;
 use preedit::Preedit;
 use state::State;
 
-pub use crate::core::window::{Event, Id, RedrawRequest, Settings};
+pub use crate::core::window::RedrawRequest;
 
 use crate::conversion;
 use crate::core::input_method;
