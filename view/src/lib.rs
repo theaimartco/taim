@@ -24,6 +24,9 @@ pub use taim_core::{
     keyboard, mouse, semantics,
 };
 
+/// A point in time, as used for animation.
+pub use taim_core::time::{Duration, Instant};
+
 /// The renderer every view draws with, chosen when TAIM is compiled.
 pub type Renderer = taim_renderer::Renderer;
 
@@ -31,8 +34,9 @@ pub type Renderer = taim_renderer::Renderer;
 pub mod prelude {
     pub use crate::views;
     pub use crate::views::{
-        Align, button, checkbox, column, container, each, layers, progress, rebuild, row, rule,
-        scroll, slider, space, switch, text, text_field, when,
+        Align, avatar, badge, button, checkbox, chip, column, container, drawer, each, layers,
+        nav_bar, progress, pull_to_refresh, rebuild, row, rule, scaffold, scroll, search, sheet,
+        skeleton, slider, snackbar, space, switch, tabs, text, text_field, when,
     };
     pub use crate::{AnyView, Scope, State, View, spawn};
 }

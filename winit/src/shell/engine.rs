@@ -610,11 +610,14 @@ where
                     #[cfg(not(feature = "unconditional-rendering"))]
                     window.request_redraw(_redraw_request);
 
+                    // Input can start an animation but never ends one: an
+                    // event batch that says nothing about animation (a wake,
+                    // a cursor move) must not cancel a running loop. Only a
+                    // frame that no longer asks for animation stops it (see
+                    // `finish_redraw`).
                     if is_animating {
                         window.scheduler.request_animation();
                         window.raw.request_redraw();
-                    } else {
-                        window.scheduler.stop_animating();
                     }
 
                     frame::serve_clipboard(&mut self.proxy, &mut self.clipboard, clipboard, id);

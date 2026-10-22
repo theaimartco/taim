@@ -29,6 +29,7 @@ pub struct PaintCx<'a> {
     pub(crate) pointer: Option<Point>,
     pub(crate) text_color: Color,
     pub(crate) focused: bool,
+    pub(crate) now: crate::Instant,
 }
 
 impl PaintCx<'_> {
@@ -50,6 +51,11 @@ impl PaintCx<'_> {
     /// Whether this view has keyboard focus.
     pub fn has_focus(&self) -> bool {
         self.focused
+    }
+
+    /// The time this frame is painted for; animations sample at it.
+    pub fn now(&self) -> crate::Instant {
+        self.now
     }
 
     /// Text color where a view does not choose one.
@@ -77,6 +83,7 @@ impl PaintCx<'_> {
 
 /// Available while handling an event.
 pub struct EventCx<'a> {
+    pub(crate) now: crate::Instant,
     pub(crate) bounds: Rectangle,
     pub(crate) pointer: Option<Point>,
     pub(crate) requests: &'a mut Requests,
@@ -103,6 +110,11 @@ pub(crate) struct Focus {
 }
 
 impl EventCx<'_> {
+    /// The time of this event; start animations from it.
+    pub fn now(&self) -> crate::Instant {
+        self.now
+    }
+
     /// Where this view is, in window coordinates.
     pub fn bounds(&self) -> Rectangle {
         self.bounds

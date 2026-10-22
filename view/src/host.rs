@@ -120,6 +120,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Host<'_> {
             pointer: cursor.position(),
             text_color: style.text_color,
             focus: root.focus.current.as_deref(),
+            now: crate::Instant::now(),
         };
 
         tree::paint(
@@ -150,6 +151,11 @@ impl<Message> Widget<Message, Theme, Renderer> for Host<'_> {
             root.waker_installed = true;
         }
 
+        let now = match event {
+            Event::Window(taim_core::window::Event::RedrawRequested(at)) => *at,
+            _ => crate::Instant::now(),
+        };
+
         let mut requests = Requests::default();
         let origin = layout.position();
         let everything = Some(Rectangle::INFINITE);
@@ -157,6 +163,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Host<'_> {
 
         let handled = {
             let mut router = tree::Router {
+                now,
                 pointer: cursor.position(),
                 requests: &mut requests,
                 focus: &mut root.focus,
@@ -212,8 +219,18 @@ impl<Message> Widget<Message, Theme, Renderer> for Host<'_> {
         if requests.paste {
             shell.read_clipboard(taim_core::clipboard::Kind::Text);
         }
+        // Each frame, keep frames coming while anything is still moving.
+        if matches!(
+            event,
+            Event::Window(taim_core::window::Event::RedrawRequested(_))
+        ) && tree::any_animating(&mut root.child, now)
+        {
+            requests.animate = true;
+        }
+
         if requests.animate {
             shell.request_animation();
+            shell.request_redraw();
         }
 
         let owed = root.invalidation.take();
@@ -336,6 +353,7 @@ mod tests {
                 &mut Vec::new(),
                 event,
                 &mut tree::Router {
+                    now: crate::Instant::now(),
                     pointer: Some(at),
                     requests: &mut requests,
                     focus: &mut focus,

@@ -318,11 +318,34 @@ impl<T: Clone + Send + Sync + 'static> IntoProp<T> for State<T> {
     }
 }
 
-impl IntoProp<f32> for f32 {
-    fn into_prop(self) -> Prop<f32> {
-        Prop::fixed(self)
-    }
+/// Plain values of common types are fixed properties.
+macro_rules! fixed_props {
+    ($($value:ty),+ $(,)?) => {
+        $(
+            impl IntoProp<$value> for $value {
+                fn into_prop(self) -> Prop<$value> {
+                    Prop::fixed(self)
+                }
+            }
+        )+
+    };
 }
+
+fixed_props!(
+    f32,
+    f64,
+    u8,
+    u16,
+    u32,
+    u64,
+    usize,
+    i8,
+    i16,
+    i32,
+    i64,
+    isize,
+    crate::Color
+);
 
 impl IntoProp<String> for &str {
     fn into_prop(self) -> Prop<String> {

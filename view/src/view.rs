@@ -1,7 +1,7 @@
 //! The view contract.
 use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::{Constraints, Sizing};
-use crate::{Event, Point, Rectangle, Size, Vector, mouse, semantics};
+use crate::{Event, Instant, Point, Rectangle, Size, Vector, mouse, semantics};
 
 /// A piece of user interface.
 ///
@@ -46,8 +46,21 @@ pub trait View: 'static {
         None
     }
 
+    /// Whether the view is mid-animation at `now` and needs another frame.
+    fn is_animating(&self, _now: Instant) -> bool {
+        false
+    }
+
     /// Whether the view can take keyboard focus (and be reached with Tab).
     fn focusable(&self) -> bool {
+        false
+    }
+
+    /// Whether the view and its subtree are drawn in a layer of their own,
+    /// above everything painted before them. Overlays (drawers, sheets,
+    /// notices) need this: within one layer the renderer draws all shapes
+    /// before all text, so earlier text would show through.
+    fn is_layer(&self) -> bool {
         false
     }
 
@@ -64,6 +77,11 @@ pub trait View: 'static {
 
     /// Hands each child to `visit`, in paint order.
     fn children(&mut self, _visit: &mut dyn FnMut(&mut Child)) {}
+
+    /// The view's type, for diagnostics and developer tools.
+    fn debug_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }
 
 /// Whether a view consumed an event.
@@ -89,6 +107,11 @@ impl AnyView {
     /// Boxes `view`.
     pub fn new(view: impl View) -> Self {
         Self(Box::new(view))
+    }
+
+    /// Converts anything view-like (a view, or an `AnyView`).
+    pub fn of(view: impl Into<AnyView>) -> Self {
+        view.into()
     }
 
     /// The boxed view.

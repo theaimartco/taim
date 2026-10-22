@@ -4,6 +4,8 @@ mod container;
 mod dynamic;
 mod layers;
 mod look;
+mod mobile;
+mod overlays;
 mod range;
 mod scroll;
 mod space;
@@ -16,6 +18,13 @@ pub use button::{Button, button};
 pub use container::{Container, container};
 pub use dynamic::{Each, Rebuild, each, rebuild, when};
 pub use layers::{Layers, layers};
+pub use mobile::{
+    Avatar, Badge, Chip, Segments, Skeleton, avatar, badge, chip, nav_bar, scaffold, search,
+    skeleton, tabs,
+};
+pub use overlays::{
+    Drawer, PullToRefresh, Sheet, Snackbar, drawer, pull_to_refresh, sheet, snackbar,
+};
 pub use range::{Progress, Rule, Slider, progress, rule, slider};
 pub use scroll::{Scroll, scroll};
 pub use space::{Space, space};
@@ -28,6 +37,6 @@ pub use toggle::{Toggle, checkbox, switch};
 #[macro_export]
 macro_rules! views {
     ($($child:expr),* $(,)?) => {
-        [$($crate::AnyView::from($child)),*]
+        [$($crate::AnyView::of($child)),*]
     };
 }

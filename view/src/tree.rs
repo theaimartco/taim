@@ -76,9 +76,49 @@ pub(crate) struct Painter<'a> {
     pub pointer: Option<Point>,
     pub text_color: Color,
     pub focus: Option<&'a [u16]>,
+    pub now: crate::Instant,
 }
 
 pub(crate) fn paint(
+    child: &mut Child,
+    origin: Point,
+    visible: Option<Rectangle>,
+    path: &mut Vec<u16>,
+    painter: &mut Painter<'_>,
+) {
+    if !child.view().is_layer() {
+        paint_view(child, origin, visible, path, painter);
+        return;
+    }
+
+    let Painter {
+        renderer,
+        theme,
+        pointer,
+        text_color,
+        focus,
+        now,
+    } = painter;
+    let area = Rectangle::INFINITE;
+    renderer.with_layer(area, |renderer| {
+        paint_view(
+            child,
+            origin,
+            visible,
+            path,
+            &mut Painter {
+                renderer,
+                theme,
+                pointer: *pointer,
+                text_color: *text_color,
+                focus: *focus,
+                now: *now,
+            },
+        );
+    });
+}
+
+fn paint_view(
     child: &mut Child,
     origin: Point,
     visible: Option<Rectangle>,
@@ -94,6 +134,7 @@ pub(crate) fn paint(
         pointer: pointer_in(painter.pointer, at.visible),
         text_color: painter.text_color,
         focused: painter.focus == Some(path.as_slice()),
+        now: painter.now,
     });
 
     let (origin, visible) = inner(child.view(), at);
@@ -119,6 +160,7 @@ pub(crate) fn paint(
                 pointer,
                 text_color,
                 focus,
+                now,
             } = painter;
             renderer.with_layer(bounds, |renderer| {
                 paint_children(&mut Painter {
@@ -127,6 +169,7 @@ pub(crate) fn paint(
                     pointer: *pointer,
                     text_color: *text_color,
                     focus: *focus,
+                    now: *now,
                 });
             });
         }
@@ -140,11 +183,13 @@ pub(crate) fn paint(
         pointer: pointer_in(painter.pointer, at.visible),
         text_color: painter.text_color,
         focused,
+        now: painter.now,
     });
 }
 
 /// Everything routing needs besides the tree.
 pub(crate) struct Router<'a> {
+    pub now: crate::Instant,
     pub pointer: Option<Point>,
     pub requests: &'a mut Requests,
     pub focus: &'a mut Focus,
@@ -162,23 +207,35 @@ pub(crate) fn broadcast(
     let at = place(child, origin, visible);
     let (inner_origin, inner_visible) = inner(child.view(), at);
 
+    // Topmost (last painted) children first, so overlays get input before
+    // what they cover.
+    let mut count = 0_u16;
+    child.view_mut().children(&mut |_| count += 1);
+
     let mut handled = Handled::No;
-    let mut index = 0_u16;
-    child.view_mut().children(&mut |grandchild| {
-        if handled == Handled::No {
-            path.push(index);
-            handled = broadcast(grandchild, inner_origin, inner_visible, path, event, router);
-            let _ = path.pop();
+    for target in (0..count).rev() {
+        let mut index = 0_u16;
+        child.view_mut().children(&mut |grandchild| {
+            if index == target && handled == Handled::No {
+                path.push(index);
+                handled = broadcast(grandchild, inner_origin, inner_visible, path, event, router);
+                let _ = path.pop();
+            }
+            index += 1;
+        });
+
+        if handled == Handled::Yes {
+            break;
         }
-        index += 1;
-    });
+    }
 
     if handled == Handled::Yes {
         return handled;
     }
 
-    child.view_mut().event(
+    let handled = child.view_mut().event(
         &mut EventCx {
+            now: router.now,
             bounds: at.bounds,
             pointer: pointer_in(router.pointer, at.visible),
             requests: router.requests,
@@ -186,7 +243,19 @@ pub(crate) fn broadcast(
             path,
         },
         event,
-    )
+    );
+
+    if handled == Handled::Yes && tracing_events() {
+        eprintln!("{} handled {event:?}", child.view().debug_name());
+    }
+
+    handled
+}
+
+/// Whether `TAIM_VIEW_TRACE` asks for every handled event to be logged.
+fn tracing_events() -> bool {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ENABLED.get_or_init(|| std::env::var_os("TAIM_VIEW_TRACE").is_some())
 }
 
 /// Delivers `event` to the view at `target`, bubbling up through its
@@ -231,6 +300,7 @@ pub(crate) fn deliver(
 
     child.view_mut().event(
         &mut EventCx {
+            now: router.now,
             bounds: at.bounds,
             pointer: pointer_in(router.pointer, at.visible),
             requests: router.requests,
@@ -239,6 +309,15 @@ pub(crate) fn deliver(
         },
         event,
     )
+}
+
+/// Whether any view is mid-animation at `now`.
+pub(crate) fn any_animating(child: &mut Child, now: crate::Instant) -> bool {
+    let mut animating = false;
+    walk(child, Point::ORIGIN, &mut Vec::new(), &mut |view, _, _| {
+        animating |= view.is_animating(now);
+    });
+    animating
 }
 
 /// Paths of every focusable view, in tree order.
