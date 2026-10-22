@@ -1,99 +1,98 @@
+//! A plain-text paragraph that rebuilds itself only when it has to.
 use super::Paragraph;
 use crate::Size;
 use crate::alignment;
 use crate::text::{Alignment, Difference, Text};
 
-/// A [`Paragraph`] of plain text.
+/// A plain-text [`Paragraph`] that remembers its content, so callers can
+/// hand it the desired [`Text`] every frame and pay only for real changes.
 #[derive(Debug, Clone, Default)]
 pub struct Plain<P: Paragraph> {
-    raw: P,
+    shaped: P,
     content: String,
 }
 
 impl<P: Paragraph> Plain<P> {
-    /// Creates a new [`Plain`] paragraph.
+    /// Shapes `text`.
     pub fn new(text: Text<String, P::Font>) -> Self {
         Self {
-            raw: P::with_text(text.as_ref()),
+            shaped: P::with_text(text.as_ref()),
             content: text.content,
         }
     }
 
-    /// Updates the plain [`Paragraph`] to match the given [`Text`], if needed.
+    /// Brings the paragraph in line with `text`, doing as little work as
+    /// possible: nothing, a re-layout, or a full reshape.
     ///
-    /// Returns true if the [`Paragraph`] changed.
+    /// Returns whether anything changed.
     pub fn update(&mut self, text: Text<&str, P::Font>) -> bool {
-        if self.content != text.content {
+        let difference = if self.content == text.content {
+            self.shaped.compare(text.with_content(()))
+        } else {
             text.content.clone_into(&mut self.content);
-            self.raw = P::with_text(text);
-            return true;
+            Difference::Shape
+        };
+
+        match difference {
+            Difference::None => return false,
+            Difference::Bounds => self.shaped.resize(text.bounds),
+            Difference::Shape => self.shaped = P::with_text(text),
         }
 
-        match self.raw.compare(text.with_content(())) {
-            Difference::None => false,
-            Difference::Bounds => {
-                self.raw.resize(text.bounds);
-                true
-            }
-            Difference::Shape => {
-                self.raw = P::with_text(text);
-                true
-            }
-        }
+        true
     }
 
-    /// Returns the horizontal alignment of the [`Paragraph`].
+    /// Horizontal line placement.
     pub fn align_x(&self) -> Alignment {
-        self.raw.align_x()
+        self.shaped.align_x()
     }
 
-    /// Returns the vertical alignment of the [`Paragraph`].
+    /// Vertical block placement.
     pub fn align_y(&self) -> alignment::Vertical {
-        self.raw.align_y()
+        self.shaped.align_y()
     }
 
-    /// Returns the minimum boundaries that can fit the contents of the
-    /// [`Paragraph`].
+    /// The smallest box the text fits in.
     pub fn min_bounds(&self) -> Size {
-        self.raw.min_bounds()
+        self.shaped.min_bounds()
     }
 
-    /// Returns the minimum width that can fit the contents of the
-    /// [`Paragraph`].
+    /// Width of [`min_bounds`](Self::min_bounds).
     pub fn min_width(&self) -> f32 {
-        self.raw.min_width()
+        self.shaped.min_width()
     }
 
-    /// Returns the minimum height that can fit the contents of the
-    /// [`Paragraph`].
+    /// Height of [`min_bounds`](Self::min_bounds).
     pub fn min_height(&self) -> f32 {
-        self.raw.min_height()
+        self.shaped.min_height()
     }
 
-    /// Returns the cached [`Paragraph`].
+    /// The underlying shaped paragraph.
     pub fn raw(&self) -> &P {
-        &self.raw
+        &self.shaped
     }
 
-    /// Returns the current content of the plain [`Paragraph`].
+    /// The text currently shaped.
     pub fn content(&self) -> &str {
         &self.content
     }
 
-    /// Returns the [`Paragraph`] as a [`Text`] definition.
+    /// The settings and content this paragraph was built from.
     pub fn as_text(&self) -> Text<&str, P::Font> {
+        let shaped = &self.shaped;
+
         Text {
-            content: &self.content,
-            bounds: self.raw.bounds(),
-            size: self.raw.size(),
-            line_height: self.raw.line_height(),
-            font: self.raw.font(),
-            align_x: self.raw.align_x(),
-            align_y: self.raw.align_y(),
-            shaping: self.raw.shaping(),
-            wrapping: self.raw.wrapping(),
-            ellipsis: self.raw.ellipsis(),
-            hint_factor: self.raw.hint_factor(),
+            content: self.content.as_str(),
+            bounds: shaped.bounds(),
+            size: shaped.size(),
+            line_height: shaped.line_height(),
+            font: shaped.font(),
+            align_x: shaped.align_x(),
+            align_y: shaped.align_y(),
+            shaping: shaped.shaping(),
+            wrapping: shaped.wrapping(),
+            ellipsis: shaped.ellipsis(),
+            hint_factor: shaped.hint_factor(),
         }
     }
 }

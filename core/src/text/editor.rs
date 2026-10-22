@@ -1,4 +1,4 @@
-//! Edit text.
+//! Editable multi-line text.
 mod action;
 mod line;
 mod selection;
@@ -11,70 +11,73 @@ use crate::text::highlighter::{self, Highlighter};
 use crate::text::{LineHeight, Wrapping};
 use crate::{Pixels, Size};
 
-/// A component that can be used by widgets to edit multi-line text.
+/// A multi-line text buffer with a cursor, as used by the text editor
+/// widget. Renderers provide the implementation.
 pub trait Editor: Sized + Default {
-    /// The font of the [`Editor`].
+    /// The renderer's font handle.
     type Font: Copy + PartialEq + Default;
 
-    /// Creates a new [`Editor`] laid out with the given text.
+    /// A buffer holding `text`, cursor at the start.
     fn with_text(text: &str) -> Self;
 
-    /// Returns true if the [`Editor`] has no contents.
+    /// Whether the buffer holds no text.
     fn is_empty(&self) -> bool;
 
-    /// Returns the current [`Cursor`] of the [`Editor`].
+    /// Where the caret is, and the selection anchor if any.
     fn cursor(&self) -> Cursor;
 
-    /// Returns the current [`Selection`] of the [`Editor`].
+    /// The selected range, as geometry for drawing.
     fn selection(&self) -> Selection;
 
-    /// Returns the current selected text of the [`Editor`].
+    /// The selected text, if anything is selected.
     fn copy(&self) -> Option<String>;
 
-    /// Returns the text of the given line in the [`Editor`], if it exists.
+    /// Line `index`, if the buffer has that many lines.
     fn line(&self, index: usize) -> Option<Line<'_>>;
 
-    /// Returns the amount of lines in the [`Editor`].
+    /// Number of lines.
     fn line_count(&self) -> usize;
 
-    /// Returns the first visible logical line and its vertical pixel offset.
+    /// The first visible line and how far it is scrolled, in pixels.
     fn scroll_position(&self) -> (usize, f32) {
         (0, 0.0)
     }
 
-    /// Performs an [`Action`] on the [`Editor`].
+    /// Applies an edit, a motion, a selection change or a scroll.
     fn perform(&mut self, action: Action);
 
-    /// Moves the cursor to the given position.
+    /// Places the caret (and selection) at `cursor`.
     fn move_to(&mut self, cursor: Cursor);
 
-    /// Returns the current boundaries of the [`Editor`].
+    /// The box the text is laid out in.
     fn bounds(&self) -> Size;
 
-    /// Returns the minimum boundaries to fit the current contents of
-    /// the [`Editor`].
+    /// The smallest box the text fits in.
     fn min_bounds(&self) -> Size;
 
-    /// Returns the hint factor of the [`Editor`].
+    /// Metrics-hinting scale, if hinted.
     fn hint_factor(&self) -> Option<f32>;
 
-    /// Updates the [`Editor`] with some new attributes.
+    /// Applies new layout and style settings, re-laying out only what they
+    /// affect.
+    #[allow(clippy::too_many_arguments)]
     fn update(
         &mut self,
-        new_bounds: Size,
-        new_font: Self::Font,
-        new_size: Pixels,
-        new_line_height: LineHeight,
-        new_wrapping: Wrapping,
-        new_hint_factor: Option<f32>,
-        new_highlighter: &mut impl Highlighter,
+        bounds: Size,
+        font: Self::Font,
+        size: Pixels,
+        line_height: LineHeight,
+        wrapping: Wrapping,
+        hint_factor: Option<f32>,
+        highlighter: &mut impl Highlighter,
     );
 
-    /// Runs a text [`Highlighter`] in the [`Editor`].
+    /// Colors the text with `highlighter`, turning each highlight into a
+    /// font and color with `format`.
     fn highlight<H: Highlighter>(
         &mut self,
         font: Self::Font,
         highlighter: &mut H,
-        format_highlight: impl Fn(&H::Highlight) -> highlighter::Format<Self::Font>,
+        format: impl Fn(&H::Highlight) -> highlighter::Format<Self::Font>,
     );
 }

@@ -1,41 +1,44 @@
+//! What a widget asks of the platform input method (IME) each frame.
 use crate::{Pixels, Rectangle};
 use std::ops::Range;
 
-/// The input method strategy of a widget.
+/// Whether a widget wants the input method, and how.
+///
+/// The focused text widget reports this every redraw; the shell keeps the
+/// first enabled request it receives (see [`merge`](InputMethod::merge)).
 #[derive(Debug, Clone, PartialEq)]
 pub enum InputMethod<T = String> {
-    /// Input method is disabled.
+    /// No text entry is focused.
     Disabled,
-    /// Input method is enabled.
+    /// A text field is focused.
     Enabled {
-        /// The area of the cursor of the input method.
-        ///
-        /// This area should not be covered.
+        /// The caret area. Candidate windows are placed so they do not cover
+        /// it.
         cursor: Rectangle,
-        /// The [`Purpose`] of the input method.
+        /// What kind of text is being entered.
         purpose: Purpose,
-        /// The preedit to overlay on top of the input method dialog, if needed.
+        /// Text being composed, for the shell to draw near the caret.
         ///
-        /// Ideally, your widget will show pre-edits on-the-spot; but, since that can
-        /// be tricky, you can instead provide the current pre-edit here and the
-        /// runtime will display it as an overlay (i.e. "Over-the-spot IME").
+        /// Widgets that render composition inline ("on the spot") leave this
+        /// `None`; widgets that do not can hand it to the shell, which draws
+        /// it as an overlay ("over the spot").
         preedit: Option<Preedit<T>>,
     },
 }
 
-/// The pre-edit of an [`InputMethod`].
+/// Text an input method is composing but has not committed yet.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Preedit<T = String> {
-    /// The current content.
+    /// The composed text.
     pub content: T,
-    /// The selected range of the content.
+    /// The part of `content` the input method highlights, in bytes.
     pub selection: Option<Range<usize>>,
-    /// The text size of the content.
+    /// Font size for the overlay; the renderer default when `None`.
     pub text_size: Option<Pixels>,
 }
 
 impl<T> Preedit<T> {
-    /// Creates a new empty [`Preedit`].
+    /// Nothing composed.
     pub fn new() -> Self
     where
         T: Default,
@@ -43,13 +46,17 @@ impl<T> Preedit<T> {
         Self::default()
     }
 
-    /// Turns a [`Preedit`] into its owned version.
+    /// An owned copy of the composition.
     pub fn to_owned(&self) -> Preedit
     where
         T: AsRef<str>,
     {
+        self.with_content(self.content.as_ref().to_owned())
+    }
+
+    fn with_content<U>(&self, content: U) -> Preedit<U> {
         Preedit {
-            content: self.content.as_ref().to_owned(),
+            content,
             selection: self.selection.clone(),
             text_size: self.text_size,
         }
@@ -57,65 +64,51 @@ impl<T> Preedit<T> {
 }
 
 impl Preedit {
-    /// Borrows the contents of a [`Preedit`].
+    /// The composition with its text borrowed.
     pub fn as_ref(&self) -> Preedit<&str> {
-        Preedit {
-            content: &self.content,
-            selection: self.selection.clone(),
-            text_size: self.text_size,
-        }
+        self.with_content(self.content.as_str())
     }
 }
 
-/// The purpose of an [`InputMethod`].
+/// What kind of text is being entered; platforms adapt their keyboards and
+/// candidate lists to it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Purpose {
-    /// No special hints for the IME (default).
+    /// Ordinary text.
     #[default]
     Normal,
-    /// The IME is used for secure input (e.g. passwords).
+    /// A secret, such as a password: no suggestions, no learning.
     Secure,
-    /// The IME is used to input into a terminal.
-    ///
-    /// For example, that could alter OSK on Wayland to show extra buttons.
+    /// A terminal; on-screen keyboards may offer extra keys.
     Terminal,
 }
 
 impl InputMethod {
-    /// Merges two [`InputMethod`] strategies, prioritizing the first one when both open:
+    /// Takes `other` unless an input method is already enabled: the first
+    /// widget to claim the input method keeps it.
+    ///
     /// ```
-    /// # use taim_core::input_method::{InputMethod, Purpose, Preedit};
+    /// # use taim_core::input_method::{InputMethod, Purpose};
     /// # use taim_core::{Point, Rectangle, Size};
-    ///
-    /// let open = InputMethod::Enabled {
+    /// let field = |purpose| InputMethod::<String>::Enabled {
     ///     cursor: Rectangle::new(Point::ORIGIN, Size::UNIT),
-    ///     purpose: Purpose::Normal,
-    ///     preedit: Some(Preedit { content: "1".to_owned(), selection: None, text_size: None }),
-    /// };
-    ///
-    /// let open_2 = InputMethod::Enabled {
-    ///     cursor: Rectangle::new(Point::ORIGIN, Size::UNIT),
-    ///     purpose: Purpose::Secure,
-    ///     preedit: Some(Preedit { content: "2".to_owned(), selection: None, text_size: None }),
+    ///     purpose,
+    ///     preedit: None,
     /// };
     ///
     /// let mut ime = InputMethod::Disabled;
+    /// ime.merge(&field(Purpose::Normal));
+    /// ime.merge(&field(Purpose::Secure));
     ///
-    /// ime.merge(&open);
-    /// assert_eq!(ime, open);
-    ///
-    /// ime.merge(&open_2);
-    /// assert_eq!(ime, open);
+    /// assert_eq!(ime, field(Purpose::Normal));
     /// ```
     pub fn merge<T: AsRef<str>>(&mut self, other: &InputMethod<T>) {
-        if let InputMethod::Enabled { .. } = self {
-            return;
+        if !self.is_enabled() {
+            *self = other.to_owned();
         }
-
-        *self = other.to_owned();
     }
 
-    /// Returns true if the [`InputMethod`] is open.
+    /// Whether a text field claimed the input method.
     #[inline]
     pub const fn is_enabled(&self) -> bool {
         matches!(self, Self::Enabled { .. })
@@ -123,22 +116,24 @@ impl InputMethod {
 }
 
 impl<T> InputMethod<T> {
-    /// Turns an [`InputMethod`] into its owned version.
+    /// An owned copy, with any composed text copied.
     pub fn to_owned(&self) -> InputMethod
     where
         T: AsRef<str>,
     {
-        match self {
-            Self::Disabled => InputMethod::Disabled,
-            Self::Enabled {
-                cursor,
-                purpose,
-                preedit,
-            } => InputMethod::Enabled {
-                cursor: *cursor,
-                purpose: *purpose,
-                preedit: preedit.as_ref().map(Preedit::to_owned),
-            },
+        let Self::Enabled {
+            cursor,
+            purpose,
+            preedit,
+        } = self
+        else {
+            return InputMethod::Disabled;
+        };
+
+        InputMethod::Enabled {
+            cursor: *cursor,
+            purpose: *purpose,
+            preedit: preedit.as_ref().map(Preedit::to_owned),
         }
     }
 }

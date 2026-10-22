@@ -1,4 +1,4 @@
-//! Draw paragraphs.
+//! Shaped, laid-out text.
 use crate::alignment;
 use crate::text::{
     Alignment, Difference, Ellipsis, Hit, LineHeight, Shaping, Span, Text, Wrapping,
@@ -11,80 +11,85 @@ mod shaping_key;
 pub use cached::Plain;
 pub use shaping_key::{Direction, ShapingKey};
 
-/// A text paragraph.
+/// A shaped, laid-out paragraph a text [`Renderer`](super::Renderer) can
+/// draw and query.
+///
+/// Paragraphs are expensive to build and cheap to keep: widgets store one
+/// and use [`compare`](Self::compare) to decide whether it can be reused,
+/// merely [`resize`](Self::resize)d, or must be rebuilt.
 pub trait Paragraph: Sized + Default {
-    /// The font of this [`Paragraph`].
+    /// The renderer's font handle.
     type Font: Copy + PartialEq;
 
-    /// Creates a new [`Paragraph`] laid out with the given [`Text`].
+    // Building
+
+    /// Shapes and lays out plain text.
     fn with_text(text: Text<&str, Self::Font>) -> Self;
 
-    /// Creates a new [`Paragraph`] laid out with the given [`Text`].
+    /// Shapes and lays out rich text.
     fn with_spans<Link>(text: Text<&[Span<'_, Link, Self::Font>], Self::Font>) -> Self;
 
-    /// Lays out the [`Paragraph`] with some new boundaries.
-    fn resize(&mut self, new_bounds: Size);
+    /// Lays the already-shaped glyphs out again in `bounds`.
+    fn resize(&mut self, bounds: Size);
 
-    /// Compares the [`Paragraph`] with some desired [`Text`] and returns the
-    /// [`Difference`].
+    /// How much of this paragraph survives if the settings change to `text`.
     fn compare(&self, text: Text<(), Self::Font>) -> Difference;
 
-    /// Returns the text size of the [`Paragraph`] in [`Pixels`].
+    // The settings it was built with
+
+    /// Font size.
     fn size(&self) -> Pixels;
 
-    /// Returns the hint factor of the [`Paragraph`].
+    /// Metrics-hinting scale, if hinted.
     fn hint_factor(&self) -> Option<f32>;
 
-    /// Returns the font of the [`Paragraph`].
+    /// Default font.
     fn font(&self) -> Self::Font;
 
-    /// Returns the [`LineHeight`] of the [`Paragraph`].
+    /// Distance between baselines.
     fn line_height(&self) -> LineHeight;
 
-    /// Returns the horizontal alignment of the [`Paragraph`].
+    /// Horizontal line placement.
     fn align_x(&self) -> Alignment;
 
-    /// Returns the vertical alignment of the [`Paragraph`].
+    /// Vertical block placement.
     fn align_y(&self) -> alignment::Vertical;
 
-    /// Returns the [`Wrapping`] strategy of the [`Paragraph`]>
+    /// Line-breaking policy.
     fn wrapping(&self) -> Wrapping;
 
-    /// Returns the [`Ellipsis`] strategy of the [`Paragraph`]>
+    /// Elision policy.
     fn ellipsis(&self) -> Ellipsis;
 
-    /// Returns the [`Shaping`] strategy of the [`Paragraph`]>
+    /// Shaping level.
     fn shaping(&self) -> Shaping;
 
-    /// Returns the available bounds used to layout the [`Paragraph`].
+    /// The box the paragraph was laid out in.
     fn bounds(&self) -> Size;
 
-    /// Returns the minimum boundaries that can fit the contents of the
-    /// [`Paragraph`].
+    // Measuring and querying
+
+    /// The smallest box the laid-out text fits in.
     fn min_bounds(&self) -> Size;
 
-    /// Tests whether the provided point is within the boundaries of the
-    /// [`Paragraph`], returning information about the nearest character.
+    /// The character nearest to `point`, if `point` is inside the paragraph.
     fn hit_test(&self, point: Point) -> Option<Hit>;
 
-    /// Tests whether the provided point is within the boundaries of a
-    /// [`Span`] in the [`Paragraph`], returning the index of the [`Span`]
-    /// that was hit.
+    /// Which span `point` is over, by index.
     fn hit_span(&self, point: Point) -> Option<usize>;
 
-    /// Returns all bounds for the provided [`Span`] index of the [`Paragraph`].
-    /// A [`Span`] can have multiple bounds for each line it's on.
+    /// The boxes covering span `index`: one per line it spans.
     fn span_bounds(&self, index: usize) -> Vec<Rectangle>;
 
-    /// Returns the distance to the given grapheme index in the [`Paragraph`].
-    fn grapheme_position(&self, line: usize, index: usize) -> Option<Point>;
+    /// Where grapheme `grapheme` of line `line` starts.
+    fn grapheme_position(&self, line: usize, grapheme: usize) -> Option<Point>;
 
-    /// Returns the minimum width that can fit the contents of the [`Paragraph`].
+    /// Width of [`min_bounds`](Self::min_bounds).
     fn min_width(&self) -> f32 {
         self.min_bounds().width
     }
 
-    /// Returns the minimum height that can fit the contents of the [`Paragraph`].
+    /// Height of [`min_bounds`](Self::min_bounds).
     fn min_height(&self) -> f32 {
         self.min_bounds().height
     }
