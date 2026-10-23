@@ -79,24 +79,24 @@ pub struct Seed {
 }
 
 impl Seed {
-    /// Built-in light seed.
+    /// Built-in light seed: cool paper, ink text, the logo's blue.
     pub const LIGHT: Self = Self {
-        background: Color::WHITE,
-        text: Color::BLACK,
-        primary: Color::from_packed_rgba8(0x5865F2, 1.0),
-        success: Color::from_packed_rgba8(0x12664f, 1.0),
-        warning: Color::from_packed_rgba8(0xb77e33, 1.0),
-        danger: Color::from_packed_rgba8(0xc3423f, 1.0),
+        background: Color::from_packed_rgba8(0xF6F8FC, 1.0),
+        text: Color::from_packed_rgba8(0x172033, 1.0),
+        primary: Color::from_packed_rgba8(0x2563EB, 1.0),
+        success: Color::from_packed_rgba8(0x15803D, 1.0),
+        warning: Color::from_packed_rgba8(0xB45309, 1.0),
+        danger: Color::from_packed_rgba8(0xDC2626, 1.0),
     };
 
-    /// Built-in dark seed.
+    /// Built-in dark seed: the logo's deep ink as the surface.
     pub const DARK: Self = Self {
-        background: Color::from_packed_rgba8(0x2B2D31, 1.0),
-        text: Color::from_rgb(0.90, 0.90, 0.90),
-        primary: Color::from_packed_rgba8(0x5865F2, 1.0),
-        success: Color::from_packed_rgba8(0x12664f, 1.0),
-        warning: Color::from_packed_rgba8(0xffc14e, 1.0),
-        danger: Color::from_packed_rgba8(0xc3423f, 1.0),
+        background: Color::from_packed_rgba8(0x0F1523, 1.0),
+        text: Color::from_packed_rgba8(0xE7ECF5, 1.0),
+        primary: Color::from_packed_rgba8(0x4C8DFF, 1.0),
+        success: Color::from_packed_rgba8(0x34D399, 1.0),
+        warning: Color::from_packed_rgba8(0xFBBF24, 1.0),
+        danger: Color::from_packed_rgba8(0xF87171, 1.0),
     };
 
     /// Built-in maximum-contrast seed.

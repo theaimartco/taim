@@ -22,7 +22,7 @@ mod text_field;
 mod toggle;
 
 pub use area::{MouseArea, mouse_area};
-pub use button::{Button, button};
+pub use button::{Button, Kind as ButtonKind, button};
 pub use container::{Container, container};
 pub use disclosure::{
     Accordion, Carousel, Stepper, Tooltip, accordion, carousel, stepper, tooltip,

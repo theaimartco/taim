@@ -64,6 +64,12 @@ pub trait View: 'static {
         false
     }
 
+    /// The text color this view's subtree inherits, if it sets one (a
+    /// solid button, say, wants text readable on its fill).
+    fn foreground(&self, _theme: &crate::Theme) -> Option<crate::Color> {
+        None
+    }
+
     /// Whether children are clipped to this view's bounds.
     fn clips(&self) -> bool {
         false

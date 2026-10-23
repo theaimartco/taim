@@ -32,8 +32,8 @@ pub use state::{IntoProp, Invalidation, Prop, Scope, State, spawn};
 pub use view::{AnyView, Child, Handled, View};
 
 pub use taim_core::{
-    Background, Border, Color, Event, Padding, Pixels, Point, Rectangle, Size, Theme, Vector,
-    keyboard, mouse, semantics,
+    Background, Border, Color, Event, Padding, Pixels, Point, Rectangle, Shadow, Size, Theme,
+    Vector, keyboard, mouse, semantics,
 };
 
 /// A point in time, as used for animation.
@@ -45,6 +45,10 @@ pub type Renderer = taim_renderer::Renderer;
 /// Everything an application needs, in one import.
 pub mod prelude {
     pub use crate::views;
+    #[cfg(feature = "image")]
+    pub use crate::views::image;
+    #[cfg(feature = "svg")]
+    pub use crate::views::svg;
     pub use crate::views::{
         Align, Buffer, Date, Icon, Time, accordion, app_bar, avatar, badge, button, carousel,
         checkbox, chip, column, container, date_picker, dialog, drawer, dropdown, each, grid, icon,
@@ -52,9 +56,5 @@ pub mod prelude {
         rebuild, row, rule, scaffold, scroll, search, segmented, sheet, skeleton, slider, snackbar,
         space, stepper, switch, tabs, text, text_editor, text_field, time_picker, tooltip, when,
     };
-    #[cfg(feature = "image")]
-    pub use crate::views::image;
-    #[cfg(feature = "svg")]
-    pub use crate::views::svg;
     pub use crate::{AnyView, Scope, State, View, spawn};
 }

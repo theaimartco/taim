@@ -1,8 +1,9 @@
+use super::look::Tween;
 use super::text::Text;
 use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::Constraints;
 use crate::state::{IntoProp, Prop};
-use crate::{Border, Child, Event, Handled, Padding, Point, Size, View, mouse, semantics};
+use crate::{Border, Child, Color, Event, Handled, Padding, Point, Size, View, mouse, semantics};
 
 use taim_core::widget;
 
@@ -13,29 +14,49 @@ pub fn button(label: impl IntoProp<String>) -> Button {
     Button {
         label: Child::new(Text::from_prop(name.clone())),
         name,
+        kind: Kind::Primary,
         on_press: None,
         enabled: Prop::fixed(true),
-        padding: Padding::from([6.0, 14.0]),
+        padding: Padding::from([9.0, 16.0]),
+        hover: Tween::new(0.0),
         hovered: false,
         pressed: false,
         id: widget::Id::unique(),
     }
 }
 
+/// How prominent a [`Button`] is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Kind {
+    /// A solid accent fill: the one thing to do here.
+    Primary,
+    /// An outlined surface: an alternative action.
+    Secondary,
+    /// Only text until hovered: a quiet action, such as in a toolbar.
+    Ghost,
+    /// A solid red fill: an action that destroys something.
+    Danger,
+}
+
 /// See [`button`].
 pub struct Button {
     label: Child,
     name: Prop<String>,
+    kind: Kind,
     on_press: Option<Box<dyn Fn()>>,
     enabled: Prop<bool>,
     padding: Padding,
+    hover: Tween,
     hovered: bool,
     pressed: bool,
     id: widget::Id,
 }
 
+const RADIUS: f32 = 8.0;
+
 impl Button {
-    /// Runs `action` when the button is clicked.
+    /// Runs `action` when the button is clicked, or activated from the
+    /// keyboard with Space or Enter.
     pub fn on_press(mut self, action: impl Fn() + 'static) -> Self {
         self.on_press = Some(Box::new(action));
         self
@@ -53,6 +74,24 @@ impl Button {
         self
     }
 
+    /// An outlined button, for an alternative action.
+    pub fn secondary(mut self) -> Self {
+        self.kind = Kind::Secondary;
+        self
+    }
+
+    /// A button that is only text until hovered.
+    pub fn ghost(mut self) -> Self {
+        self.kind = Kind::Ghost;
+        self
+    }
+
+    /// A button for an action that destroys something.
+    pub fn danger(mut self) -> Self {
+        self.kind = Kind::Danger;
+        self
+    }
+
     /// Shows `label` instead of the text label; the name given to
     /// [`button`] is still what assistive technology announces.
     pub fn label_view(mut self, label: impl Into<crate::AnyView>) -> Self {
@@ -62,6 +101,12 @@ impl Button {
 
     fn is_active(&self) -> bool {
         self.on_press.is_some() && self.enabled.get()
+    }
+
+    fn fire(&self) {
+        if let Some(action) = &self.on_press {
+            action();
+        }
     }
 }
 
@@ -79,22 +124,95 @@ impl View for Button {
     }
 
     fn paint(&self, cx: &mut PaintCx<'_>) {
-        let palette = cx.theme().palette();
-        let shade = if !self.is_active() {
-            palette.secondary.weak
-        } else if self.pressed {
-            palette.primary.strong
-        } else if self.hovered {
-            palette.primary.base
-        } else {
-            palette.primary.weak
+        let palette = *cx.theme().palette();
+        let bounds = cx.bounds();
+        let lift = self.hover.value(cx.now());
+        let active = self.is_active();
+
+        let (fill, edge) = match (self.kind, active) {
+            (_, false) => (palette.background.weak.color, palette.background.weak.color),
+            (Kind::Primary, true) => {
+                let rest = palette.primary.base.color;
+                let lifted = if self.pressed {
+                    palette.primary.strong.color.mix(Color::BLACK, 0.12)
+                } else {
+                    palette.primary.strong.color
+                };
+                (rest.mix(lifted, lift.max(f32::from(self.pressed))), rest)
+            }
+            (Kind::Danger, true) => {
+                let rest = palette.danger.base.color;
+                let lifted = if self.pressed {
+                    palette.danger.strong.color.mix(Color::BLACK, 0.12)
+                } else {
+                    palette.danger.strong.color
+                };
+                (rest.mix(lifted, lift.max(f32::from(self.pressed))), rest)
+            }
+            (Kind::Secondary, true) => {
+                let rest = palette.background.weak.color;
+                let lifted = if self.pressed {
+                    palette.background.strong.color
+                } else {
+                    palette.background.neutral.color
+                };
+                (
+                    rest.mix(lifted, lift.max(f32::from(self.pressed))),
+                    palette
+                        .background
+                        .strong
+                        .color
+                        .mix(palette.primary.base.color, lift * 0.6),
+                )
+            }
+            (Kind::Ghost, true) => {
+                let tint = if self.pressed {
+                    palette.background.neutral.color
+                } else {
+                    palette.background.weak.color
+                };
+                let shown = lift.max(f32::from(self.pressed));
+                (Color { a: shown, ..tint }, Color::TRANSPARENT)
+            }
         };
 
-        let bounds = cx.bounds();
-        cx.fill(bounds, shade.color, Border::default().rounded(6.0));
+        let outline = if self.kind == Kind::Secondary {
+            1.0
+        } else {
+            0.0
+        };
+        cx.fill(
+            bounds,
+            fill,
+            Border::default().width(outline).color(edge).rounded(RADIUS),
+        );
+
+        if cx.has_focus() {
+            super::look::focus_ring(cx, bounds, RADIUS);
+        }
+    }
+
+    fn foreground(&self, theme: &crate::Theme) -> Option<Color> {
+        let palette = theme.palette();
+
+        if !self.is_active() {
+            let text = palette.background.base.text;
+            return Some(text.mix(palette.background.base.color, 0.55));
+        }
+
+        match self.kind {
+            Kind::Primary => Some(palette.primary.base.text),
+            Kind::Danger => Some(palette.danger.base.text),
+            Kind::Secondary | Kind::Ghost => None,
+        }
     }
 
     fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+        if super::look::is_activation(event) && cx.has_focus() && self.is_active() {
+            self.fire();
+            return Handled::Yes;
+        }
+
         let Event::Mouse(mouse) = event else {
             return Handled::No;
         };
@@ -102,7 +220,8 @@ impl View for Button {
         let hovered = cx.is_hovered();
         if hovered != self.hovered {
             self.hovered = hovered;
-            cx.request_paint();
+            self.hover.go(f32::from(hovered), cx.now());
+            cx.request_animation();
         }
 
         if !self.is_active() {
@@ -119,13 +238,17 @@ impl View for Button {
                 self.pressed = false;
                 cx.request_paint();
 
-                if hovered && let Some(action) = &self.on_press {
-                    action();
+                if hovered {
+                    self.fire();
                 }
                 Handled::Yes
             }
             _ => Handled::No,
         }
+    }
+
+    fn is_animating(&self, now: crate::Instant) -> bool {
+        self.hover.is_moving(now)
     }
 
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
@@ -144,6 +267,10 @@ impl View for Button {
 
     fn cursor(&self) -> Option<mouse::Interaction> {
         self.is_active().then_some(mouse::Interaction::Pointer)
+    }
+
+    fn focusable(&self) -> bool {
+        self.is_active()
     }
 
     fn children(&mut self, visit: &mut dyn FnMut(&mut Child)) {

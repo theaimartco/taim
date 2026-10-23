@@ -141,6 +141,12 @@ fn paint_view(
     let clip = child.view().clips().then_some(at.bounds);
     let focused = painter.focus == Some(path.as_slice());
 
+    // Children inherit the view's text color for the duration of their paint.
+    let inherited = painter.text_color;
+    if let Some(color) = child.view().foreground(painter.theme) {
+        painter.text_color = color;
+    }
+
     let mut paint_children = |painter: &mut Painter<'_>| {
         let mut index = 0_u16;
         child.view_mut().children(&mut |grandchild| {
@@ -175,6 +181,7 @@ fn paint_view(
         }
         None => paint_children(painter),
     }
+    painter.text_color = inherited;
 
     child.view().paint_over(&mut PaintCx {
         renderer: &mut *painter.renderer,

@@ -75,6 +75,32 @@ impl PaintCx<'_> {
         );
     }
 
+    /// Like [`fill`](Self::fill), with a drop shadow under the shape.
+    pub fn fill_shadowed(
+        &mut self,
+        area: Rectangle,
+        background: impl Into<Background>,
+        border: Border,
+        shadow: crate::Shadow,
+    ) {
+        self.renderer.fill_quad(
+            Quad {
+                bounds: area,
+                border,
+                shadow,
+                ..Quad::default()
+            },
+            background,
+        );
+    }
+
+    /// Text color for secondary information: the text color faded toward
+    /// the window's background.
+    pub fn muted(&self) -> Color {
+        let background = self.theme.palette().background.base.color;
+        self.text_color.mix(background, 0.42)
+    }
+
     /// The renderer, for drawing primitives the context does not wrap.
     pub fn renderer(&mut self) -> &mut Renderer {
         self.renderer
