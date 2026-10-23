@@ -9,7 +9,7 @@ pub fn container(child: impl Into<AnyView>) -> Container {
         padding: Padding::ZERO,
         background: None,
         border: Border::default(),
-        center: false,
+        align: (0.0, 0.0),
         sizing: Sizing::HUG,
     }
 }
@@ -20,7 +20,9 @@ pub struct Container {
     padding: Padding,
     background: Option<Color>,
     border: Border,
-    center: bool,
+    /// Where the child sits in spare room, as fractions of it: 0 is
+    /// left/top, 1 is right/bottom.
+    align: (f32, f32),
     sizing: Sizing,
 }
 
@@ -45,7 +47,49 @@ impl Container {
 
     /// Centers the child in the container's space.
     pub fn center(mut self) -> Self {
-        self.center = true;
+        self.align = (0.5, 0.5);
+        self
+    }
+
+    /// Centers the child horizontally.
+    pub fn center_x(mut self) -> Self {
+        self.align.0 = 0.5;
+        self
+    }
+
+    /// Centers the child vertically.
+    pub fn center_y(mut self) -> Self {
+        self.align.1 = 0.5;
+        self
+    }
+
+    /// Puts the child against the right edge.
+    pub fn align_right(mut self) -> Self {
+        self.align.0 = 1.0;
+        self
+    }
+
+    /// Puts the child against the bottom edge.
+    pub fn align_bottom(mut self) -> Self {
+        self.align.1 = 1.0;
+        self
+    }
+
+    /// Exactly this wide.
+    pub fn width(mut self, width: f32) -> Self {
+        self.sizing.width = Axis::Fixed(width.max(0.0));
+        self
+    }
+
+    /// Exactly this tall.
+    pub fn height(mut self, height: f32) -> Self {
+        self.sizing.height = Axis::Fixed(height.max(0.0));
+        self
+    }
+
+    /// Takes all available height.
+    pub fn fill_height(mut self) -> Self {
+        self.sizing.height = Axis::Fill(1);
         self
     }
 
@@ -76,14 +120,10 @@ impl View for Container {
             child.width.max(inner.min.width),
             child.height.max(inner.min.height),
         );
-        let offset = if self.center {
-            Point::new(
-                (content.width - child.width) / 2.0,
-                (content.height - child.height) / 2.0,
-            )
-        } else {
-            Point::ORIGIN
-        };
+        let offset = Point::new(
+            (content.width - child.width) * self.align.0,
+            (content.height - child.height) * self.align.1,
+        );
 
         self.child.place(Point::new(
             self.padding.left + offset.x,

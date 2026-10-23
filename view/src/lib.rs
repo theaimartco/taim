@@ -14,8 +14,8 @@ mod view;
 pub mod views;
 
 pub use cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
-pub use root::{Response, Root};
 pub use layout::{Axis, Constraints, Sizing};
+pub use root::{Response, Root};
 pub use state::{IntoProp, Invalidation, Prop, Scope, State, spawn};
 pub use view::{AnyView, Child, Handled, View};
 
@@ -34,11 +34,11 @@ pub type Renderer = taim_renderer::Renderer;
 pub mod prelude {
     pub use crate::views;
     pub use crate::views::{
-        Align, Date, Icon, Time, accordion, app_bar, avatar, badge, button, carousel, checkbox,
-        chip, column, container, date_picker, dialog, drawer, dropdown, each, grid, icon,
+        Align, Buffer, Date, Icon, Time, accordion, app_bar, avatar, badge, button, carousel,
+        checkbox, chip, column, container, date_picker, dialog, drawer, dropdown, each, grid, icon,
         icon_button, layers, list_tile, nav_bar, progress, pull_to_refresh, radio, rebuild, row,
         rule, scaffold, scroll, search, segmented, sheet, skeleton, slider, snackbar, space,
-        stepper, switch, tabs, text, text_field, time_picker, tooltip, when,
+        stepper, switch, tabs, text, text_editor, text_field, time_picker, tooltip, when,
     };
     pub use crate::{AnyView, Scope, State, View, spawn};
 }

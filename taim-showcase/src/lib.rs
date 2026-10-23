@@ -46,6 +46,7 @@ struct Model {
     level: State<f32>,
     quantity: State<i32>,
     query: State<String>,
+    notes: Buffer,
     filters: [State<bool>; 3],
     mode: State<usize>,
     size: State<&'static str>,
@@ -80,6 +81,7 @@ pub fn build(cx: &mut Scope) -> AnyView {
         level: cx.signal(0.4),
         quantity: cx.signal(3),
         query: cx.signal(String::new()),
+        notes: Buffer::new(cx, "Multi-line notes.\nClick, drag, double-click a word,\nor type here."),
         filters: [cx.signal(true), cx.signal(false), cx.signal(false)],
         mode: cx.signal(0),
         size: cx.signal("Medium"),
@@ -303,6 +305,20 @@ fn controls(model: Model) -> AnyView {
         heading("Text entry"),
         text_field("A plain text field", model.query),
         search("Search", model.query),
+        heading("Text editor"),
+        container(
+            text_editor(&model.notes)
+                .placeholder("Write something")
+                .size(14),
+        )
+        .fill_width()
+        .height(120.0),
+        text(move || format!(
+            "Line {}, column {}",
+            model.notes.cursor().position.line + 1,
+            model.notes.cursor().position.column + 1
+        ))
+        .size(12),
     ])
     .gap(16.0)
     .fill_width()

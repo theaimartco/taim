@@ -266,11 +266,11 @@ impl std::fmt::Debug for Root {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::views;
-    use crate::views::{button, column, row, text};
     use crate::cx::{Focus, Requests};
     use crate::layout::Constraints;
     use crate::tree;
+    use crate::views;
+    use crate::views::{button, column, row, text};
     use crate::{Child, Event, Handled, Point, Rectangle, Size, View, mouse, semantics};
 
     fn frames(root: &mut Root) -> Vec<Rectangle> {
