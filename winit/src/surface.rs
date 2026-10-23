@@ -43,6 +43,9 @@ pub(crate) struct Surface {
 
     accessibility: Accessibility,
     published: taim_accessibility::Tree,
+    /// Something that can change the semantic tree happened since it was
+    /// last published. A pointer merely moving over the window does not.
+    semantics_stale: bool,
     #[cfg(feature = "accessibility")]
     _bridge: taim_accessibility::atspi::bridge::Bridge,
 }
@@ -114,6 +117,7 @@ impl Surface {
             hidden: Hidden::default(),
             accessibility,
             published: taim_accessibility::Tree::new(),
+            semantics_stale: true,
             #[cfg(feature = "accessibility")]
             _bridge,
         };
@@ -191,6 +195,16 @@ impl Surface {
     pub fn handle(&mut self, event: &taim_core::Event) -> Response {
         let response = self.root.handle(event, self.pointer(), Instant::now());
 
+        if response.paint
+            || response.captured
+            || !matches!(
+                event,
+                taim_core::Event::Mouse(mouse::Event::CursorMoved { .. })
+            )
+        {
+            self.semantics_stale = true;
+        }
+
         if response.layout {
             self.stale_layout = true;
         }
@@ -221,6 +235,7 @@ impl Surface {
             self.stale_layout = true;
         }
         if paint || layout {
+            self.semantics_stale = true;
             self.request_frame();
         }
     }
@@ -250,6 +265,7 @@ impl Surface {
     /// Draws and presents one frame.
     pub fn draw(&mut self, compositor: &mut Compositor) {
         let now = Instant::now();
+        let started = std::time::Instant::now();
 
         if self.clock.is_suspended() {
             return;
@@ -279,8 +295,10 @@ impl Surface {
         self.renderer.reset(bounds);
         self.root
             .paint(&mut self.renderer, self.look.style.text_color, pointer, now);
+        let painted = started.elapsed();
         self.publish_semantics();
         self.update_cursor();
+        let described = started.elapsed();
 
         self.clock.submit(now);
         let presented = compositor.present(
@@ -291,6 +309,18 @@ impl Surface {
             || self.raw.pre_present_notify(),
         );
         self.clock.feedback_received();
+
+        if trace_frames() {
+            let total = started.elapsed();
+            eprintln!(
+                "frame {:?}: tree {:>5} us | semantics {:>5} us | present {:>6} us | total {:>6} us",
+                self.id,
+                painted.as_micros(),
+                (described - painted).as_micros(),
+                (total - described).as_micros(),
+                total.as_micros(),
+            );
+        }
 
         match presented {
             Ok(()) => {
@@ -334,6 +364,12 @@ impl Surface {
     /// Diffs the views' semantic tree against what assistive technology
     /// last saw and sends the difference.
     fn publish_semantics(&mut self) {
+        // Without the AT-SPI bridge nothing reads the published tree.
+        if !cfg!(feature = "accessibility") || !self.semantics_stale {
+            return;
+        }
+        self.semantics_stale = false;
+
         let window = self.root.describe(self.viewport.logical_size());
         let next = taim_accessibility::Tree::from_forest(&[window]);
         let changes = self.published.diff(&next);
@@ -388,6 +424,12 @@ impl Surface {
         }
         self.cursor = wanted;
     }
+}
+
+/// Whether `TAIM_FRAME_TRACE` asks for one timing line per frame.
+fn trace_frames() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("TAIM_FRAME_TRACE").is_some())
 }
 
 /// The platform scale times the application's zoom; never zero or
