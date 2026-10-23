@@ -14,6 +14,10 @@ rust-version.workspace = true
 [lints]
 workspace = true
 
+[features]
+image = ["taim_renderer/image"]
+svg = ["taim_renderer/svg"]
+
 [dependencies]
 taim_core.workspace = true
 taim_renderer.workspace = true

@@ -48,9 +48,9 @@ tiny-skia = ["taim_renderer/tiny-skia"]
 # Enables raster images, decoded window icons and image clipboard support
 image = ["image-without-codecs", "image/default", "taim_winit/image"]
 # Enables raster images without any built-in codecs of the `image` crate
-image-without-codecs = ["taim_renderer/image", "dep:image"]
+image-without-codecs = ["taim_renderer/image", "taim-view/image", "dep:image"]
 # Enables vector images
-svg = ["taim_renderer/svg"]
+svg = ["taim_renderer/svg", "taim-view/svg"]
 # Enables an opt-in first-successful-present marker for application measurement.
 measurement = ["taim_winit/measurement"]
 # Enables the experimental tiled compute-raster scene contract. The current

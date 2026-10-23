@@ -305,6 +305,16 @@ fn controls(model: Model) -> AnyView {
         heading("Text entry"),
         text_field("A plain text field", model.query),
         search("Search", model.query),
+        heading("Pictures"),
+        row(views![
+            svg(taim::view::svg_handle(
+                br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#5b6cff"/><path d="M7 12l3 3 7-7" stroke="white" stroke-width="2.5" fill="none"/></svg>"##
+            ))
+            .size(48.0),
+            image(gradient_swatch()).width(96.0).radius(12.0),
+        ])
+        .gap(16.0)
+        .align(Align::Center),
         heading("Text editor"),
         container(
             text_editor(&model.notes)
@@ -487,4 +497,23 @@ fn navigation(model: Model) -> AnyView {
     .gap(12.0)
     .padding(8.0)
     .into()
+}
+
+/// A small generated picture, so the showcase needs no image files.
+fn gradient_swatch() -> taim::view::image_handle::Handle {
+    let (width, height) = (96_u32, 48_u32);
+    let pixels = (0..height)
+        .flat_map(|y| {
+            (0..width).flat_map(move |x| {
+                [
+                    (x * 255 / width) as u8,
+                    (y * 255 / height) as u8,
+                    200,
+                    255,
+                ]
+            })
+        })
+        .collect::<Vec<u8>>();
+
+    taim::view::image_handle::Handle::from_rgba(width, height, pixels)
 }

@@ -1,4 +1,5 @@
 //! The built-in views.
+mod area;
 mod button;
 mod container;
 mod disclosure;
@@ -8,6 +9,7 @@ mod forms;
 mod icon;
 mod layers;
 mod look;
+mod media;
 mod mobile;
 mod overlays;
 mod pickers;
@@ -19,6 +21,7 @@ mod text;
 mod text_field;
 mod toggle;
 
+pub use area::{MouseArea, mouse_area};
 pub use button::{Button, button};
 pub use container::{Container, container};
 pub use disclosure::{
@@ -31,6 +34,10 @@ pub use forms::{
 };
 pub use icon::{Icon, icon};
 pub use layers::{Layers, layers};
+#[cfg(feature = "image")]
+pub use media::{Image, image};
+#[cfg(feature = "svg")]
+pub use media::{Svg, svg};
 pub use mobile::{
     Avatar, Badge, Chip, Segments, Skeleton, avatar, badge, chip, nav_bar, scaffold, search,
     segmented, skeleton, tabs,

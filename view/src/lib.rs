@@ -13,6 +13,18 @@ mod view;
 
 pub mod views;
 
+/// Image handles, for [`views::image`].
+#[cfg(feature = "image")]
+pub mod image_handle {
+    pub use taim_core::image::{FilterMethod, Handle};
+}
+
+/// Builds an SVG handle from bytes, for [`views::svg`].
+#[cfg(feature = "svg")]
+pub fn svg_handle(bytes: &'static [u8]) -> taim_core::svg::Handle {
+    taim_core::svg::Handle::from_memory(bytes)
+}
+
 pub use cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 pub use layout::{Axis, Constraints, Sizing};
 pub use root::{Response, Root};
@@ -36,9 +48,13 @@ pub mod prelude {
     pub use crate::views::{
         Align, Buffer, Date, Icon, Time, accordion, app_bar, avatar, badge, button, carousel,
         checkbox, chip, column, container, date_picker, dialog, drawer, dropdown, each, grid, icon,
-        icon_button, layers, list_tile, nav_bar, progress, pull_to_refresh, radio, rebuild, row,
-        rule, scaffold, scroll, search, segmented, sheet, skeleton, slider, snackbar, space,
-        stepper, switch, tabs, text, text_editor, text_field, time_picker, tooltip, when,
+        icon_button, layers, list_tile, mouse_area, nav_bar, progress, pull_to_refresh, radio,
+        rebuild, row, rule, scaffold, scroll, search, segmented, sheet, skeleton, slider, snackbar,
+        space, stepper, switch, tabs, text, text_editor, text_field, time_picker, tooltip, when,
     };
+    #[cfg(feature = "image")]
+    pub use crate::views::image;
+    #[cfg(feature = "svg")]
+    pub use crate::views::svg;
     pub use crate::{AnyView, Scope, State, View, spawn};
 }

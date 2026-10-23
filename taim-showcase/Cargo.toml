@@ -17,6 +17,8 @@ taim.features = [
     "x11",
     "wayland",
     "fira-sans",
+    "image-without-codecs",
+    "svg",
 ]
 
 [dev-dependencies]
