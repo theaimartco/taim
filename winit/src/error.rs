@@ -1,12 +1,11 @@
 use crate::core::backend;
-use crate::futures::futures;
 
 /// An error that occurred while running an application.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// The futures executor could not be created.
-    #[error("TAIM window executor failed: {0}")]
-    ExecutorCreationFailed(#[source] futures::io::Error),
+    /// The platform event loop could not start or failed while running.
+    #[error("TAIM event loop failed: {0}")]
+    EventLoop(#[source] winit::error::EventLoopError),
 
     /// The application window could not be created.
     #[error("TAIM window creation failed: {0}")]
@@ -30,9 +29,10 @@ mod taim_window_error_chain_tests {
     #[test]
     fn async_initialization_error_has_a_root_cause() {
         use std::error::Error as _;
-        let err =
-            Error::ExecutorCreationFailed(futures::io::Error::other("worker backend unavailable"));
-        assert!(err.to_string().contains("worker backend unavailable"));
+        let err = Error::GraphicsCreationFailed(backend::Error::BackendError(
+            "worker backend unavailable".to_owned(),
+        ));
+        assert!(err.to_string().contains("graphics"));
         assert!(err.source().is_some());
     }
 }

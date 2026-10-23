@@ -1,18 +1,14 @@
-//! Drives the whole showcase with no window: the view tree runs inside the
-//! runtime's `UserInterface` with the CPU (tiny-skia) renderer created
-//! headless, and the test finds controls only through the semantic tree —
-//! role, name, actions, bounds — the way a screen reader or an agent would,
-//! then clicks at the bounds the tree reported.
-use std::cell::RefCell;
-
-use taim::Theme;
-use taim::view::Host;
-use taim::view::host::Root;
+//! Drives the whole showcase with no window: the view tree runs on its own
+//! [`Root`] with the CPU (tiny-skia) renderer created headless, and the test
+//! finds controls only through the semantic tree — role, name, actions,
+//! bounds — the way a screen reader or an agent would, then clicks at the
+//! bounds the tree reported.
+use taim::view::Root;
 use taim_accessibility::tree::Tree;
 use taim_core::renderer::Headless as _;
 use taim_core::semantics::{Actions, Role, State};
-use taim_core::{Element, Event, Point, Rectangle, Size, mouse, shell, window};
-use taim_runtime::user_interface::{Cache, UserInterface};
+use taim_core::time::Instant;
+use taim_core::{Event, Point, Rectangle, Size, mouse};
 
 type Renderer = taim::Renderer;
 
@@ -29,35 +25,22 @@ fn renderer() -> Renderer {
     .expect("the CPU renderer starts without a GPU or a window")
 }
 
-/// Lays the tree out, refreshes its semantics, and returns both.
-fn frame<'a>(
-    root: &'a RefCell<Root>,
-    cache: Cache,
-    renderer: &mut Renderer,
-) -> (UserInterface<'a, (), Theme, Renderer>, Tree) {
-    let element: Element<'a, (), Theme, Renderer> = Host::new(root).into();
-    let mut ui = UserInterface::build(element, WINDOW, cache, renderer);
-    let _ = ui.semantics_changes(renderer);
-    let tree = ui.semantic_tree().clone();
-    (ui, tree)
+/// Lays the tree out and returns its semantics.
+fn frame(root: &mut Root, renderer: &Renderer) -> Tree {
+    root.layout(renderer, WINDOW);
+    Tree::from_forest(&[root.describe(WINDOW)])
 }
 
 /// A move, press and release at `point`.
-fn click(ui: &mut UserInterface<'_, (), Theme, Renderer>, renderer: &mut Renderer, point: Point) {
+fn click(root: &mut Root, point: Point) {
     let events = [
         Event::Mouse(mouse::Event::CursorMoved { position: point }),
         Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
         Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
     ];
-    let mut messages = Vec::new();
-    let _ = ui.update(
-        &window::Headless,
-        &shell::Waker::noop(),
-        &events,
-        mouse::Cursor::Available(point),
-        renderer,
-        &mut messages,
-    );
+    for event in &events {
+        let _ = root.handle(event, Some(point), Instant::now());
+    }
 }
 
 fn center(bounds: Rectangle) -> Point {
@@ -77,11 +60,10 @@ fn find(tree: &Tree, role: Role, name: &str) -> taim_accessibility::Entry {
 
 #[test]
 fn the_showcase_is_driven_end_to_end_through_its_semantic_tree() {
-    let root = RefCell::new(Root::new(taim_showcase::build));
-    let mut renderer = renderer();
+    let mut root = Root::new(taim_showcase::build);
+    let renderer = renderer();
 
-    let (ui, tree) = frame(&root, Cache::new(), &mut renderer);
-    let mut cache = ui.into_cache();
+    let tree = frame(&mut root, &renderer);
 
     assert!(
         tree.len() > 20,
@@ -105,13 +87,10 @@ fn the_showcase_is_driven_end_to_end_through_its_semantic_tree() {
         "the showcase starts unchecked"
     );
 
-    let (mut ui, _) = frame(&root, cache, &mut renderer);
-    click(&mut ui, &mut renderer, center(checkbox.bounds));
-    cache = ui.into_cache();
+    click(&mut root, center(checkbox.bounds));
 
     // The next tree reports the new state: no message, no update function.
-    let (ui, tree) = frame(&root, cache, &mut renderer);
-    let _ = ui.into_cache();
+    let tree = frame(&mut root, &renderer);
     assert!(
         find(&tree, Role::Checkbox, "Checkbox")
             .state

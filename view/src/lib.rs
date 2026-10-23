@@ -5,8 +5,8 @@
 //! `docs/architecture/taim-api.md` for the design.
 #![cfg_attr(docsrs, feature(doc_cfg))]
 mod cx;
-pub mod host;
 mod layout;
+mod root;
 mod state;
 mod tree;
 mod view;
@@ -14,7 +14,7 @@ mod view;
 pub mod views;
 
 pub use cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
-pub use host::Host;
+pub use root::{Response, Root};
 pub use layout::{Axis, Constraints, Sizing};
 pub use state::{IntoProp, Invalidation, Prop, Scope, State, spawn};
 pub use view::{AnyView, Child, Handled, View};

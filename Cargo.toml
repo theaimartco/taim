@@ -38,49 +38,24 @@ maintenance = { status = "actively-developed" }
 # that "broken". Linear-light compositing is the production default, and the
 # Web-compatibility behaviour is an explicit opt-in. See
 # `docs/architecture/color-pipeline.md` and `tests/color/contract.rs`.
-default = ["wgpu", "tiny-skia", "crisp", "hinting", "thread-pool", "linux-theme-detection", "x11", "wayland", "signal"]
+default = ["wgpu", "tiny-skia", "crisp", "hinting", "linux-theme-detection", "x11", "wayland"]
 # Enables the `wgpu` GPU-accelerated renderer with all its default features (Vulkan, Metal, DX12, OpenGL, and WebGPU)
 wgpu = ["wgpu-bare", "taim_renderer/wgpu"]
 # Enables the `wgpu` GPU-accelerated renderer with the minimum required features (no backends!)
-wgpu-bare = ["taim_renderer/wgpu-bare", "taim_widget/wgpu"]
+wgpu-bare = ["taim_renderer/wgpu-bare"]
 # Enables the `tiny-skia` software renderer
 tiny-skia = ["taim_renderer/tiny-skia"]
-# Enables the `image` widget and image clipboard support
+# Enables raster images, decoded window icons and image clipboard support
 image = ["image-without-codecs", "image/default", "taim_winit/image"]
-# Enables the `image` widget, without any built-in codecs of the `image` crate
-image-without-codecs = ["taim_widget/image", "dep:image"]
-# Enables the `svg` widget
-svg = ["taim_widget/svg"]
-# Enables the `canvas` widget
-canvas = ["taim_widget/canvas"]
-# Enables the `qr_code` widget
-qr_code = ["taim_widget/qr_code"]
-# Enables the `markdown` widget
-markdown = ["taim_widget/markdown"]
-# Makes `taim_design::Theme` usable as the theme for every widget with an
-# Taim counterpart, so real controls render from Taim's semantic tokens
-# (see docs/design/taim-language.md). Depend on `taim-design` directly to
-# name the theme type.
-taim = ["taim_widget/taim"]
-# Enables lazy widgets
-lazy = ["taim_widget/lazy"]
-# Enables fine-grained reactive widget subtrees.
-signal = ["taim_widget/signal"]
+# Enables raster images without any built-in codecs of the `image` crate
+image-without-codecs = ["taim_renderer/image", "dep:image"]
+# Enables vector images
+svg = ["taim_renderer/svg"]
 # Enables an opt-in first-successful-present marker for application measurement.
 measurement = ["taim_winit/measurement"]
 # Enables the experimental tiled compute-raster scene contract. The current
 # quad/triangle renderer remains the fallback until the GPU stages land.
 raster = ["taim_renderer/raster"]
-# Enables hot reloading (very experimental!)
-hot = ["taim_debug/hot"]
-# Enables the `thread-pool` futures executor as the `executor::Default` on native platforms
-thread-pool = ["taim_futures/thread-pool"]
-# Enables `tokio` as the `executor::Default` on native platforms
-tokio = ["taim_futures/tokio"]
-# Enables `smol` as the `executor::Default` on native platforms
-smol = ["taim_futures/smol"]
-# Enables querying system information
-sysinfo = ["taim_winit/sysinfo"]
 # Legacy compatibility: blends in gamma space, reproducing the Web's colour
 # management. Opt-in only.
 #
@@ -96,11 +71,9 @@ web-colors = ["taim_renderer/web-colors"]
 crisp = ["taim_core/crisp"]
 # Enables the WebGL backend
 webgl = ["taim_renderer/webgl"]
-# Enables syntax highlighting for the `markdown` widget and the
-# `text_editor` widget, via the dependency-free `taim-highlighter` crate
-highlighter = ["dep:taim-highlighter", "taim_widget/highlighter"]
-# Enables the advanced module
-advanced = ["taim_core/advanced", "taim_widget/advanced"]
+# Enables syntax highlighting via the dependency-free `taim-highlighter`
+# crate
+highlighter = ["dep:taim-highlighter"]
 # Embeds Fira Sans into the final application; useful for testing and Wasm builds
 fira-sans = ["taim_renderer/fira-sans"]
 # Enables basic text shaping by default
@@ -111,10 +84,6 @@ advanced-shaping = ["taim_core/advanced-shaping"]
 hinting = ["taim_winit/hinting"]
 # Enables strict assertions for debugging purposes at the expense of performance
 strict-assertions = ["taim_renderer/strict-assertions"]
-# Redraws on every runtime event, and not only when a widget requests it
-unconditional-rendering = ["taim_winit/unconditional-rendering"]
-# Enables support for the `sipper` library
-sipper = ["taim_runtime/sipper"]
 # Enables Linux system theme detection
 linux-theme-detection = ["taim_winit/linux-theme-detection"]
 # Enables the Unix X11 backend
@@ -132,14 +101,10 @@ vyom = ["dep:taim-platform-vyom"]
 accessibility = ["taim_winit/accessibility"]
 
 [dependencies]
-taim_debug.workspace = true
 taim_core.workspace = true
-taim_futures.workspace = true
 taim_renderer.workspace = true
-taim_runtime.workspace = true
 taim-signal.workspace = true
 taim-view.workspace = true
-taim_widget.workspace = true
 taim_winit.workspace = true
 
 taim-highlighter.workspace = true
@@ -180,13 +145,10 @@ taim_tiny_skia.workspace = true
 # integration test exercises, so it should be a deliberate act.
 taim.workspace = true
 taim.features = [
-    "advanced",
-    "taim",
     "wgpu",
     "tiny-skia",
     "crisp",
     "hinting",
-    "thread-pool",
     "fira-sans",
     "linux-theme-detection",
     "x11",
@@ -202,12 +164,10 @@ serde_json = "1.0"
 [[bench]]
 name = "wgpu"
 harness = false
-required-features = ["canvas"]
 
 [[bench]]
 name = "cpu"
 harness = false
-required-features = ["canvas"]
 
 [[bench]]
 name = "phase3_production"

@@ -11,17 +11,13 @@ taim.features = [
     "tiny-skia",
     "crisp",
     "hinting",
-    "thread-pool",
-    "smol",
     "linux-theme-detection",
     "x11",
     "wayland",
     "fira-sans",
-    "advanced",
     "highlighter",
     "svg",
     "image",
-    "canvas",
 ]
 taim_core.workspace = true
 taim-highlighter.workspace = true

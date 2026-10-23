@@ -6,4 +6,4 @@ publish = false
 
 [dependencies]
 taim.workspace = true
-taim.features = ["wgpu", "tiny-skia", "thread-pool", "x11", "wayland"]
+taim.features = ["wgpu", "tiny-skia", "x11", "wayland"]

@@ -18,7 +18,6 @@ taim.features = [
     "tiny-skia",
     "crisp",
     "hinting",
-    "thread-pool",
     "linux-theme-detection",
     "x11",
     "wayland",

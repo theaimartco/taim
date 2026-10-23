@@ -17,7 +17,7 @@ path = "src/main.rs"
 [dependencies]
 taim-profiler.workspace = true
 taim.workspace = true
-taim.features = ["advanced", "tokio"]
+taim.features = []
 taim_core.workspace = true
 taim_futures.workspace = true
 taim_renderer.workspace = true

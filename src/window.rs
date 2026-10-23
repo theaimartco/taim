@@ -1,16 +1,16 @@
-//! Configure the window of your application in native platforms.
+//! Window configuration.
 
 pub mod icon;
 
 pub use icon::Icon;
 
-pub use crate::core::window::*;
-pub use crate::runtime::window::*;
+pub use crate::core::window::{Level, Position, Settings};
 
-/// Construct a normalized window with explicit viewport constraints.
+/// Settings for a window of `desired` size, kept within `minimum` and
+/// `maximum`.
 ///
-/// The TAIM native layout policy clamps invalid/contradictory sizes rather
-/// than forwarding NaN and impossible bounds into the platform API.
+/// Invalid or contradictory sizes are clamped rather than handed to the
+/// platform.
 pub fn constrained_settings(
     desired: crate::core::Size,
     minimum: Option<crate::core::Size>,
@@ -23,7 +23,7 @@ pub fn constrained_settings(
 }
 
 #[cfg(test)]
-mod taim_window_setup_tests {
+mod tests {
     use super::*;
 
     #[test]

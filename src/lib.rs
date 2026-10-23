@@ -1,61 +1,38 @@
 //! # TAIM
 //!
-//! TAIM is an experimental Rust GUI framework focused on predictable frame
-//! scheduling, retained rendering work, bounded caches, and composable state.
-//! The runtime owns invalidation, window lifecycle, accessibility, and renderer
-//! recovery while applications remain ordinary state, update, and view code.
-//!
-//! Native applications have a dedicated intent-first API. Updates explicitly
-//! declare whether to schedule a frame, avoiding a redraw on idle actions.
+//! TAIM is a Rust GUI framework built around views that own their state.
+//! There is no message type and no update function: a view reads state
+//! handles, and changing a handle repaints exactly the views that read it.
 //!
 //! ```no_run
-//! use taim::{Element, Task};
-//! use taim::native::{app, Dispatch};
-//! use taim::AppContext;
-//! use taim::WindowContext;
-//!
-//! fn scene<'a>(value: &'a u64, _: &WindowContext) -> Element<'a, u64> {
-//!     taim::widget::text(format!("Count: {value}")).into()
-//! }
+//! use taim::prelude::*;
 //!
 //! fn main() -> taim::Result {
-//!     let native = app(
-//!         "TAIM Native Example",
-//!         |_context: &mut AppContext| (0_u64, Task::none()),
-//!         |state: &mut u64, increment: u64, _context: &mut AppContext| {
-//!             if increment == 0 {
-//!                 Dispatch::idle()
-//!             } else {
-//!                 *state += increment;
-//!                 Dispatch::paint()
-//!             }
-//!         },
-//!         scene,
-//!     );
-//!     taim::run_app(native)
+//!     taim::launch("Counter", |cx| {
+//!         let count = cx.signal(0);
+//!
+//!         column(views![
+//!             text(move || format!("Count: {}", count.get())).size(24),
+//!             row(views![
+//!                 button("-1").on_press(move || count.update(|n| *n -= 1)),
+//!                 button("+1").on_press(move || count.update(|n| *n += 1)),
+//!             ])
+//!             .gap(8.0),
+//!         ])
+//!         .gap(12.0)
+//!         .padding(24.0)
+//!     })
 //! }
 //! ```
 //!
-//! Use [`application`] for initialization, subscriptions, theming, and window
-//! configuration. Use [`reactive_app`] with [`Signal`] for fine-grained state,
-//! or implement [`App`] when native runner lifecycle control is required.
+//! The [`view`] module holds the view API and every built-in view; the
+//! [`prelude`] imports what an application needs. The runtime owns frame
+//! scheduling, accessibility and renderer recovery.
 //!
-//! Widgets compose through containers such as [`widget::Row`],
-//! [`widget::Column`], [`widget::Grid`], and [`widget::Stack`]. Asynchronous
-//! finite work uses [`Task`]; passive sources use [`Subscription`].
-//!
-//! TAIM is under active development. Consult `docs/status.md` and current
-//! benchmark reports before depending on a platform or performance property.
+//! TAIM is under active development. Consult `docs/status.md` before
+//! depending on a platform or performance property.
 #![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-
-#[cfg(not(any(
-    target_arch = "wasm32",
-    feature = "thread-pool",
-    feature = "tokio",
-    feature = "smol"
-)))]
-compile_error!("No futures executor is enabled. Enable one of: thread-pool, tokio, smol.");
 
 #[cfg(all(
     target_family = "unix",
@@ -65,32 +42,53 @@ compile_error!("No futures executor is enabled. Enable one of: thread-pool, toki
 ))]
 compile_error!("No Unix display backend is enabled. Enable x11 or wayland.");
 
-#[cfg(feature = "advanced")]
-use taim_widget::renderer;
-use taim_winit as shell;
-use taim_winit::{core, program, runtime};
+use taim_core as core;
 
-mod entry;
 mod error;
-mod facade;
 mod launch;
 
-pub mod application;
-
-/// Native intent-based TAIM application API (no legacy ProgramAdapter).
-pub mod native {
-    pub use crate::program::native::{Dispatch, NativeApp, app};
-}
-pub mod daemon;
-pub mod time;
+pub mod touch;
 pub mod window;
 
-#[cfg(feature = "advanced")]
-pub mod advanced;
+pub use error::Error;
+pub use launch::{App, app, launch, prelude};
 
-pub use entry::{run, run_app};
-pub use launch::{launch, prelude};
-
-pub use facade::*;
 /// The TAIM view API: views, state handles and their contracts.
 pub use taim_view as view;
+
+pub use crate::core::{
+    Background, Border, Color, Degrees, Font, Gradient, Padding, Pixels, Point, Radians,
+    Rectangle, Settings, Shadow, Size, Theme, Transformation, Vector, alignment, border, color,
+    font, gradient, keyboard, mouse, padding, semantics, theme, time,
+};
+pub use taim_signal::{Memo, Signal};
+
+/// The renderer views draw with, chosen when TAIM is compiled.
+pub type Renderer = taim_renderer::Renderer;
+
+/// Renderer backend selection and preferences.
+pub mod backend {
+    pub use taim_core::backend::*;
+}
+
+pub use backend::{Backend, PowerPreference};
+
+/// Fine-grained reactive state primitives.
+pub mod signal {
+    pub use taim_signal::*;
+}
+
+/// The VYOM backend for TAIM applications.
+#[cfg(feature = "vyom")]
+pub mod platform_vyom {
+    pub use taim_platform_vyom::*;
+}
+
+#[cfg(feature = "highlighter")]
+pub use taim_highlighter as highlighter;
+
+#[cfg(feature = "wgpu-bare")]
+pub use taim_renderer::wgpu::wgpu;
+
+/// What running an application returns.
+pub type Result = std::result::Result<(), Error>;

@@ -1,6 +1,6 @@
 [package]
 name = "taim_winit"
-description = "A runtime for taim on top of winit"
+description = "The TAIM desktop shell, on top of winit"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -18,11 +18,9 @@ default = ["x11", "wayland"]
 debug = []
 # Opt-in first-successful-present marker for the external application harness.
 measurement = []
-sysinfo = ["dep:sysinfo"]
 hinting = []
-unconditional-rendering = []
 linux-theme-detection = ["dep:mundy", "mundy/async-io", "mundy/color-scheme"]
-image = ["taim_runtime/image", "arboard/image-data"]
+image = ["taim_core/image", "arboard/image-data"]
 # Connects the retained semantic tree to the platform's assistive technology
 # over AT-SPI. Off by default because it pulls in zbus and an async runtime,
 # which an embedder that supplies its own accessibility layer should not have
@@ -32,11 +30,15 @@ x11 = ["winit/x11"]
 wayland = ["winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita", "arboard/wayland-data-control"]
 
 [dependencies]
+taim_core.workspace = true
 taim_debug.workspace = true
+taim_graphics.workspace = true
+taim_renderer.workspace = true
 taim-accessibility.workspace = true
-taim_program.workspace = true
-taim_runtime.workspace = true
-taim-gesture.workspace = true
+taim-view.workspace = true
+
+futures.workspace = true
+futures.features = ["executor"]
 
 log.workspace = true
 rustc-hash.workspace = true
@@ -44,8 +46,6 @@ thiserror.workspace = true
 tracing.workspace = true
 winit.workspace = true
 
-sysinfo.workspace = true
-sysinfo.optional = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 arboard.workspace = true
