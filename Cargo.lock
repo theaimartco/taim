@@ -4127,14 +4127,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "taim_program"
-version = "0.15.0-dev"
-dependencies = [
- "taim_graphics",
- "taim_runtime",
-]
-
-[[package]]
 name = "taim_renderer"
 version = "0.15.0-dev"
 dependencies = [

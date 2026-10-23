@@ -259,7 +259,6 @@ members = [
     "examples/trivial",
     "futures",
     "graphics",
-    "program",
     "renderer",
     "runtime",
     "tiny_skia",
@@ -305,7 +304,6 @@ taim_core = { version = "0.15.0-dev", path = "core" }
 taim_debug = { version = "0.15.0-dev", path = "debug" }
 taim_futures = { version = "0.15.0-dev", path = "futures" }
 taim_graphics = { version = "0.15.0-dev", path = "graphics" }
-taim_program = { version = "0.15.0-dev", path = "program" }
 taim_renderer = { version = "0.15.0-dev", path = "renderer" }
 taim_runtime = { version = "0.15.0-dev", path = "runtime" }
 taim_tiny_skia = { version = "0.15.0-dev", path = "tiny_skia", default-features = false }
