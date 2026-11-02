@@ -22,17 +22,26 @@ pub mod conversion;
 pub mod frame_clock;
 pub mod frame_gate;
 
+#[cfg(target_os = "android")]
+mod android;
 mod error;
 #[cfg(all(feature = "measurement", not(target_arch = "wasm32")))]
 mod measurement;
 mod shell;
 mod surface;
+mod touch;
 mod wake;
 
 pub use clipboard::Clipboard;
 pub use error::Error;
 pub use frame_gate::{DirtyFlags, FrameGate, PlatformEvent, TaimEvent, WindowStateTracker};
 pub use shell::{App, run};
+
+#[cfg(target_os = "android")]
+pub use shell::run_android;
+/// The running Android activity, handed to `android_main`.
+#[cfg(target_os = "android")]
+pub use winit::platform::android::activity::AndroidApp;
 
 type Renderer = taim_renderer::Renderer;
 type Compositor = taim_renderer::Compositor;

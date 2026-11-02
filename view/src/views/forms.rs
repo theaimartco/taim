@@ -417,6 +417,11 @@ impl View for Dialog {
             local.size(),
         );
 
+        if look::is_back(event) {
+            let _ = self.open.set(false);
+            return Handled::Yes;
+        }
+
         match look::gesture(event, cx.pointer()) {
             Some(Gesture::Down(at)) if !card.contains(at) => {
                 let _ = self.open.set(false);

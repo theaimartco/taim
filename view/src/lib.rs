@@ -27,7 +27,7 @@ pub fn svg_handle(bytes: &'static [u8]) -> taim_core::svg::Handle {
 
 pub use cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 pub use layout::{Axis, Constraints, Sizing};
-pub use root::{Response, Root};
+pub use root::{Response, Root, is_back};
 pub use state::{IntoProp, Invalidation, Prop, Scope, State, spawn};
 pub use view::{AnyView, Child, Handled, View};
 

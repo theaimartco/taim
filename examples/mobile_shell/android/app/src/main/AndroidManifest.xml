@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      No Java or Kotlin: the activity is the platform's NativeActivity, which
+      loads libmobile_shell.so and calls its `android_main`.
+
+      configChanges keeps the activity (and the application's state) alive
+      across rotation, resizing, a hardware keyboard and a dark-mode switch;
+      TAIM lays out again and follows the new theme.
+
+      adjustResize lets the on-screen keyboard shrink the content area, which
+      TAIM reads as an inset so a focused text field stays visible.
+    -->
+    <application
+        android:label="Taim Mobile Shell"
+        android:hasCode="false"
+        android:theme="@android:style/Theme.Material.NoActionBar">
+
+        <activity
+            android:name="android.app.NativeActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|density"
+            android:windowSoftInputMode="adjustResize">
+
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="mobile_shell" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

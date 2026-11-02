@@ -115,6 +115,7 @@ pub struct EventCx<'a> {
     pub(crate) requests: &'a mut Requests,
     pub(crate) focus: &'a mut Focus,
     pub(crate) path: &'a [u16],
+    pub(crate) touch: bool,
 }
 
 /// What views asked for while handling events.
@@ -149,6 +150,15 @@ impl EventCx<'_> {
     /// The pointer position in window coordinates, if known.
     pub fn pointer(&self) -> Option<Point> {
         self.pointer
+    }
+
+    /// Whether the pointer is a finger rather than a mouse or pen.
+    ///
+    /// The shell turns the first finger on the screen into pointer events,
+    /// so every view works with touch; this tells the views that behave
+    /// differently for touch (dragging to scroll, say) which one it is.
+    pub fn is_touch(&self) -> bool {
+        self.touch
     }
 
     /// Whether the pointer is over this view.

@@ -92,6 +92,13 @@ x11 = ["taim_renderer/x11", "taim_winit/x11"]
 wayland = ["taim_renderer/wayland", "taim_winit/wayland"]
 # Enables the VYOM platform backend
 vyom = ["dep:taim-platform-vyom"]
+# Android, through NativeActivity: an application is a `cdylib` with an
+# `android_main` entry point and needs no Java code. See
+# `docs/platform/android.md`.
+android = ["taim_winit/android-native-activity"]
+# Android through AndroidX GameActivity instead, for applications that ship
+# the GameActivity Java library.
+android-game-activity = ["taim_winit/android-game-activity"]
 # Delivers the semantic tree to assistive technology over AT-SPI.
 #
 # Taim builds a retained semantic tree every frame regardless; this is what
@@ -173,6 +180,10 @@ harness = false
 
 [[bench]]
 name = "cpu"
+harness = false
+
+[[bench]]
+name = "views"
 harness = false
 
 

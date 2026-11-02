@@ -37,10 +37,18 @@
 #[cfg(all(
     target_family = "unix",
     not(target_os = "macos"),
+    not(target_os = "android"),
     not(feature = "wayland"),
     not(feature = "x11"),
 ))]
 compile_error!("No Unix display backend is enabled. Enable x11 or wayland.");
+
+#[cfg(all(
+    target_os = "android",
+    not(feature = "android"),
+    not(feature = "android-game-activity"),
+))]
+compile_error!("Building for Android needs the `android` (or `android-game-activity`) feature.");
 
 use taim_core as core;
 
@@ -76,6 +84,14 @@ pub use backend::{Backend, PowerPreference};
 /// Fine-grained reactive state primitives.
 pub mod signal {
     pub use taim_signal::*;
+}
+
+/// Running on Android: the activity handle `android_main` receives.
+///
+/// See [`App::run_android`].
+#[cfg(target_os = "android")]
+pub mod android {
+    pub use taim_winit::AndroidApp;
 }
 
 /// The VYOM backend for TAIM applications.

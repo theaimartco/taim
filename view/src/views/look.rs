@@ -209,6 +209,12 @@ pub(crate) fn gesture(event: &Event, pointer: Option<crate::Point>) -> Option<Ge
     })
 }
 
+/// Whether `event` asks to go back: the Android back button or gesture, a
+/// browser/mouse back key, or Escape. The topmost open overlay closes.
+pub(crate) fn is_back(event: &Event) -> bool {
+    crate::root::is_back(event)
+}
+
 /// Whether `event` is pointer input (mouse or touch), the only kind a
 /// modal overlay blocks from reaching what it covers.
 pub(crate) fn is_pointer(event: &Event) -> bool {

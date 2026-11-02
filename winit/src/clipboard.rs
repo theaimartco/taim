@@ -61,7 +61,7 @@ mod platform {
     impl Clipboard {
         /// Creates a clipboard connection and its one bounded worker.
         pub fn new() -> Self {
-            let Ok(clipboard) = arboard::Clipboard::new() else {
+            let Some(clipboard) = native::connect() else {
                 return Self {
                     state: State::Unavailable,
                 };
@@ -139,62 +139,19 @@ mod platform {
         }
     }
 
-    fn run_worker(mut clipboard: arboard::Clipboard, receiver: mpsc::Receiver<Command>) {
+    fn run_worker(mut clipboard: native::Native, receiver: mpsc::Receiver<Command>) {
         while let Ok(command) = receiver.recv() {
             match command {
                 Command::Read { kind, callback } => {
-                    let result = read_content(&mut clipboard, kind);
+                    let result = native::read_content(&mut clipboard, kind);
                     invoke(|| callback(result));
                 }
                 Command::Write { content, callback } => {
-                    let result = write_content(&mut clipboard, content);
+                    let result = native::write_content(&mut clipboard, content);
                     invoke(|| callback(result));
                 }
             }
         }
-    }
-
-    fn read_content(clipboard: &mut arboard::Clipboard, kind: Kind) -> Result<Content, Error> {
-        match kind {
-            Kind::Text => clipboard.get().text().map(Content::Text).map_err(to_error),
-            Kind::Html => clipboard.get().html().map(Content::Html).map_err(to_error),
-            #[cfg(feature = "image")]
-            Kind::Image => clipboard
-                .get()
-                .image()
-                .map_err(to_error)
-                .and_then(image_content),
-            Kind::Files => clipboard
-                .get()
-                .file_list()
-                .map(Content::Files)
-                .map_err(to_error),
-            kind => {
-                log::warn!("unsupported clipboard kind: {kind:?}");
-                Err(Error::ContentNotAvailable)
-            }
-        }
-    }
-
-    fn write_content(clipboard: &mut arboard::Clipboard, content: Content) -> Result<(), Error> {
-        let set = clipboard.set();
-        let result = match content {
-            Content::Text(text) => set.text(text),
-            Content::Html(html) => set.html(html, None),
-            #[cfg(feature = "image")]
-            Content::Image(image) => set.image(arboard::ImageData {
-                bytes: image.rgba.as_ref().into(),
-                width: image.size.width as usize,
-                height: image.size.height as usize,
-            }),
-            Content::Files(files) => set.file_list(&files),
-            content => {
-                log::warn!("unsupported clipboard content: {content:?}");
-                Err(arboard::Error::ClipboardNotSupported)
-            }
-        };
-
-        result.map_err(to_error)
     }
 
     fn validate_content(content: &Content) -> Result<(), Error> {
@@ -216,24 +173,6 @@ mod platform {
             )),
             _ => Ok(()),
         }
-    }
-
-    #[cfg(feature = "image")]
-    fn image_content(image: arboard::ImageData<'static>) -> Result<Content, Error> {
-        let width = u32::try_from(image.width)
-            .map_err(|_| too_large("clipboard image width does not fit in u32"))?;
-        let height = u32::try_from(image.height)
-            .map_err(|_| too_large("clipboard image height does not fit in u32"))?;
-        let expected = image_byte_len(width, height)?;
-
-        if expected != image.bytes.len() {
-            return Err(Error::ConversionFailure);
-        }
-
-        Ok(Content::Image(crate::core::clipboard::Image {
-            rgba: crate::core::Bytes::from_owner(image.bytes),
-            size: crate::core::Size::new(width, height),
-        }))
     }
 
     #[cfg(feature = "image")]
@@ -260,20 +199,104 @@ mod platform {
         }
     }
 
-    fn to_error(error: arboard::Error) -> Error {
-        match error {
-            arboard::Error::ContentNotAvailable => Error::ContentNotAvailable,
-            arboard::Error::ClipboardNotSupported => Error::ClipboardUnavailable,
-            arboard::Error::ClipboardOccupied => Error::ClipboardOccupied,
-            arboard::Error::ConversionFailure => Error::ConversionFailure,
-            arboard::Error::Unknown { description } => Error::Unknown {
-                description: Arc::new(description),
-            },
-            error => Error::Unknown {
-                description: Arc::new(error.to_string()),
-            },
+    /// The desktop clipboard, through `arboard`.
+    #[cfg(not(target_os = "android"))]
+    mod native {
+        use super::*;
+
+        pub(super) type Native = arboard::Clipboard;
+
+        pub(super) fn connect() -> Option<Native> {
+            arboard::Clipboard::new().ok()
+        }
+
+        pub(super) fn read_content(
+            clipboard: &mut arboard::Clipboard,
+            kind: Kind,
+        ) -> Result<Content, Error> {
+            match kind {
+                Kind::Text => clipboard.get().text().map(Content::Text).map_err(to_error),
+                Kind::Html => clipboard.get().html().map(Content::Html).map_err(to_error),
+                #[cfg(feature = "image")]
+                Kind::Image => clipboard
+                    .get()
+                    .image()
+                    .map_err(to_error)
+                    .and_then(image_content),
+                Kind::Files => clipboard
+                    .get()
+                    .file_list()
+                    .map(Content::Files)
+                    .map_err(to_error),
+                kind => {
+                    log::warn!("unsupported clipboard kind: {kind:?}");
+                    Err(Error::ContentNotAvailable)
+                }
+            }
+        }
+
+        pub(super) fn write_content(
+            clipboard: &mut arboard::Clipboard,
+            content: Content,
+        ) -> Result<(), Error> {
+            let set = clipboard.set();
+            let result = match content {
+                Content::Text(text) => set.text(text),
+                Content::Html(html) => set.html(html, None),
+                #[cfg(feature = "image")]
+                Content::Image(image) => set.image(arboard::ImageData {
+                    bytes: image.rgba.as_ref().into(),
+                    width: image.size.width as usize,
+                    height: image.size.height as usize,
+                }),
+                Content::Files(files) => set.file_list(&files),
+                content => {
+                    log::warn!("unsupported clipboard content: {content:?}");
+                    Err(arboard::Error::ClipboardNotSupported)
+                }
+            };
+
+            result.map_err(to_error)
+        }
+
+        #[cfg(feature = "image")]
+        fn image_content(image: arboard::ImageData<'static>) -> Result<Content, Error> {
+            let width = u32::try_from(image.width)
+                .map_err(|_| too_large("clipboard image width does not fit in u32"))?;
+            let height = u32::try_from(image.height)
+                .map_err(|_| too_large("clipboard image height does not fit in u32"))?;
+            let expected = image_byte_len(width, height)?;
+
+            if expected != image.bytes.len() {
+                return Err(Error::ConversionFailure);
+            }
+
+            Ok(Content::Image(crate::core::clipboard::Image {
+                rgba: crate::core::Bytes::from_owner(image.bytes),
+                size: crate::core::Size::new(width, height),
+            }))
+        }
+
+        fn to_error(error: arboard::Error) -> Error {
+            match error {
+                arboard::Error::ContentNotAvailable => Error::ContentNotAvailable,
+                arboard::Error::ClipboardNotSupported => Error::ClipboardUnavailable,
+                arboard::Error::ClipboardOccupied => Error::ClipboardOccupied,
+                arboard::Error::ConversionFailure => Error::ConversionFailure,
+                arboard::Error::Unknown { description } => Error::Unknown {
+                    description: Arc::new(description),
+                },
+                error => Error::Unknown {
+                    description: Arc::new(error.to_string()),
+                },
+            }
         }
     }
+
+    /// The Android clipboard, through `ClipboardManager` over JNI.
+    #[cfg(target_os = "android")]
+    #[path = "android.rs"]
+    mod native;
 }
 
 #[cfg(target_arch = "wasm32")]

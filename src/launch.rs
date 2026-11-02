@@ -104,6 +104,44 @@ impl App {
         })
         .map_err(Into::into)
     }
+
+    /// Runs as an Android activity, until it finishes. Call it from the
+    /// library's `android_main`:
+    ///
+    /// ```ignore
+    /// use taim::prelude::*;
+    ///
+    /// #[unsafe(no_mangle)]
+    /// fn android_main(android: taim::android::AndroidApp) {
+    ///     let app = taim::app("Counter", |cx| {
+    ///         let count = cx.signal(0);
+    ///         button(move || format!("Tapped {}", count.get()))
+    ///             .on_press(move || count.update(|n| *n += 1))
+    ///     });
+    ///
+    ///     if let Err(error) = app.run_android(android) {
+    ///         log::error!("{error}");
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// The window fills the screen; views are kept inside the system bars,
+    /// cutouts and on-screen keyboard. Back closes the topmost dialog,
+    /// sheet or drawer, and leaves the application when nothing is open.
+    /// See `docs/platform/android.md`.
+    #[cfg(target_os = "android")]
+    pub fn run_android(self, android: crate::android::AndroidApp) -> Result {
+        taim_winit::run_android(
+            taim_winit::App {
+                title: self.title,
+                settings: self.settings,
+                window: self.window,
+                build: self.build,
+            },
+            android,
+        )
+        .map_err(Into::into)
+    }
 }
 
 impl std::fmt::Debug for App {

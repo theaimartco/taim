@@ -27,6 +27,11 @@ image = ["taim_core/image", "arboard/image-data"]
 # to carry. See taim-accessibility/src/atspi/bridge.rs.
 accessibility = ["taim-accessibility/atspi"]
 x11 = ["winit/x11"]
+# Android, through NativeActivity: no Java code is needed in the
+# application package. GameActivity (AndroidX) handles more of the
+# platform's input, including text input from the on-screen keyboard.
+android-native-activity = ["winit/android-native-activity"]
+android-game-activity = ["winit/android-game-activity"]
 wayland = ["winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita", "arboard/wayland-data-control"]
 
 [dependencies]
@@ -47,8 +52,13 @@ tracing.workspace = true
 winit.workspace = true
 
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android")))'.dependencies]
 arboard.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+ndk-context = "0.1"
+android_logger = "0.15"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys.workspace = true

@@ -35,6 +35,18 @@ pub trait View: 'static {
         Handled::No
     }
 
+    /// Looks at `event` before any child does, and may take it.
+    ///
+    /// This is how a scrollable area claims a drag that began on a button:
+    /// it lets the press through, watches the finger move, and once the
+    /// movement is clearly a scroll returns [`Handled::Yes`]. The children
+    /// that saw the press then receive a cancellation (the pointer leaves
+    /// and the button is released with no pointer), so nothing activates.
+    /// Android calls this `onInterceptTouchEvent`.
+    fn intercept(&mut self, _cx: &mut EventCx<'_>, _event: &Event) -> Handled {
+        Handled::No
+    }
+
     /// Describes the view to assistive technology.
     ///
     /// There is deliberately no default: every view must decide whether it
@@ -53,6 +65,12 @@ pub trait View: 'static {
 
     /// Whether the view can take keyboard focus (and be reached with Tab).
     fn focusable(&self) -> bool {
+        false
+    }
+
+    /// Whether the view edits text while it has focus. The shell shows the
+    /// on-screen keyboard (and enables the input method) while it does.
+    fn takes_text(&self) -> bool {
         false
     }
 

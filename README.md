@@ -25,6 +25,15 @@ cargo run -p mobile_shell      # Full mobile application shell with touch naviga
 
 ---
 
+## Android
+
+TAIM builds for Android (`aarch64-linux-android`, `x86_64-linux-android`) with
+the `android` feature: touch scrolling with flings, back navigation, safe
+areas, the on-screen keyboard, dark mode and the clipboard. It is
+experimental and **not yet tested on a device**. See
+[docs/platform/android.md](docs/platform/android.md); `examples/mobile_shell`
+runs on both the desktop and Android.
+
 ## TAIM view API
 
 Applications are built from views that own their state. There is no message

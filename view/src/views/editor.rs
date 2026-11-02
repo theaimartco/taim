@@ -570,6 +570,10 @@ impl View for TextEditor {
         true
     }
 
+    fn takes_text(&self) -> bool {
+        true
+    }
+
     fn clips(&self) -> bool {
         true
     }

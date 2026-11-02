@@ -198,6 +198,8 @@ fn paint_view(
 pub(crate) struct Router<'a> {
     pub now: crate::Instant,
     pub pointer: Option<Point>,
+    /// The pointer is a finger.
+    pub touch: bool,
     pub requests: &'a mut Requests,
     pub focus: &'a mut Focus,
 }
@@ -212,6 +214,25 @@ pub(crate) fn broadcast(
     router: &mut Router<'_>,
 ) -> Handled {
     let at = place(child, origin, visible);
+
+    let intercepted = child.view_mut().intercept(
+        &mut EventCx {
+            now: router.now,
+            bounds: at.bounds,
+            pointer: pointer_in(router.pointer, at.visible),
+            requests: router.requests,
+            focus: router.focus,
+            path,
+            touch: router.touch,
+        },
+        event,
+    );
+
+    if intercepted == Handled::Yes {
+        cancel_children(child, at, path, router);
+        return Handled::Yes;
+    }
+
     let (inner_origin, inner_visible) = inner(child.view(), at);
 
     // Topmost (last painted) children first, so overlays get input before
@@ -248,6 +269,7 @@ pub(crate) fn broadcast(
             requests: router.requests,
             focus: router.focus,
             path,
+            touch: router.touch,
         },
         event,
     );
@@ -257,6 +279,71 @@ pub(crate) fn broadcast(
     }
 
     handled
+}
+
+/// Tells every view under `child` that the pointer gesture they may have
+/// started is over: the pointer leaves, then the button is released with
+/// no pointer anywhere, which no view treats as a click.
+fn cancel_children(child: &mut Child, at: Placement, path: &mut Vec<u16>, router: &mut Router<'_>) {
+    let (inner_origin, inner_visible) = inner(child.view(), at);
+    let pointer = router.pointer.take();
+
+    for event in [
+        Event::Mouse(mouse::Event::CursorLeft),
+        Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+    ] {
+        let mut index = 0_u16;
+        child.view_mut().children(&mut |grandchild| {
+            path.push(index);
+            let _ = broadcast_all(
+                grandchild,
+                inner_origin,
+                inner_visible,
+                path,
+                &event,
+                router,
+            );
+            let _ = path.pop();
+            index += 1;
+        });
+    }
+
+    router.pointer = pointer;
+}
+
+/// Offers `event` to every view in the subtree, whether or not one handles
+/// it: a cancellation must reach every view that might be holding a press.
+fn broadcast_all(
+    child: &mut Child,
+    origin: Point,
+    visible: Option<Rectangle>,
+    path: &mut Vec<u16>,
+    event: &Event,
+    router: &mut Router<'_>,
+) -> Handled {
+    let at = place(child, origin, visible);
+    let (inner_origin, inner_visible) = inner(child.view(), at);
+
+    let mut index = 0_u16;
+    child.view_mut().children(&mut |grandchild| {
+        path.push(index);
+        let _ = broadcast_all(grandchild, inner_origin, inner_visible, path, event, router);
+        let _ = path.pop();
+        index += 1;
+    });
+
+    child.view_mut().event(
+        &mut EventCx {
+            now: router.now,
+            bounds: at.bounds,
+            pointer: None,
+            requests: router.requests,
+            focus: router.focus,
+            path,
+            touch: router.touch,
+        },
+        event,
+    )
 }
 
 /// Whether `TAIM_VIEW_TRACE` asks for every handled event to be logged.
@@ -313,6 +400,7 @@ pub(crate) fn deliver(
             requests: router.requests,
             focus: router.focus,
             path,
+            touch: router.touch,
         },
         event,
     )

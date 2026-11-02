@@ -26,7 +26,9 @@ pub(crate) struct Surface {
     pub changes: ChangeSignal,
     pub root: Root,
 
-    target: <Compositor as compositor::Compositor>::Surface,
+    /// The GPU surface. `None` while the platform has taken the native
+    /// window away (an Android application in the background).
+    target: Option<<Compositor as compositor::Compositor>::Surface>,
     renderer: Renderer,
     viewport: Viewport,
     /// The surface must be reconfigured to the viewport before drawing.
@@ -40,6 +42,12 @@ pub(crate) struct Surface {
     modifiers: keyboard::Modifiers,
     cursor: mouse::Interaction,
     hidden: Hidden,
+    /// The finger turned into pointer events; see [`Surface::touch`].
+    fingers: crate::touch::Fingers,
+    /// The pointer is currently a finger.
+    touch: bool,
+    /// The on-screen keyboard was last asked to be shown.
+    text_input: bool,
 
     accessibility: Accessibility,
     published: taim_accessibility::Tree,
@@ -63,6 +71,8 @@ struct Look {
 struct Hidden {
     occluded: bool,
     empty: bool,
+    /// The platform took the native window away.
+    suspended: bool,
 }
 
 impl Surface {
@@ -96,7 +106,7 @@ impl Surface {
 
         let mut surface = Self {
             id,
-            target: compositor.create_surface(raw.clone(), physical.width, physical.height),
+            target: Some(compositor.create_surface(raw.clone(), physical.width, physical.height)),
             renderer: compositor.create_renderer(renderer_settings),
             raw,
             exit_on_close,
@@ -115,6 +125,9 @@ impl Surface {
             modifiers: keyboard::Modifiers::empty(),
             cursor: mouse::Interaction::None,
             hidden: Hidden::default(),
+            fingers: crate::touch::Fingers::default(),
+            touch: false,
+            text_input: false,
             accessibility,
             published: taim_accessibility::Tree::new(),
             semantics_stale: true,
@@ -154,9 +167,60 @@ impl Surface {
         }
     }
 
+    /// Lets go of the GPU surface: the platform is taking the native window
+    /// away. Nothing is drawn until [`Surface::resume`].
+    pub fn suspend(&mut self) {
+        self.target = None;
+        self.fingers.reset();
+        self.hidden.suspended = true;
+        self.refresh_visibility();
+    }
+
+    /// Creates a new GPU surface for the native window the platform gave
+    /// back, and draws.
+    pub fn resume(&mut self, compositor: &mut Compositor) {
+        let physical = self.raw.inner_size();
+        self.target =
+            Some(compositor.create_surface(self.raw.clone(), physical.width, physical.height));
+        self.hidden.suspended = false;
+        self.hidden.empty = physical.width == 0 || physical.height == 0;
+        self.refresh_visibility();
+        self.fit(Size::new(physical.width, physical.height));
+        self.resized = true;
+        self.stale_layout = true;
+        self.request_frame();
+    }
+
+    /// Sets the window edges the platform covers, in physical pixels:
+    /// top, right, bottom, left. Views are laid out inside them.
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    pub fn set_insets(&mut self, top: f32, right: f32, bottom: f32, left: f32) {
+        let scale = self.viewport.scale_factor();
+        let logical = taim_core::Padding {
+            top: top / scale,
+            right: right / scale,
+            bottom: bottom / scale,
+            left: left / scale,
+        };
+
+        if self.root.set_insets(logical) {
+            self.stale_layout = true;
+            self.semantics_stale = true;
+            self.request_frame();
+        }
+    }
+
     /// Folds a platform event into the window's own state. Returns the
-    /// TAIM event the views should see, if any.
-    pub fn observe(&mut self, event: WindowEvent, system: theme::Mode) -> Option<taim_core::Event> {
+    /// TAIM events the views should see, in order.
+    pub fn observe(
+        &mut self,
+        event: WindowEvent,
+        system: theme::Mode,
+    ) -> [Option<taim_core::Event>; 2] {
+        if let WindowEvent::Touch(contact) = event {
+            return self.touch(contact);
+        }
+
         match &event {
             WindowEvent::Resized(size) => {
                 self.hidden.empty = size.width == 0 || size.height == 0;
@@ -173,8 +237,10 @@ impl Surface {
             }
             WindowEvent::Focused(_) => self.request_frame(),
             WindowEvent::ThemeChanged(_) => self.restyle(system),
-            WindowEvent::CursorMoved { position, .. } => self.pointer = Some(*position),
-            WindowEvent::Touch(touch) => self.pointer = Some(touch.location),
+            WindowEvent::CursorMoved { position, .. } => {
+                self.pointer = Some(*position);
+                self.touch = false;
+            }
             WindowEvent::CursorLeft { .. } => self.pointer = None,
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = conversion::modifiers(modifiers.state());
@@ -182,7 +248,46 @@ impl Surface {
             _ => {}
         }
 
-        conversion::window_event(event, self.viewport.scale_factor(), self.modifiers)
+        [
+            conversion::window_event(event, self.viewport.scale_factor(), self.modifiers),
+            None,
+        ]
+    }
+
+    /// Turns the first finger on the screen into pointer events (a move, a
+    /// press, a release), so every view that works with a mouse works with
+    /// touch, the way Flutter and the web unify pointers. Views that act
+    /// differently for a finger, such as dragging to scroll, are told it is
+    /// one. Further fingers are not delivered yet.
+    ///
+    /// A cancelled touch (the system took the gesture) leaves before it
+    /// releases, so nothing under it activates.
+    fn touch(&mut self, contact: winit::event::Touch) -> [Option<taim_core::Event>; 2] {
+        use crate::touch::Step;
+
+        let position = conversion::cursor_position(contact.location, self.viewport.scale_factor());
+        let moved = taim_core::Event::Mouse(mouse::Event::CursorMoved { position });
+        let pressed = taim_core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left));
+        let released = taim_core::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left));
+        let left = taim_core::Event::Mouse(mouse::Event::CursorLeft);
+
+        match self.fingers.step(contact.id, contact.phase) {
+            Step::Press => {
+                self.touch = true;
+                self.pointer = Some(contact.location);
+                [Some(moved), Some(pressed)]
+            }
+            Step::Move => {
+                self.pointer = Some(contact.location);
+                [Some(moved), None]
+            }
+            Step::Release => {
+                self.pointer = Some(contact.location);
+                [Some(released), Some(left)]
+            }
+            Step::Cancel => [Some(left), Some(released)],
+            Step::Ignore => [None, None],
+        }
     }
 
     /// The pointer in logical coordinates.
@@ -193,7 +298,14 @@ impl Surface {
 
     /// Routes `event` to the views.
     pub fn handle(&mut self, event: &taim_core::Event) -> Response {
-        let response = self.root.handle(event, self.pointer(), Instant::now());
+        if matches!(event, taim_core::Event::Mouse(mouse::Event::CursorLeft)) {
+            self.pointer = None;
+        }
+
+        let response = self
+            .root
+            .handle_input(event, self.pointer(), Instant::now(), self.touch);
+        self.sync_text_input();
 
         if response.paint
             || response.captured
@@ -217,6 +329,22 @@ impl Surface {
 
         self.update_cursor();
         response
+    }
+
+    /// Shows the on-screen keyboard while a text view has focus, and hides
+    /// it when none does.
+    fn sync_text_input(&mut self) {
+        let wants = self.root.wants_text_input();
+        if wants == self.text_input {
+            return;
+        }
+        self.text_input = wants;
+
+        // Phones need the on-screen keyboard. Desktop input methods are not
+        // wired up yet: enabling one there changes how typed text arrives.
+        if cfg!(any(target_os = "android", target_os = "ios")) {
+            self.raw.set_ime_allowed(wants);
+        }
     }
 
     /// Picks up state changes the views were told about.
@@ -267,7 +395,7 @@ impl Surface {
         let now = Instant::now();
         let started = std::time::Instant::now();
 
-        if self.clock.is_suspended() {
+        if self.clock.is_suspended() || self.target.is_none() {
             return;
         }
         // A frame the platform asked for (an expose) is drawn even if the
@@ -276,7 +404,9 @@ impl Surface {
 
         if self.resized {
             let size = self.viewport.physical_size();
-            compositor.configure_surface(&mut self.target, size.width, size.height);
+            if let Some(target) = self.target.as_mut() {
+                compositor.configure_surface(target, size.width, size.height);
+            }
             #[cfg(feature = "hinting")]
             self.renderer.hint(self.viewport.scale_factor());
             self.resized = false;
@@ -301,9 +431,12 @@ impl Surface {
         let described = started.elapsed();
 
         self.clock.submit(now);
+        let Some(target) = self.target.as_mut() else {
+            return;
+        };
         let presented = compositor.present(
             &mut self.renderer,
-            &mut self.target,
+            target,
             &self.viewport,
             self.look.style.background_color,
             || self.raw.pre_present_notify(),
@@ -332,7 +465,8 @@ impl Surface {
             }
             Err(compositor::SurfaceError::Lost) => {
                 let size = self.viewport.physical_size();
-                self.target = compositor.create_surface(self.raw.clone(), size.width, size.height);
+                self.target =
+                    Some(compositor.create_surface(self.raw.clone(), size.width, size.height));
                 self.request_frame();
             }
             Err(compositor::SurfaceError::Outdated) => {
@@ -395,7 +529,7 @@ impl Surface {
     }
 
     fn refresh_visibility(&mut self) {
-        if self.hidden.occluded || self.hidden.empty {
+        if self.hidden.occluded || self.hidden.empty || self.hidden.suspended {
             self.clock.suspend();
         } else {
             self.clock.resume();

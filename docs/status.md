@@ -4,6 +4,20 @@
 **Production release verdict:** NO-GO until every evidence gate in
 docs/release/production-gates.md is approved on a reviewed release commit.
 
+## Android checkpoint (2026-11-02)
+
+TAIM builds and passes `clippy -D warnings` for `aarch64-linux-android`
+and `x86_64-linux-android` (`android` feature, NativeActivity). Added: an
+`android_main` entry (`App::run_android`), GPU surface drop/recreate across
+the activity lifecycle, touch delivered as pointer events, an intercept
+phase so touch drags scroll (with flings) and cancel the press underneath,
+back navigation that closes overlays then finishes the activity, safe-area
+insets, on-screen keyboard for text views, dark mode, Android system fonts
+and a JNI clipboard. View-level touch behaviour is covered by
+`tests/touch`. **None of it has run on a device or emulator**: there is no
+Android NDK in the build environment, so not even linking is verified. See
+`docs/platform/android.md` for the gaps compared with Flutter.
+
 ## Build and test checkpoint (2026-11-02)
 
 After the move to the view API (the `program` crate, the Elm-style

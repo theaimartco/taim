@@ -508,6 +508,10 @@ impl View for TextField {
     fn focusable(&self) -> bool {
         true
     }
+
+    fn takes_text(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

@@ -116,6 +116,13 @@ impl View for Drawer {
         let bounds = cx.bounds();
         let now = cx.now();
         let progress = self.progress(now);
+
+        if progress > 0.0 && look::is_back(event) {
+            self.settle(false, now);
+            cx.request_animation();
+            return Handled::Yes;
+        }
+
         match look::gesture(event, cx.pointer()) {
             Some(Gesture::Down(at)) if bounds.contains(at) => {
                 let on_panel = at.x < bounds.x + self.width * progress;
@@ -334,6 +341,12 @@ impl View for Sheet {
 
         let top = bounds.y + bounds.height * (1.0 - fraction);
         let now = cx.now();
+
+        if look::is_back(event) {
+            self.dismiss(now);
+            cx.request_animation();
+            return Handled::Yes;
+        }
 
         match look::gesture(event, cx.pointer()) {
             Some(Gesture::Down(at)) if at.y < top => {
@@ -580,6 +593,7 @@ pub fn pull_to_refresh(content: impl Into<AnyView>, refreshing: State<bool>) -> 
         busy: refreshing.into_prop(),
         on_refresh: None,
         drag: None,
+        finger: None,
         settle: Tween::new(0.0),
         painted: Cell::new(0.0),
     }
@@ -593,14 +607,63 @@ pub struct PullToRefresh {
     on_refresh: Option<Box<dyn Fn()>>,
     /// Pointer y where the pull started, and the current pull distance.
     drag: Option<(f32, f32)>,
+    /// Where a finger landed, before it is known to be pulling.
+    finger: Option<f32>,
     settle: Tween,
     painted: Cell<f32>,
 }
 
 const THRESHOLD: f32 = 70.0;
 const HOLD: f32 = 56.0;
+/// How far a finger moves down before it is pulling rather than tapping.
+const PULL_SLOP: f32 = 8.0;
+
+/// Whether anything inside `child` is scrolled away from its top, so a
+/// downward drag should scroll it back rather than pull to refresh.
+fn scrolled_down(child: &mut Child) -> bool {
+    if child.view().scroll_offset().y > 0.0 {
+        return true;
+    }
+
+    let mut scrolled = false;
+    child.view_mut().children(&mut |grandchild| {
+        scrolled = scrolled || scrolled_down(grandchild);
+    });
+    scrolled
+}
 
 impl PullToRefresh {
+    /// Follows the pointer to `y`, returning the pull distance.
+    fn pull_to(&mut self, y: f32, cx: &mut EventCx<'_>) -> f32 {
+        let Some((start, _)) = self.drag else {
+            return 0.0;
+        };
+        // Resistance: the content follows at half the finger speed.
+        let pull = ((y - start) * 0.5).clamp(0.0, 120.0);
+        self.drag = Some((start, pull));
+        cx.request_paint();
+        pull
+    }
+
+    /// Ends a pull: refreshes past the threshold, springs back either way.
+    fn release(&mut self, cx: &mut EventCx<'_>) -> Handled {
+        let Some((_, pull)) = self.drag.take() else {
+            return Handled::No;
+        };
+        self.settle = Tween::new(pull);
+        if pull >= THRESHOLD {
+            let _ = self.refreshing.set(true);
+            if let Some(refresh) = &self.on_refresh {
+                refresh();
+            }
+            self.settle.go(HOLD, cx.now());
+        } else {
+            self.settle.go(0.0, cx.now());
+        }
+        cx.request_animation();
+        Handled::from(pull > 0.0)
+    }
+
     /// Runs `action` when the user pulls past the threshold.
     pub fn on_refresh(mut self, action: impl Fn() + 'static) -> Self {
         self.on_refresh = Some(Box::new(action));
@@ -679,8 +742,58 @@ impl View for PullToRefresh {
         }
     }
 
+    /// A finger pulls before the content sees it, as long as the content
+    /// is at its top: then a downward drag is a pull, even one that starts
+    /// on a button. Otherwise the content scrolls back first.
+    fn intercept(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+        if !cx.is_touch() {
+            return Handled::No;
+        }
+
+        match look::gesture(event, cx.pointer()) {
+            Some(Gesture::Down(at)) if cx.bounds().contains(at) && !self.busy.get() => {
+                self.finger = Some(at.y);
+                Handled::No
+            }
+            Some(Gesture::Move(at)) if self.drag.is_none() => {
+                let Some(start) = self.finger else {
+                    return Handled::No;
+                };
+                let moved = at.y - start;
+
+                if moved < -PULL_SLOP || (moved > PULL_SLOP && scrolled_down(&mut self.content)) {
+                    // Up, or down a list that can scroll back: not a pull.
+                    self.finger = None;
+                    return Handled::No;
+                }
+                if moved <= PULL_SLOP {
+                    return Handled::No;
+                }
+
+                self.finger = None;
+                self.drag = Some((start + PULL_SLOP, 0.0));
+                let _ = self.pull_to(at.y, cx);
+                Handled::Yes
+            }
+            Some(Gesture::Move(at)) => {
+                let _ = self.pull_to(at.y, cx);
+                Handled::Yes
+            }
+            Some(Gesture::Up(_)) => {
+                self.finger = None;
+                self.release(cx)
+            }
+            _ => Handled::No,
+        }
+    }
+
     fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
         let bounds = cx.bounds();
+
+        // A finger pulls through `intercept`.
+        if cx.is_touch() {
+            return Handled::No;
+        }
 
         match look::gesture(event, cx.pointer()) {
             Some(Gesture::Down(at)) if bounds.contains(at) && !self.busy.get() => {
@@ -688,32 +801,13 @@ impl View for PullToRefresh {
                 Handled::No
             }
             Some(Gesture::Move(at)) => {
-                let Some((start, _)) = self.drag else {
+                if self.drag.is_none() {
                     return Handled::No;
-                };
-                // Resistance: the content follows at half the finger speed.
-                let pull = ((at.y - start) * 0.5).clamp(0.0, 120.0);
-                self.drag = Some((start, pull));
-                cx.request_paint();
-                Handled::from(pull > 0.0)
-            }
-            Some(Gesture::Up(_)) => {
-                let Some((_, pull)) = self.drag.take() else {
-                    return Handled::No;
-                };
-                self.settle = Tween::new(pull);
-                if pull >= THRESHOLD {
-                    let _ = self.refreshing.set(true);
-                    if let Some(refresh) = &self.on_refresh {
-                        refresh();
-                    }
-                    self.settle.go(HOLD, cx.now());
-                } else {
-                    self.settle.go(0.0, cx.now());
                 }
-                cx.request_animation();
+                let pull = self.pull_to(at.y, cx);
                 Handled::from(pull > 0.0)
             }
+            Some(Gesture::Up(_)) => self.release(cx),
             _ => Handled::No,
         }
     }
