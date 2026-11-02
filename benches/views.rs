@@ -46,7 +46,7 @@ fn views(c: &mut Criterion) {
         // A pointer moving over the list: every view is offered the event.
         let mut group = c.benchmark_group("views/pointer_move");
         let mut y = 0.0_f32;
-        group.bench_with_input(BenchmarkId::from_parameter(rows), &rows, |b, _| {
+        let _ = group.bench_with_input(BenchmarkId::from_parameter(rows), &rows, |b, _| {
             b.iter(|| {
                 y = (y + 7.0) % WINDOW.height;
                 let at = Point::new(100.0, y);
@@ -60,19 +60,19 @@ fn views(c: &mut Criterion) {
         group.finish();
 
         let mut group = c.benchmark_group("views/is_animating");
-        group.bench_with_input(BenchmarkId::from_parameter(rows), &rows, |b, _| {
+        let _ = group.bench_with_input(BenchmarkId::from_parameter(rows), &rows, |b, _| {
             b.iter(|| black_box(root.is_animating(Instant::now())));
         });
         group.finish();
 
         let mut group = c.benchmark_group("views/layout");
-        group.bench_with_input(BenchmarkId::from_parameter(rows), &rows, |b, _| {
+        let _ = group.bench_with_input(BenchmarkId::from_parameter(rows), &rows, |b, _| {
             b.iter(|| root.layout(&renderer, WINDOW));
         });
         group.finish();
 
         let mut group = c.benchmark_group("views/paint");
-        group.bench_with_input(BenchmarkId::from_parameter(rows), &rows, |b, _| {
+        let _ = group.bench_with_input(BenchmarkId::from_parameter(rows), &rows, |b, _| {
             b.iter(|| {
                 use taim_core::Renderer as _;
                 renderer.reset(taim_core::Rectangle::with_size(WINDOW));

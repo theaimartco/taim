@@ -4,6 +4,26 @@
 **Production release verdict:** NO-GO until every evidence gate in
 docs/release/production-gates.md is approved on a reviewed release commit.
 
+## View-tree performance checkpoint (2026-11-02)
+
+`cargo bench --bench views` measures a list of buttons inside `scroll`
+with the CPU renderer (criterion medians, one Linux x86-64 container,
+debug assertions off; indicative only):
+
+| Benchmark | Before | After |
+|---|---:|---:|
+| pointer move, 100 rows | 40.3 µs | 7.3 µs |
+| pointer move, 1000 rows | 3.36 ms | 86 µs |
+| paint, 100 rows | 27.4 µs | 8.2 µs |
+| paint, 1000 rows | 338 µs | 27 µs |
+
+Two causes. Routing an event visited a parent's children in reverse by
+walking all of them once per child, which is quadratic for a long list;
+`View::children_rev` makes it linear. Painting drew every row of a
+scrolled list; views entirely outside a clipping ancestor (with a 32px
+margin for shadows and focus rings) are now skipped. Layout and
+`is_animating` are unchanged.
+
 ## Android checkpoint (2026-11-02)
 
 TAIM builds and passes `clippy -D warnings` for `aarch64-linux-android`

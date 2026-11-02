@@ -102,6 +102,28 @@ pub trait View: 'static {
     /// Hands each child to `visit`, in paint order.
     fn children(&mut self, _visit: &mut dyn FnMut(&mut Child)) {}
 
+    /// Hands each child to `visit` in reverse paint order: topmost first,
+    /// the order input is offered in.
+    ///
+    /// The default walks [`View::children`] once per child, which is fine
+    /// for a handful of children. Views that hold many (stacks, lists,
+    /// grids) override it so routing an event stays linear in the number
+    /// of children.
+    fn children_rev(&mut self, visit: &mut dyn FnMut(&mut Child)) {
+        let mut count = 0_usize;
+        self.children(&mut |_| count += 1);
+
+        for target in (0..count).rev() {
+            let mut index = 0_usize;
+            self.children(&mut |child| {
+                if index == target {
+                    visit(child);
+                }
+                index += 1;
+            });
+        }
+    }
+
     /// The view's type, for diagnostics and developer tools.
     fn debug_name(&self) -> &'static str {
         std::any::type_name::<Self>()

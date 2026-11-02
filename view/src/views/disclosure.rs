@@ -597,4 +597,10 @@ impl View for Carousel {
             visit(page);
         }
     }
+
+    fn children_rev(&mut self, visit: &mut dyn FnMut(&mut Child)) {
+        for page in self.pages.iter_mut().rev() {
+            visit(page);
+        }
+    }
 }

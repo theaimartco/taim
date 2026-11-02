@@ -4,3 +4,6 @@
 
 #[path = "touch/scroll.rs"]
 mod scroll;
+
+#[path = "touch/paint.rs"]
+mod paint;

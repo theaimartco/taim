@@ -574,4 +574,36 @@ mod tests {
         assert!(is_back(&key(Named::Escape)));
         assert!(!is_back(&key(Named::Enter)));
     }
+
+    #[test]
+    fn reverse_child_order_is_the_reverse_of_paint_order() {
+        use crate::views::{grid, layers};
+
+        fn order(view: &mut dyn View, reverse: bool) -> Vec<*const Child> {
+            let mut seen = Vec::new();
+            let mut record = |child: &mut Child| seen.push(child as *const Child);
+            if reverse {
+                view.children_rev(&mut record);
+            } else {
+                view.children(&mut record);
+            }
+            seen
+        }
+
+        let mut views: Vec<Box<dyn View>> = vec![
+            Box::new(column(views![text("a"), text("b"), text("c")])),
+            Box::new(layers(views![text("a"), text("b"), text("c")])),
+            Box::new(grid(2, views![text("a"), text("b"), text("c")])),
+            // A view with a single child uses the default.
+            Box::new(crate::views::container(text("a"))),
+        ];
+
+        for view in &mut views {
+            let forward = order(view.as_mut(), false);
+            let mut backward = order(view.as_mut(), true);
+            backward.reverse();
+
+            assert_eq!(forward, backward, "{}", view.debug_name());
+        }
+    }
 }

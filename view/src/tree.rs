@@ -79,6 +79,9 @@ pub(crate) struct Painter<'a> {
     pub now: crate::Instant,
 }
 
+/// How far outside its bounds a view may still draw: shadows, focus rings.
+const BLEED: f32 = 32.0;
+
 pub(crate) fn paint(
     child: &mut Child,
     origin: Point,
@@ -86,6 +89,21 @@ pub(crate) fn paint(
     path: &mut Vec<u16>,
     painter: &mut Painter<'_>,
 ) {
+    // A view entirely outside what its clipping ancestors show cannot be
+    // seen: the rows of a long list scrolled out of view are not painted.
+    // `visible` is only narrower than the window inside a clipping view, so
+    // nothing outside a clip is ever skipped. Layers are drawn above their
+    // ancestors' clips, so they are always painted.
+    if let Some(visible) = visible
+        && !child.view().is_layer()
+        && !place(child, origin, None)
+            .bounds
+            .expand(BLEED)
+            .intersects(&visible)
+    {
+        return;
+    }
+
     if !child.view().is_layer() {
         paint_view(child, origin, visible, path, painter);
         return;
@@ -241,21 +259,15 @@ pub(crate) fn broadcast(
     child.view_mut().children(&mut |_| count += 1);
 
     let mut handled = Handled::No;
-    for target in (0..count).rev() {
-        let mut index = 0_u16;
-        child.view_mut().children(&mut |grandchild| {
-            if index == target && handled == Handled::No {
-                path.push(index);
-                handled = broadcast(grandchild, inner_origin, inner_visible, path, event, router);
-                let _ = path.pop();
-            }
-            index += 1;
-        });
-
-        if handled == Handled::Yes {
-            break;
+    let mut index = count;
+    child.view_mut().children_rev(&mut |grandchild| {
+        index = index.saturating_sub(1);
+        if handled == Handled::No {
+            path.push(index);
+            handled = broadcast(grandchild, inner_origin, inner_visible, path, event, router);
+            let _ = path.pop();
         }
-    }
+    });
 
     if handled == Handled::Yes {
         return handled;
