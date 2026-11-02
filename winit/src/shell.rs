@@ -168,6 +168,10 @@ impl Shell {
             surface.raw.set_visible(true);
         }
         surface.request_frame();
+        #[cfg(target_os = "android")]
+        if let Some(android) = &self.platform.android {
+            surface.attach_android(android);
+        }
         self.windows.push(surface);
 
         Ok(())
@@ -428,6 +432,23 @@ impl winit::application::ApplicationHandler<Wake> for Shell {
                 self.serve(id, response);
             }
             Wake::SystemTheme(mode) => self.set_system_theme(mode),
+            #[cfg(target_os = "android")]
+            Wake::Describe(id) => {
+                if let Some(surface) = self.window_by_id(id) {
+                    surface.describe_again();
+                }
+            }
+            #[cfg(target_os = "android")]
+            Wake::Accessibility(id, request) => {
+                let Some(surface) = self.window_by_id(id) else {
+                    return;
+                };
+                let responses = surface.accessibility_action(&request);
+                surface.absorb_changes(system);
+                for response in responses {
+                    self.serve(id, response);
+                }
+            }
             Wake::Refresh => {
                 for surface in &mut self.windows {
                     surface.request_frame();
@@ -440,6 +461,22 @@ impl winit::application::ApplicationHandler<Wake> for Shell {
         #[cfg(target_os = "android")]
         {
             self.follow_insets();
+
+            // The input method edits its buffer on the UI thread and wakes
+            // the event loop; its changes are read here.
+            let system = self.system;
+            for index in 0..self.windows.len() {
+                let surface = &mut self.windows[index];
+                let window = surface.id;
+                let responses = surface.follow_typing();
+                if responses.is_empty() {
+                    continue;
+                }
+                surface.absorb_changes(system);
+                for response in responses {
+                    self.serve(window, response);
+                }
+            }
 
             // The manifest keeps the activity alive across a dark-mode
             // switch (`uiMode` in `configChanges`), so the switch is read

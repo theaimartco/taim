@@ -29,7 +29,11 @@ mod error;
 mod measurement;
 mod shell;
 mod surface;
+#[cfg(any(target_os = "android", test))]
+mod talkback;
 mod touch;
+#[cfg(any(target_os = "android", test))]
+mod typing;
 mod wake;
 
 pub use clipboard::Clipboard;

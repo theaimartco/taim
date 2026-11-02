@@ -22,6 +22,12 @@ pub(crate) enum Wake {
     /// The renderer finished background work (an image decoded, a font
     /// loaded) and every window should be laid out and painted again.
     Refresh,
+    /// A screen reader started reading a window: publish its whole tree.
+    #[cfg(target_os = "android")]
+    Describe(window::Id),
+    /// A screen reader asked for an action on a node.
+    #[cfg(target_os = "android")]
+    Accessibility(window::Id, accesskit::ActionRequest),
 }
 
 /// Wakes the event loop when a window's state changes, at most once until
@@ -34,6 +40,12 @@ pub(crate) struct ChangeSignal {
 }
 
 impl ChangeSignal {
+    /// The event loop this signal wakes.
+    #[cfg(target_os = "android")]
+    pub fn proxy(&self) -> EventLoopProxy<Wake> {
+        self.proxy.clone()
+    }
+
     pub fn new(window: window::Id, proxy: EventLoopProxy<Wake>) -> Self {
         Self {
             window,

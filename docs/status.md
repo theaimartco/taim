@@ -34,8 +34,13 @@ phase so touch drags scroll (with flings) and cancel the press underneath,
 back navigation that closes overlays then finishes the activity, safe-area
 insets, on-screen keyboard for text views, dark mode, Android system fonts
 and a JNI clipboard. View-level touch behaviour is covered by
-`tests/touch`. **None of it has run on a device or emulator**: there is no
-Android NDK in the build environment, so not even linking is verified. See
+`tests/touch`. Since then: TalkBack through AccessKit (tree conversion
+unit tested), input-method text through GameActivity's buffer (diffing
+unit tested, including Devanagari composition), every finger delivered as
+raw touch, and a `pinch` view (integration tested). **None of it has run
+on a device or emulator**: there is no Android NDK in the build
+environment, so not even linking is verified, and the GameActivity
+backend's C++ glue has never been compiled here. See
 `docs/platform/android.md` for the gaps compared with Flutter.
 
 ## Build and test checkpoint (2026-11-02)

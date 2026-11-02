@@ -14,6 +14,7 @@ mod media;
 mod mobile;
 mod overlays;
 mod pickers;
+mod pinch;
 mod range;
 mod scroll;
 mod space;
@@ -47,6 +48,7 @@ pub use overlays::{
     Drawer, PullToRefresh, Sheet, Snackbar, drawer, pull_to_refresh, sheet, snackbar,
 };
 pub use pickers::{Date, DatePicker, Time, date_picker, days_in_month, is_leap_year, time_picker};
+pub use pinch::{Pinch, pinch};
 pub use range::{Progress, Rule, Slider, progress, rule, slider};
 pub use scroll::{Scroll, scroll};
 pub use space::{Space, space};

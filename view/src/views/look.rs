@@ -193,18 +193,16 @@ pub(crate) enum Gesture {
 
 /// Decodes `event` into a gesture step. Mouse positions come from
 /// `pointer`, which is what the runtime tracks for the mouse.
+///
+/// Raw finger events are not gesture steps: the shell already delivers the
+/// first finger as pointer events, and decoding both would act on every
+/// touch twice. Views that want every finger (pinching) read
+/// [`Event::Touch`] themselves.
 pub(crate) fn gesture(event: &Event, pointer: Option<crate::Point>) -> Option<Gesture> {
-    use taim_core::touch;
-
     Some(match event {
         Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => Gesture::Down(pointer?),
         Event::Mouse(mouse::Event::CursorMoved { position }) => Gesture::Move(*position),
         Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => Gesture::Up(pointer),
-        Event::Touch(touch::Event::FingerPressed { position, .. }) => Gesture::Down(*position),
-        Event::Touch(touch::Event::FingerMoved { position, .. }) => Gesture::Move(*position),
-        Event::Touch(
-            touch::Event::FingerLifted { position, .. } | touch::Event::FingerLost { position, .. },
-        ) => Gesture::Up(Some(*position)),
         _ => return None,
     })
 }

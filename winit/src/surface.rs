@@ -56,6 +56,15 @@ pub(crate) struct Surface {
     semantics_stale: bool,
     #[cfg(feature = "accessibility")]
     _bridge: taim_accessibility::atspi::bridge::Bridge,
+    /// TalkBack, once attached.
+    #[cfg(target_os = "android")]
+    talkback: Option<crate::android::TalkBack>,
+    /// The activity, for its input method's text buffer.
+    #[cfg(target_os = "android")]
+    android: Option<crate::AndroidApp>,
+    /// What the input method's buffer has typed into the focused view.
+    #[cfg(target_os = "android")]
+    typing: crate::typing::Typing,
 }
 
 /// The resolved theme and the colors derived from it.
@@ -133,6 +142,12 @@ impl Surface {
             semantics_stale: true,
             #[cfg(feature = "accessibility")]
             _bridge,
+            #[cfg(target_os = "android")]
+            talkback: None,
+            #[cfg(target_os = "android")]
+            android: None,
+            #[cfg(target_os = "android")]
+            typing: crate::typing::Typing::default(),
         };
 
         surface.hidden.empty = physical.width == 0 || physical.height == 0;
@@ -216,7 +231,7 @@ impl Surface {
         &mut self,
         event: WindowEvent,
         system: theme::Mode,
-    ) -> [Option<taim_core::Event>; 2] {
+    ) -> [Option<taim_core::Event>; 3] {
         if let WindowEvent::Touch(contact) = event {
             return self.touch(contact);
         }
@@ -251,6 +266,7 @@ impl Surface {
         [
             conversion::window_event(event, self.viewport.scale_factor(), self.modifiers),
             None,
+            None,
         ]
     }
 
@@ -258,12 +274,19 @@ impl Surface {
     /// press, a release), so every view that works with a mouse works with
     /// touch, the way Flutter and the web unify pointers. Views that act
     /// differently for a finger, such as dragging to scroll, are told it is
-    /// one. Further fingers are not delivered yet.
+    /// one. Every finger, the first included, is also delivered as a raw
+    /// touch event, for views that follow several (pinching).
     ///
     /// A cancelled touch (the system took the gesture) leaves before it
     /// releases, so nothing under it activates.
-    fn touch(&mut self, contact: winit::event::Touch) -> [Option<taim_core::Event>; 2] {
+    fn touch(&mut self, contact: winit::event::Touch) -> [Option<taim_core::Event>; 3] {
         use crate::touch::Step;
+
+        let raw = conversion::window_event(
+            WindowEvent::Touch(contact),
+            self.viewport.scale_factor(),
+            self.modifiers,
+        );
 
         let position = conversion::cursor_position(contact.location, self.viewport.scale_factor());
         let moved = taim_core::Event::Mouse(mouse::Event::CursorMoved { position });
@@ -275,18 +298,18 @@ impl Surface {
             Step::Press => {
                 self.touch = true;
                 self.pointer = Some(contact.location);
-                [Some(moved), Some(pressed)]
+                [Some(moved), Some(pressed), raw]
             }
             Step::Move => {
                 self.pointer = Some(contact.location);
-                [Some(moved), None]
+                [Some(moved), raw, None]
             }
             Step::Release => {
                 self.pointer = Some(contact.location);
-                [Some(released), Some(left)]
+                [Some(released), Some(left), raw]
             }
-            Step::Cancel => [Some(left), Some(released)],
-            Step::Ignore => [None, None],
+            Step::Cancel => [Some(left), Some(released), raw],
+            Step::Ignore => [raw, None, None],
         }
     }
 
@@ -300,6 +323,18 @@ impl Surface {
     pub fn handle(&mut self, event: &taim_core::Event) -> Response {
         if matches!(event, taim_core::Event::Mouse(mouse::Event::CursorLeft)) {
             self.pointer = None;
+        }
+
+        // A press may move the caret; what the input method's buffer holds
+        // no longer sits just before it.
+        #[cfg(target_os = "android")]
+        if self.text_input
+            && matches!(
+                event,
+                taim_core::Event::Mouse(mouse::Event::ButtonPressed(_))
+            )
+        {
+            self.clear_typing();
         }
 
         let response = self
@@ -339,6 +374,9 @@ impl Surface {
             return;
         }
         self.text_input = wants;
+
+        #[cfg(target_os = "android")]
+        self.clear_typing();
 
         // Phones need the on-screen keyboard. Desktop input methods are not
         // wired up yet: enabling one there changes how typed text arrives.
@@ -498,13 +536,40 @@ impl Surface {
     /// Diffs the views' semantic tree against what assistive technology
     /// last saw and sends the difference.
     fn publish_semantics(&mut self) {
-        // Without the AT-SPI bridge nothing reads the published tree.
-        if !cfg!(feature = "accessibility") || !self.semantics_stale {
+        if !self.semantics_stale {
+            return;
+        }
+
+        #[cfg(target_os = "android")]
+        let talkback = self
+            .talkback
+            .as_ref()
+            .is_some_and(crate::android::TalkBack::is_active);
+        #[cfg(not(target_os = "android"))]
+        let talkback = false;
+        let atspi = cfg!(feature = "accessibility");
+
+        // Nothing reads the tree: do not build it.
+        if !talkback && !atspi {
             return;
         }
         self.semantics_stale = false;
 
         let window = self.root.describe(self.viewport.logical_size());
+
+        #[cfg(target_os = "android")]
+        if let Some(talkback) = self
+            .talkback
+            .as_mut()
+            .filter(|talkback| talkback.is_active())
+        {
+            talkback.publish(&window, self.viewport.scale_factor());
+        }
+
+        if !atspi {
+            return;
+        }
+
         let next = taim_accessibility::Tree::from_forest(&[window]);
         let changes = self.published.diff(&next);
         self.published = next;
@@ -515,6 +580,129 @@ impl Surface {
             .find(|entry| entry.state.contains(taim_core::semantics::State::FOCUSED))
             .map(|entry| &entry.id);
         self.accessibility.focus_changed(focused);
+    }
+
+    /// Connects the window to the activity: TalkBack and the input
+    /// method's text buffer.
+    #[cfg(target_os = "android")]
+    pub fn attach_android(&mut self, android: &crate::AndroidApp) {
+        self.talkback = crate::android::TalkBack::attach(android, self.id, self.changes.proxy());
+        self.android = Some(android.clone());
+    }
+
+    /// Empties the input method's buffer, so it starts a new word with
+    /// nothing before it that TAIM would have to reconcile.
+    #[cfg(target_os = "android")]
+    fn clear_typing(&mut self) {
+        use winit::platform::android::activity::input::{TextInputState, TextSpan};
+
+        self.typing.reset();
+        if let Some(android) = &self.android {
+            android.set_text_input_state(TextInputState {
+                text: String::new(),
+                selection: TextSpan { start: 0, end: 0 },
+                compose_region: None,
+            });
+        }
+    }
+
+    /// Replays what the input method changed in its buffer as typing:
+    /// Backspace for each character it took back, then the new text. Only
+    /// GameActivity has such a buffer; with NativeActivity the on-screen
+    /// keyboard sends key events and this finds nothing to do.
+    #[cfg(target_os = "android")]
+    pub fn follow_typing(&mut self) -> Vec<Response> {
+        if !self.text_input {
+            return Vec::new();
+        }
+        let Some(android) = &self.android else {
+            return Vec::new();
+        };
+
+        let state = android.text_input_state();
+        let Some(edit) = self.typing.update(&state.text) else {
+            return Vec::new();
+        };
+
+        let mut responses = Vec::new();
+        for _ in 0..edit.delete {
+            responses.push(self.handle(&backspace()));
+        }
+        if !edit.insert.is_empty() {
+            responses.push(self.handle(&taim_core::Event::InputMethod(
+                taim_core::input_method::Event::Commit(edit.insert),
+            )));
+        }
+
+        // Between words the buffer can be emptied without disturbing the
+        // input method; while it composes, it must be left alone.
+        if state.compose_region.is_none() && !state.text.is_empty() {
+            self.clear_typing();
+        }
+
+        responses
+    }
+
+    /// A screen reader started reading: publish the whole tree next frame.
+    #[cfg(target_os = "android")]
+    pub fn describe_again(&mut self) {
+        self.semantics_stale = true;
+        self.request_frame();
+    }
+
+    /// Carries out a screen reader's action as the input a person would
+    /// give: a tap at the node's center to activate, focus, expand or
+    /// collapse it; a wheel turn over it to scroll. Returns what the views
+    /// asked of the shell.
+    #[cfg(target_os = "android")]
+    pub fn accessibility_action(&mut self, request: &accesskit::ActionRequest) -> Vec<Response> {
+        use accesskit::Action;
+
+        let Some(target) = self
+            .talkback
+            .as_ref()
+            .and_then(|talkback| talkback.target(request.target_node))
+        else {
+            return Vec::new();
+        };
+
+        let at = target.center();
+        let page = (target.bounds.height * 0.8).max(40.0);
+        let press = [
+            taim_core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            taim_core::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+        ];
+        let wheel = |y: f32| {
+            [taim_core::Event::Mouse(mouse::Event::WheelScrolled {
+                delta: mouse::ScrollDelta::Pixels { x: 0.0, y },
+            })]
+        };
+
+        let events: &[taim_core::Event] = match request.action {
+            Action::Click | Action::Focus | Action::Expand | Action::Collapse => &press,
+            Action::ScrollDown => &wheel(-page),
+            Action::ScrollUp => &wheel(page),
+            _ => return Vec::new(),
+        };
+
+        let scale = f64::from(self.viewport.scale_factor());
+        self.pointer = Some(PhysicalPosition::new(
+            f64::from(at.x) * scale,
+            f64::from(at.y) * scale,
+        ));
+        self.touch = false;
+
+        let mut responses =
+            vec![
+                self.handle(&taim_core::Event::Mouse(mouse::Event::CursorMoved {
+                    position: at,
+                })),
+            ];
+        for event in events {
+            responses.push(self.handle(event));
+        }
+        responses.push(self.handle(&taim_core::Event::Mouse(mouse::Event::CursorLeft)));
+        responses
     }
 
     /// Matches the viewport to a new surface size or scale.
@@ -554,6 +742,22 @@ impl Surface {
         }
         self.cursor = wanted;
     }
+}
+
+/// A Backspace press, as an input method's deletion is replayed.
+#[cfg(target_os = "android")]
+fn backspace() -> taim_core::Event {
+    use taim_core::keyboard::{self, key};
+
+    taim_core::Event::Keyboard(keyboard::Event::KeyPressed {
+        key: keyboard::Key::Named(key::Named::Backspace),
+        modified_key: keyboard::Key::Named(key::Named::Backspace),
+        physical_key: key::Physical::Unidentified(key::NativeCode::Unidentified),
+        location: keyboard::Location::Standard,
+        modifiers: keyboard::Modifiers::empty(),
+        text: None,
+        repeat: false,
+    })
 }
 
 /// Whether `TAIM_FRAME_TRACE` asks for one timing line per frame.
