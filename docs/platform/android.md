@@ -7,6 +7,38 @@ covered by tests that run on any machine. **Nothing here has run on a
 physical device or an emulator yet.** Treat it as a first port that still
 needs device testing before you ship it.
 
+## Starting a new application
+
+`taim-new` writes a project that builds for the desktop and Android, like
+`flutter create`:
+
+```sh
+cargo run -p taim-new -- ~/apps/my_notes --name "My Notes" --package com.example.notes
+cd ~/apps/my_notes
+cargo run                              # on the desktop
+cd android && gradle installDebug      # on a phone
+```
+
+Use `--taim-path <checkout>` to build against a local TAIM checkout instead
+of the Git repository. The starter app is a notes list kept between
+launches: a lazy `list`, a `navigator` with a detail page, a text field and
+`taim::storage`. It pins TAIM's Rust release and Android targets in
+`rust-toolchain.toml`.
+
+## What applications are built from
+
+| Need | TAIM | Flutter equivalent |
+|---|---|---|
+| Screens and back navigation | `Navigator::new(cx, home)`, `navigator(nav, \|cx, route\| …)`, `nav.push`, `nav.pop` | `Navigator` with routes |
+| Page-local state | the `cx` each page is built with; freed when the page is popped | `StatefulWidget` |
+| Long lists and feeds | `list(count, \|index\| …)`, which builds only items near the screen | `ListView.builder` |
+| Settings that persist | `taim::storage::Store::open("settings")` | `shared_preferences` |
+| Open links, share, vibrate | `taim::platform::{open_url, share_text, vibrate}` | `url_launcher`, `share_plus`, `vibration` |
+| App files | `taim::platform::data_dir()` | `path_provider` |
+| Pinch to zoom | `pinch(content).on_pinch(\|scale, focal\| …)` | `GestureDetector.onScale` |
+| Pull to refresh | `pull_to_refresh(content, refreshing)` | `RefreshIndicator` |
+| App structure | `scaffold`, `app_bar`, `nav_bar`, `tabs`, `drawer`, `sheet`, `dialog`, `snackbar` | Material scaffold widgets |
+
 ## Writing an application
 
 An Android application is a Rust library with an `android_main` entry
@@ -169,9 +201,12 @@ These are not done yet, roughly in order of how much they matter:
    caret after each word, which weakens its next-word suggestions.
 4. **Gestures.** Pinching is supported. Two-finger rotation, two-finger
    panning and long-press text selection are not.
-5. **Platform services.** There is no plugin or method-channel system
-   for Android APIs (camera, sensors, notifications, sharing). Applications
-   reach Java through `jni`, as the clipboard does.
-6. **Tooling.** There is no hot reload, and no `flutter create`-style
-   project generator beyond copying `examples/mobile_shell`.
-7. **iOS.** Not started.
+5. **Platform services.** Links, sharing, vibration, files and settings
+   are built in. There is no plugin system for the rest (camera, location,
+   notifications, permissions at run time, in-app purchases); applications
+   reach Java through `jni`, as `taim::platform` does.
+6. **Networking and images from the web.** There is no HTTP client or
+   network image view; use a Rust HTTP crate in `spawn` and show the result
+   with `image`.
+7. **Tooling.** There is no hot reload and no device-preview tooling.
+8. **iOS.** Not started.

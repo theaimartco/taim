@@ -8,10 +8,12 @@ mod editor;
 mod forms;
 mod icon;
 mod layers;
+mod list;
 mod look;
 #[cfg(any(feature = "image", feature = "svg"))]
 mod media;
 mod mobile;
+mod navigator;
 mod overlays;
 mod pickers;
 mod pinch;
@@ -36,6 +38,7 @@ pub use forms::{
 };
 pub use icon::{Icon, icon};
 pub use layers::{Layers, layers};
+pub use list::{List, list};
 #[cfg(feature = "image")]
 pub use media::{Image, image};
 #[cfg(feature = "svg")]
@@ -44,6 +47,7 @@ pub use mobile::{
     Avatar, Badge, Chip, Segments, Skeleton, avatar, badge, chip, nav_bar, scaffold, search,
     segmented, skeleton, tabs,
 };
+pub use navigator::{Navigator, NavigatorView, navigator};
 pub use overlays::{
     Drawer, PullToRefresh, Sheet, Snackbar, drawer, pull_to_refresh, sheet, snackbar,
 };

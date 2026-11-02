@@ -1,0 +1,15 @@
+[package]
+name = "taim-new"
+description = "Creates a TAIM application that runs on the desktop and on Android"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "taim-new"
+path = "src/main.rs"

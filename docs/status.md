@@ -4,6 +4,18 @@
 **Production release verdict:** NO-GO until every evidence gate in
 docs/release/production-gates.md is approved on a reviewed release commit.
 
+## Application-building checkpoint (2026-11-02)
+
+Added for writing applications: `navigator` (a route stack with page-local
+state, slide transitions and back), a lazy `list` that builds only items
+near the screen (100,000 items tested), `taim::storage` (persistent
+settings, atomic writes), `taim::platform` (open URL, share, vibrate, data
+directory; Android over JNI, desktop through system tools) and `taim-new`,
+a project generator. A generated project was built on the desktop, checked
+for `aarch64-linux-android`, and driven under Xvfb: notes added, saved,
+restored after a restart, opened on their own page and closed with back.
+The Android side of `taim::platform` has not run on a device.
+
 ## View-tree performance checkpoint (2026-11-02)
 
 `cargo bench --bench views` measures a list of buttons inside `scroll`

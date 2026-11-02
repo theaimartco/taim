@@ -21,6 +21,7 @@ pub mod clipboard;
 pub mod conversion;
 pub mod frame_clock;
 pub mod frame_gate;
+pub mod platform;
 
 #[cfg(target_os = "android")]
 mod android;

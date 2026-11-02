@@ -19,25 +19,18 @@ use std::cell::Cell;
 pub fn scroll(content: impl Into<AnyView>) -> Scroll {
     Scroll {
         content: Child::new(content.into()),
-        offset: Cell::new(0.0),
+        scroller: Scroller::default(),
         viewport: Size::ZERO,
         id: widget::Id::unique(),
-        drag: None,
-        fling: Cell::new(None),
     }
 }
 
 /// See [`scroll`].
 pub struct Scroll {
     content: Child,
-    /// A cell so a fling can advance while painting, which only borrows.
-    offset: Cell<f32>,
+    scroller: Scroller,
     viewport: Size,
     id: widget::Id,
-    /// A finger on the area that may become, or has become, a scroll.
-    drag: Option<Drag>,
-    /// Momentum after the finger left.
-    fling: Cell<Option<Fling>>,
 }
 
 /// Pixels per wheel "line".
@@ -86,9 +79,57 @@ impl Fling {
     }
 }
 
-impl Scroll {
-    fn max_offset(&self) -> f32 {
-        (self.content.size().height - self.viewport.height).max(0.0)
+/// Vertical scrolling: the offset, wheel input, touch dragging with slop
+/// and flings. Shared by [`scroll`] and [`list`](super::list).
+#[derive(Debug, Default)]
+pub(crate) struct Scroller {
+    /// A cell so a fling can advance while painting, which only borrows.
+    offset: Cell<f32>,
+    /// The scrolled content's height and the visible height.
+    content: f32,
+    viewport: f32,
+    /// A finger on the area that may become, or has become, a scroll.
+    drag: Option<Drag>,
+    /// Momentum after the finger left.
+    fling: Cell<Option<Fling>>,
+    /// Scrolling changes which children exist (a lazy list), so it needs a
+    /// layout rather than just a paint.
+    relayout: bool,
+}
+
+impl Scroller {
+    /// A scroller whose content changes as it scrolls (a lazy list), so
+    /// every move asks for a layout.
+    pub fn relayouting() -> Self {
+        Self {
+            relayout: true,
+            ..Self::default()
+        }
+    }
+
+    /// Asks for what a moved offset needs.
+    fn moved(&self, cx: &mut EventCx<'_>) {
+        if self.relayout {
+            cx.request_layout();
+        } else {
+            cx.request_paint();
+        }
+    }
+
+    pub fn offset(&self) -> f32 {
+        self.offset.get()
+    }
+
+    /// Records the content and visible heights, keeping the offset in range.
+    pub fn set_extent(&mut self, content: f32, viewport: f32) {
+        self.content = content;
+        self.viewport = viewport;
+        self.offset
+            .set(self.offset.get().clamp(0.0, self.max_offset()));
+    }
+
+    pub fn max_offset(&self) -> f32 {
+        (self.content - self.viewport).max(0.0)
     }
 
     fn scroll_by(&mut self, delta: f32) -> bool {
@@ -98,16 +139,17 @@ impl Scroll {
         next != current
     }
 
-    /// Advances a running fling to `now`.
-    fn advance(&self, now: Instant) {
+    /// Advances a running fling to `now`. Returns whether the offset moved.
+    pub fn advance(&self, now: Instant) -> bool {
         let Some(fling) = self.fling.get() else {
-            return;
+            return false;
         };
 
         let elapsed = now.saturating_duration_since(fling.started).as_secs_f32();
         let (distance, moving) = fling.travel(elapsed);
         let max = self.max_offset();
         let next = (fling.from + distance).clamp(0.0, max);
+        let moved = next != self.offset.get();
         self.offset.set(next);
 
         // A fling that reaches either end stops there.
@@ -115,6 +157,11 @@ impl Scroll {
         if !moving || at_end {
             self.fling.set(None);
         }
+        moved
+    }
+
+    pub fn is_flinging(&self) -> bool {
+        self.fling.get().is_some()
     }
 
     /// The finger's speed over the last moments of the drag, in pixels per
@@ -138,65 +185,10 @@ impl Scroll {
         // A finger moving up scrolls towards the end.
         ((first_y - last_y) / elapsed).clamp(-MAX_FLING, MAX_FLING)
     }
-}
 
-impl View for Scroll {
-    fn sizing(&self) -> Sizing {
-        Sizing::FILL
-    }
-
-    fn measure(&mut self, cx: &mut MeasureCx<'_>, constraints: Constraints) -> Size {
-        let outer = constraints.with_sizing(Sizing::FILL);
-        let room = Size::new(outer.max.width, f32::INFINITY);
-        let content = self.content.measure(cx, Constraints::loose(room));
-
-        self.viewport = Size::new(
-            if outer.max.width.is_finite() {
-                outer.max.width
-            } else {
-                content.width
-            },
-            if outer.max.height.is_finite() {
-                outer.max.height
-            } else {
-                content.height
-            },
-        );
-        self.content.place(Point::ORIGIN);
-        self.offset.set(self.offset.get().min(self.max_offset()));
-        self.viewport
-    }
-
-    fn paint(&self, cx: &mut PaintCx<'_>) {
-        self.advance(cx.now());
-    }
-
-    fn paint_over(&self, cx: &mut PaintCx<'_>) {
-        let total = self.content.size().height;
-        if total <= self.viewport.height || total <= 0.0 {
-            return;
-        }
-
-        let bounds = cx.bounds();
-        let length = (bounds.height * bounds.height / total).max(24.0);
-        let travel = bounds.height - length;
-        let top = bounds.y + travel * (self.offset.get() / self.max_offset());
-        let bar = Rectangle::new(
-            Point::new(bounds.x + bounds.width - BAR - 2.0, top),
-            Size::new(BAR, length),
-        );
-
-        let color = cx
-            .theme()
-            .palette()
-            .background
-            .strongest
-            .color
-            .scale_alpha(0.5);
-        cx.fill(bar, color, Border::default().rounded(BAR / 2.0));
-    }
-
-    fn intercept(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+    /// Takes a finger drag once it is clearly a scroll; see
+    /// [`View::intercept`].
+    pub fn intercept(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
         if !cx.is_touch() {
             return Handled::No;
         }
@@ -207,7 +199,7 @@ impl View for Scroll {
                 // A finger landing on a moving list stops it, and only that:
                 // it must not press whatever happened to be underneath.
                 let caught = self.fling.get().is_some();
-                self.advance(now);
+                let _ = self.advance(now);
                 self.fling.set(None);
 
                 self.drag = Some(Drag {
@@ -258,7 +250,7 @@ impl View for Scroll {
                 }
 
                 if self.scroll_by(delta) {
-                    cx.request_paint();
+                    self.moved(cx);
                 }
                 Handled::Yes
             }
@@ -288,7 +280,8 @@ impl View for Scroll {
         }
     }
 
-    fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+    /// Scrolls for a mouse wheel or trackpad over the area.
+    pub fn wheel(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
         let Event::Mouse(mouse::Event::WheelScrolled { delta }) = event else {
             return Handled::No;
         };
@@ -297,7 +290,7 @@ impl View for Scroll {
         }
 
         // The wheel takes over from any fling.
-        self.advance(cx.now());
+        let _ = self.advance(cx.now());
         self.fling.set(None);
 
         let pixels = match *delta {
@@ -306,9 +299,80 @@ impl View for Scroll {
         };
 
         if self.scroll_by(pixels) {
-            cx.request_paint();
+            self.moved(cx);
         }
         Handled::Yes
+    }
+
+    /// Draws the scroll bar over `cx`'s bounds.
+    pub fn paint_bar(&self, cx: &mut PaintCx<'_>) {
+        let total = self.content;
+        if total <= self.viewport || total <= 0.0 {
+            return;
+        }
+
+        let bounds = cx.bounds();
+        let length = (bounds.height * bounds.height / total).max(24.0);
+        let travel = bounds.height - length;
+        let top = bounds.y + travel * (self.offset.get() / self.max_offset());
+        let bar = Rectangle::new(
+            Point::new(bounds.x + bounds.width - BAR - 2.0, top),
+            Size::new(BAR, length),
+        );
+
+        let color = cx
+            .theme()
+            .palette()
+            .background
+            .strongest
+            .color
+            .scale_alpha(0.5);
+        cx.fill(bar, color, Border::default().rounded(BAR / 2.0));
+    }
+}
+
+impl View for Scroll {
+    fn sizing(&self) -> Sizing {
+        Sizing::FILL
+    }
+
+    fn measure(&mut self, cx: &mut MeasureCx<'_>, constraints: Constraints) -> Size {
+        let outer = constraints.with_sizing(Sizing::FILL);
+        let room = Size::new(outer.max.width, f32::INFINITY);
+        let content = self.content.measure(cx, Constraints::loose(room));
+
+        self.viewport = Size::new(
+            if outer.max.width.is_finite() {
+                outer.max.width
+            } else {
+                content.width
+            },
+            if outer.max.height.is_finite() {
+                outer.max.height
+            } else {
+                content.height
+            },
+        );
+        self.content.place(Point::ORIGIN);
+        self.scroller
+            .set_extent(self.content.size().height, self.viewport.height);
+        self.viewport
+    }
+
+    fn paint(&self, cx: &mut PaintCx<'_>) {
+        let _ = self.scroller.advance(cx.now());
+    }
+
+    fn paint_over(&self, cx: &mut PaintCx<'_>) {
+        self.scroller.paint_bar(cx);
+    }
+
+    fn intercept(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+        self.scroller.intercept(cx, event)
+    }
+
+    fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+        self.scroller.wheel(cx, event)
     }
 
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
@@ -324,11 +388,11 @@ impl View for Scroll {
     }
 
     fn scroll_offset(&self) -> Vector {
-        Vector::new(0.0, self.offset.get())
+        Vector::new(0.0, self.scroller.offset())
     }
 
     fn is_animating(&self, _now: Instant) -> bool {
-        self.fling.get().is_some()
+        self.scroller.is_flinging()
     }
 
     fn children(&mut self, visit: &mut dyn FnMut(&mut Child)) {

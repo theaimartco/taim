@@ -281,6 +281,7 @@ members = [
     "tiny_skia",
     "tools/taim_bench",
     "tools/taim_lab",
+    "tools/taim_new",
     "wgpu",
     "widget",
     "winit",

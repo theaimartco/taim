@@ -50,12 +50,12 @@ pub mod prelude {
     #[cfg(feature = "svg")]
     pub use crate::views::svg;
     pub use crate::views::{
-        Align, Buffer, Date, Icon, Time, accordion, app_bar, avatar, badge, button, carousel,
-        checkbox, chip, column, container, date_picker, dialog, drawer, dropdown, each, grid, icon,
-        icon_button, layers, list_tile, mouse_area, nav_bar, pinch, progress, pull_to_refresh,
-        radio, rebuild, row, rule, scaffold, scroll, search, segmented, sheet, skeleton, slider,
-        snackbar, space, stepper, switch, tabs, text, text_editor, text_field, time_picker,
-        tooltip, when,
+        Align, Buffer, Date, Icon, Navigator, Time, accordion, app_bar, avatar, badge, button,
+        carousel, checkbox, chip, column, container, date_picker, dialog, drawer, dropdown, each,
+        grid, icon, icon_button, layers, list, list_tile, mouse_area, nav_bar, navigator, pinch,
+        progress, pull_to_refresh, radio, rebuild, row, rule, scaffold, scroll, search, segmented,
+        sheet, skeleton, slider, snackbar, space, stepper, switch, tabs, text, text_editor,
+        text_field, time_picker, tooltip, when,
     };
     pub use crate::{AnyView, Scope, State, View, spawn};
 }

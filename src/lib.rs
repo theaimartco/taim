@@ -55,8 +55,15 @@ use taim_core as core;
 mod error;
 mod launch;
 
+pub mod storage;
 pub mod touch;
 pub mod window;
+
+/// What an application asks of the operating system: open a link, share
+/// text, vibrate, and where to keep its files.
+pub mod platform {
+    pub use taim_winit::platform::*;
+}
 
 pub use error::Error;
 pub use launch::{App, app, launch, prelude};

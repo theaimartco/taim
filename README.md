@@ -34,6 +34,12 @@ experimental and **not yet tested on a device**. See
 [docs/platform/android.md](docs/platform/android.md); `examples/mobile_shell`
 runs on both the desktop and Android.
 
+Start an application with `cargo run -p taim-new -- <directory>`: it writes
+a project with a desktop binary, an Android library and a Gradle project.
+Applications get a `navigator` for screens and back, a lazy `list` for long
+feeds, `taim::storage` for settings and `taim::platform` for links, sharing,
+vibration and files.
+
 ## TAIM view API
 
 Applications are built from views that own their state. There is no message
