@@ -26,8 +26,8 @@
 //! wider than the surface. Those are checkable from bounds alone, and
 //! they are what this panel checks.
 
-use taim::widget::{column, container, row, scrollable, text};
-use taim::{Element, Length, Rectangle, Size};
+use taim::prelude::*;
+use taim::{Rectangle, Size};
 
 use crate::target::Node;
 
@@ -101,15 +101,14 @@ pub fn findings(node: Rectangle, parent: Option<Rectangle>, surface: Size) -> Ve
 }
 
 /// Renders the layout overlay.
-pub fn view<'a, Message: 'a>(tree: &[Node], surface: Size) -> Element<'a, Message> {
+pub fn view(tree: &[Node], surface: Size) -> AnyView {
     if tree.is_empty() {
-        return container(text("No layout. Nothing is attached.").size(16))
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
+        return container(text("No layout. Nothing is attached.").size(16.0))
+            .center()
             .into();
     }
 
-    let mut rows = column![].spacing(1);
+    let mut rows = column([]).gap(1.0);
     let mut flagged = 0;
 
     // A parent stack, so `Escaped` can be checked against the real parent
@@ -147,16 +146,16 @@ pub fn view<'a, Message: 'a>(tree: &[Node], surface: Size) -> Element<'a, Messag
         )
     };
 
-    column![
-        text(summary).size(13),
-        text(MISSING).size(11),
-        scrollable(rows).height(Length::Fill),
-    ]
-    .spacing(8)
+    column(views![
+        text(summary).size(13.0),
+        text(MISSING).size(11.0),
+        scroll(rows),
+    ])
+    .gap(8.0)
     .into()
 }
 
-fn node_row<'a, Message: 'a>(node: &Node, findings: &[Finding]) -> Element<'a, Message> {
+fn node_row(node: &Node, findings: &[Finding]) -> AnyView {
     let indent = "  ".repeat(node.depth);
 
     let flags = findings
@@ -165,20 +164,20 @@ fn node_row<'a, Message: 'a>(node: &Node, findings: &[Finding]) -> Element<'a, M
         .collect::<Vec<_>>()
         .join(", ");
 
-    row![
+    row(views![
         text(format!(
             "{indent}{:>7.1},{:<7.1}",
             node.bounds.x, node.bounds.y
         ))
-        .size(11),
+        .size(11.0),
         text(format!(
             "{:>7.1}\u{00d7}{:<7.1}",
             node.bounds.width, node.bounds.height
         ))
-        .size(11),
-        text(flags).size(11),
-    ]
-    .spacing(10)
+        .size(11.0),
+        text(flags).size(11.0),
+    ])
+    .gap(10.0)
     .into()
 }
 
@@ -300,7 +299,7 @@ mod tests {
             },
         ];
 
-        let element: Element<'_, ()> = view(&tree, SURFACE);
+        let element: AnyView = view(&tree, SURFACE);
         let _ = std::hint::black_box(element);
 
         // The direct assertion, since the built element cannot be read:

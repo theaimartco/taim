@@ -166,12 +166,12 @@ impl State {
     }
 
     pub fn trim(&mut self) {
-        if let Some(active) = self.active.take() {
-            if let Some(state) = self.pipelines.get_mut(&active) {
-                state.cache.trim();
-                state.storage.trim();
-                state.prepare_layer = 0;
-            }
+        if let Some(active) = self.active.take()
+            && let Some(state) = self.pipelines.get_mut(&active)
+        {
+            state.cache.trim();
+            state.storage.trim();
+            state.prepare_layer = 0;
         }
 
         self.pipelines

@@ -31,22 +31,22 @@
 //! These tests exist because that failure is invisible at every layer
 //! until something divides by it.
 
-use taim::widget::{column, container, row, text};
-use taim::{Element, Length, Point, Rectangle, Size, Theme};
+use taim::{Point, Rectangle, Size, Theme};
+use taim_core::Length;
 use taim_core::damage;
 use taim_core::layout::Limits;
 use taim_renderer::Renderer;
 use taim_runtime::user_interface::{Cache, UserInterface};
+use taim_widget::Element;
+use taim_widget::{column, container, row, text};
 
 type Message = &'static str;
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 

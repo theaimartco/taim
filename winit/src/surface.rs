@@ -378,11 +378,7 @@ impl Surface {
         self.accessibility.publish(&changes);
         let focused = self
             .published
-            .find(|entry| {
-                entry
-                    .state
-                    .contains(taim_core::semantics::State::FOCUSED)
-            })
+            .find(|entry| entry.state.contains(taim_core::semantics::State::FOCUSED))
             .map(|entry| &entry.id);
         self.accessibility.focus_changed(focused);
     }

@@ -35,10 +35,7 @@ mod platform {
                 ))
             }
 
-            fn spawn(
-                &self,
-                _future: impl Future<Output = ()> + crate::MaybeSend + 'static,
-            ) {
+            fn spawn(&self, _future: impl Future<Output = ()> + crate::MaybeSend + 'static) {
                 unreachable!("unavailable default executor cannot be initialized");
             }
 

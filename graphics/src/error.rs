@@ -29,10 +29,9 @@ mod tests {
 
     #[test]
     fn rejects_invalid_backend_geometry_without_allocation() {
-        assert!(validate_frame_bounds(Rectangle::new(
-            Point::ORIGIN,
-            Size::new(100.0, 100.0),
-        )).is_ok());
+        assert!(
+            validate_frame_bounds(Rectangle::new(Point::ORIGIN, Size::new(100.0, 100.0),)).is_ok()
+        );
         assert_eq!(
             validate_frame_bounds(Rectangle::new(
                 Point::new(f32::NAN, 1.0),
@@ -41,10 +40,7 @@ mod tests {
             Err(BoundsError::NonFinite)
         );
         assert_eq!(
-            validate_frame_bounds(Rectangle::new(
-                Point::ORIGIN,
-                Size::new(-1.0, 2.0),
-            )),
+            validate_frame_bounds(Rectangle::new(Point::ORIGIN, Size::new(-1.0, 2.0),)),
             Err(BoundsError::NegativeSize)
         );
     }

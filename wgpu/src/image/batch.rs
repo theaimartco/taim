@@ -154,6 +154,8 @@ impl State {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Sampling {
     Nearest,
+    // Only raster images ask for linear filtering.
+    #[cfg_attr(not(feature = "image"), allow(dead_code))]
     Linear,
 }
 
@@ -321,10 +323,19 @@ pub(super) struct Uniforms {
 /// into a clip even if the unrotated bounds appear out of view.
 #[inline]
 fn drawable_paint(bounds: Rectangle, clip: Rectangle, opacity: f32) -> bool {
-    [bounds.x, bounds.y, bounds.width, bounds.height, clip.x, clip.y,
-     clip.width, clip.height, opacity]
-        .iter()
-        .all(|value| value.is_finite())
+    [
+        bounds.x,
+        bounds.y,
+        bounds.width,
+        bounds.height,
+        clip.x,
+        clip.y,
+        clip.width,
+        clip.height,
+        opacity,
+    ]
+    .iter()
+    .all(|value| value.is_finite())
         && bounds.width >= 1.0
         && bounds.height >= 1.0
         && clip.width > 0.0

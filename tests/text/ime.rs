@@ -15,13 +15,14 @@
 //! testing easier would open a fresh disclosure channel for exactly the
 //! content Phase 10's security requirements protect.
 
-use taim::advanced::widget::{self, Widget};
-use taim::advanced::{Layout, Shell, layout, mouse};
-use taim::widget::text_input;
-use taim::{Event, Point, Rectangle, Size};
+use taim::{Point, Rectangle, Size};
+use taim_core::Event;
 use taim_core::input_method::{self, CandidateRect, InputMethod, Preedit, Purpose};
+use taim_core::widget::{self, Widget};
+use taim_core::{Layout, Shell, layout, mouse};
 use taim_core::{shell::Waker, window};
 use taim_renderer::Renderer;
+use taim_widget::text_input;
 
 type Message = String;
 type Paragraph = <Renderer as taim_core::text::Renderer>::Paragraph;
@@ -32,12 +33,10 @@ const BOUNDS: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 

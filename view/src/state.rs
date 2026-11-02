@@ -412,6 +412,18 @@ impl IntoProp<bool> for bool {
     }
 }
 
+/// Whether transitions should be skipped, as set by the window's
+/// [`Scope::reduced_motion`].
+pub(crate) fn motion_reduced() -> bool {
+    REDUCED_MOTION.load(Ordering::Relaxed)
+}
+
+pub(crate) fn set_motion_reduced(reduced: bool) {
+    REDUCED_MOTION.store(reduced, Ordering::Relaxed);
+}
+
+static REDUCED_MOTION: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -463,15 +475,3 @@ mod tests {
         assert_eq!((|| 7_u8).into_prop().get(), 7);
     }
 }
-
-/// Whether transitions should be skipped, as set by the window's
-/// [`Scope::reduced_motion`].
-pub(crate) fn motion_reduced() -> bool {
-    REDUCED_MOTION.load(Ordering::Relaxed)
-}
-
-pub(crate) fn set_motion_reduced(reduced: bool) {
-    REDUCED_MOTION.store(reduced, Ordering::Relaxed);
-}
-
-static REDUCED_MOTION: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);

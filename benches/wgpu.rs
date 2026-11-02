@@ -5,10 +5,12 @@ use criterion::{
 
 use taim::alignment;
 use taim::mouse;
-use taim::widget::{canvas, scrollable, stack, text};
-use taim::{Color, Element, Font, Length, Pixels, Point, Rectangle, Size, Theme};
+use taim::{Color, Font, Pixels, Point, Rectangle, Size, Theme};
+use taim_core::Length;
 use taim_wgpu::Renderer;
 use taim_wgpu::wgpu;
+use taim_widget::Element;
+use taim_widget::{canvas, scrollable, stack, text};
 
 criterion_main!(taim_gpu_benches);
 criterion_group!(taim_gpu_benches, measure_gpu_frames);
@@ -125,10 +127,10 @@ fn render_workload(
     queue: &wgpu::Queue,
     workload: Workload,
 ) {
+    use taim_runtime as runtime;
     use taim_wgpu::graphics::{self, Antialiasing, Shell};
     use taim_winit::core;
     use taim_winit::core::renderer;
-    use taim_winit::runtime;
 
     let engine = taim_wgpu::Engine::new(
         adapter,

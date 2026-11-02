@@ -25,37 +25,38 @@ cargo run -p mobile_shell      # Full mobile application shell with touch naviga
 
 ---
 
-## TAIM-native application path
+## TAIM view API
 
-TAIM now offers an intent-driven entry point without the inherited `Program` adapter:
+Applications are built from views that own their state. There is no message
+type and no update function: a view reads state handles, and changing a
+handle repaints exactly the views that read it.
 
 ```rust
-use taim::{AppContext, Element, Task, WindowContext};
-use taim::native::{app, Dispatch};
-
-fn scene<'a>(count: &'a u64, _: &WindowContext) -> Element<'a, u64> {
-    taim::widget::text(format!("Count: {count}")).into()
-}
+use taim::prelude::*;
 
 fn main() -> taim::Result {
-    let application = app(
-        "TAIM Native",
-        |_context: &mut AppContext| (0_u64, Task::none()),
-        |count: &mut u64, amount: u64, _context: &mut AppContext| {
-            if amount == 0 { Dispatch::idle() }
-            else { *count += amount; Dispatch::paint() }
-        },
-        scene,
-    );
-    taim::run_app(application)
+    taim::launch("Counter", |cx| {
+        let count = cx.signal(0_i64);
+
+        column(views![
+            text(move || format!("Count: {}", count.get())).size(24.0),
+            row(views![
+                button("-1").on_press(move || count.update(|n| *n -= 1)),
+                button("+1").on_press(move || count.update(|n| *n += 1)),
+            ])
+            .gap(8.0),
+        ])
+        .gap(12.0)
+        .padding(24.0)
+    })
 }
 ```
 
-This dispatch path goes straight to the TAIM `AppRunner` and frame scheduling. It
-is a **new native application contract**, not proof that the entire framework
-is independently authored: most existing widgets and portions of the renderer
-still have historic Iced origin, correctly acknowledged in `CREDITS.md` and
-`LICENSE`. The older API remains available for existing applications.
+The shell drives the view tree directly: layout, paint, events and the
+accessibility description all come from the views. Most widget and renderer
+internals still have historic Iced origin, acknowledged in `CREDITS.md` and
+`LICENSE`. Custom-widget authors can still use the engine crates
+(`taim_core`, `taim_widget`, `taim_runtime`) directly.
 
 For the migration acceptance gates, see `docs/architecture/native-identity.md`.
 
@@ -223,59 +224,36 @@ Taim implements a broad widget catalog across 6 domains; full hardware and acces
 
 ```toml
 [dependencies]
-taim = { path = "../taim", features = ["wgpu", "highlighter", "signal"] } # adjust to your local checkout; unpublished development package
+taim = { path = "../taim" } # adjust to your local checkout; unpublished development package
 ```
 
 ### 2. Write Your First Reactive Application
 
+See [`examples/counter`](examples/counter/src/main.rs) for the complete,
+compiled version of this program.
+
 ```rust
 use taim::prelude::*;
-use taim::widget::{button, column, container, text};
-use taim::signal::Signal;
 
-pub fn main() -> taim::Result {
-    taim::application(CounterApp::new, CounterApp::update, CounterApp::view)
-        .title("Taim High-Performance App")
-        .run()
-}
+fn main() -> taim::Result {
+    taim::launch("Counter", |cx| {
+        let count = cx.signal(0_i64);
 
-struct CounterApp {
-    count: Signal<i32>,
-}
-
-#[derive(Debug, Clone)]
-enum Message {
-    Increment,
-    Decrement,
-}
-
-impl CounterApp {
-    fn new() -> (Self, Task<Message>) {
-        (
-            Self {
-                count: Signal::new(0),
-            },
-            Task::none(),
+        container(
+            column(views![
+                text(move || format!("Count: {}", count.get())).size(32.0),
+                row(views![
+                    button("Decrement").on_press(move || count.update(|n| *n -= 1)),
+                    button("Increment").on_press(move || count.update(|n| *n += 1)),
+                ])
+                .gap(8.0),
+            ])
+            .gap(16.0)
+            .align(Align::Center),
         )
-    }
-
-    fn update(&mut self, message: Message) -> Task<Message> {
-        match message {
-            Message::Increment => self.count.update(|c| *c += 1),
-            Message::Decrement => self.count.update(|c| *c -= 1),
-        }
-        Task::none()
-    }
-
-    fn view(&self) -> Element<'_, Message> {
-        let display = text(format!("Count: {}", self.count.get())).size(32);
-        let inc_btn = button(text("＋ Increment")).on_press(Message::Increment);
-        let dec_btn = button(text("－ Decrement")).on_press(Message::Decrement);
-
-        container(column![display, inc_btn, dec_btn].spacing(12).align_x(Center))
-            .padding(24)
-            .into()
-    }
+        .center()
+        .fill()
+    })
 }
 ```
 

@@ -2,6 +2,8 @@ use super::Layer;
 use crate::core::Rectangle;
 use crate::graphics;
 use crate::image;
+use crate::primitive;
+use crate::quad;
 use crate::text;
 use crate::triangle;
 
@@ -110,10 +112,10 @@ impl Default for Layer {
     fn default() -> Self {
         Self {
             bounds: Rectangle::INFINITE,
-            quads: Default::default(),
-            triangles: Default::default(),
-            primitives: Default::default(),
-            text: Default::default(),
+            quads: quad::Batch::default(),
+            triangles: triangle::Batch::default(),
+            primitives: primitive::Batch::default(),
+            text: text::Batch::default(),
             #[allow(clippy::default_constructed_unit_structs)]
             images: image::Batch::default(),
             effects: crate::effects::Graph::new(),

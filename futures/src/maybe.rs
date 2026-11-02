@@ -46,9 +46,6 @@ mod taim_async_contract_tests {
 
     #[test]
     fn task_thread_transfer_matches_target_marker_constraints() {
-        assert_eq!(
-            requires_send_for_spawn(),
-            cfg!(not(target_arch = "wasm32"))
-        );
+        assert_eq!(requires_send_for_spawn(), cfg!(not(target_arch = "wasm32")));
     }
 }

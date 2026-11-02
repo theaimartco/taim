@@ -179,6 +179,12 @@ impl Value {
     }
 }
 
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Value;
@@ -203,11 +209,5 @@ mod tests {
         assert_eq!(value.previous_start_of_word(value.len()), 7);
         assert_eq!(value.next_end_of_word(0), 1);
         assert_eq!(value.next_end_of_word(2), 6);
-    }
-}
-
-impl std::fmt::Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.text)
     }
 }

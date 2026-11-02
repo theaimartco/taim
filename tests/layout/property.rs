@@ -10,19 +10,19 @@
 //! avoid pulling in an external crate for this -- a fixed seed makes a
 //! failure reproducible without needing to capture whatever case a real
 //! property-testing library happened to shrink to.
-use taim::advanced::layout;
-use taim::advanced::widget;
-use taim::widget::{column, grid, row, text};
-use taim::{Element, Length, Size};
+use taim::Size;
+use taim_core::Length;
+use taim_core::layout;
+use taim_core::widget;
 use taim_renderer::Renderer;
+use taim_widget::Element;
+use taim_widget::{column, grid, row, text};
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 

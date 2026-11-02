@@ -20,20 +20,20 @@
 //! to match. `Widget::visit_children` removed the need, so what is
 //! walked here is now the tree itself.
 
-use taim::advanced::Layout;
-use taim::advanced::widget::{self, Widget};
-use taim::{Element, Length, Point, Rectangle, Size, Theme, Vector};
+use taim::{Point, Rectangle, Size, Theme, Vector};
+use taim_core::Layout;
+use taim_core::Length;
 use taim_core::widget::visit;
+use taim_core::widget::{self, Widget};
 use taim_renderer::Renderer;
 use taim_runtime::hit_test;
+use taim_widget::Element;
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 
@@ -51,9 +51,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Probe {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
-        taim::advanced::layout::Node::new(Size::new(self.size, self.size))
+        _limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
+        taim_core::layout::Node::new(Size::new(self.size, self.size))
     }
 
     fn draw(
@@ -61,9 +61,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Probe {
         _tree: &widget::Tree,
         _renderer: &mut Renderer,
         _theme: &Theme,
-        _style: &taim::advanced::renderer::Style,
+        _style: &taim_core::renderer::Style,
         _layout: Layout<'_>,
-        _cursor: taim::advanced::mouse::Cursor,
+        _cursor: taim_core::mouse::Cursor,
         _viewport: &Rectangle,
     ) {
     }
@@ -83,7 +83,7 @@ fn path_to(root: &mut Element<'_, ()>, point: Point) -> Option<hit_test::Path> {
     let mut tree = widget::Tree::new(root.as_widget());
     tree.diff(root.as_widget_mut());
 
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
     let node = root.as_widget_mut().layout(&mut tree, &renderer, &limits);
 
     hit_test::hit_test(
@@ -94,7 +94,7 @@ fn path_to(root: &mut Element<'_, ()>, point: Point) -> Option<hit_test::Path> {
 
 #[test]
 fn overlapping_siblings_resolve_to_the_topmost_via_the_oracle() {
-    use taim::widget::stack;
+    use taim_widget::stack;
 
     let mut root: Element<'_, ()> = stack([probe(50.0), probe(50.0)]).into();
 
@@ -117,7 +117,7 @@ fn a_point_outside_every_widget_is_not_hit() {
     let mut tree = widget::Tree::new(root.as_widget());
     tree.diff(root.as_widget_mut());
 
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
     let node = root.as_widget_mut().layout(&mut tree, &renderer, &limits);
     let layout = Layout::new(&node);
 
@@ -139,7 +139,7 @@ fn a_translated_layout_hit_tests_at_its_new_position_not_the_old_one() {
     let mut tree = widget::Tree::new(root.as_widget());
     tree.diff(root.as_widget_mut());
 
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
     let node = root
         .as_widget_mut()
         .layout(&mut tree, &renderer, &limits)
@@ -162,7 +162,7 @@ fn a_translated_layout_hit_tests_at_its_new_position_not_the_old_one() {
 
 #[test]
 fn content_clipped_outside_a_scrollables_bounds_is_not_hit() {
-    use taim::widget::{container, scrollable};
+    use taim_widget::{container, scrollable};
 
     let renderer = headless_renderer();
 
@@ -178,7 +178,7 @@ fn content_clipped_outside_a_scrollables_bounds_is_not_hit() {
     let mut tree = widget::Tree::new(root.as_widget());
     tree.diff(root.as_widget_mut());
 
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
     let node = root.as_widget_mut().layout(&mut tree, &renderer, &limits);
     let layout = Layout::new(&node);
 
@@ -195,7 +195,7 @@ fn content_clipped_outside_a_scrollables_bounds_is_not_hit() {
 
 #[test]
 fn a_nested_child_reached_through_two_levels_returns_the_full_path() {
-    use taim::widget::row;
+    use taim_widget::row;
 
     let mut root: Element<'_, ()> =
         row([row([probe(10.0), probe(10.0)]).into(), probe(10.0)]).into();

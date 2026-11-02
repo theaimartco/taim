@@ -32,8 +32,7 @@
 //!
 //! So: nothing, and the reason.
 
-use taim::widget::{column, container, text};
-use taim::{Element, Length};
+use taim::prelude::*;
 
 /// Why this is empty, and what it would take.
 pub const MISSING: &str = "Nothing counts per-pixel writes, and nothing can without a new render \
@@ -44,23 +43,22 @@ pub const MISSING: &str = "Nothing counts per-pixel writes, and nothing can with
                            about text in a way that would send you optimising the wrong thing).";
 
 /// Renders the overdraw panel.
-pub fn view<'a, Message: 'a>() -> Element<'a, Message> {
+pub fn view() -> AnyView {
     container(
-        column![
-            text("Overdraw is not measured.").size(16),
-            text(MISSING).size(12),
+        column(views![
+            text("Overdraw is not measured.").size(16.0),
+            text(MISSING).size(12.0),
             text(
                 "A heat map built from layer bounds would be persuasive and wrong. Nobody \
                  double-checks a picture."
             )
-            .size(12),
-        ]
-        .spacing(8)
-        .width(Length::Fill),
+            .size(12.0),
+        ])
+        .gap(8.0)
+        .fill_width(),
     )
-    .center_x(Length::Fill)
-    .center_y(Length::Fill)
-    .padding(12)
+    .center()
+    .padding(12.0)
     .into()
 }
 
@@ -86,7 +84,7 @@ mod tests {
     #[test]
     fn it_renders_without_a_target() {
         // It has nothing to read, so it must not require anything.
-        let element: Element<'_, ()> = view();
+        let element: AnyView = view();
 
         let _ = std::hint::black_box(element);
     }

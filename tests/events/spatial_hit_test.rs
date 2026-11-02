@@ -16,20 +16,20 @@
 //! layouts (overlapping siblings, nested rows) rather than only the
 //! grid-of-leaves stress test `hit_test.rs` runs internally.
 
-use taim::advanced::Layout;
-use taim::advanced::widget::{self, Widget};
-use taim::{Element, Length, Point, Rectangle, Size, Theme};
+use taim::{Point, Rectangle, Size, Theme};
+use taim_core::Layout;
+use taim_core::Length;
 use taim_core::widget::visit;
+use taim_core::widget::{self, Widget};
 use taim_renderer::Renderer;
 use taim_runtime::hit_test::{self, Index};
+use taim_widget::Element;
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 
@@ -46,9 +46,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Probe {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
-        taim::advanced::layout::Node::new(Size::new(self.size, self.size))
+        _limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
+        taim_core::layout::Node::new(Size::new(self.size, self.size))
     }
 
     fn draw(
@@ -56,9 +56,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Probe {
         _tree: &widget::Tree,
         _renderer: &mut Renderer,
         _theme: &Theme,
-        _style: &taim::advanced::renderer::Style,
+        _style: &taim_core::renderer::Style,
         _layout: Layout<'_>,
-        _cursor: taim::advanced::mouse::Cursor,
+        _cursor: taim_core::mouse::Cursor,
         _viewport: &Rectangle,
     ) {
     }
@@ -77,7 +77,7 @@ fn probe(size: f32) -> Element<'static, ()> {
 struct Tree<'a> {
     root: Element<'a, ()>,
     tree: widget::Tree,
-    node: taim::advanced::layout::Node,
+    node: taim_core::layout::Node,
 }
 
 impl<'a> Tree<'a> {
@@ -91,7 +91,7 @@ impl<'a> Tree<'a> {
         let node = root.as_widget_mut().layout(
             &mut tree,
             &renderer,
-            &taim::advanced::layout::Limits::new(Size::ZERO, limits),
+            &taim_core::layout::Limits::new(Size::ZERO, limits),
         );
 
         Self { root, tree, node }
@@ -149,7 +149,7 @@ fn assert_index_matches_oracle_everywhere(tree: &mut Tree<'_>, bounds: Rectangle
 
 #[test]
 fn the_index_agrees_with_the_oracle_over_overlapping_siblings() {
-    use taim::widget::stack;
+    use taim_widget::stack;
 
     let mut tree = Tree::new(
         stack([probe(50.0), probe(50.0), probe(50.0)]),
@@ -165,7 +165,7 @@ fn the_index_agrees_with_the_oracle_over_overlapping_siblings() {
 
 #[test]
 fn the_index_agrees_with_the_oracle_over_a_dense_grid_of_rows() {
-    use taim::widget::row;
+    use taim_widget::row;
 
     let mut tree = Tree::new(
         row((0..20).map(|_| probe(10.0))).spacing(2),
@@ -181,7 +181,7 @@ fn the_index_agrees_with_the_oracle_over_a_dense_grid_of_rows() {
 
 #[test]
 fn the_index_agrees_with_the_oracle_over_a_nested_two_level_tree() {
-    use taim::widget::row;
+    use taim_widget::row;
 
     let mut tree = Tree::new(
         row([row([probe(10.0), probe(10.0)]).into(), probe(10.0)]),
@@ -197,7 +197,7 @@ fn the_index_agrees_with_the_oracle_over_a_nested_two_level_tree() {
 
 #[test]
 fn the_index_agrees_with_the_oracle_using_a_smaller_custom_cell_size() {
-    use taim::widget::stack;
+    use taim_widget::stack;
 
     let mut tree = Tree::new(stack([probe(50.0), probe(50.0)]), Size::new(200.0, 200.0));
 

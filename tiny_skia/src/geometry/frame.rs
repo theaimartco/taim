@@ -134,7 +134,7 @@ impl geometry::frame::Backend for Frame {
                     LineHeight::Absolute(height) => {
                         LineHeight::Absolute(Pixels(height.0 * scale_y))
                     }
-                    relative => relative,
+                    relative @ LineHeight::Relative(_) => relative,
                 }
             } else {
                 text.line_height

@@ -53,8 +53,7 @@ impl Atlas {
         requested_size: u32,
     ) -> Self {
         let side = requested_size
-            .max(1)
-            .min(MAX_SIZE)
+            .clamp(1, MAX_SIZE)
             .min(device.limits().max_texture_dimension_2d);
         let preferred_initial_layers = if backend == wgpu::Backend::Gl { 2 } else { 1 };
         let storage = TextureStore::new(

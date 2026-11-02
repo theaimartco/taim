@@ -33,16 +33,18 @@ pub(crate) fn measure_intent(
         return declared;
     }
 
-    children.into_iter().fold(declared, |current, child| match flow {
-        Flow::Row => Size::new(
-            current.width.stack(child.width),
-            current.height.cross(child.height),
-        ),
-        Flow::Column => Size::new(
-            current.width.cross(child.width),
-            current.height.stack(child.height),
-        ),
-    })
+    children
+        .into_iter()
+        .fold(declared, |current, child| match flow {
+            Flow::Row => Size::new(
+                current.width.stack(child.width),
+                current.height.cross(child.height),
+            ),
+            Flow::Column => Size::new(
+                current.width.cross(child.width),
+                current.height.stack(child.height),
+            ),
+        })
 }
 
 /// The cache key represents the complete resolved linear-container contract.
@@ -85,11 +87,7 @@ mod tests {
 
     #[test]
     fn removing_row_fill_restores_declared_fit_without_state_leak() {
-        let filled = measure_intent(
-            fit(),
-            Flow::Row,
-            [Size::new(Length::Fill, Length::Fit)],
-        );
+        let filled = measure_intent(fit(), Flow::Row, [Size::new(Length::Fill, Length::Fit)]);
         assert_eq!(filled.width, Length::Fill);
         let after_removal = measure_intent(fit(), Flow::Row, []);
         assert_eq!(after_removal, fit());
@@ -97,11 +95,7 @@ mod tests {
 
     #[test]
     fn removing_column_fill_restores_declared_fit_without_state_leak() {
-        let filled = measure_intent(
-            fit(),
-            Flow::Column,
-            [Size::new(Length::Fit, Length::Fill)],
-        );
+        let filled = measure_intent(fit(), Flow::Column, [Size::new(Length::Fit, Length::Fill)]);
         assert_eq!(filled.height, Length::Fill);
         assert_eq!(measure_intent(fit(), Flow::Column, []), fit());
     }
@@ -109,11 +103,7 @@ mod tests {
     #[test]
     fn explicit_fixed_length_is_not_overridden_by_child_fill() {
         let declared = Size::new(Length::Fixed(80.0), Length::Fit);
-        let got = measure_intent(
-            declared,
-            Flow::Row,
-            [Size::new(Length::Fill, Length::Fill)],
-        );
+        let got = measure_intent(declared, Flow::Row, [Size::new(Length::Fill, Length::Fill)]);
         assert_eq!(got.width, Length::Fixed(80.0));
         assert_eq!(got.height, Length::Fill);
     }
@@ -146,15 +136,27 @@ mod tests {
     #[test]
     fn fingerprint_tracks_all_structural_inputs() {
         let key = fingerprint(2, fit(), Padding::ZERO, 4.0, Alignment::Start);
-        assert_ne!(key, fingerprint(3, fit(), Padding::ZERO, 4.0, Alignment::Start));
-        assert_ne!(key, fingerprint(2, fit(), Padding::ZERO, 5.0, Alignment::Start));
-        assert_ne!(key, fingerprint(2, fit(), Padding::ZERO, 4.0, Alignment::End));
-        assert_ne!(key, fingerprint(
-            2,
-            Size::new(Length::Fill, Length::Fit),
-            Padding::ZERO,
-            4.0,
-            Alignment::Start,
-        ));
+        assert_ne!(
+            key,
+            fingerprint(3, fit(), Padding::ZERO, 4.0, Alignment::Start)
+        );
+        assert_ne!(
+            key,
+            fingerprint(2, fit(), Padding::ZERO, 5.0, Alignment::Start)
+        );
+        assert_ne!(
+            key,
+            fingerprint(2, fit(), Padding::ZERO, 4.0, Alignment::End)
+        );
+        assert_ne!(
+            key,
+            fingerprint(
+                2,
+                Size::new(Length::Fill, Length::Fit),
+                Padding::ZERO,
+                4.0,
+                Alignment::Start,
+            )
+        );
     }
 }

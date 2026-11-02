@@ -17,8 +17,10 @@ path = "src/main.rs"
 [dependencies]
 taim-profiler.workspace = true
 taim.workspace = true
-taim.features = []
+# A real windowed application: the same backends `taim`'s defaults enable.
+taim.features = ["wgpu", "tiny-skia", "crisp", "hinting", "linux-theme-detection", "x11", "wayland"]
 taim_core.workspace = true
 taim_futures.workspace = true
 taim_renderer.workspace = true
 taim_runtime.workspace = true
+taim_widget.workspace = true

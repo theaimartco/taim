@@ -23,43 +23,39 @@
 //!
 //! [`Role::SecureField`]: taim_core::semantics::Role::SecureField
 
-use taim::widget::{Column, column, container, row, scrollable, text};
-use taim::{Element, Length};
+use taim::prelude::*;
+use taim::view::views::Stack;
 use taim_core::security::{Audience, Privacy};
 use taim_core::semantics::{Actions, Node, Role, State};
 
 /// Renders the semantic forest.
-pub fn view<'a, Message: 'a>(forest: &[Node]) -> Element<'a, Message> {
+pub fn view(forest: &[Node]) -> AnyView {
     if forest.is_empty() {
         return container(
-            column![
-                text("Nothing is announced.").size(16),
+            column(views![
+                text("Nothing is announced.").size(16.0),
                 text(
                     "An empty forest is not necessarily a bug \u{2014} a view of pure layout \
                      announces nothing. It is a bug if anything here is a control."
                 )
-                .size(12),
-            ]
-            .spacing(6),
+                .size(12.0),
+            ])
+            .gap(6.0),
         )
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
+        .center()
         .into();
     }
 
-    let mut rows = column![].spacing(2);
+    let mut rows = column([]).gap(2.0);
     let mut counts = Counts::default();
 
     for node in forest {
         rows = walk(node, 0, rows, &mut counts);
     }
 
-    column![
-        text(counts.describe()).size(13),
-        scrollable(rows).height(Length::Fill),
-    ]
-    .spacing(8)
-    .into()
+    column(views![text(counts.describe()).size(13.0), scroll(rows),])
+        .gap(8.0)
+        .into()
 }
 
 /// What the forest adds up to.
@@ -124,12 +120,7 @@ fn names_matter(role: Role) -> bool {
     )
 }
 
-fn walk<'a, Message: 'a>(
-    node: &Node,
-    depth: usize,
-    rows: Column<'a, Message>,
-    counts: &mut Counts,
-) -> Column<'a, Message> {
+fn walk(node: &Node, depth: usize, rows: Stack, counts: &mut Counts) -> Stack {
     counts.record(node);
 
     let mut rows = rows.push(node_row(node, depth));
@@ -141,7 +132,7 @@ fn walk<'a, Message: 'a>(
     rows
 }
 
-fn node_row<'a, Message: 'a>(node: &Node, depth: usize) -> Element<'a, Message> {
+fn node_row(node: &Node, depth: usize) -> AnyView {
     let indent = "  ".repeat(depth);
 
     let name = match &node.name {
@@ -150,14 +141,14 @@ fn node_row<'a, Message: 'a>(node: &Node, depth: usize) -> Element<'a, Message> 
         None => String::new(),
     };
 
-    row![
-        text(format!("{indent}{:?}", node.role)).size(12),
-        text(name).size(12),
-        text(describe_state(node.state)).size(11),
-        text(describe_actions(node.actions)).size(11),
-        text(describe_value(node)).size(11),
-    ]
-    .spacing(10)
+    row(views![
+        text(format!("{indent}{:?}", node.role)).size(12.0),
+        text(name).size(12.0),
+        text(describe_state(node.state)).size(11.0),
+        text(describe_actions(node.actions)).size(11.0),
+        text(describe_value(node)).size(11.0),
+    ])
+    .gap(10.0)
     .into()
 }
 
@@ -330,7 +321,7 @@ mod tests {
         let mut forest = node(Role::Button).with_name("Save");
         forest.children = vec![node(Role::StaticText).with_name("Save")];
 
-        let rows: Column<'_, ()> = Column::new();
+        let rows = column([]);
         let _ = walk(&forest, 0, rows, &mut counts);
 
         assert_eq!(counts.nodes, 2);

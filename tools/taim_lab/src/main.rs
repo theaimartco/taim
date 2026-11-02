@@ -38,10 +38,11 @@ mod semantics_inspector;
 mod target;
 mod widget_inspector;
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::time::Duration;
 
-use taim::widget::{button, column, container, row, scrollable, text};
-use taim::{Element, Length, Subscription, Task};
+use taim::prelude::*;
 
 use target::{Connection, Hosted};
 
@@ -204,7 +205,7 @@ enum Message {
     Profile(device_profiles::Profile),
 }
 
-fn update(lab: &mut Lab, message: Message) -> Task<Message> {
+fn update(lab: &mut Lab, message: Message) {
     match message {
         Message::Show(panel) => lab.panel = panel,
         Message::Attach => {
@@ -231,40 +232,35 @@ fn update(lab: &mut Lab, message: Message) -> Task<Message> {
             }
         }
     }
-
-    Task::none()
 }
 
-fn subscription(lab: &Lab) -> Subscription<Message> {
-    if lab.target.is_some() {
-        taim::time::every(TICK).map(|_| Message::Tick)
-    } else {
-        // Detached costs nothing. A timer that kept firing into a `None`
-        // would keep the inspector awake and burning battery to do
-        // nothing, which is the opposite of what a profiler should model.
-        Subscription::none()
-    }
+/// Delivers a [`Message`] to the inspector from a view's handler.
+type Send = Rc<dyn Fn(Message)>;
+
+/// Builds the press handler that sends `message`.
+fn on(send: &Send, message: Message) -> impl Fn() + 'static {
+    let send = Rc::clone(send);
+
+    move || send(message.clone())
 }
 
-fn view(lab: &Lab) -> Element<'_, Message> {
-    let tabs = Panel::ALL.iter().fold(row![].spacing(4), |tabs, panel| {
+fn view(lab: &Lab, send: &Send) -> AnyView {
+    let tabs = Panel::ALL.iter().fold(row([]).gap(4.0), |tabs, panel| {
         let label = if panel.has_data() {
-            text(panel.title())
+            panel.title().to_owned()
         } else {
             // Marked, so a developer knows before clicking. The panel
             // still opens and explains itself.
-            text(format!("{} \u{00b7} —", panel.title()))
+            format!("{} \u{00b7} \u{2014}", panel.title())
         };
 
-        tabs.push(
-            button(label)
-                .on_press(Message::Show(*panel))
-                .style(if *panel == lab.panel {
-                    button::primary
-                } else {
-                    button::text
-                }),
-        )
+        let tab = button(label).on_press(on(send, Message::Show(*panel)));
+
+        tabs.push(if *panel == lab.panel {
+            tab
+        } else {
+            tab.ghost()
+        })
     });
 
     // Rendered whether or not anything is attached: the two panels with
@@ -276,7 +272,7 @@ fn view(lab: &Lab) -> Element<'_, Message> {
         .map(taim_profiler::Collector::events)
         .unwrap_or_default();
 
-    let body: Element<'_, Message> = match (lab.panel, &lab.target) {
+    let body: AnyView = match (lab.panel, &lab.target) {
         (Panel::OverdrawOverlay, _) => overdraw_overlay::view(),
         (Panel::GpuResources, _) => gpu_resources::view(&events),
         (_, None) => unbuilt("Nothing is attached.", "Attach to inspect a view."),
@@ -304,8 +300,11 @@ fn view(lab: &Lab) -> Element<'_, Message> {
         }
         (Panel::DeviceProfiles, Some(target)) => {
             let snapshot = target.snapshot();
+            let send = Rc::clone(send);
 
-            device_profiles::view(snapshot.bounds, snapshot.scale, Message::Profile)
+            device_profiles::view(snapshot.bounds, snapshot.scale, move |profile| {
+                send(Message::Profile(profile));
+            })
         }
     };
 
@@ -314,55 +313,137 @@ fn view(lab: &Lab) -> Element<'_, Message> {
         None => "not driving".to_owned(),
     };
 
-    let status = row![
-        text(lab.connection.describe()).size(12),
-        text(driven).size(12),
-        text(format!("{:.1}s", lab.connection.uptime().as_secs_f32())).size(12),
-        if lab.connection.is_live() {
-            button(text("Detach").size(12)).on_press(Message::Detach)
-        } else {
-            button(text("Attach").size(12)).on_press(Message::Attach)
-        },
-    ]
-    .spacing(12);
+    let toggle = if lab.connection.is_live() {
+        button("Detach").on_press(on(send, Message::Detach))
+    } else {
+        button("Attach").on_press(on(send, Message::Attach))
+    };
+
+    let status = row(views![
+        text(lab.connection.describe()).size(12.0),
+        text(driven).size(12.0),
+        text(format!("{:.1}s", lab.connection.uptime().as_secs_f32())).size(12.0),
+        toggle.secondary(),
+    ])
+    .gap(12.0)
+    .align(Align::Center);
 
     container(
-        column![
-            scrollable(tabs).direction(scrollable::Direction::Horizontal(
-                scrollable::Scrollbar::default()
-            )),
-            container(body).height(Length::Fill).padding(8),
-            status,
-        ]
-        .spacing(8),
+        column(views![tabs, container(body).fill().padding(8.0), status,])
+            .gap(8.0)
+            .fill_width(),
     )
-    .padding(12)
+    .padding(12.0)
+    .fill()
     .into()
 }
 
 /// A panel that is not built, saying so rather than showing an empty box.
-fn unbuilt<'a>(question: &'a str, why: &'a str) -> Element<'a, Message> {
+fn unbuilt(question: &str, why: &str) -> AnyView {
     container(
-        column![text(question).size(16), text(why).size(12)]
-            .spacing(6)
-            .width(Length::Fill),
+        column(views![text(question).size(16.0), text(why).size(12.0)])
+            .gap(6.0)
+            .fill_width(),
     )
-    .center_x(Length::Fill)
-    .center_y(Length::Fill)
+    .center()
+    .fill()
     .into()
+}
+
+/// Drives the hosted target on a timer while one is attached.
+///
+/// ~60Hz, on a timer rather than on the inspector's own frames: those stop
+/// when the inspector's window is occluded or minimised, and the trace
+/// would simply stop, with nothing saying why. A timer keeps measuring
+/// whether or not anyone is looking, which is the behaviour a profiler
+/// needs.
+///
+/// Each attachment starts its own ticker, identified by `generation`; a
+/// ticker whose generation is no longer current stops. Detached costs
+/// nothing: no thread keeps firing into a `None`.
+fn start_ticker(ticks: State<u64>, generation: State<u64>) {
+    let mine = generation.get();
+
+    spawn(async move {
+        loop {
+            std::thread::sleep(TICK);
+
+            if generation.get() != mine {
+                break;
+            }
+
+            ticks.update(|n| {
+                *n = n.wrapping_add(1);
+            });
+        }
+    });
 }
 
 /// Opens the inspector.
 pub fn main() -> taim::Result {
-    taim::application(Lab::default, update, view)
-        .subscription(subscription)
-        .title("Taim Lab")
-        .run()
+    taim::launch("Taim Lab", |cx| {
+        let lab = Rc::new(RefCell::new(Lab::default()));
+
+        // Bumped by every message, so the shell rebuilds after each one.
+        let version = cx.signal(0_u64);
+        // Bumped by the ticker; each new value is one `Message::Tick`.
+        let ticks = cx.signal(0_u64);
+        // Which ticker is current; see `start_ticker`.
+        let generation = cx.signal(0_u64);
+
+        let send: Send = {
+            let lab = Rc::clone(&lab);
+
+            Rc::new(move |message: Message| {
+                let restart = matches!(message, Message::Attach | Message::Detach);
+
+                update(&mut lab.borrow_mut(), message);
+
+                if restart {
+                    generation.update(|n| *n = n.wrapping_add(1));
+
+                    if lab.borrow().target.is_some() {
+                        start_ticker(ticks, generation);
+                    }
+                }
+
+                version.update(|n| *n = n.wrapping_add(1));
+            })
+        };
+
+        if lab.borrow().target.is_some() {
+            start_ticker(ticks, generation);
+        }
+
+        let seen = RefCell::new(0_u64);
+
+        rebuild(
+            move || (version.get(), ticks.get()),
+            move |&(_, tick)| {
+                let mut lab_mut = lab.borrow_mut();
+
+                // A tick drives the target exactly once, however many
+                // times the shell is rebuilt for it.
+                if *seen.borrow() != tick {
+                    *seen.borrow_mut() = tick;
+                    update(&mut lab_mut, Message::Tick);
+                }
+
+                drop(lab_mut);
+
+                Some(view(&lab.borrow(), &send))
+            },
+        )
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ignore() -> Send {
+        Rc::new(|_| {})
+    }
 
     #[test]
     fn every_panel_says_what_it_answers() {
@@ -397,12 +478,12 @@ mod tests {
         // They have something to say regardless, and a "nothing attached"
         // message would hide the more useful explanation.
         let mut lab = Lab::default();
-        let _ = update(&mut lab, Message::Detach);
+        update(&mut lab, Message::Detach);
 
         for panel in [Panel::OverdrawOverlay, Panel::GpuResources] {
-            let _ = update(&mut lab, Message::Show(panel));
+            update(&mut lab, Message::Show(panel));
 
-            let _ = std::hint::black_box(view(&lab));
+            let _ = std::hint::black_box(view(&lab, &ignore()));
         }
     }
 
@@ -411,12 +492,12 @@ mod tests {
         // The cheapest guard against a panel wired to the wrong field: all
         // nine are built against a real driven frame.
         let mut lab = Lab::default();
-        let _ = update(&mut lab, Message::Tick);
+        update(&mut lab, Message::Tick);
 
         for panel in Panel::ALL {
-            let _ = update(&mut lab, Message::Show(panel));
+            update(&mut lab, Message::Show(panel));
 
-            let _ = std::hint::black_box(view(&lab));
+            let _ = std::hint::black_box(view(&lab, &ignore()));
         }
     }
 
@@ -426,11 +507,11 @@ mod tests {
         // pixels, and the only way to know what a view does at 360x780 is
         // to lay it out at 360x780.
         let mut lab = Lab::default();
-        let _ = update(&mut lab, Message::Tick);
+        update(&mut lab, Message::Tick);
 
         let phone = device_profiles::Profile::ALL[0];
-        let _ = update(&mut lab, Message::Profile(phone));
-        let _ = update(&mut lab, Message::Tick);
+        update(&mut lab, Message::Profile(phone));
+        update(&mut lab, Message::Tick);
 
         let snapshot = lab.target.as_ref().expect("attached").snapshot();
 
@@ -445,10 +526,10 @@ mod tests {
         let mut lab = Lab::default();
 
         for _ in 0..3 {
-            let _ = update(&mut lab, Message::Tick);
+            update(&mut lab, Message::Tick);
         }
 
-        let _ = update(&mut lab, Message::Attach);
+        update(&mut lab, Message::Attach);
 
         assert_eq!(lab.activity.run(), 0);
         assert_eq!(lab.activity.longest(), 0);
@@ -460,7 +541,7 @@ mod tests {
         // snapshot the panels read is populated.
         let mut lab = Lab::default();
 
-        let _ = update(&mut lab, Message::Tick);
+        update(&mut lab, Message::Tick);
 
         let snapshot = lab.target.as_ref().expect("attached").snapshot();
 
@@ -496,7 +577,7 @@ mod tests {
         let mut lab = Lab::default();
 
         for _ in 0..3 {
-            let _ = update(&mut lab, Message::Tick);
+            update(&mut lab, Message::Tick);
         }
 
         let collector = lab.connection.collector().expect("attached");
@@ -510,11 +591,11 @@ mod tests {
     fn attaching_and_detaching_round_trips() {
         let mut lab = Lab::default();
 
-        let _ = update(&mut lab, Message::Detach);
+        update(&mut lab, Message::Detach);
         assert!(!lab.connection.is_live());
         assert!(lab.target.is_none(), "detaching must stop driving the view");
 
-        let _ = update(&mut lab, Message::Attach);
+        update(&mut lab, Message::Attach);
         assert!(lab.connection.is_live());
         assert!(lab.target.is_some());
     }
@@ -525,7 +606,7 @@ mod tests {
         // burning battery to do nothing -- the opposite of what a profiler
         // should model.
         let mut lab = Lab::default();
-        let _ = update(&mut lab, Message::Detach);
+        update(&mut lab, Message::Detach);
 
         // `Subscription` has no public emptiness predicate, so the check
         // is that detaching drops the target the subscription keys off.
@@ -536,8 +617,8 @@ mod tests {
     fn a_tick_while_detached_is_harmless() {
         let mut lab = Lab::default();
 
-        let _ = update(&mut lab, Message::Detach);
-        let _ = update(&mut lab, Message::Tick);
+        update(&mut lab, Message::Detach);
+        update(&mut lab, Message::Tick);
 
         assert!(lab.connection.collector().is_none());
     }
@@ -546,7 +627,7 @@ mod tests {
     fn showing_a_panel_selects_it() {
         let mut lab = Lab::default();
 
-        let _ = update(&mut lab, Message::Show(Panel::GpuResources));
+        update(&mut lab, Message::Show(Panel::GpuResources));
 
         assert_eq!(lab.panel, Panel::GpuResources);
     }

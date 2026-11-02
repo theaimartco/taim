@@ -68,6 +68,6 @@ pub(super) fn scattered<'a, T: bytemuck::Pod + 'a>(
     }
 
     debug_assert!(source[source_at..].is_empty());
-    debug_assert!(sources.all(|source| source.is_empty()));
+    debug_assert!(sources.all(<[u8]>::is_empty));
     written
 }

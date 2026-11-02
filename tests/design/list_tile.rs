@@ -4,26 +4,26 @@
 //! says a tile's height comes from its line count and that a
 //! non-interactive tile is presentation; this proves the widget does both.
 
-use taim::advanced::widget::{self, Widget};
-use taim::advanced::{Layout, Shell, layout, mouse};
-use taim::widget::{list_tile, space, text};
-use taim::{Element, Event, Point, Rectangle, Size, Theme};
+use taim::{Point, Rectangle, Size, Theme};
+use taim_core::Event;
 use taim_core::semantics::{Actions, Role, State};
+use taim_core::widget::{self, Widget};
+use taim_core::{Layout, Shell, layout, mouse};
 use taim_core::{shell::Waker, window};
 use taim_renderer::Renderer;
+use taim_widget::Element;
 use taim_widget::list_tile as list_tile_mod;
+use taim_widget::{list_tile, space, text};
 
 type Message = &'static str;
 
 const WIDTH: f32 = 320.0;
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 

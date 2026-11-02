@@ -3,12 +3,17 @@ use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_ma
 
 use taim::border;
 use taim::mouse;
-use taim::widget::{canvas, center_y, column, container, row, scrollable, space, text};
-use taim::{Center, Color, Element, Fill, Length, Never, Point, Rectangle, Size, Theme};
+use taim::{Color, Point, Rectangle, Size, Theme};
+use taim_core::Alignment::Center;
+use taim_core::Length;
+use taim_core::Length::Fill;
+use taim_core::Never;
 use taim_futures::futures::executor;
 use taim_renderer::Renderer;
 use taim_renderer::core::renderer::{self, Headless as _};
 use taim_runtime::{UserInterface, user_interface};
+use taim_widget::Element;
+use taim_widget::{canvas, center_y, column, container, row, scrollable, space, text};
 
 criterion_main!(taim_cpu_benches);
 criterion_group!(taim_cpu_benches, measure_software_frames);

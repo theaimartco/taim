@@ -90,8 +90,7 @@ impl graphics::Layer for Layer {
 }
 
 fn batch_bytes<T>(batches: &[DrawBatch<T>]) -> usize {
-    batches.len() * std::mem::size_of::<DrawBatch<T>>()
-        + batches.iter().map(DrawBatch::retained_bytes).sum::<usize>()
+    std::mem::size_of_val(batches) + batches.iter().map(DrawBatch::retained_bytes).sum::<usize>()
 }
 
 fn clear_bounded<T>(values: &mut Vec<T>) {

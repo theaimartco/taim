@@ -57,9 +57,9 @@ pub use launch::{App, app, launch, prelude};
 pub use taim_view as view;
 
 pub use crate::core::{
-    Background, Border, Color, Degrees, Font, Gradient, Padding, Pixels, Point, Radians,
-    Rectangle, Settings, Shadow, Size, Theme, Transformation, Vector, alignment, border, color,
-    font, gradient, keyboard, mouse, padding, semantics, theme, time,
+    Background, Border, Color, Degrees, Font, Gradient, Padding, Pixels, Point, Radians, Rectangle,
+    Settings, Shadow, Size, Theme, Transformation, Vector, alignment, border, color, font,
+    gradient, keyboard, mouse, padding, semantics, theme, time,
 };
 pub use taim_signal::{Memo, Signal};
 

@@ -32,11 +32,10 @@ pub fn stage_rgba(
     let pad_y = padding.height as usize;
     let row_pixels = width + 2 * pad_x;
     let copy_rows = height + 2 * pad_y;
-    let bytes_per_row = match (row_pixels * RGBA_BYTES)
+    let Some(bytes_per_row) = (row_pixels * RGBA_BYTES)
         .checked_next_multiple_of(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize)
-    {
-        Some(bytes) => bytes,
-        None => return false,
+    else {
+        return false;
     };
     let Some(total_bytes) = bytes_per_row.checked_mul(copy_rows) else {
         return false;

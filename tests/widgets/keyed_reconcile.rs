@@ -9,11 +9,13 @@
 //! level deeper than the keyed slot itself, since a real application's
 //! keyed list rows are essentially never a single leaf widget.
 
-use taim::advanced::widget::{self, Widget};
-use taim::advanced::{Layout, mouse, renderer};
-use taim::widget::keyed::Column;
-use taim::{Element, Length, Point, Rectangle, Size, Theme};
+use taim::{Point, Rectangle, Size, Theme};
+use taim_core::Length;
+use taim_core::widget::{self, Widget};
+use taim_core::{Layout, mouse, renderer};
 use taim_renderer::Renderer;
+use taim_widget::Element;
+use taim_widget::keyed::Column;
 
 /// A single-child wrapper, so each keyed row has a nested `Tree` level
 /// (`tree.children[i].children[0]`) whose own state must survive
@@ -35,14 +37,14 @@ impl<Message> Widget<Message, Theme, Renderer> for Row<Message> {
         &mut self,
         tree: &mut widget::Tree,
         renderer: &Renderer,
-        limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
+        limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
         let child_node = self
             .child
             .as_widget_mut()
             .layout(&mut tree.children[0], renderer, limits);
 
-        taim::advanced::layout::Node::with_children(Size::new(20.0, 20.0), vec![child_node])
+        taim_core::layout::Node::with_children(Size::new(20.0, 20.0), vec![child_node])
     }
 
     fn draw(
@@ -75,9 +77,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Marker {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
-        taim::advanced::layout::Node::new(Size::new(20.0, 20.0))
+        _limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
+        taim_core::layout::Node::new(Size::new(20.0, 20.0))
     }
 
     fn tag(&self) -> widget::tree::Tag {
@@ -193,8 +195,8 @@ fn replacing_every_key_gives_every_row_fresh_nested_state() {
 #[test]
 fn a_keyed_columns_layout_still_succeeds_with_nested_rows() {
     let renderer = taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
+        <Renderer as taim_core::renderer::Headless>::new(
+            taim_core::renderer::Settings::default(),
             Some("tiny-skia"),
         ),
     )
@@ -206,7 +208,7 @@ fn a_keyed_columns_layout_still_succeeds_with_nested_rows() {
     let mut tree = widget::Tree::new(&column as &dyn Widget<(), Theme, Renderer>);
     tree.diff(&mut column as &mut dyn Widget<(), Theme, Renderer>);
 
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
     let node = Widget::<(), Theme, Renderer>::layout(&mut column, &mut tree, &renderer, &limits);
 
     assert_eq!(node.children().len(), 3);

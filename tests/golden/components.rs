@@ -11,9 +11,9 @@
 //! Changing any assertion here must be deliberate, exactly as
 //! re-approving a golden image would be.
 
-use taim::widget::date::{Date, days_in_month, is_leap_year};
-use taim::widget::time_picker::Time;
 use taim_core::touch::MIN_TARGET;
+use taim_widget::date::{Date, days_in_month, is_leap_year};
+use taim_widget::time_picker::Time;
 
 /// Every interactive control must present a target at least this large.
 /// Pinned against the core constant so the two cannot drift apart.
@@ -58,7 +58,7 @@ fn month_lengths_are_pinned_for_both_kinds_of_year() {
 
 #[test]
 fn weekdays_are_pinned_against_the_real_calendar() {
-    use taim::widget::date::Weekday;
+    use taim_widget::date::Weekday;
 
     // Fixed reference points, including one before the epoch and one on
     // a leap day, since those are where day-count arithmetic breaks.

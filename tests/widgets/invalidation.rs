@@ -14,8 +14,8 @@
 //! `semantics_with_cache` calls must independently reflect exactly the
 //! flags that were actually cleared.
 
-use taim::advanced::widget::Tree;
-use taim::advanced::widget::tree::DirtyFlags;
+use taim_core::widget::Tree;
+use taim_core::widget::tree::DirtyFlags;
 use taim_runtime::invalidation::{Aggregator, propagate};
 
 fn tree_with_two_children() -> Tree {
@@ -102,9 +102,9 @@ fn layout_with_cache_and_semantics_with_cache_clear_only_their_own_flag() {
     let mut tree = Tree::empty();
     assert_eq!(tree.dirty(), DirtyFlags::all());
 
-    let limits = taim::advanced::layout::Limits::new(taim::Size::ZERO, taim::Size::new(10.0, 10.0));
+    let limits = taim_core::layout::Limits::new(taim::Size::ZERO, taim::Size::new(10.0, 10.0));
     let _ = tree.layout_with_cache(limits, |_| {
-        taim::advanced::layout::Node::new(taim::Size::new(10.0, 10.0))
+        taim_core::layout::Node::new(taim::Size::new(10.0, 10.0))
     });
 
     assert!(!tree.dirty().contains(DirtyFlags::LAYOUT));

@@ -13,7 +13,7 @@ use taim_core::text::{self, Editor as _, LineHeight, Renderer as _, Wrapping};
 use taim_core::{Font, Pixels, Theme, clipboard, input_method, widget};
 
 use std::cell::{Cell, RefCell};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 
 type Engine = <Renderer as text::Renderer>::Editor;
 
@@ -140,7 +140,7 @@ impl std::fmt::Debug for Buffer {
 /// An editable, scrollable block of text showing `buffer`.
 pub fn text_editor(buffer: &Buffer) -> TextEditor {
     TextEditor {
-        buffer: buffer.clone(),
+        buffer: *buffer,
         font: None,
         size: None,
         line_height: LineHeight::default(),
@@ -376,7 +376,7 @@ impl View for TextEditor {
                     wrapping,
                     hint,
                 },
-            )
+            );
         });
 
         room
@@ -421,28 +421,28 @@ impl View for TextEditor {
         let selection = engine.selection();
         let line = self.line_height.to_absolute(size).0;
 
-        if engine.is_empty() {
-            if let Some(placeholder) = &self.placeholder {
-                use text::Renderer as _;
-                cx.renderer().fill_text(
-                    text::Text {
-                        content: placeholder.clone(),
-                        bounds: area.size(),
-                        size,
-                        line_height: self.line_height,
-                        font,
-                        align_x: text::Alignment::Default,
-                        align_y: taim_core::alignment::Vertical::Top,
-                        shaping: text::Shaping::Advanced,
-                        wrapping: self.wrapping,
-                        ellipsis: text::Ellipsis::None,
-                        hint_factor: hint,
-                    },
-                    area.position(),
-                    palette.background.strongest.color,
-                    area,
-                );
-            }
+        if engine.is_empty()
+            && let Some(placeholder) = &self.placeholder
+        {
+            use text::Renderer as _;
+            cx.renderer().fill_text(
+                text::Text {
+                    content: placeholder.clone(),
+                    bounds: area.size(),
+                    size,
+                    line_height: self.line_height,
+                    font,
+                    align_x: text::Alignment::Default,
+                    align_y: taim_core::alignment::Vertical::Top,
+                    shaping: text::Shaping::Advanced,
+                    wrapping: self.wrapping,
+                    ellipsis: text::Ellipsis::None,
+                    hint_factor: hint,
+                },
+                area.position(),
+                palette.background.strongest.color,
+                area,
+            );
         }
 
         let origin = area.position() - Point::ORIGIN;

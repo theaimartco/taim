@@ -29,8 +29,7 @@
 //! [`semantics_inspector`]: crate::semantics_inspector
 //! [`Visit`]: taim_core::widget::visit::Visit
 
-use taim::widget::{column, container, row, scrollable, text};
-use taim::{Element, Length};
+use taim::prelude::*;
 
 use crate::target::Node;
 
@@ -44,28 +43,27 @@ pub const MISSING: &str = "Type, state and revisions are not shown: `Visit` carr
                            widget is. Adding them is a framework change, not a panel one.";
 
 /// Renders the widget tree.
-pub fn view<'a, Message: 'a>(tree: &[Node]) -> Element<'a, Message> {
+pub fn view(tree: &[Node]) -> AnyView {
     if tree.is_empty() {
-        return container(text("No tree. Nothing is attached.").size(16))
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
+        return container(text("No tree. Nothing is attached.").size(16.0))
+            .center()
             .into();
     }
 
     let rows = tree
         .iter()
-        .fold(column![].spacing(1), |rows, node| rows.push(node_row(node)));
+        .fold(column([]).gap(1.0), |rows, node| rows.push(node_row(node)));
 
-    column![
-        text(summarise(tree)).size(13),
-        text(MISSING).size(11),
-        scrollable(rows).height(Length::Fill),
-    ]
-    .spacing(8)
+    column(views![
+        text(summarise(tree)).size(13.0),
+        text(MISSING).size(11.0),
+        scroll(rows),
+    ])
+    .gap(8.0)
     .into()
 }
 
-fn node_row<'a, Message: 'a>(node: &Node) -> Element<'a, Message> {
+fn node_row(node: &Node) -> AnyView {
     let indent = "  ".repeat(node.depth);
 
     // The identity, when the node has one. A node reports an identity only
@@ -82,16 +80,16 @@ fn node_row<'a, Message: 'a>(node: &Node) -> Element<'a, Message> {
         None => "\u{2014}".to_owned(),
     };
 
-    row![
-        text(format!("{indent}{role}")).size(12),
+    row(views![
+        text(format!("{indent}{role}")).size(12.0),
         text(format!(
             "{:.0},{:.0} {:.0}\u{00d7}{:.0}",
             node.bounds.x, node.bounds.y, node.bounds.width, node.bounds.height
         ))
-        .size(11),
-        text(identity).size(10),
-    ]
-    .spacing(10)
+        .size(11.0),
+        text(identity).size(10.0),
+    ])
+    .gap(10.0)
     .into()
 }
 
@@ -193,7 +191,7 @@ mod tests {
         // exactly the thing the accessibility engine depends on being
         // stable -- and a developer comparing ids across frames would be
         // comparing fiction.
-        let element: Element<'_, ()> = node_row(&node(0, (10.0, 10.0), false));
+        let element: AnyView = node_row(&node(0, (10.0, 10.0), false));
 
         let _ = std::hint::black_box(element);
     }
@@ -208,7 +206,7 @@ mod tests {
 
     #[test]
     fn an_empty_tree_says_nothing_is_attached() {
-        let element: Element<'_, ()> = view(&[]);
+        let element: AnyView = view(&[]);
 
         let _ = std::hint::black_box(element);
     }

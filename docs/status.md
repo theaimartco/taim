@@ -4,6 +4,31 @@
 **Production release verdict:** NO-GO until every evidence gate in
 docs/release/production-gates.md is approved on a reviewed release commit.
 
+## Build and test checkpoint (2026-11-02)
+
+After the move to the view API (the `program` crate, the Elm-style
+`application` builder and the widget facade were removed), the workspace
+builds again and its automated checks are green on Linux x86-64:
+
+- `cargo check --workspace --all-targets`, `cargo clippy --workspace
+  --all-targets -- -D warnings` and `cargo fmt --all --check` pass.
+- Integration tests and benches exercise the engine crates
+  (`taim_core`, `taim_widget`, `taim_runtime`, `taim_futures`) directly;
+  the `taim` facade exposes only the view API.
+- Tests of removed code (`AppRunner`/`Program`/`FrameGate`) were deleted
+  with it: `tests/runtime/phase3_inversion.rs`, `benches/phase3_production.rs`.
+- Widget-gallery goldens were re-adopted for the TAIM palette introduced in
+  37a7097. Before that, 25 of them had also drifted by sub-perceptual
+  border antialiasing (max channel delta 12); the source of that drift was
+  not identified.
+- `taim_wgpu` built with `svg` but without `image` failed to compile; fixed.
+- `tools/taim_lab` and `examples/trivial` are ported to the view API.
+- **`examples/ide` is not ported** and is excluded from the workspace.
+
+None of this changes the release verdict: automated checks passing on a
+headless machine is not hardware, accessibility, performance or security
+acceptance. Hosted CI remains disabled at the owner's request.
+
 ## Implemented foundations
 
 The repository includes a Rust GUI workspace with wgpu/software renderer

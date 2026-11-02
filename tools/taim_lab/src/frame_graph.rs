@@ -18,8 +18,7 @@
 
 use std::collections::BTreeMap;
 
-use taim::widget::{column, container, row, scrollable, text};
-use taim::{Element, Length};
+use taim::prelude::*;
 use taim_profiler::Phase;
 
 use crate::target::Frame;
@@ -32,21 +31,20 @@ use crate::target::Frame;
 pub const BUDGET: u64 = 16_666_667;
 
 /// Renders the frame timeline.
-pub fn view<'a, Message: 'a>(frames: &[Frame]) -> Element<'a, Message> {
+pub fn view(frames: &[Frame]) -> AnyView {
     if frames.is_empty() {
         return container(
-            column![
-                text("No frames recorded.").size(16),
+            column(views![
+                text("No frames recorded.").size(16.0),
                 text(
                     "A trace records phases as they run. If this stays empty while something \
                      is drawing, the pipeline is not instrumented \u{2014} not that it is fast."
                 )
-                .size(12),
-            ]
-            .spacing(6),
+                .size(12.0),
+            ])
+            .gap(6.0),
         )
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
+        .center()
         .into();
     }
 
@@ -56,21 +54,21 @@ pub fn view<'a, Message: 'a>(frames: &[Frame]) -> Element<'a, Message> {
         .iter()
         .rev()
         .take(60)
-        .fold(column![].spacing(2), |rows, frame| {
+        .fold(column([]).gap(2.0), |rows, frame| {
             rows.push(frame_row(frame))
         });
 
-    column![
-        text(summary).size(13),
-        text(dominant(frames)).size(12),
-        scrollable(rows).height(Length::Fill),
-    ]
-    .spacing(8)
+    column(views![
+        text(summary).size(13.0),
+        text(dominant(frames)).size(12.0),
+        scroll(rows),
+    ])
+    .gap(8.0)
     .into()
 }
 
 /// One frame's line.
-fn frame_row<'a, Message: 'a>(frame: &Frame) -> Element<'a, Message> {
+fn frame_row(frame: &Frame) -> AnyView {
     let duration = match frame.duration {
         Some(duration) => format!("{:>7.2}ms", nanos_to_millis(duration)),
         // A frame that began and never ended is what a hang looks like.
@@ -101,13 +99,13 @@ fn frame_row<'a, Message: 'a>(frame: &Frame) -> Element<'a, Message> {
         Some(unattributed) => format!("  ?:{:.1}", nanos_to_millis(unattributed)),
     };
 
-    row![
-        text(format!("#{:<5}", frame.number)).size(12),
-        text(duration).size(12),
-        text(format!("{breakdown}{residue}")).size(12),
-        text(late).size(12),
-    ]
-    .spacing(10)
+    row(views![
+        text(format!("#{:<5}", frame.number)).size(12.0),
+        text(duration).size(12.0),
+        text(format!("{breakdown}{residue}")).size(12.0),
+        text(late).size(12.0),
+    ])
+    .gap(10.0)
     .into()
 }
 
@@ -326,7 +324,7 @@ mod tests {
     fn an_empty_trace_is_not_reported_as_fast() {
         // The trap this avoids: an empty timeline looks like a perfect
         // application. It almost always means nothing is instrumented.
-        let element: Element<'_, ()> = view(&[]);
+        let element: AnyView = view(&[]);
 
         // The assertion that matters is in the copy, which a test cannot
         // read from a built `Element`. Constructing it without panicking

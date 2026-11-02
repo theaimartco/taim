@@ -81,7 +81,10 @@ pub fn build(cx: &mut Scope) -> AnyView {
         level: cx.signal(0.4),
         quantity: cx.signal(3),
         query: cx.signal(String::new()),
-        notes: Buffer::new(cx, "Multi-line notes.\nClick, drag, double-click a word,\nor type here."),
+        notes: Buffer::new(
+            cx,
+            "Multi-line notes.\nClick, drag, double-click a word,\nor type here.",
+        ),
         filters: [cx.signal(true), cx.signal(false), cx.signal(false)],
         mode: cx.signal(0),
         size: cx.signal("Medium"),
@@ -504,14 +507,8 @@ fn gradient_swatch() -> taim::view::image_handle::Handle {
     let (width, height) = (96_u32, 48_u32);
     let pixels = (0..height)
         .flat_map(|y| {
-            (0..width).flat_map(move |x| {
-                [
-                    (x * 255 / width) as u8,
-                    (y * 255 / height) as u8,
-                    200,
-                    255,
-                ]
-            })
+            (0..width)
+                .flat_map(move |x| [(x * 255 / width) as u8, (y * 255 / height) as u8, 200, 255])
         })
         .collect::<Vec<u8>>();
 

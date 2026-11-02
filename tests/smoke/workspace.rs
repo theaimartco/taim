@@ -11,26 +11,15 @@
 //! combination in `.github/workflows/ci.yml`, since a single `cargo test`
 //! invocation only sees the feature set it was built with.
 
-/// The default VYOM profile must expose a working application/daemon
-/// builder, the `wgpu` and `tiny-skia` renderer feature flags, and the
-/// core prelude re-exports every widget module needs.
+/// The default profile must expose the view-based application entry
+/// points and the prelude every application imports.
 #[test]
 fn default_profile_public_api_compiles() {
     #[allow(unused_imports)]
-    use taim::{Alignment, Center, Fill, Length, Task};
+    use taim::prelude::*;
 
-    #[allow(unused_imports)]
-    use taim::widget;
-
-    #[allow(dead_code)]
-    fn assert_application_builder_exists() {
-        fn _typecheck<State, Message>()
-        where
-            State: Default + 'static,
-            Message: std::fmt::Debug + Send + 'static,
-        {
-        }
-    }
+    // Describing an application must not open a window; only `run` does.
+    let _app: taim::App = taim::app("smoke", |_cx| text("ready"));
 }
 
 /// `taim_core`, `taim_runtime`, and `taim_widget` must each compile and
@@ -55,12 +44,12 @@ fn core_types_are_backend_independent() {
     assert_eq!(bounds.height, 1.0);
 }
 
-/// The `advanced` feature must additively expose the advanced module
-/// without breaking the base public API. `Cargo.toml`'s `[dev-dependencies]`
-/// enables `advanced` for the whole `taim` dev-dependency graph, so this
-/// checks the feature is real rather than a manifest-only stub.
+/// The engine crates the facade is built on stay individually usable for
+/// custom widget authors.
 #[test]
-fn advanced_feature_exposes_advanced_module() {
+fn engine_crates_are_reachable() {
     #[allow(unused_imports)]
-    use taim::advanced;
+    use taim_core::{Layout, Widget, layout, renderer};
+    #[allow(unused_imports)]
+    use taim_widget::Element;
 }

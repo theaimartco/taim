@@ -11,13 +11,13 @@
 //! exists, forwards correctly, and is actually implemented where it
 //! mattered.
 
-use taim::advanced::widget::{self, Widget};
-use taim::advanced::{Layout, layout, mouse, overlay};
-use taim::widget::pick_list;
 use taim::{Point, Rectangle, Size, Theme, Vector};
 use taim_core::semantics::{Node, Role, State};
 use taim_core::widget::Id;
+use taim_core::widget::{self, Widget};
+use taim_core::{Layout, layout, mouse, overlay};
 use taim_renderer::Renderer;
+use taim_widget::pick_list;
 
 type Message = &'static str;
 
@@ -27,12 +27,10 @@ const WINDOW: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 
@@ -61,7 +59,7 @@ impl overlay::Overlay<Message, Theme, Renderer> for Reporting {
         &self,
         _renderer: &mut Renderer,
         _theme: &Theme,
-        _style: &taim::advanced::renderer::Style,
+        _style: &taim_core::renderer::Style,
         _layout: Layout<'_>,
         _cursor: mouse::Cursor,
     ) {
@@ -169,7 +167,7 @@ impl OpenPickList<'_> {
     /// Clicks the control, which is what opens the dropdown.
     fn click(&mut self) {
         let mut messages = Vec::new();
-        let mut shell = taim::advanced::Shell::new(
+        let mut shell = taim_core::Shell::new(
             &taim_core::window::Headless,
             taim_core::shell::Waker::noop(),
             &mut messages,
@@ -178,7 +176,7 @@ impl OpenPickList<'_> {
         Widget::<Message, Theme, Renderer>::update(
             &mut self.widget,
             &mut self.tree,
-            &taim::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            &taim_core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
             Layout::new(&self.node),
             mouse::Cursor::Available(Layout::new(&self.node).bounds().center()),
             &self.renderer,

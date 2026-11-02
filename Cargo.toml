@@ -119,6 +119,12 @@ image.workspace = true
 image.optional = true
 
 [dev-dependencies]
+# The engine crates the integration tests and benches exercise directly.
+# The `taim` facade exposes only the view API; widget-, runtime- and
+# executor-level contracts are tested against the crates that own them.
+taim_futures = { workspace = true, features = ["thread-pool"] }
+taim_runtime.workspace = true
+taim_widget = { workspace = true, features = ["advanced", "taim", "canvas", "lazy", "signal", "wgpu", "markdown", "qr_code", "svg"] }
 taim-accessibility.workspace = true
 taim-design.workspace = true
 taim-gesture.workspace = true
@@ -169,9 +175,6 @@ harness = false
 name = "cpu"
 harness = false
 
-[[bench]]
-name = "phase3_production"
-harness = false
 
 [profile.dev]
 opt-level = 0
@@ -235,6 +238,10 @@ panic = "abort"
 strip = "symbols"
 
 [workspace]
+# `examples/ide` still targets the removed Elm-style `application` API and
+# has not been ported to the view API; it is kept out of the workspace
+# build until it is. See `docs/status.md`.
+exclude = ["examples/ide"]
 members = [
     "taim-accessibility",
     "taim-atlas",
@@ -254,7 +261,6 @@ members = [
     "examples/counter",
     "examples/gallery",
     "examples/todos",
-    "examples/ide",
     "examples/mobile_shell",
     "examples/trivial",
     "futures",

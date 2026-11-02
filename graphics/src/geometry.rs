@@ -35,7 +35,10 @@ pub trait Renderer: core::Renderer {
 
     /// Create a frame only when TAIM's explicit geometry contract accepts
     /// the requested rectangle. Useful for untrusted plugin layout values.
-    fn try_new_frame(&self, bounds: Rectangle) -> Result<Self::Frame, crate::validation::BoundsError> {
+    fn try_new_frame(
+        &self,
+        bounds: Rectangle,
+    ) -> Result<Self::Frame, crate::validation::BoundsError> {
         crate::validation::validate_frame_bounds(bounds)?;
         Ok(self.new_frame(bounds))
     }
@@ -62,7 +65,10 @@ mod taim_geometry_frame_tests {
     #[test]
     fn invalid_geometry_does_not_enter_the_render_backend() {
         let rect = Rectangle::new(Point::new(f32::NAN, 0.0), Size::new(10.0, 10.0));
-        assert!(matches!(().try_new_frame(rect), Err(crate::validation::BoundsError::NonFinite)));
+        assert!(matches!(
+            ().try_new_frame(rect),
+            Err(crate::validation::BoundsError::NonFinite)
+        ));
         let valid = Rectangle::new(Point::ORIGIN, Size::new(10.0, 10.0));
         assert!(().try_new_frame(valid).is_ok());
     }

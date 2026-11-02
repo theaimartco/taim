@@ -170,8 +170,10 @@ mod tests {
 
     #[test]
     fn trivial_and_empty_sources() {
-        assert!(Entry::Contiguous(atlas::Allocation::Full { layer: 0, size: 8 })
-            .valid_source_coverage());
+        assert!(
+            Entry::Contiguous(atlas::Allocation::Full { layer: 0, size: 8 })
+                .valid_source_coverage()
+        );
         let empty = Entry::Fragmented {
             size: Size::new(0, 0),
             fragments: vec![],

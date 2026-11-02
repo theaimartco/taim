@@ -35,8 +35,8 @@
 //! rectangle, same cost, completely different thing to do about it — which
 //! is why they are different variants and not a bool.
 
-use taim::widget::{column, container, row, text};
-use taim::{Element, Length, Size};
+use taim::Size;
+use taim::prelude::*;
 use taim_core::damage::{Attribution, Causes, Fallback, Region};
 
 /// What this panel still cannot say.
@@ -99,11 +99,7 @@ pub fn coverage(region: Option<&Region>, surface: Size) -> f32 {
 }
 
 /// Renders the damage overlay.
-pub fn view<'a, Message: 'a>(
-    damage: Option<&Attribution>,
-    surface: Size,
-    layout_changed: bool,
-) -> Element<'a, Message> {
+pub fn view(damage: Option<&Attribution>, surface: Size, layout_changed: bool) -> AnyView {
     let region = damage.map(|damage| damage.region);
     let covered = coverage(region.as_ref(), surface);
 
@@ -146,16 +142,16 @@ pub fn view<'a, Message: 'a>(
     };
 
     container(
-        column![
-            text(headline).size(20),
-            text(why).size(13),
-            text(verdict).size(13),
-            row![
+        column(views![
+            text(headline).size(20.0),
+            text(why).size(13.0),
+            text(verdict).size(13.0),
+            row(views![
                 text(format!(
                     "surface {:.0}\u{00d7}{:.0}",
                     surface.width, surface.height
                 ))
-                .size(12),
+                .size(12.0),
                 text(if layout_changed {
                     // Worth pairing: a relayout is the usual reason a frame
                     // damages everything, and seeing them together is the
@@ -164,15 +160,15 @@ pub fn view<'a, Message: 'a>(
                 } else {
                     "layout reused"
                 })
-                .size(12),
-            ]
-            .spacing(12),
-            text(MISSING).size(11),
-        ]
-        .spacing(8),
+                .size(12.0),
+            ])
+            .gap(12.0),
+            text(MISSING).size(11.0),
+        ])
+        .gap(8.0),
     )
-    .center_x(Length::Fill)
-    .padding(12)
+    .center_x()
+    .padding(12.0)
     .into()
 }
 
@@ -316,7 +312,7 @@ mod tests {
             fallback: Some(Fallback::Requested(taim_core::damage::Cause::Layout)),
         };
 
-        let element: Element<'_, ()> = view(Some(&attribution), SURFACE, true);
+        let element: AnyView = view(Some(&attribution), SURFACE, true);
 
         let _ = std::hint::black_box(element);
     }

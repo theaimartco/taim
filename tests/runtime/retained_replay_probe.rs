@@ -1,10 +1,12 @@
 //! Live-path retained replay regressions.
 
-use taim::advanced::widget::{self, Widget};
-use taim::advanced::{Layout, mouse, renderer};
-use taim::{Element, Length, Rectangle, Size, Theme};
+use taim::{Rectangle, Size, Theme};
+use taim_core::Length;
+use taim_core::widget::{self, Widget};
+use taim_core::{Layout, mouse, renderer};
 use taim_renderer::Renderer;
 use taim_runtime::user_interface::{self, UserInterface};
+use taim_widget::Element;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -20,9 +22,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Quiet {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
-        taim::advanced::layout::Node::new(Size::new(10.0, 10.0))
+        _limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
+        taim_core::layout::Node::new(Size::new(10.0, 10.0))
     }
 
     fn draw(
@@ -35,7 +37,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Quiet {
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
-        use taim::advanced::renderer::Renderer as _;
+        use taim_core::renderer::Renderer as _;
         let _ = self.0.fetch_add(1, Ordering::Relaxed);
         renderer.fill_quad(
             renderer::Quad {
@@ -48,18 +50,16 @@ impl<Message> Widget<Message, Theme, Renderer> for Quiet {
 }
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 
 #[test]
 fn an_unchanged_interface_replays_without_reentering_widget_paint() {
-    use taim::advanced::renderer::Renderer as _;
+    use taim_core::renderer::Renderer as _;
 
     let mut renderer = headless_renderer();
     let cache = user_interface::Cache::new();
@@ -97,9 +97,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Changing {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
-        taim::advanced::layout::Node::new(Size::new(10.0, 10.0))
+        _limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
+        taim_core::layout::Node::new(Size::new(10.0, 10.0))
     }
 
     fn draw(
@@ -112,7 +112,7 @@ impl<Message> Widget<Message, Theme, Renderer> for Changing {
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
-        use taim::advanced::renderer::Renderer as _;
+        use taim_core::renderer::Renderer as _;
         renderer.fill_quad(
             renderer::Quad {
                 bounds: Rectangle::new([0.0, 0.0].into(), Size::new(10.0, 10.0)),
@@ -143,10 +143,10 @@ impl<Message> Widget<Message, Theme, Renderer> for LiveValueProbe {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
+        _limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
         let _ = self.layouts.fetch_add(1, Ordering::Relaxed);
-        taim::advanced::layout::Node::new(Size::new(10.0, 10.0))
+        taim_core::layout::Node::new(Size::new(10.0, 10.0))
     }
 
     fn draw(
@@ -159,7 +159,7 @@ impl<Message> Widget<Message, Theme, Renderer> for LiveValueProbe {
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
-        use taim::advanced::renderer::Renderer as _;
+        use taim_core::renderer::Renderer as _;
 
         let _ = self.paints.fetch_add(1, Ordering::Relaxed);
         let red = self.signal.get() as f32 / 10.0;
@@ -182,10 +182,10 @@ impl<Message> Widget<Message, Theme, Renderer> for LayoutProbe {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
+        _limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
         let _ = self.layouts.fetch_add(1, Ordering::Relaxed);
-        taim::advanced::layout::Node::new(Size::new(10.0, 10.0))
+        taim_core::layout::Node::new(Size::new(10.0, 10.0))
     }
 
     fn draw(
@@ -204,7 +204,7 @@ impl<Message> Widget<Message, Theme, Renderer> for LayoutProbe {
 
 #[test]
 fn rebuilding_changed_content_never_replays_stale_pixels() {
-    use taim::advanced::renderer::Renderer as _;
+    use taim_core::renderer::Renderer as _;
 
     let mut renderer = headless_renderer();
     let mut cache = user_interface::Cache::new();
@@ -243,7 +243,7 @@ fn a_reactive_subtree_rebuilds_only_when_its_signal_changes() {
         let builds = Arc::clone(&builds);
         let layouts = Arc::clone(&layouts);
         let paints = Arc::clone(&paints);
-        taim::widget::reactive(signal, move |_value| {
+        taim_widget::reactive(signal, move |_value| {
             let _ = builds.fetch_add(1, Ordering::Relaxed);
             Element::new(LayoutProbe {
                 layouts: Arc::clone(&layouts),
@@ -306,7 +306,7 @@ fn check_live_signal(batched: bool) {
         let builds = Arc::clone(&builds);
         let layouts = Arc::clone(&layouts);
         let paints = Arc::clone(&paints);
-        taim::widget::reactive(signal.clone(), move |value| {
+        taim_widget::reactive(signal.clone(), move |value| {
             built_value.store(value as usize, Ordering::Relaxed);
             let _ = builds.fetch_add(1, Ordering::Relaxed);
             Element::new(LayoutProbe {
@@ -344,7 +344,7 @@ fn check_live_signal(batched: bool) {
     let _ = ui.update(
         &window,
         &waker,
-        &[taim::Event::Waken],
+        &[taim_core::Event::Waken],
         mouse::Cursor::Unavailable,
         &mut renderer,
         &mut messages,
@@ -369,7 +369,7 @@ fn check_live_signal(batched: bool) {
     let (state, _) = ui.update(
         &window,
         &waker,
-        &[taim::Event::Reactive(source)],
+        &[taim_core::Event::Reactive(source)],
         mouse::Cursor::Unavailable,
         &mut renderer,
         &mut messages,
@@ -406,7 +406,7 @@ fn a_paint_only_signal_reuses_layout() {
     let element: Element<'static, (), Theme, Renderer> = {
         let layouts = Arc::clone(&layouts);
         let paints = Arc::clone(&paints);
-        taim::widget::reactive_paint(signal.clone(), move |_value| {
+        taim_widget::reactive_paint(signal.clone(), move |_value| {
             Element::new(LayoutProbe {
                 layouts: Arc::clone(&layouts),
                 paints: Arc::clone(&paints),
@@ -439,7 +439,7 @@ fn a_paint_only_signal_reuses_layout() {
     let _ = ui.update(
         &window,
         &waker,
-        &[taim::Event::Waken],
+        &[taim_core::Event::Waken],
         mouse::Cursor::Unavailable,
         &mut renderer,
         &mut messages,
@@ -453,7 +453,7 @@ fn a_paint_only_signal_reuses_layout() {
     let _ = ui.update(
         &window,
         &waker,
-        &[taim::Event::Reactive(source)],
+        &[taim_core::Event::Reactive(source)],
         mouse::Cursor::Unavailable,
         &mut renderer,
         &mut messages,
@@ -480,7 +480,7 @@ fn a_value_signal_reuses_its_widget_tree_and_layout() {
         let layouts = Arc::clone(&layouts);
         let paints = Arc::clone(&paints);
 
-        taim::widget::reactive_value(signal.clone(), move |live| {
+        taim_widget::reactive_value(signal.clone(), move |live| {
             let _ = builds.fetch_add(1, Ordering::Relaxed);
             Element::new(LiveValueProbe {
                 signal: live,
@@ -515,7 +515,7 @@ fn a_value_signal_reuses_its_widget_tree_and_layout() {
     let _ = ui.update(
         &window,
         &waker,
-        &[taim::Event::Waken],
+        &[taim_core::Event::Waken],
         mouse::Cursor::Unavailable,
         &mut renderer,
         &mut messages,
@@ -529,7 +529,7 @@ fn a_value_signal_reuses_its_widget_tree_and_layout() {
     let _ = ui.update(
         &window,
         &waker,
-        &[taim::Event::Reactive(source)],
+        &[taim_core::Event::Reactive(source)],
         mouse::Cursor::Unavailable,
         &mut renderer,
         &mut messages,

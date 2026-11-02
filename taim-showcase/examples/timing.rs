@@ -50,7 +50,12 @@ fn main() {
     let (p50, p99) = micros(|| {
         use taim_core::Renderer as _;
         renderer.reset(bounds);
-        root.paint(&mut renderer, Color::WHITE, None, taim_core::time::Instant::now());
+        root.paint(
+            &mut renderer,
+            Color::WHITE,
+            None,
+            taim_core::time::Instant::now(),
+        );
     });
     println!("reset+paint   p50 {p50:8.1} us   p99 {p99:8.1} us");
 
@@ -58,7 +63,12 @@ fn main() {
     let (p50, p99) = micros(|| {
         use taim_core::Renderer as _;
         renderer.reset(bounds);
-        root.paint(&mut renderer, Color::WHITE, None, taim_core::time::Instant::now());
+        root.paint(
+            &mut renderer,
+            Color::WHITE,
+            None,
+            taim_core::time::Instant::now(),
+        );
         let _ = renderer.screenshot(physical, 1.0, Color::BLACK);
     });
     println!("full CPU frame (paint + rasterize 1024x768)  p50 {p50:8.1} us   p99 {p99:8.1} us");

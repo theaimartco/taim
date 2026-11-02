@@ -271,7 +271,7 @@ impl View for DatePicker {
                 if at.and_then(|at| self.target_at(bounds, at)) == Some(pressed) {
                     match pressed {
                         Target::Previous => {
-                            self.visible.update(|month| *month = month.add_months(-1))
+                            self.visible.update(|month| *month = month.add_months(-1));
                         }
                         Target::Next => self.visible.update(|month| *month = month.add_months(1)),
                         Target::Day(day) => {

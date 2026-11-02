@@ -27,18 +27,18 @@ impl Stack {
         &mut self,
         tessellator: &mut tessellation::FillTessellator,
         path: &Path,
-        options: &tessellation::FillOptions,
+        options: tessellation::FillOptions,
         style: &Style,
     ) -> Result<(), tessellation::TessellationError> {
         match (style, self.for_style(style)) {
             (Style::Solid(color), Buffer::Solid(buffer)) => tessellator.tessellate_path(
                 path.raw(),
-                options,
+                &options,
                 &mut tessellation::BuffersBuilder::new(buffer, SolidBuilder(color::pack(*color))),
             ),
             (Style::Gradient(gradient), Buffer::Gradient(buffer)) => tessellator.tessellate_path(
                 path.raw(),
-                options,
+                &options,
                 &mut tessellation::BuffersBuilder::new(
                     buffer,
                     GradientBuilder {
@@ -54,19 +54,19 @@ impl Stack {
         &mut self,
         tessellator: &mut tessellation::FillTessellator,
         rectangle: &lyon::math::Box2D,
-        options: &tessellation::FillOptions,
+        options: tessellation::FillOptions,
         style: &Style,
     ) -> Result<(), tessellation::TessellationError> {
         match (style, self.for_style(style)) {
             (Style::Solid(color), Buffer::Solid(buffer)) => tessellator.tessellate_rectangle(
                 rectangle,
-                options,
+                &options,
                 &mut tessellation::BuffersBuilder::new(buffer, SolidBuilder(color::pack(*color))),
             ),
             (Style::Gradient(gradient), Buffer::Gradient(buffer)) => tessellator
                 .tessellate_rectangle(
                     rectangle,
-                    options,
+                    &options,
                     &mut tessellation::BuffersBuilder::new(
                         buffer,
                         GradientBuilder {

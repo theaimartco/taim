@@ -251,7 +251,11 @@ impl winit::application::ApplicationHandler<Wake> for Shell {
             self.set_system_theme(conversion::theme_mode(*theme));
         }
 
-        let Some(index) = self.windows.iter().position(|surface| surface.raw.id() == id) else {
+        let Some(index) = self
+            .windows
+            .iter()
+            .position(|surface| surface.raw.id() == id)
+        else {
             return;
         };
         let surface = &mut self.windows[index];

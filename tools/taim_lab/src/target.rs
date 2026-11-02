@@ -25,8 +25,7 @@
 
 use std::time::{Duration, Instant};
 
-use taim::widget::{button, checkbox, column, container, row, scrollable, slider, text};
-use taim::{Color, Element, Rectangle, Size, Theme};
+use taim::{Color, Rectangle, Size, Theme};
 use taim_core::semantics;
 use taim_core::widget::visit::Visit;
 use taim_profiler::events::{Event, Phase, Resource};
@@ -34,6 +33,8 @@ use taim_profiler::{Collector, export};
 use taim_renderer::graphics::text::CacheStatistics;
 use taim_runtime::diagnostics::Trace;
 use taim_runtime::user_interface::{Cache, UserInterface};
+use taim_widget::Element;
+use taim_widget::{button, checkbox, column, container, row, scrollable, slider, text};
 
 /// The renderer the hosted view draws with.
 ///
@@ -325,8 +326,8 @@ impl Hosted {
     /// confidently wrong rather than absent.
     pub fn new(collector: Collector) -> Option<Self> {
         let renderer = taim_futures::futures::executor::block_on(
-            <Renderer as taim::advanced::renderer::Headless>::new(
-                taim::advanced::renderer::Settings::default(),
+            <Renderer as taim_core::renderer::Headless>::new(
+                taim_core::renderer::Settings::default(),
                 Some("tiny-skia"),
             ),
         )?;
@@ -426,7 +427,7 @@ impl Hosted {
             (self.bounds.width * self.scale).round() as u32,
             (self.bounds.height * self.scale).round() as u32,
         );
-        let _ = <Renderer as taim::advanced::renderer::Headless>::screenshot(
+        let _ = <Renderer as taim_core::renderer::Headless>::screenshot(
             &mut self.renderer,
             physical,
             self.scale,
