@@ -434,7 +434,7 @@ impl Surface {
     /// Draws and presents one frame.
     pub fn draw(&mut self, compositor: &mut Compositor) {
         let now = Instant::now();
-        let started = std::time::Instant::now();
+        let started = Instant::now();
 
         if self.clock.is_suspended() || self.target.is_none() {
             return;

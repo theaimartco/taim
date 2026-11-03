@@ -200,7 +200,7 @@ mod platform {
     }
 
     /// The desktop clipboard, through `arboard`.
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     mod native {
         use super::*;
 
@@ -290,6 +290,27 @@ mod platform {
                     description: Arc::new(error.to_string()),
                 },
             }
+        }
+    }
+
+    /// iOS: `UIPasteboard` is not connected yet, so the clipboard reports
+    /// itself unavailable rather than pretending to copy.
+    #[cfg(target_os = "ios")]
+    mod native {
+        use super::*;
+
+        pub(super) struct Native;
+
+        pub(super) fn connect() -> Option<Native> {
+            None
+        }
+
+        pub(super) fn read_content(_: &mut Native, _: Kind) -> Result<Content, Error> {
+            Err(Error::ClipboardUnavailable)
+        }
+
+        pub(super) fn write_content(_: &mut Native, _: Content) -> Result<(), Error> {
+            Err(Error::ClipboardUnavailable)
         }
     }
 

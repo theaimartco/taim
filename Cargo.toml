@@ -125,6 +125,12 @@ thiserror.workspace = true
 image.workspace = true
 image.optional = true
 
+
+# A browser offers no system fonts to read, so web builds always embed one;
+# without it no text is drawn at all.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+taim_renderer = { workspace = true, features = ["fira-sans"] }
+
 [dev-dependencies]
 # The engine crates the integration tests and benches exercise directly.
 # The `taim` facade exposes only the view API; widget-, runtime- and

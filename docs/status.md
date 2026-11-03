@@ -324,8 +324,10 @@ Verified in this checkpoint: `cargo check --workspace --all-targets
 window-layer rewrite). Typing into `mobile_shell`'s search field also
 works once the test harness gives the window X keyboard focus (Xvfb runs
 without a window manager, so `xdotool windowfocus` is required).
-Physical-device, Wayland, Windows, macOS
-and web runs remain unverified.
+Physical-device, Wayland, Windows and macOS runs remain unverified. Web
+runs in headless Chromium through WebGL2 (`scripts/web/build.sh`, see
+`docs/platform/web.md`); Windows, macOS and iOS are lint-clean in the
+release check but have not been run.
 
 ## Verification lanes
 

@@ -108,7 +108,7 @@ fn main() -> taim::Result {
         let now_playing = container(
             glass(
                 row(views![
-                    container(text("♪").size(22.0))
+                    container(icon(Icon::PLAY).size(20.0))
                         .width(44.0)
                         .height(44.0)
                         .center()
@@ -146,10 +146,10 @@ fn main() -> taim::Result {
             now_playing,
             nav_bar(
                 [
-                    ("\u{2302}", "Home"),
-                    ("\u{2315}", "Search"),
-                    ("\u{266B}", "Library"),
-                    ("\u{263A}", "Profile"),
+                    (Icon::HOME, "Home"),
+                    (Icon::SEARCH, "Search"),
+                    (Icon::FOLDER, "Library"),
+                    (Icon::PERSON, "Profile"),
                 ],
                 tab,
             ),

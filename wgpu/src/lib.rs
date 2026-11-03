@@ -19,6 +19,10 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(missing_docs)]
+// On the web wgpu's handles are neither `Send` nor `Sync`. A page runs on
+// one thread, so the `Arc`s that share them between parts of the renderer
+// are sound there; on every other target they are `Send` and `Sync`.
+#![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
 pub mod display;
 pub mod layer;
 pub mod primitive;
@@ -936,8 +940,14 @@ impl Renderer {
     ) {
         use std::mem::ManuallyDrop;
 
+        // Glass and effects copy from the frame; a frame that cannot be
+        // copied from (WebGL) draws them flat instead of failing validation.
+        let can_copy = frame_texture
+            .usage()
+            .contains(wgpu::TextureUsages::COPY_SRC);
+
         // Before the draw loop, which borrows `self.layers`.
-        if self.layers.iter().any(|layer| layer.quads.needs_backdrop()) {
+        if can_copy && self.layers.iter().any(|layer| layer.quads.needs_backdrop()) {
             self.prepare_quad_backdrop(frame_texture);
         }
 
@@ -1010,7 +1020,7 @@ impl Renderer {
             // before it draws over them. A backdrop blur frosts the page
             // behind a sheet; running it after the sheet has drawn would
             // blur the sheet instead.
-            if self.pipelines.effect.has_backdrop(index) {
+            if can_copy && self.pipelines.effect.has_backdrop(index) {
                 let physical = viewport.physical_size();
 
                 let _ = ManuallyDrop::into_inner(render_pass);
@@ -1048,7 +1058,7 @@ impl Renderer {
             // backdrop *effect*, which replaces its region in its own pass,
             // this is a plain copy: the bending happens per-fragment inside
             // the quad's own draw.
-            let backdrop = (!layer.quads.is_empty() && layer.quads.needs_backdrop())
+            let backdrop = (can_copy && !layer.quads.is_empty() && layer.quads.needs_backdrop())
                 .then_some(self.quad_backdrop.as_ref())
                 .flatten();
 
@@ -1249,7 +1259,7 @@ impl Renderer {
                 render_span.finish();
             }
 
-            if !layer.effects.is_empty() {
+            if can_copy && !layer.effects.is_empty() {
                 let _ = ManuallyDrop::into_inner(render_pass);
                 let physical = viewport.physical_size();
 

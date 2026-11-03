@@ -7,11 +7,15 @@
 #   1. formatting                 cargo fmt --check
 #   2. desktop lints              cargo clippy --workspace --all-targets -D warnings
 #   3. Android lints              clippy for aarch64- and x86_64-linux-android
-#   4. tests                      cargo test --workspace
-#   5. new-project smoke          taim-new writes a project that builds
-#   6. Android link               cargo ndk build of mobile_shell (needs the NDK)
+#   4. web lints                  clippy for wasm32 (WebGPU and WebGL builds)
+#   5. other platform lints       clippy for Windows, macOS and iOS targets
+#   6. tests                      cargo test --workspace
+#   7. new-project smoke          taim-new writes a project that builds
+#   8. Android link               cargo ndk build of mobile_shell (needs the NDK)
 #
-# Step 6 is skipped, and reported as SKIPPED, when cargo-ndk or the NDK is
+# Steps 4 and 5 type-check and lint without linking, so they need only the
+# Rust targets, which they add with rustup; no Windows, Apple or browser
+# toolchain is involved. Step 8 is skipped, and reported as SKIPPED, when cargo-ndk or the NDK is
 # missing: a check without it has not linked anything for Android. Device
 # behaviour is a separate gate: scripts/qa/android-device-check.sh.
 #
@@ -76,6 +80,22 @@ android_lints() {
   done
 }
 
+EXAMPLES=(-p taim -p counter -p liquid -p mobile_shell)
+
+web_lints() {
+  rustup target add wasm32-unknown-unknown >/dev/null 2>&1 || return 1
+  cargo clippy "${EXAMPLES[@]}" --target wasm32-unknown-unknown -- -D warnings || return 1
+  cargo clippy "${EXAMPLES[@]}" --features taim/webgl --target wasm32-unknown-unknown -- -D warnings
+}
+
+platform_lints() {
+  for target in x86_64-pc-windows-msvc aarch64-pc-windows-msvc \
+    x86_64-apple-darwin aarch64-apple-darwin aarch64-apple-ios; do
+    rustup target add "$target" >/dev/null 2>&1 || return 1
+    cargo clippy "${EXAMPLES[@]}" --target "$target" -- -D warnings || return 1
+  done
+}
+
 new_project() {
   local scratch
   scratch="$(mktemp -d)"
@@ -95,6 +115,8 @@ echo
 step "formatting" cargo fmt --all --check
 [ "$FAILED" = 0 ] && step "desktop lints" cargo clippy --workspace --all-targets -- -D warnings
 [ "$FAILED" = 0 ] && step "android lints" android_lints
+[ "$FAILED" = 0 ] && step "web lints" web_lints
+[ "$FAILED" = 0 ] && step "other platform lints" platform_lints
 [ "$FAILED" = 0 ] && step "tests" cargo test --workspace --no-fail-fast -- --nocapture
 # GPU tests pass without running when there is no adapter; say so.
 if [ "$FAILED" = 0 ] && grep -qE "skipped: no (wgpu|GPU) adapter" "$LOGS/tests.log" 2>/dev/null; then

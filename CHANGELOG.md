@@ -4,6 +4,36 @@ All notable changes to this project are recorded here. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 break the public API.
 
+## [Unreleased]
+
+### Added
+
+- Web: applications run in the browser (`scripts/web/build.sh`,
+  `docs/platform/web.md`). The canvas mounts into `#taim` or the page body,
+  the GPU device is created asynchronously, Fira Sans is embedded, panics
+  reach the console, and WebGL2 works (glass and effects are drawn flat
+  there, since a WebGL canvas cannot be read back).
+- `nav_bar` takes an `Icon`
+  (`nav_bar([(Icon::HOME, "Home")], tab)`); it is drawn in the built-in
+  icon font, so it shows on every platform.
+- `Icon::name`; `icon_button` announces it to screen readers (it announced
+  nothing before).
+- `Container::background_themed(light, dark)` and `TextField::plain`.
+- The release check lints the web, Windows, macOS and iOS targets.
+
+### Fixed
+
+- Gradients were never drawn on the web: the pipeline was compiled out for
+  wasm.
+- The search field kept a light background on dark themes; its text field
+  drew a second frame inside it.
+- The search, clear and time-picker arrow glyphs, and the examples'
+  navigation glyphs, were symbols missing from the bundled font and showed
+  as boxes where the system had no fallback (Android, the web).
+- iOS and Windows builds: keyboard conversion, the Unix display check,
+  clipboard and a lint failed to compile or pass.
+- `std::time::Instant` panicked on the web; time comes from `web-time`.
+
 ## [0.15.0-rc.1] - 2026-11-03
 
 Release candidate. Automated checks pass on Linux x86-64 and the Android

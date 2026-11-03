@@ -54,9 +54,10 @@ security disclosure and deprecation policies without inventing an SLA.
 |---|---|
 | Linux x86-64 via winit/Wayland and X11 | Implemented; physical QA not signed |
 | Native VYOM/Smithay Wayland | Experimental; physical presentation not accepted |
-| Windows/macOS | Platform code present; physical QA not accepted |
-| Android/iOS | Unsupported until native device verification |
-| Web/WASM | Compile support only; functional device/browser QA pending |
+| Windows x64/ARM64, macOS x64/ARM64 | Lint clean in the release check; not run, physical QA not accepted |
+| Android arm64/x86_64 | Lint clean; device verification pending |
+| iOS arm64 | Lint clean; no app-bundle (Xcode) tooling; clipboard unavailable; not run |
+| Web/WASM | Runs in headless Chromium (WebGL2): render, text, gradients, clicks; glass is drawn flat on WebGL; WebGPU, Firefox, Safari and real devices not verified |
 
 ## Latest gate ledger
 

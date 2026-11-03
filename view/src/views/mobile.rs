@@ -1,6 +1,6 @@
 //! Views for phone-style layouts.
 use super::look::{self, Label, Tween};
-use super::{button, column, container, layers, row, text, text_field, when};
+use super::{button, column, container, layers, row, text_field, when};
 use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::{Axis, Constraints, Sizing};
 use crate::state::{IntoProp, Prop, State};
@@ -637,14 +637,17 @@ impl View for Badge {
 pub fn search(placeholder: impl IntoProp<String>, query: State<String>) -> AnyView {
     container(
         row(crate::views![
-            text("⌕").size(18),
-            text_field(placeholder, query),
+            super::icon(super::Icon::SEARCH).size(18),
+            text_field(placeholder, query).plain(),
             when(
                 move || !query.get().is_empty(),
                 move || {
-                    button("✕").on_press(move || {
-                        let _ = query.set(String::new());
-                    })
+                    button("Clear search")
+                        .label_view(super::icon(super::Icon::CLOSE).size(16))
+                        .ghost()
+                        .on_press(move || {
+                            let _ = query.set(String::new());
+                        })
                 }
             ),
         ])
@@ -653,7 +656,10 @@ pub fn search(placeholder: impl IntoProp<String>, query: State<String>) -> AnyVi
         .fill_width(),
     )
     .padding([4.0, 12.0])
-    .background(Color::from_rgb8(0xE6, 0xE6, 0xEA))
+    .background_themed(
+        Color::from_rgb8(0xE6, 0xE6, 0xEA),
+        Color::from_rgb8(0x2C, 0x2C, 0x34),
+    )
     .border(Border::default().rounded(22.0))
     .fill_width()
     .into()

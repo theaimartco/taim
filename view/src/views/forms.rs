@@ -454,9 +454,11 @@ impl View for Dialog {
     }
 }
 
-/// A square button showing just an icon.
+/// A square button showing just an icon. Screen readers announce the
+/// icon's [name](Icon::name); give a more specific one with
+/// `button("Play episode").label_view(icon(Icon::PLAY))`.
 pub fn icon_button(glyph: Icon) -> super::Button {
-    button(String::new()).label_view(icon(glyph).size(18))
+    button(glyph.name()).label_view(icon(glyph).size(18))
 }
 
 /// A list row: optional leading icon, a title and an optional subtitle.

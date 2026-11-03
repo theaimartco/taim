@@ -4174,6 +4174,7 @@ dependencies = [
  "taim_renderer",
  "thiserror 2.0.19",
  "tracing",
+ "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
  "winit",

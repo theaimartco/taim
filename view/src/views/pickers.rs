@@ -339,9 +339,15 @@ pub fn time_picker(time: State<Time>, step: u8) -> AnyView {
 
     let column_of = |label: &'static str, up: i32, down: i32, show: fn(Time) -> u8| {
         column(crate::views![
-            button("▲").on_press(shift(up)),
+            button(format!("{label} up"))
+                .label_view(super::icon(super::Icon::CHEVRON_UP).size(18))
+                .secondary()
+                .on_press(shift(up)),
             text(move || format!("{:02}", show(time.get()))).size(24),
-            button("▼").on_press(shift(down)),
+            button(format!("{label} down"))
+                .label_view(super::icon(super::Icon::CHEVRON_DOWN).size(18))
+                .secondary()
+                .on_press(shift(down)),
             text(label).size(11),
         ])
         .gap(6.0)

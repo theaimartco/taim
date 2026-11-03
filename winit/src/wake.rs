@@ -22,6 +22,9 @@ pub(crate) enum Wake {
     /// The renderer finished background work (an image decoded, a font
     /// loaded) and every window should be laid out and painted again.
     Refresh,
+    /// The browser finished creating the compositor.
+    #[cfg(target_arch = "wasm32")]
+    CompositorReady,
     /// A screen reader started reading a window: publish its whole tree.
     #[cfg(target_os = "android")]
     Describe(window::Id),

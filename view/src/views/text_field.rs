@@ -22,6 +22,7 @@ pub fn text_field(placeholder: impl IntoProp<String>, value: State<String>) -> T
         shown: value.into_prop(),
         on_submit: None,
         secret: false,
+        plain: false,
         padding: Padding::from([6.0, 10.0]),
         caret: Caret::at(0),
         dragging: false,
@@ -39,6 +40,8 @@ pub struct TextField {
     shown: Prop<String>,
     on_submit: Option<Box<dyn Fn()>>,
     secret: bool,
+    /// No frame of its own: the field sits in a surface that draws one.
+    plain: bool,
     padding: Padding,
     caret: Caret,
     dragging: bool,
@@ -150,6 +153,14 @@ impl TextField {
     /// Hides the text (for passwords).
     pub fn secret(mut self) -> Self {
         self.secret = true;
+        self
+    }
+
+    /// Draws no background or outline, for a field inside a surface that
+    /// already looks like one (as in [`search`](super::search)). Keyboard
+    /// focus still shows a ring.
+    pub fn plain(mut self) -> Self {
+        self.plain = true;
         self
     }
 
@@ -366,14 +377,22 @@ impl View for TextField {
             palette.background.strong.color
         };
 
-        cx.fill(
-            bounds,
-            palette.background.base.color,
-            Border::default()
-                .width(if focused { 2.0 } else { 1.0 })
-                .color(edge)
-                .rounded(6.0),
-        );
+        if !self.plain {
+            cx.fill(
+                bounds,
+                palette.background.base.color,
+                Border::default()
+                    .width(if focused { 2.0 } else { 1.0 })
+                    .color(edge)
+                    .rounded(6.0),
+            );
+        } else if focused {
+            cx.fill(
+                bounds,
+                crate::Color::TRANSPARENT,
+                Border::default().width(2.0).color(edge).rounded(6.0),
+            );
+        }
 
         let Some((paragraph, placeholder)) = &self.shaped else {
             return;

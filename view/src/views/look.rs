@@ -68,10 +68,11 @@ pub(crate) struct Label {
 
 impl Label {
     pub(crate) fn new(content: impl Into<String>, size: Option<f32>) -> Self {
+        let content = content.into();
         Self {
-            content: content.into(),
+            font: super::Icon::is_glyph(&content).then_some(super::Icon::FONT),
+            content,
             size: size.map(crate::Pixels),
-            font: None,
             shaped: None,
         }
     }

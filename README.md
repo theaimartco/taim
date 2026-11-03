@@ -50,6 +50,18 @@ Applications get a `navigator` for screens and back, a lazy `list` for long
 feeds, `taim::storage` for settings and `taim::platform` for links, sharing,
 vibration and files.
 
+## Other platforms
+
+| Platform | State |
+|---|---|
+| Linux (X11, Wayland) | Runs; checked under a virtual X11 display |
+| Android | Builds; not yet run on a device |
+| Web (WebAssembly) | Runs in Chromium with WebGL2; see [docs/platform/web.md](docs/platform/web.md) |
+| Windows, macOS | Type-check and lint clean; not run |
+| iOS | Type-checks and lints clean; no app-bundle tooling or device run yet; the clipboard is unavailable |
+
+`bash scripts/release/check.sh` lints every one of these targets.
+
 ## TAIM view API
 
 Applications are built from views that own their state. There is no message

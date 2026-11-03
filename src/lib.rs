@@ -37,6 +37,7 @@
 #[cfg(all(
     target_family = "unix",
     not(target_os = "macos"),
+    not(target_os = "ios"),
     not(target_os = "android"),
     not(feature = "wayland"),
     not(feature = "x11"),

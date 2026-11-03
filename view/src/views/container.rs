@@ -8,6 +8,7 @@ pub fn container(child: impl Into<AnyView>) -> Container {
         child: Child::new(child.into()),
         padding: Padding::ZERO,
         background: None,
+        background_dark: None,
         border: Border::default(),
         align: (0.0, 0.0),
         sizing: Sizing::HUG,
@@ -19,6 +20,8 @@ pub struct Container {
     child: Child,
     padding: Padding,
     background: Option<Color>,
+    /// The background on a dark theme, when it differs.
+    background_dark: Option<Color>,
     border: Border,
     /// Where the child sits in spare room, as fractions of it: 0 is
     /// left/top, 1 is right/bottom.
@@ -36,6 +39,15 @@ impl Container {
     /// Fills the container behind the child.
     pub fn background(mut self, color: impl Into<Color>) -> Self {
         self.background = Some(color.into());
+        self.background_dark = None;
+        self
+    }
+
+    /// Fills the container with `light` on a light theme and `dark` on a
+    /// dark one, so a surface keeps its contrast when the theme changes.
+    pub fn background_themed(mut self, light: impl Into<Color>, dark: impl Into<Color>) -> Self {
+        self.background = Some(light.into());
+        self.background_dark = Some(dark.into());
         self
     }
 
@@ -142,7 +154,10 @@ impl View for Container {
         }
 
         let bounds = cx.bounds();
-        let fill = self.background.unwrap_or(Color::TRANSPARENT);
+        let fill = match self.background_dark {
+            Some(dark) if cx.theme().palette().is_dark => dark,
+            _ => self.background.unwrap_or(Color::TRANSPARENT),
+        };
         cx.fill(bounds, fill, self.border);
     }
 

@@ -9,10 +9,10 @@
 use std::time::Duration;
 use taim::prelude::*;
 
-const DESTINATIONS: [(&str, &str); 3] = [
-    ("\u{2302}", "Home"),
-    ("\u{2315}", "Search"),
-    ("\u{263A}", "Profile"),
+const DESTINATIONS: [(Icon, &str); 3] = [
+    (Icon::HOME, "Home"),
+    (Icon::SEARCH, "Search"),
+    (Icon::PERSON, "Profile"),
 ];
 const SECTIONS: [&str; 3] = ["Overview", "Activity", "Settings"];
 const FILTERS: [&str; 3] = ["Unread", "Starred", "Muted"];

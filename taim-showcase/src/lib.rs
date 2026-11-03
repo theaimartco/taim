@@ -22,11 +22,11 @@ pub fn main() -> taim::Result {
 }
 
 /// The showcase's sections, which double as the bottom bar's destinations.
-const GROUPS: [(&str, &str); 4] = [
-    ("\u{25C9}", "Controls"),
-    ("\u{2261}", "Collections"),
-    ("\u{25F4}", "Pickers"),
-    ("\u{25F1}", "Surfaces"),
+const GROUPS: [(Icon, &str); 4] = [
+    (Icon::SETTINGS, "Controls"),
+    (Icon::MENU, "Collections"),
+    (Icon::CALENDAR, "Pickers"),
+    (Icon::FOLDER, "Surfaces"),
 ];
 
 /// UI zoom levels offered by the accessibility panel.
