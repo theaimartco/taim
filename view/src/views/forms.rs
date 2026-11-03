@@ -216,7 +216,7 @@ impl View for Dropdown {
             Some(option) => option.paint(cx, at, cx.text_color()),
             None => self
                 .placeholder
-                .paint(cx, at, palette.background.strongest.color),
+                .paint(cx, at, cx.muted_on(palette.background.weak.color)),
         }
 
         let arrow = Rectangle::new(
@@ -228,7 +228,7 @@ impl View for Dropdown {
         } else {
             &self.chevrons[0]
         };
-        chevron.paint_centered(cx, arrow, palette.background.strongest.color);
+        chevron.paint_centered(cx, arrow, cx.quiet_icon_on(palette.background.weak.color));
     }
 
     fn paint_over(&self, cx: &mut PaintCx<'_>) {
@@ -399,10 +399,15 @@ impl View for Dialog {
             Point::new(bounds.x + local.x, bounds.y + local.y),
             local.size(),
         );
-        cx.fill(
+        // The card is liquid glass over the dimmed page.
+        let _ = palette;
+        super::glass::pane(
+            cx,
             card,
-            palette.background.base.color,
-            Border::default().rounded(12.0),
+            22.0,
+            taim_core::material::Material::LIQUID,
+            None,
+            2.0,
         );
     }
 

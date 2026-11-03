@@ -358,7 +358,7 @@ impl View for Accordion {
             let tint = if open == Some(index) {
                 palette.primary.base.color
             } else {
-                palette.background.strongest.color
+                cx.quiet_icon_on(palette.background.base.color)
             };
             section.chevron.paint_centered(cx, chevron, tint);
         }

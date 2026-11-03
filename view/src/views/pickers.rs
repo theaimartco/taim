@@ -211,7 +211,7 @@ impl View for DatePicker {
         let month = self.shown_month.get().first_of_month();
         let chosen = self.shown_choice.get();
         let ink = cx.text_color();
-        let quiet = palette.background.strongest.color;
+        let quiet = cx.muted();
 
         let header = Rectangle::new(bounds.position(), Size::new(bounds.width, TITLE));
         self.title.paint_centered(cx, header, ink);

@@ -130,6 +130,8 @@ impl View for Button {
         let active = self.is_active();
 
         let (fill, edge) = match (self.kind, active) {
+            // A quiet action stays only its label when it cannot be used.
+            (Kind::Ghost, false) => (Color::TRANSPARENT, Color::TRANSPARENT),
             (_, false) => (palette.background.weak.color, palette.background.weak.color),
             (Kind::Primary, true) => {
                 let rest = palette.primary.base.color;

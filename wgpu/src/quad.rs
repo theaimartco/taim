@@ -237,6 +237,9 @@ impl Pipeline {
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
+            // Frosted glass reads the backdrop's blurred levels, blending
+            // between them.
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
             ..wgpu::SamplerDescriptor::default()
         });
 

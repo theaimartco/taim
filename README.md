@@ -25,6 +25,15 @@ cargo run -p mobile_shell      # Full mobile application shell with touch naviga
 
 ---
 
+## Liquid glass
+
+`glass(content)` puts content on a pane of liquid glass, in the manner of
+Apple's interface material. The pane frosts what is behind it, its rounded
+edge lenses it with a faint rainbow fringe, and a lit rim and sheen catch
+the light. The navigation capsule, dialogs and sheets use it too. Run
+`cargo run -p liquid` to see it over a scrolling feed. See
+[docs/design/liquid-glass.md](docs/design/liquid-glass.md).
+
 ## Android
 
 TAIM builds for Android (`aarch64-linux-android`, `x86_64-linux-android`) with

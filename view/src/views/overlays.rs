@@ -315,10 +315,14 @@ impl View for Sheet {
             Point::new(bounds.x, top),
             Size::new(bounds.width, bounds.height * fraction + 16.0),
         );
-        cx.fill(
+        // Liquid glass rising over the dimmed page.
+        super::glass::pane(
+            cx,
             panel,
-            palette.background.base.color,
-            Border::default().rounded(16.0),
+            28.0,
+            taim_core::material::Material::LIQUID,
+            None,
+            1.5,
         );
 
         let grip = Rectangle::new(

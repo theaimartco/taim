@@ -95,7 +95,11 @@ echo
 step "formatting" cargo fmt --all --check
 [ "$FAILED" = 0 ] && step "desktop lints" cargo clippy --workspace --all-targets -- -D warnings
 [ "$FAILED" = 0 ] && step "android lints" android_lints
-[ "$FAILED" = 0 ] && step "tests" cargo test --workspace --no-fail-fast
+[ "$FAILED" = 0 ] && step "tests" cargo test --workspace --no-fail-fast -- --nocapture
+# GPU tests pass without running when there is no adapter; say so.
+if [ "$FAILED" = 0 ] && grep -qE "skipped: no (wgpu|GPU) adapter" "$LOGS/tests.log" 2>/dev/null; then
+  skip "gpu tests" "no GPU adapter: install a driver, or mesa-vulkan-drivers"
+fi
 [ "$FAILED" = 0 ] && step "new-project smoke" new_project
 if [ "$FAILED" = 0 ]; then
   if ! command -v cargo-ndk >/dev/null 2>&1; then

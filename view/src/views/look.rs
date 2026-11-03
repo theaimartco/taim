@@ -185,6 +185,32 @@ impl Tween {
     }
 }
 
+/// WCAG AA contrast for text, with a little margin for rounding.
+pub(crate) const TEXT_CONTRAST: f32 = 4.6;
+/// WCAG contrast for graphics and controls that are not text.
+pub(crate) const ICON_CONTRAST: f32 = 3.1;
+
+/// The quietest version of `ink` on `surface`: `ink` faded towards the
+/// surface as far as it can go while keeping `contrast` against it. If
+/// `ink` itself has less, it is returned unchanged.
+pub(crate) fn quiet(ink: crate::Color, surface: crate::Color, contrast: f32) -> crate::Color {
+    if ink.relative_contrast(surface) <= contrast {
+        return ink;
+    }
+
+    // Contrast falls monotonically as the ink fades into the surface.
+    let (mut readable, mut too_faint) = (0.0_f32, 1.0_f32);
+    for _ in 0..16 {
+        let middle = (readable + too_faint) / 2.0;
+        if ink.mix(surface, middle).relative_contrast(surface) >= contrast {
+            readable = middle;
+        } else {
+            too_faint = middle;
+        }
+    }
+    ink.mix(surface, readable)
+}
+
 /// A pointer gesture step, from either the mouse or a finger.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum Gesture {
@@ -219,4 +245,47 @@ pub(crate) fn is_back(event: &Event) -> bool {
 /// modal overlay blocks from reaching what it covers.
 pub(crate) fn is_pointer(event: &Event) -> bool {
     matches!(event, Event::Mouse(_) | Event::Touch(_))
+}
+
+#[cfg(test)]
+mod contrast_tests {
+    use super::{ICON_CONTRAST, TEXT_CONTRAST, quiet};
+    use crate::Theme;
+
+    #[test]
+    fn secondary_text_is_quieter_than_text_yet_meets_wcag_aa_in_every_theme() {
+        for theme in [Theme::Light, Theme::Dark] {
+            let palette = *theme.palette();
+            let ink = palette.background.base.text;
+
+            for surface in [palette.background.base.color, palette.background.weak.color] {
+                let text = quiet(ink, surface, TEXT_CONTRAST);
+                let icon = quiet(ink, surface, ICON_CONTRAST);
+
+                assert!(
+                    text.relative_contrast(surface) >= 4.5,
+                    "{theme:?}: secondary text reads at {:.2}:1",
+                    text.relative_contrast(surface)
+                );
+                assert!(
+                    text.relative_contrast(surface) < ink.relative_contrast(surface),
+                    "{theme:?}: and is quieter than primary text"
+                );
+                assert!(
+                    icon.relative_contrast(surface) >= 3.0,
+                    "{theme:?}: a quiet icon reads at {:.2}:1",
+                    icon.relative_contrast(surface)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn ink_that_is_already_faint_is_left_alone() {
+        let palette = *Theme::Light.palette();
+        let surface = palette.background.base.color;
+        let faint = palette.background.strong.color;
+
+        assert_eq!(quiet(faint, surface, TEXT_CONTRAST), faint);
+    }
 }

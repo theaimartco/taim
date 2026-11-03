@@ -107,6 +107,28 @@ impl Material {
         transmission: 0.78,
     };
 
+    /// Liquid glass, in the manner of Apple's interface material: thick
+    /// enough that its rounded edge visibly lenses what is behind it,
+    /// frosted so the backdrop reads as light and colour rather than
+    /// detail, with a faint rainbow fringe where the edge bends light.
+    pub const LIQUID: Self = Self {
+        roughness: 0.55,
+        thickness_mm: 18.0,
+        ior: IOR_GLASS,
+        dispersion: 0.03,
+        transmission: 0.86,
+    };
+
+    /// Liquid glass with almost no frost: for small controls over busy
+    /// content, where the lensing alone should carry the effect.
+    pub const LIQUID_CLEAR: Self = Self {
+        roughness: 0.12,
+        thickness_mm: 10.0,
+        ior: IOR_GLASS,
+        dispersion: 0.02,
+        transmission: 0.94,
+    };
+
     /// A polished, slightly reflective surface with no transmission.
     pub const POLISHED: Self = Self {
         roughness: 0.18,

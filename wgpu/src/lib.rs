@@ -32,6 +32,7 @@ pub mod effects;
 pub mod gbuffer;
 pub mod rasterizer;
 
+mod backdrop_mips;
 mod buffer;
 mod color;
 mod engine;
@@ -147,6 +148,8 @@ struct RecordingRetainedFrame {
 /// effect visible.
 struct QuadBackdrop {
     texture: wgpu::Texture,
+    /// Fills the blurred levels frosted glass reads.
+    mips: backdrop_mips::Mips,
     bind_group: wgpu::BindGroup,
     size: wgpu::Extent3d,
     format: wgpu::TextureFormat,
@@ -894,16 +897,20 @@ impl Renderer {
         let size = frame_texture.size();
         let format = frame_texture.format();
 
+        let levels = backdrop_mips::levels(size);
         let texture = self.engine.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("taim_wgpu::quad backdrop"),
             size,
-            mip_level_count: 1,
+            mip_level_count: levels,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         });
+        let mips = backdrop_mips::Mips::new(&self.engine.device, &texture, format, levels);
 
         let bind_group = self.pipelines.quad.backdrop_bind_group(
             &self.engine.device,
@@ -912,6 +919,7 @@ impl Renderer {
 
         self.quad_backdrop = Some(QuadBackdrop {
             texture,
+            mips,
             bind_group,
             size,
             format,
@@ -1052,6 +1060,7 @@ impl Renderer {
                     backdrop.texture.as_image_copy(),
                     backdrop.size,
                 );
+                backdrop.mips.generate(encoder);
 
                 render_pass =
                     ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

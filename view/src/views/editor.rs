@@ -427,6 +427,7 @@ impl View for TextEditor {
             && let Some(placeholder) = &self.placeholder
         {
             use text::Renderer as _;
+            let hint_color = cx.muted_on(palette.background.weak.color);
             cx.renderer().fill_text(
                 text::Text {
                     content: placeholder.clone(),
@@ -442,7 +443,7 @@ impl View for TextEditor {
                     hint_factor: hint,
                 },
                 area.position(),
-                palette.background.strongest.color,
+                hint_color,
                 area,
             );
         }

@@ -271,6 +271,7 @@ members = [
     "debug",
     "examples/counter",
     "examples/gallery",
+    "examples/liquid",
     "examples/todos",
     "examples/mobile_shell",
     "examples/trivial",

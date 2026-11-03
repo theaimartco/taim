@@ -4,6 +4,17 @@
 **Production release verdict:** NO-GO until every evidence gate in
 docs/release/production-gates.md is approved on a reviewed release commit.
 
+## Liquid glass and visual checkpoint (2026-11-03)
+
+Glass now frosts through a mip chain of the backdrop (smooth, nine samples
+per pixel) with vibrance, lenses at its rim scaled to screen density, and
+has a lit rim, sheen and shadow. A `glass` view, `Material::LIQUID` and
+`LIQUID_CLEAR`, and glass navigation capsules, dialogs and sheets are new;
+segmented controls use a raised thumb. Secondary text meets WCAG AA in
+every theme; it measured 1.4–2:1 before. GPU tests had been skipping in
+the build environment for lack of an adapter; with Mesa's software Vulkan
+driver they run, and all pass. See `docs/design/liquid-glass.md`.
+
 ## Application-building checkpoint (2026-11-02)
 
 Added for writing applications: `navigator` (a route stack with page-local

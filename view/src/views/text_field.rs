@@ -397,7 +397,7 @@ impl View for TextField {
         let origin = Point::new(area.x - self.scroll.get(), area.y);
 
         let text_color = if *placeholder {
-            palette.background.strongest.color
+            cx.muted_on(palette.background.weak.color)
         } else {
             cx.text_color()
         };

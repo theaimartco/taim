@@ -6,10 +6,11 @@ mod disclosure;
 mod dynamic;
 mod editor;
 mod forms;
+mod glass;
 mod icon;
 mod layers;
 mod list;
-mod look;
+pub(crate) mod look;
 #[cfg(any(feature = "image", feature = "svg"))]
 mod media;
 mod mobile;
@@ -36,6 +37,7 @@ pub use editor::{Buffer, TextEditor, text_editor};
 pub use forms::{
     Dialog, Dropdown, Grid, Radio, app_bar, dialog, dropdown, grid, icon_button, list_tile, radio,
 };
+pub use glass::{Glass, glass};
 pub use icon::{Icon, icon};
 pub use layers::{Layers, layers};
 pub use list::{List, list};
