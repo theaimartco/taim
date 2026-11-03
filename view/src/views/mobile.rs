@@ -250,11 +250,14 @@ impl View for Segments {
                 // The chosen item sits in a soft, tinted lozenge.
                 let pill = indicator.shrink(4.0);
                 // Neutral, as Apple draws it: the accent is left to the
-                // chosen item's glyph and label, where it reads.
+                // chosen item's glyph and label, where it reads. Blending
+                // is in linear light, where a little white goes a long way
+                // on a dark surface: 3% white lifts smoked glass about as
+                // visibly as 5% black darkens bright glass.
                 cx.fill(
                     pill,
                     if dark {
-                        crate::Color::from_rgba(1.0, 1.0, 1.0, 0.10)
+                        crate::Color::from_rgba(1.0, 1.0, 1.0, 0.03)
                     } else {
                         crate::Color::from_rgba(0.0, 0.0, 0.0, 0.05)
                     },
@@ -655,7 +658,7 @@ pub fn search(placeholder: impl IntoProp<String>, query: State<String>) -> AnyVi
         .align(super::Align::Center)
         .fill_width(),
     )
-    .padding([4.0, 12.0])
+    .padding([2.0, 12.0])
     .background_themed(
         Color::from_rgb8(0xE6, 0xE6, 0xEA),
         Color::from_rgb8(0x2C, 0x2C, 0x34),

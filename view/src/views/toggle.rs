@@ -42,6 +42,8 @@ pub struct Toggle {
     shown: Prop<bool>,
     enabled: Prop<bool>,
     gap: f32,
+    /// The checkbox's tick, from the icon font.
+    tick: look::Label,
     pressed: bool,
     id: widget::Id,
 }
@@ -58,6 +60,7 @@ impl Toggle {
             shown: value.into_prop(),
             enabled: Prop::fixed(true),
             gap: 8.0,
+            tick: look::Label::glyph(super::Icon::CHECK, 14.0),
             pressed: false,
             id: widget::Id::unique(),
         }
@@ -92,6 +95,9 @@ impl View for Toggle {
             constraints.max.height,
         );
         let label = self.label.measure(cx, Constraints::loose(room));
+        if self.shape == Shape::Checkbox {
+            let _ = self.tick.measure(cx);
+        }
 
         let height = label.height.max(indicator.height);
         self.label
@@ -132,14 +138,12 @@ impl View for Toggle {
                 );
 
                 if on {
-                    // A tick drawn as two strokes would need paths; a solid
-                    // inner mark reads clearly at this size.
-                    let mark = area.shrink(5.0);
-                    cx.fill(
-                        mark,
-                        palette.primary.base.text,
-                        Border::default().rounded(1.5),
-                    );
+                    let ink = if enabled {
+                        palette.primary.base.text
+                    } else {
+                        palette.secondary.base.text
+                    };
+                    self.tick.paint_centered(cx, area, ink);
                 }
             }
             Shape::Switch => {

@@ -111,7 +111,10 @@ pub fn date_picker(visible: State<Date>, chosen: State<Date>) -> DatePicker {
         days: (1..=31)
             .map(|day| Label::new(day.to_string(), Some(13.0)))
             .collect(),
-        arrows: [Label::new("‹", Some(20.0)), Label::new("›", Some(20.0))],
+        arrows: [
+            Label::glyph(super::Icon::CHEVRON_LEFT, 20.0),
+            Label::glyph(super::Icon::CHEVRON_RIGHT, 20.0),
+        ],
         pressed: None,
         id: widget::Id::unique(),
     }

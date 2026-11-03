@@ -21,6 +21,16 @@ break the public API.
 - `Container::background_themed(light, dark)` and `TextField::plain`.
 - The release check lints the web, Windows, macOS and iOS targets.
 
+### Changed
+
+- Text fields are as tall as buttons (9 px vertical padding, was 6) and
+  share their 8 px corner radius, so a field and its button line up.
+- Checkboxes show a tick instead of a filled square; an open accordion
+  section's chevron points down; the date picker's arrows are icon
+  chevrons.
+- The chosen item in the floating navigation bar is a gentler lift on dark
+  themes (3% white, was 10%: blending in linear light made it a bright grey).
+
 ### Fixed
 
 - Gradients were never drawn on the web: the pipeline was compiled out for

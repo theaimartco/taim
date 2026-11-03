@@ -268,7 +268,8 @@ pub fn accordion<T: Into<String>>(
             .into_iter()
             .map(|(title, body)| Section {
                 title: Label::new(title, Some(15.0)),
-                chevron: Label::new("›", Some(18.0)),
+                chevron: Label::glyph(super::Icon::CHEVRON_RIGHT, 18.0),
+                chevron_open: Label::glyph(super::Icon::CHEVRON_DOWN, 18.0),
                 body: Child::new(body),
                 header: Cell::new(Rectangle::default()),
             })
@@ -282,7 +283,9 @@ pub fn accordion<T: Into<String>>(
 
 struct Section {
     title: Label,
+    /// Points right while the section is closed and down while it is open.
     chevron: Label,
+    chevron_open: Label,
     body: Child,
     header: Cell<Rectangle>,
 }
@@ -315,6 +318,7 @@ impl View for Accordion {
         for (index, section) in self.sections.iter_mut().enumerate() {
             let _ = section.title.measure(cx);
             let _ = section.chevron.measure(cx);
+            let _ = section.chevron_open.measure(cx);
             section
                 .header
                 .set(Rectangle::new(Point::new(0.0, y), Size::new(width, HEADER)));
@@ -355,12 +359,14 @@ impl View for Accordion {
                 Point::new(header.x + header.width - 36.0, header.y),
                 Size::new(24.0, HEADER),
             );
-            let tint = if open == Some(index) {
-                palette.primary.base.color
+            if open == Some(index) {
+                section
+                    .chevron_open
+                    .paint_centered(cx, chevron, palette.primary.base.color);
             } else {
-                cx.quiet_icon_on(palette.background.base.color)
-            };
-            section.chevron.paint_centered(cx, chevron, tint);
+                let tint = cx.quiet_icon_on(palette.background.base.color);
+                section.chevron.paint_centered(cx, chevron, tint);
+            }
         }
     }
 

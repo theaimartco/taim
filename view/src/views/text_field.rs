@@ -23,7 +23,7 @@ pub fn text_field(placeholder: impl IntoProp<String>, value: State<String>) -> T
         on_submit: None,
         secret: false,
         plain: false,
-        padding: Padding::from([6.0, 10.0]),
+        padding: Padding::from([9.0, 12.0]),
         caret: Caret::at(0),
         dragging: false,
         awaiting_paste: false,
@@ -384,13 +384,13 @@ impl View for TextField {
                 Border::default()
                     .width(if focused { 2.0 } else { 1.0 })
                     .color(edge)
-                    .rounded(6.0),
+                    .rounded(8.0),
             );
         } else if focused {
             cx.fill(
                 bounds,
                 crate::Color::TRANSPARENT,
-                Border::default().width(2.0).color(edge).rounded(6.0),
+                Border::default().width(2.0).color(edge).rounded(8.0),
             );
         }
 
