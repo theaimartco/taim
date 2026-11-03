@@ -18,7 +18,10 @@ No tag or publication follows from that check alone.
    with its by-hand section completed, on at least three physical
    devices with different GPU vendors (for example Adreno, Mali,
    PowerVR or Xclipse) and Android versions spanning the supported
-   range (API 26 and the newest), plus one emulator. Supported devices
+   range (API 26 and the newest), plus one emulator. A passing
+   `scripts/qa/firebase-test-lab.sh` run on three physical models from
+   different manufacturers may stand in for the automated half of the
+   device check; the by-hand half still needs a person. Supported devices
    in published material may not exceed the tested ones.
    **Desktop and VYOM:** evidence under docs/testing/wayland-vyom-device-acceptance.md
    collected on the claimed target hardware. Native VYOM support cannot be

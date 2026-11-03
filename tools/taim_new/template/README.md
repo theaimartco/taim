@@ -25,8 +25,8 @@ Then, with a phone connected (USB debugging on) or an emulator running:
 
 ```sh
 cd android
-gradle installDebug       # build and install
-gradle bundleRelease      # an .aab for the Play Store
+./gradlew installDebug    # build and install
+./gradlew bundleRelease   # an .aab for the Play Store
 adb logcat -s taim        # logs and panics
 ```
 

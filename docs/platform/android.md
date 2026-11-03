@@ -16,7 +16,7 @@ needs device testing before you ship it.
 cargo run -p taim-new -- ~/apps/my_notes --name "My Notes" --package com.example.notes
 cd ~/apps/my_notes
 cargo run                              # on the desktop
-cd android && gradle installDebug      # on a phone
+cd android && ./gradlew installDebug    # on a phone
 ```
 
 Use `--taim-path <checkout>` to build against a local TAIM checkout instead
@@ -102,8 +102,8 @@ before each build and packages the library with the platform's
 
 ```sh
 cd examples/mobile_shell/android
-gradle installDebug          # build and install on a connected device
-gradle bundleRelease         # an .aab for the Play Store
+./gradlew installDebug       # build and install on a connected device
+./gradlew bundleRelease      # an .aab for the Play Store
 ```
 
 Open the folder in Android Studio to run, debug and profile it like any
@@ -127,6 +127,38 @@ Log records and panics go to logcat under the `taim` tag:
 ```sh
 adb logcat -s taim
 ```
+
+## Building and testing from a cloud session
+
+Everything above also runs in a cloud session with no phone attached:
+
+1. Allow `dl.google.com` in the environment's network settings. The SDK,
+   the NDK and the Android Gradle Plugin all come from there
+   (`maven.google.com` redirects to it); Gradle itself comes from
+   `services.gradle.org`.
+2. Set the environment's setup script to
+   `bash /home/user/taim/scripts/cloud/setup-android.sh`, so every session
+   starts with Rust's Android targets, cargo-ndk, Gradle, the SDK and the
+   NDK. It writes `~/.taim-android-env`, which the scripts below load.
+3. For real phones, create a Google Cloud project with Firebase Test Lab
+   enabled and a service account allowed to run tests (Firebase Test Lab
+   Admin, with access to the results bucket). Store its JSON key in the
+   environment as `GCP_SERVICE_ACCOUNT_KEY`, and the project id as
+   `FIREBASE_PROJECT`. Never paste the key into a chat.
+
+Then:
+
+```sh
+bash scripts/release/check.sh ~/evidence/check        # now with the Android link step
+bash scripts/qa/firebase-test-lab.sh ~/evidence/lab   # three physical phones
+```
+
+`firebase-test-lab.sh` builds the debug APK, picks three physical models
+from different manufacturers (or the ones in `TEST_LAB_DEVICES`), runs
+Test Lab's robo test on each, downloads screenshots and logcat, and fails
+on any failed device or TAIM panic. The by-hand checks (typing, TalkBack,
+smoothness) still need a person with a phone, or Test Lab's live device
+view.
 
 ## Checking a release
 

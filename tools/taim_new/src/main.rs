@@ -47,6 +47,31 @@ const TEMPLATE: &[(&str, &str)] = &[
     ),
 ];
 
+/// Template files copied byte for byte: the Gradle wrapper, so a project
+/// builds without Gradle installed. `true` marks an executable.
+const BINARY: &[(&str, &[u8], bool)] = &[
+    (
+        "android/gradlew",
+        include_bytes!("../template/android/gradlew"),
+        true,
+    ),
+    (
+        "android/gradlew.bat",
+        include_bytes!("../template/android/gradlew.bat"),
+        false,
+    ),
+    (
+        "android/gradle/wrapper/gradle-wrapper.jar",
+        include_bytes!("../template/android/gradle/wrapper/gradle-wrapper.jar"),
+        false,
+    ),
+    (
+        "android/gradle/wrapper/gradle-wrapper.properties",
+        include_bytes!("../template/android/gradle/wrapper/gradle-wrapper.properties"),
+        false,
+    ),
+];
+
 const USAGE: &str = "\
 usage: taim-new <directory> [--name <display name>] [--package <android package>]
                             [--taim-path <path to a TAIM checkout> | --taim-git <url>]";
@@ -181,6 +206,25 @@ impl Project {
             }
             std::fs::write(&target, self.fill(contents))
                 .map_err(|error| format!("{}: {error}", target.display()))?;
+        }
+
+        for (path, bytes, executable) in BINARY {
+            let target = self.directory.join(path);
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|error| format!("{}: {error}", parent.display()))?;
+            }
+            std::fs::write(&target, bytes)
+                .map_err(|error| format!("{}: {error}", target.display()))?;
+
+            #[cfg(unix)]
+            if *executable {
+                use std::os::unix::fs::PermissionsExt as _;
+                std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o755))
+                    .map_err(|error| format!("{}: {error}", target.display()))?;
+            }
+            #[cfg(not(unix))]
+            let _ = executable;
         }
         Ok(())
     }
@@ -343,6 +387,20 @@ mod tests {
                 .join("android/app/src/main/AndroidManifest.xml")
                 .is_file()
         );
+        assert!(
+            directory
+                .join("android/gradle/wrapper/gradle-wrapper.jar")
+                .is_file()
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mode = std::fs::metadata(directory.join("android/gradlew"))
+                .expect("written")
+                .permissions()
+                .mode();
+            assert!(mode & 0o111 != 0, "gradlew is executable");
+        }
         assert!(
             std::fs::read_to_string(directory.join("Cargo.toml"))
                 .expect("written")

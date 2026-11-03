@@ -35,6 +35,12 @@ else
   LOGS="$(mktemp -d)"
 fi
 
+# The Android toolchain, as scripts/cloud/setup-android.sh installs it.
+if [ -f "$HOME/.taim-android-env" ]; then
+  # shellcheck disable=SC1091
+  . "$HOME/.taim-android-env"
+fi
+
 ANDROID_FEATURES="taim/wgpu,taim/tiny-skia,taim/crisp,taim/hinting,taim/android"
 RESULTS=()
 FAILED=0
