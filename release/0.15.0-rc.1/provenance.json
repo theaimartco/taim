@@ -1,0 +1,41 @@
+{
+  "artifacts": [
+    {
+      "path": "/tmp/claude-0/-home-user-taim/efbad0c3-c3c8-50eb-8179-c256f698e062/scratchpad/rc1-final/liquid",
+      "sha256": "7256cbd4a248fa42f26da05a29e3d3f054af7b659bf92c7b21f7f8545aaf1a84",
+      "size_bytes": 13938808
+    },
+    {
+      "path": "/tmp/claude-0/-home-user-taim/efbad0c3-c3c8-50eb-8179-c256f698e062/scratchpad/rc1-final/mobile_shell",
+      "sha256": "75b58fcab995dcab404dab4b629a04eb2cc4f6776f0b7c94c6b1df3a58b02d36",
+      "size_bytes": 14073848
+    },
+    {
+      "path": "/tmp/claude-0/-home-user-taim/efbad0c3-c3c8-50eb-8179-c256f698e062/scratchpad/rc1-final/taim-new",
+      "sha256": "cd46e6ec45aa97de72e1f166eaa289f1b5a6701923fd806aa18b15d420ba396d",
+      "size_bytes": 442608
+    },
+    {
+      "path": "/tmp/claude-0/-home-user-taim/efbad0c3-c3c8-50eb-8179-c256f698e062/scratchpad/rc1-final/taim-showcase",
+      "sha256": "e7739e75760d148519bcd25ff0f7f36cf753a6ff31015a8bf8300b0e04c2df90",
+      "size_bytes": 14384632
+    },
+    {
+      "path": "/tmp/claude-0/-home-user-taim/efbad0c3-c3c8-50eb-8179-c256f698e062/scratchpad/rc1-final/taim-0.15.0-rc.1.cdx.json",
+      "sha256": "cb5ffb442df1d20445a9028ea4a83ebf9fdcbcfacc3928e71692b0f47b1a0eb2",
+      "size_bytes": 327531
+    }
+  ],
+  "cargo_lock_sha256": "950265018f1aa4cdc02a1f9f6b5a3598f8958d43999ea771f48f18e9b44944e4",
+  "cargo_version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "dirty_tree": false,
+  "hardware_acceptance_verified": false,
+  "independent_rebuild_match": false,
+  "notice": "Inventory only: requires independent clean rebuild, SBOM, signer verification and owner approval.",
+  "release_approved": false,
+  "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "sbom_verified": false,
+  "schema_version": 1,
+  "signature_verified": false,
+  "source_commit": "e78f3cfd9cc344d54840c597edd39ec6f7750bbe"
+}
