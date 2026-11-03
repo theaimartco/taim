@@ -1,6 +1,6 @@
 # TAIM security policy
 
-Current project version 0.15.0-dev is experimental. No production
+Current project version 0.15.0-rc.1 is a release candidate. No production
 security support window, patch SLA or supported stable release line
 has been announced.
 

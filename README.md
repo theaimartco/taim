@@ -2,7 +2,8 @@
 
 **The High-Performance, GPU-Native Reactive GUI Framework in Rust.**
 
-> **Release status: experimental (0.15.0-dev), NOT production-certified.**
+> **Release status: 0.15.0-rc.1, release candidate.** Automated checks pass; the
+> Android device gate and release sign-off are pending.
 > Actual Wayland/VYOM hardware presentation, IME, Orca, GPU loss/recovery and
 > physical frame/power measurements must be signed off before a stable release.
 > See [release gates](docs/release/production-gates.md),

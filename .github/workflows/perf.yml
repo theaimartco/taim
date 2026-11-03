@@ -1,3 +1,7 @@
+# TAIM CI DISABLED AT OWNER REQUEST (2026-11-03). Releases are checked locally
+# with scripts/release/check.sh; see docs/release/production-gates.md.
+# Every line below is commented out on purpose; do not re-enable without the owner.
+#
 # name: Perf smoke
 
 # # Phase 0 scope: prove the existing `benches/` targets still build and run
