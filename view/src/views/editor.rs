@@ -31,6 +31,8 @@ pub struct Buffer {
 
 impl Buffer {
     /// A buffer holding `text`, caret at the start.
+    // With no renderer compiled in, the paragraph and editor types are `()`.
+    #[allow(clippy::unit_arg)]
     pub fn new(cx: &mut Scope, text: &str) -> Self {
         Self {
             engine: cx.signal(Arc::new(Mutex::new(Engine::with_text(text)))),

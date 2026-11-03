@@ -128,6 +128,34 @@ Log records and panics go to logcat under the `taim` tag:
 adb logcat -s taim
 ```
 
+## Checking a release
+
+TAIM does not use hosted CI. Before a release, on a clean checkout:
+
+```sh
+bash scripts/release/check.sh ~/taim-evidence/check-$(git rev-parse --short HEAD)
+```
+
+It runs formatting, desktop and Android lints, every test, a `taim-new`
+smoke build and, with `cargo-ndk` and the NDK installed, an Android link.
+It exits non-zero on a failure, and with code 3 when a step was skipped
+(a check without the NDK has not linked anything for Android).
+
+Then, with a phone connected over USB debugging (or an emulator running):
+
+```sh
+bash scripts/qa/android-device-check.sh ~/taim-evidence/device-pixel8
+```
+
+It builds and installs `examples/mobile_shell` (or the Android project you
+name), then launches it, scrolls and flings, taps, presses back, sends it
+to the background and back, rotates the screen and switches dark mode,
+taking a screenshot at each step. It fails if the app dies or logcat shows
+a panic or a native crash, and writes a report whose by-hand section
+(typing, TalkBack, smoothness, copy and paste) a person completes. Release
+policy asks for this on at least three physical devices with different GPU
+vendors; see `docs/release/production-gates.md`.
+
 ## What the Android shell does
 
 | Area | Behaviour |

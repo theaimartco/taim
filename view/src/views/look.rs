@@ -103,6 +103,8 @@ impl Label {
     }
 
     /// Shapes the label (once) and returns its size.
+    // With no renderer compiled in, the paragraph and editor types are `()`.
+    #[allow(clippy::semicolon_if_nothing_returned)]
     pub(crate) fn measure(&mut self, cx: &crate::MeasureCx<'_>) -> crate::Size {
         use taim_core::Renderer as _;
         use taim_core::text::{self, Paragraph as _, Renderer as _};

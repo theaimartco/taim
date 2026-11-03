@@ -312,6 +312,8 @@ impl View for TextField {
         }
     }
 
+    // With no renderer compiled in, the paragraph type is `()`.
+    #[allow(clippy::let_unit_value)]
     fn measure(&mut self, cx: &mut MeasureCx<'_>, constraints: Constraints) -> Size {
         let renderer = cx.renderer();
         let value = self.shown.get();

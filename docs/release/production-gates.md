@@ -1,16 +1,26 @@
 # TAIM production release policy and signoff
 
-**Verdict on 2026-10-19: NO GO.**
-Branch hardening work is a proposal, not a 1.0 release. No tags or package
-publications should be created solely because CI passes.
+**Verdict on 2026-11-02: NO GO.** The automated checks pass locally; no
+device, screen-reader or release-signing gate has been run.
+
+**Decision (owner, 2026-11-02): no hosted CI.** Gate 1 is met by the local
+release check, `bash scripts/release/check.sh EVIDENCE_DIR`, run on the
+candidate commit from a clean checkout, with its report kept as evidence.
+No tag or publication follows from that check alone.
 
 ## Required gates
 
-1. Green active GitHub Actions verification on the proposed commit:
-   pinned toolchain, format, lint, workspace tests, visual goldens,
-   AT-SPI bus and harness contract tests. Previous five workflows
-   were commented out and did not constitute active CI.
-2. Evidence under docs/testing/wayland-vyom-device-acceptance.md
+1. A passing local release check (`scripts/release/check.sh`) on the
+   candidate commit, with no skipped step: pinned toolchain, format,
+   desktop and Android lints, workspace tests (visual goldens included),
+   the new-project smoke and an Android link with the NDK.
+2. **Android:** a passing `scripts/qa/android-device-check.sh` report,
+   with its by-hand section completed, on at least three physical
+   devices with different GPU vendors (for example Adreno, Mali,
+   PowerVR or Xclipse) and Android versions spanning the supported
+   range (API 26 and the newest), plus one emulator. Supported devices
+   in published material may not exceed the tested ones.
+   **Desktop and VYOM:** evidence under docs/testing/wayland-vyom-device-acceptance.md
    collected on the claimed target hardware. Native VYOM support cannot be
    claimed from generic Wayland/winit tests.
 3. Same-hardware four-framework comparisons under
@@ -49,7 +59,8 @@ security disclosure and deprecation policies without inventing an SLA.
 
 | Gate | Status |
 |---|---|
-| Hosted CI for proposed hardening branch | UNVERIFIED UNTIL RUNS COMPLETE |
+| Local release check (replaces hosted CI) | PASSES WITHOUT THE ANDROID LINK STEP (no NDK where it was run) |
+| Android device check on physical devices | NOT RUN |
 | Real Wayland frame presentation | NOT RUN |
 | Real VYOM-native display path | NOT RUN |
 | Input, multilingual IME, screen-reader acceptance | NOT RUN |

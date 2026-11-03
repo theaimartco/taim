@@ -48,6 +48,8 @@ pub(crate) struct Surface {
     touch: bool,
     /// The on-screen keyboard was last asked to be shown.
     text_input: bool,
+    /// Presents that failed for lack of GPU memory, in a row.
+    out_of_memory: u8,
 
     accessibility: Accessibility,
     published: taim_accessibility::Tree,
@@ -137,6 +139,7 @@ impl Surface {
             fingers: crate::touch::Fingers::default(),
             touch: false,
             text_input: false,
+            out_of_memory: 0,
             accessibility,
             published: taim_accessibility::Tree::new(),
             semantics_stale: true,
@@ -495,11 +498,30 @@ impl Surface {
 
         match presented {
             Ok(()) => {
+                self.out_of_memory = 0;
                 #[cfg(all(feature = "measurement", not(target_arch = "wasm32")))]
                 crate::measurement::first_present();
             }
             Err(compositor::SurfaceError::OutOfMemory) => {
-                panic!("the GPU ran out of memory while presenting {:?}", self.id);
+                // Memory pressure is often passing on a phone (another app
+                // came forward, the system is trimming): give the surface
+                // back and try again a few times before giving up.
+                self.out_of_memory += 1;
+                assert!(
+                    self.out_of_memory <= OUT_OF_MEMORY_RETRIES,
+                    "the GPU ran out of memory presenting {:?} {} times in a row",
+                    self.id,
+                    self.out_of_memory
+                );
+                log::warn!(
+                    "the GPU ran out of memory presenting {:?}; recreating its surface",
+                    self.id
+                );
+                let size = self.viewport.physical_size();
+                self.target = None;
+                self.target =
+                    Some(compositor.create_surface(self.raw.clone(), size.width, size.height));
+                self.request_frame();
             }
             Err(compositor::SurfaceError::Lost) => {
                 let size = self.viewport.physical_size();
@@ -759,6 +781,10 @@ fn backspace() -> taim_core::Event {
         repeat: false,
     })
 }
+
+/// How many presents in a row may fail for lack of GPU memory, each with a
+/// new surface, before the window gives up.
+const OUT_OF_MEMORY_RETRIES: u8 = 3;
 
 /// Whether `TAIM_FRAME_TRACE` asks for one timing line per frame.
 fn trace_frames() -> bool {

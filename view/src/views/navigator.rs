@@ -297,18 +297,22 @@ impl<R: Clone + PartialEq + Send + Sync + 'static> View for NavigatorView<R> {
             page.shift.set(0.0);
         }
 
+        let shift = |index: Option<usize>, by: f32| {
+            if let Some(page) = index.and_then(|index| self.pages.get(index)) {
+                page.shift.set(by);
+            }
+        };
+
         match self.progress(cx.now()) {
             Some((Direction::Push, p)) => {
-                self.pages[top].shift.set(width * (1.0 - p));
-                if top > 0 {
-                    self.pages[top - 1].shift.set(-width * UNDERLAY * p);
-                }
+                shift(Some(top), width * (1.0 - p));
+                shift(top.checked_sub(1), -width * UNDERLAY * p);
             }
             Some((Direction::Pop, p)) => {
                 if let Some(leaving) = &self.leaving {
                     leaving.shift.set(width * p);
                 }
-                self.pages[top].shift.set(-width * UNDERLAY * (1.0 - p));
+                shift(Some(top), -width * UNDERLAY * (1.0 - p));
             }
             None => {}
         }

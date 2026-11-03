@@ -59,6 +59,8 @@ impl Text {
 }
 
 impl View for Text {
+    // With no renderer compiled in, the paragraph and editor types are `()`.
+    #[allow(clippy::let_unit_value)]
     fn measure(&mut self, cx: &mut MeasureCx<'_>, constraints: Constraints) -> Size {
         let renderer = cx.renderer();
         let content = self.content.get();
