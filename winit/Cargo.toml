@@ -66,9 +66,16 @@ android_logger = "0.15"
 accesskit = "0.25"
 accesskit_android = { version = "0.9.1", features = ["embedded-dex"] }
 
+# iOS services: links, the pasteboard. The same versions winit uses.
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2 = "0.5.2"
+objc2-foundation = { version = "0.2.2", features = ["NSDictionary", "NSString", "NSURL"] }
+objc2-ui-kit = { version = "0.2.2", features = ["UIApplication", "UIPasteboard", "UIResponder", "block2"] }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys.workspace = true
-web-sys.features = ["console", "Document", "Element", "HtmlCanvasElement", "HtmlElement", "Node", "Window"]
+web-sys.features = ["Clipboard", "console", "Document", "Element", "HtmlCanvasElement", "HtmlElement", "Navigator", "Node", "ShareData", "Storage", "Window"]
+js-sys = "0.3"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures.workspace = true
 

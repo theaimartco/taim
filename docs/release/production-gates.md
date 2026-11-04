@@ -56,8 +56,8 @@ security disclosure and deprecation policies without inventing an SLA.
 | Native VYOM/Smithay Wayland | Experimental; physical presentation not accepted |
 | Windows x64/ARM64, macOS x64/ARM64 | Lint clean in the release check; not run, physical QA not accepted |
 | Android arm64/x86_64 | Lint clean; device verification pending |
-| iOS arm64 | Lint clean; no app-bundle (Xcode) tooling; clipboard unavailable; not run |
-| Web/WASM | Runs in headless Chromium (WebGL2): render, text, gradients, clicks; glass is drawn flat on WebGL; WebGPU, Firefox, Safari and real devices not verified |
+| iOS arm64 and simulator | Lint clean (tests included); clipboard, links, vibration, storage implemented; no app-bundle (Xcode) tooling; not run |
+| Web/WASM | Runs in headless Chromium (WebGL2): render, text, gradients, clicks, typing, clipboard, storage; smoke-tested by the release check; glass is drawn flat on WebGL; WebGPU, Firefox, Safari and real devices not verified |
 
 ## Latest gate ledger
 

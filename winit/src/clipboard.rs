@@ -293,24 +293,42 @@ mod platform {
         }
     }
 
-    /// iOS: `UIPasteboard` is not connected yet, so the clipboard reports
-    /// itself unavailable rather than pretending to copy.
+    /// The iOS general pasteboard (`UIPasteboard`): text, and HTML as its
+    /// text. Unlike most of UIKit it may be used from any thread. iOS shows
+    /// its own "pasted from" notice when an application reads it.
     #[cfg(target_os = "ios")]
+    #[allow(unsafe_code)]
     mod native {
         use super::*;
+
+        use objc2_foundation::NSString;
+        use objc2_ui_kit::UIPasteboard;
 
         pub(super) struct Native;
 
         pub(super) fn connect() -> Option<Native> {
-            None
+            Some(Native)
         }
 
-        pub(super) fn read_content(_: &mut Native, _: Kind) -> Result<Content, Error> {
-            Err(Error::ClipboardUnavailable)
+        pub(super) fn read_content(_: &mut Native, kind: Kind) -> Result<Content, Error> {
+            if !matches!(kind, Kind::Text) {
+                return Err(Error::ContentNotAvailable);
+            }
+            // SAFETY: the general pasteboard always exists; `string` returns
+            // nil when it holds no text.
+            let text = unsafe { UIPasteboard::generalPasteboard().string() };
+            text.map(|text| Content::Text(text.to_string()))
+                .ok_or(Error::ContentNotAvailable)
         }
 
-        pub(super) fn write_content(_: &mut Native, _: Content) -> Result<(), Error> {
-            Err(Error::ClipboardUnavailable)
+        pub(super) fn write_content(_: &mut Native, content: Content) -> Result<(), Error> {
+            let (Content::Text(text) | Content::Html(text)) = content else {
+                return Err(Error::ContentNotAvailable);
+            };
+            let text = NSString::from_str(&text);
+            // SAFETY: as above; setting a string replaces the contents.
+            unsafe { UIPasteboard::generalPasteboard().setString(Some(&text)) };
+            Ok(())
         }
     }
 
@@ -324,23 +342,83 @@ mod platform {
 mod platform {
     use super::*;
 
-    /// Clipboard placeholder for targets without a browser adapter yet.
+    use wasm_bindgen_futures::{JsFuture, spawn_local};
+
+    /// The browser's asynchronous clipboard (`navigator.clipboard`).
+    ///
+    /// Browsers allow it only in a secure context (`https:` or
+    /// `localhost`), and reading may ask the user's permission; a refusal
+    /// arrives as [`Error::ClipboardUnavailable`]. Text and HTML (written
+    /// as its text) are supported; images and files are not.
     pub struct Clipboard;
 
+    fn clipboard() -> Option<web_sys::Clipboard> {
+        let navigator = web_sys::window()?.navigator();
+        // `navigator.clipboard` is undefined outside a secure context.
+        let clipboard = js_sys_get(&navigator, "clipboard")?;
+        Some(wasm_bindgen::JsCast::unchecked_into(clipboard))
+    }
+
+    fn js_sys_get(target: &web_sys::Navigator, name: &str) -> Option<wasm_bindgen::JsValue> {
+        let value = js_sys::Reflect::get(target, &wasm_bindgen::JsValue::from_str(name)).ok()?;
+        (!value.is_undefined() && !value.is_null()).then_some(value)
+    }
+
     impl Clipboard {
-        /// Creates an unavailable clipboard bridge.
+        /// Connects to the browser clipboard.
         pub fn new() -> Self {
             Self
         }
 
-        /// Reports that browser clipboard reads are not wired yet.
-        pub fn read(&self, _kind: Kind, callback: impl FnOnce(Result<Content, Error>)) {
-            callback(Err(Error::ClipboardUnavailable));
+        /// Reads text from the clipboard; the callback runs when the
+        /// browser answers.
+        pub fn read(&self, kind: Kind, callback: impl FnOnce(Result<Content, Error>) + 'static) {
+            if !matches!(kind, Kind::Text) {
+                callback(Err(Error::ContentNotAvailable));
+                return;
+            }
+            let Some(clipboard) = clipboard() else {
+                callback(Err(Error::ClipboardUnavailable));
+                return;
+            };
+
+            let promise = clipboard.read_text();
+            spawn_local(async move {
+                let result = match JsFuture::from(promise).await {
+                    Ok(text) => text
+                        .as_string()
+                        .map(Content::Text)
+                        .ok_or(Error::ContentNotAvailable),
+                    Err(_) => Err(Error::ClipboardUnavailable),
+                };
+                callback(result);
+            });
         }
 
-        /// Reports that browser clipboard writes are not wired yet.
-        pub fn write(&mut self, _content: Content, callback: impl FnOnce(Result<(), Error>)) {
-            callback(Err(Error::ClipboardUnavailable));
+        /// Writes text (or HTML, as its text) to the clipboard; the
+        /// callback runs when the browser answers.
+        pub fn write(
+            &mut self,
+            content: Content,
+            callback: impl FnOnce(Result<(), Error>) + 'static,
+        ) {
+            let (Content::Text(text) | Content::Html(text)) = content else {
+                callback(Err(Error::ContentNotAvailable));
+                return;
+            };
+            let Some(clipboard) = clipboard() else {
+                callback(Err(Error::ClipboardUnavailable));
+                return;
+            };
+
+            let promise = clipboard.write_text(&text);
+            spawn_local(async move {
+                let result = JsFuture::from(promise)
+                    .await
+                    .map(|_| ())
+                    .map_err(|_| Error::ClipboardUnavailable);
+                callback(result);
+            });
         }
     }
 }

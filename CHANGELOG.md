@@ -19,7 +19,14 @@ break the public API.
 - `Icon::name`; `icon_button` announces it to screen readers (it announced
   nothing before).
 - `Container::background_themed(light, dark)` and `TextField::plain`.
-- The release check lints the web, Windows, macOS and iOS targets.
+- Web services: the clipboard (`navigator.clipboard`), `taim::storage` in
+  `localStorage`, `open_url`, `share_text` (Web Share) and `vibrate`.
+- iOS services: the clipboard (`UIPasteboard`), `open_url` (UIKit),
+  `vibrate` and the sandbox data directory; the desktop implementation,
+  which spawned `xdg-open` and wrote to `~/.local/share`, no longer applies.
+- The release check lints the web, Windows, macOS, iOS and iOS-simulator
+  targets, the portable crates' tests included, and runs a browser smoke
+  test (`scripts/web/smoke.js`).
 
 ### Changed
 
@@ -33,6 +40,11 @@ break the public API.
 
 ### Fixed
 
+- Windows: `open_url` went through `cmd /C start`, which cut a URL at `&`
+  and ran the rest as a command; it now uses the URL protocol handler,
+  with no shell.
+- Each crate lints clean on its own (`taim_winit` and `taim_wgpu` relied on
+  features turned on elsewhere in the workspace).
 - Gradients were never drawn on the web: the pipeline was compiled out for
   wasm.
 - The search field kept a light background on dark themes; its text field

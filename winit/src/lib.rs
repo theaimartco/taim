@@ -12,6 +12,10 @@
 //! [`winit`]: https://github.com/rust-windowing/winit
 #![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+// Built with no renderer (as `cargo clippy -p taim_winit` alone builds it),
+// the compositor and its surfaces are `()`; binding or passing them is
+// still right in the code every renderer shares.
+#![allow(clippy::let_unit_value, clippy::unit_arg)]
 pub use taim_core as core;
 pub use taim_debug as debug;
 pub use taim_graphics as graphics;

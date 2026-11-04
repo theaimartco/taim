@@ -6,17 +6,22 @@
 # Runs, in order, and stops at the first failure:
 #   1. formatting                 cargo fmt --check
 #   2. desktop lints              cargo clippy --workspace --all-targets -D warnings
+#      crate lints                each crate alone, so features another
+#                                 crate turns on cannot hide a problem
 #   3. Android lints              clippy for aarch64- and x86_64-linux-android
 #   4. web lints                  clippy for wasm32 (WebGPU and WebGL builds)
 #   5. other platform lints       clippy for Windows, macOS and iOS targets
 #   6. tests                      cargo test --workspace
 #   7. new-project smoke          taim-new writes a project that builds
-#   8. Android link               cargo ndk build of mobile_shell (needs the NDK)
+#   8. web smoke                  counter runs and responds in headless Chromium
+#   9. Android link               cargo ndk build of mobile_shell (needs the NDK)
 #
 # Steps 4 and 5 type-check and lint without linking, so they need only the
 # Rust targets, which they add with rustup; no Windows, Apple or browser
-# toolchain is involved. Step 8 is skipped, and reported as SKIPPED, when cargo-ndk or the NDK is
-# missing: a check without it has not linked anything for Android. Device
+# toolchain is involved. Step 8 is reported as SKIPPED without node,
+# playwright or the wasm-bindgen CLI. Step 9 is reported as SKIPPED when
+# cargo-ndk or the NDK is missing: a check without it has not linked
+# anything for Android. Device
 # behaviour is a separate gate: scripts/qa/android-device-check.sh.
 #
 # With EVIDENCE_DIR, a report with the commit, toolchain and each step's
@@ -81,19 +86,47 @@ android_lints() {
 }
 
 EXAMPLES=(-p taim -p counter -p liquid -p mobile_shell)
+# Crates whose own tests are portable: linted, tests included, for every
+# target. The root crate's integration tests are the Linux desktop suite
+# (X11, Wayland, VYOM) and are linted on Linux only.
+PORTABLE=(-p taim-view -p taim_core -p taim-signal -p taim-motion -p taim-gesture
+  -p taim-design -p taim_graphics -p taim_winit -p taim_wgpu -p taim_widget
+  -p taim_runtime -p taim_futures -p taim-raster -p taim_text_gpu -p taim-profiler
+  -p counter -p liquid -p mobile_shell -p todos -p gallery -p taim-showcase)
+
+crate_lints() {
+  local packages
+  packages="$(cargo metadata --no-deps --format-version 1 |
+    python3 -c 'import json,sys; print("\n".join(p["name"] for p in json.load(sys.stdin)["packages"]))')" || return 1
+  for package in $packages; do
+    echo "== $package"
+    cargo clippy -p "$package" --all-targets -- -D warnings || return 1
+  done
+}
 
 web_lints() {
   rustup target add wasm32-unknown-unknown >/dev/null 2>&1 || return 1
   cargo clippy "${EXAMPLES[@]}" --target wasm32-unknown-unknown -- -D warnings || return 1
-  cargo clippy "${EXAMPLES[@]}" --features taim/webgl --target wasm32-unknown-unknown -- -D warnings
+  cargo clippy "${EXAMPLES[@]}" --features taim/webgl --target wasm32-unknown-unknown -- -D warnings || return 1
+  cargo clippy "${PORTABLE[@]}" --all-targets --target wasm32-unknown-unknown -- -D warnings
 }
 
 platform_lints() {
   for target in x86_64-pc-windows-msvc aarch64-pc-windows-msvc \
-    x86_64-apple-darwin aarch64-apple-darwin aarch64-apple-ios; do
+    x86_64-apple-darwin aarch64-apple-darwin aarch64-apple-ios aarch64-apple-ios-sim; do
     rustup target add "$target" >/dev/null 2>&1 || return 1
     cargo clippy "${EXAMPLES[@]}" --target "$target" -- -D warnings || return 1
+    cargo clippy "${PORTABLE[@]}" --all-targets --target "$target" -- -D warnings || return 1
   done
+}
+
+# Builds `counter` for the browser, then clicks it in headless Chromium and
+# checks that it drew, that a click changed the picture, and that nothing
+# reached the console as an error. Needs node with playwright, and the
+# wasm-bindgen CLI.
+web_smoke() {
+  bash scripts/web/build.sh counter >/dev/null || return 1
+  node scripts/web/smoke.js target/web/counter
 }
 
 new_project() {
@@ -114,6 +147,7 @@ echo
 
 step "formatting" cargo fmt --all --check
 [ "$FAILED" = 0 ] && step "desktop lints" cargo clippy --workspace --all-targets -- -D warnings
+[ "$FAILED" = 0 ] && step "crate lints" crate_lints
 [ "$FAILED" = 0 ] && step "android lints" android_lints
 [ "$FAILED" = 0 ] && step "web lints" web_lints
 [ "$FAILED" = 0 ] && step "other platform lints" platform_lints
@@ -123,6 +157,15 @@ if [ "$FAILED" = 0 ] && grep -qE "skipped: no (wgpu|GPU) adapter" "$LOGS/tests.l
   skip "gpu tests" "no GPU adapter: install a driver, or mesa-vulkan-drivers"
 fi
 [ "$FAILED" = 0 ] && step "new-project smoke" new_project
+if [ "$FAILED" = 0 ]; then
+  if ! command -v wasm-bindgen >/dev/null 2>&1; then
+    skip "web smoke" "the wasm-bindgen CLI is not installed"
+  elif ! node -e "require('playwright')" >/dev/null 2>&1; then
+    skip "web smoke" "node with playwright is not available"
+  else
+    step "web smoke" web_smoke
+  fi
+fi
 if [ "$FAILED" = 0 ]; then
   if ! command -v cargo-ndk >/dev/null 2>&1; then
     skip "android link" "cargo-ndk is not installed"

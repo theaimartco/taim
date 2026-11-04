@@ -40,22 +40,40 @@ clicks update state with no console errors.
 - Text: Fira Sans is embedded (a page has no system fonts), as is the TAIM
   icon font. Characters outside Fira Sans (most symbols and emoji, CJK,
   Devanagari) need a font added with `App::font(include_bytes!(...))`.
-- Input: mouse clicks are verified. Touch and keyboard arrive through winit
-  but are untested in a browser; the canvas sets `touch-action: none` so
-  that drags reach the application instead of scrolling the page.
+- Input: mouse and keyboard are verified. Touch arrives through winit but
+  is untested in a browser; the canvas sets `touch-action: none` so that
+  drags reach the application instead of scrolling the page.
 - Time and animation use `web-time`; panics are reported to the console
   with their message.
 
+## Platform services
+
+| Service | On the web |
+|---|---|
+| Clipboard | Text through `navigator.clipboard`: copy, cut and paste in text fields. Needs a secure context (`https:` or `localhost`); the browser may ask before the first paste. |
+| `taim::storage` | Kept in the page's `localStorage`, per origin. |
+| `platform::open_url` | Opens a new tab. Browsers allow it only in response to a click or tap. |
+| `platform::share_text` | The Web Share API, where the browser offers it (mostly mobile). |
+| `platform::vibrate` | The Vibration API (Android browsers), after the user has tapped the page. |
+
+Verified in headless Chromium: typing into a text field, copy and paste
+through the system clipboard, storage surviving a reload, `open_url`
+opening a tab.
+
 ## Not yet
 
-- Clipboard, `taim::storage` (it writes files) and `taim::platform` are not
-  wired to browser APIs.
-- Images and SVG compile for the web but have not been checked in a browser.
 - Screen readers: the semantics tree is not exposed to the page's
   accessibility tree.
 - Text input methods (IME composition) are not handled.
+- Images and SVG compile for the web but have not been checked in a browser.
 - High-DPI rendering follows the browser's `devicePixelRatio` through
   winit, but has not been checked on a real high-DPI screen. DevTools device
   emulation reports CSS pixels as device pixels, so an application looks
   enlarged there; that is the emulator, not the page.
 - Not tested in Firefox or Safari.
+
+## Checking a build
+
+`node scripts/web/smoke.js target/web/counter` serves a build, clicks it in
+headless Chromium and fails on a blank canvas, a click that changes
+nothing, or a console error. The release check runs it.

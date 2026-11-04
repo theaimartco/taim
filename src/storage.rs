@@ -5,7 +5,9 @@
 //! A [`Store`] is a file in the application's private data directory
 //! ([`crate::platform::data_dir`]). Every change is written at once, through
 //! a temporary file renamed into place, so a crash or a killed process
-//! never leaves a half-written store. It is meant for settings, not for
+//! never leaves a half-written store. On the web, where a page has no
+//! files, it is an entry in the page's `localStorage` instead, written in
+//! one call; the API is the same. It is meant for settings, not for
 //! large data or records: keep those in a database or files of your own.
 //!
 //! ```no_run
@@ -21,6 +23,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt::Display;
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -59,13 +62,29 @@ impl Store {
             return Err(Error::Name(name.to_owned()));
         }
 
-        let directory = taim_winit::platform::data_dir()?;
-        Self::open_at(directory.join(format!("{name}.store")))
+        #[cfg(target_arch = "wasm32")]
+        {
+            Self::open_at(format!("{name}.store"))
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let directory = taim_winit::platform::data_dir()?;
+            Self::open_at(directory.join(format!("{name}.store")))
+        }
     }
 
-    /// Opens (or starts) a store kept in the file at `path`.
+    /// Opens (or starts) a store kept in the file at `path`. On the web,
+    /// `path` names the `localStorage` entry instead.
     pub fn open_at(path: impl Into<PathBuf>) -> Result<Self, Error> {
         let path = path.into();
+
+        #[cfg(target_arch = "wasm32")]
+        let values = taim_winit::platform::web_storage::read(&web_key(&path))?
+            .map(|contents| parse(&contents))
+            .unwrap_or_default();
+
+        #[cfg(not(target_arch = "wasm32"))]
         let values = match std::fs::read_to_string(&path) {
             Ok(contents) => parse(&contents),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => BTreeMap::new(),
@@ -75,7 +94,8 @@ impl Store {
         Ok(Self { path, values })
     }
 
-    /// The file the store is kept in.
+    /// The file the store is kept in (on the web, the name of its
+    /// `localStorage` entry, without the `taim.` prefix).
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -114,11 +134,7 @@ impl Store {
         self.values.keys().map(String::as_str)
     }
 
-    fn save(&self) -> Result<(), Error> {
-        if let Some(directory) = self.path.parent() {
-            std::fs::create_dir_all(directory)?;
-        }
-
+    fn contents(&self) -> String {
         let mut contents = String::new();
         for (key, value) in &self.values {
             contents.push_str(&escape(key));
@@ -126,6 +142,22 @@ impl Store {
             contents.push_str(&escape(value));
             contents.push('\n');
         }
+        contents
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn save(&self) -> Result<(), Error> {
+        taim_winit::platform::web_storage::write(&web_key(&self.path), &self.contents())?;
+        Ok(())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn save(&self) -> Result<(), Error> {
+        if let Some(directory) = self.path.parent() {
+            std::fs::create_dir_all(directory)?;
+        }
+
+        let contents = self.contents();
 
         let temporary = self.path.with_extension("store.tmp");
         {
@@ -136,6 +168,13 @@ impl Store {
         std::fs::rename(&temporary, &self.path)?;
         Ok(())
     }
+}
+
+/// The `localStorage` key for a store: prefixed, so a page's other
+/// entries cannot collide with it.
+#[cfg(target_arch = "wasm32")]
+fn web_key(path: &Path) -> String {
+    format!("taim.{}", path.to_string_lossy())
 }
 
 /// One `key=value` per line; `\`, `=`, newlines and carriage returns are

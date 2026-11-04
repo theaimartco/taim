@@ -56,9 +56,9 @@ vibration and files.
 |---|---|
 | Linux (X11, Wayland) | Runs; checked under a virtual X11 display |
 | Android | Builds; not yet run on a device |
-| Web (WebAssembly) | Runs in Chromium with WebGL2; see [docs/platform/web.md](docs/platform/web.md) |
+| Web (WebAssembly) | Runs in Chromium with WebGL2, with clipboard, storage and links; see [docs/platform/web.md](docs/platform/web.md) |
 | Windows, macOS | Type-check and lint clean; not run |
-| iOS | Type-checks and lints clean; no app-bundle tooling or device run yet; the clipboard is unavailable |
+| iOS | Type-checks and lints clean, with clipboard, links, vibration and storage; no app-bundle tooling or device run yet |
 
 `bash scripts/release/check.sh` lints every one of these targets.
 

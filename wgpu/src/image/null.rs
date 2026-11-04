@@ -44,8 +44,7 @@ mod taim_no_image_tests {
     #[test]
     fn suppressed_assets_count_without_fake_gpu_batches() {
         let mut first = Batch::default();
-        let mut second = Batch::default();
-        second.suppressed = 3;
+        let mut second = Batch { suppressed: 3 };
         first.append(&mut second);
         assert_eq!(first.suppressed_count(), 3);
         assert_eq!(second.suppressed_count(), 0);

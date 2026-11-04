@@ -1,10 +1,20 @@
 //! What an application asks of the operating system: open a link, share
 //! text, vibrate, and where to keep its files.
 //!
-//! Every function can be called from any thread. On Android they go
-//! through the activity over JNI; on desktops through the system's own
+//! On Android they go through the activity over JNI; on iOS through UIKit;
+//! in a browser through the Web APIs; on desktops through the system's own
 //! tools. Where a platform has no equivalent, they return
 //! [`Error::Unsupported`] rather than pretending.
+//!
+//! | | Android | iOS | Web | Windows, macOS, Linux |
+//! |---|---|---|---|---|
+//! | [`open_url`] | yes | yes (main thread) | new tab (after a tap) | yes |
+//! | [`share_text`] | share sheet | unsupported | Web Share, where offered | unsupported |
+//! | [`vibrate`] | yes | fixed length (iPhone) | where offered (after a tap) | unsupported |
+//! | [`data_dir`] | app files | app sandbox | unsupported (`taim::storage` uses `localStorage`) | per-user data |
+//!
+//! Calls may come from any thread, except `open_url` on iOS, which UIKit
+//! requires on the main thread, where views' handlers run.
 
 use std::path::PathBuf;
 use std::time::Duration;
@@ -222,7 +232,7 @@ mod imp {
     }
 }
 
-#[cfg(all(not(target_os = "android"), not(target_arch = "wasm32")))]
+#[cfg(not(any(target_os = "android", target_os = "ios", target_arch = "wasm32")))]
 mod imp {
     use super::Error;
 
@@ -236,9 +246,11 @@ mod imp {
             let _ = command.arg(url);
             command
         } else if cfg!(target_os = "windows") {
-            // `start`'s first quoted argument is a window title.
-            let mut command = Command::new("cmd");
-            let _ = command.args(["/C", "start", "", url]);
+            // Not `cmd /C start`: cmd would split the URL at `&` and run
+            // what follows as a command. The URL protocol handler takes
+            // the URL as one argument, with no shell in between.
+            let mut command = Command::new("rundll32");
+            let _ = command.args(["url.dll,FileProtocolHandler", url]);
             command
         } else {
             let mut command = Command::new("xdg-open");
@@ -289,6 +301,74 @@ mod imp {
     }
 }
 
+#[cfg(target_os = "ios")]
+// UIKit and AudioToolbox are C and Objective-C APIs; each call says why
+// it is sound.
+#[allow(unsafe_code)]
+mod imp {
+    use super::Error;
+
+    use std::path::PathBuf;
+    use std::time::Duration;
+
+    use objc2_foundation::{MainThreadMarker, NSDictionary, NSString, NSURL};
+    use objc2_ui_kit::UIApplication;
+
+    /// Hands `url` to the system (Safari, Phone, Mail). UIKit must be
+    /// asked from the main thread, where views' handlers run.
+    pub fn open_url(url: &str) -> Result<(), Error> {
+        let Some(mtm) = MainThreadMarker::new() else {
+            return Err(Error::Failed(
+                "open_url must be called from the main thread on iOS".to_owned(),
+            ));
+        };
+
+        let string = NSString::from_str(url);
+        // SAFETY: `URLWithString:` takes any string and returns nil for
+        // one that is not a URL.
+        let Some(url) = (unsafe { NSURL::URLWithString(&string) }) else {
+            return Err(Error::Failed("not a URL".to_owned()));
+        };
+
+        let application = UIApplication::sharedApplication(mtm);
+        let options = NSDictionary::new();
+        // SAFETY: on the main thread, with a valid URL, empty options and
+        // no completion handler, as UIKit documents.
+        unsafe {
+            application.openURL_options_completionHandler(&url, &options, None);
+        }
+        Ok(())
+    }
+
+    /// Presenting a share sheet needs the application's view controller,
+    /// which TAIM does not own on iOS yet.
+    pub fn share_text(_text: &str) -> Result<(), Error> {
+        Err(Error::Unsupported)
+    }
+
+    #[link(name = "AudioToolbox", kind = "framework")]
+    unsafe extern "C" {
+        fn AudioServicesPlaySystemSound(sound: u32);
+    }
+
+    /// The system vibration (`kSystemSoundID_Vibrate`). Its length is fixed
+    /// by iOS; `duration` is ignored. iPads do not vibrate.
+    pub fn vibrate(_duration: Duration) -> Result<(), Error> {
+        const VIBRATE: u32 = 4095;
+        // SAFETY: plays a built-in system sound; any thread may call it.
+        unsafe { AudioServicesPlaySystemSound(VIBRATE) };
+        Ok(())
+    }
+
+    /// `Library/Application Support` in the application's sandbox, which
+    /// iOS backs up and keeps until the app is deleted.
+    pub fn data_dir() -> Result<PathBuf, Error> {
+        std::env::var_os("HOME")
+            .map(|home| PathBuf::from(home).join("Library/Application Support"))
+            .ok_or_else(|| Error::Failed("no sandbox home directory".to_owned()))
+    }
+}
+
 #[cfg(target_arch = "wasm32")]
 mod imp {
     use super::Error;
@@ -296,20 +376,92 @@ mod imp {
     use std::path::PathBuf;
     use std::time::Duration;
 
-    pub fn open_url(_url: &str) -> Result<(), Error> {
-        Err(Error::Unsupported)
+    fn window() -> Result<web_sys::Window, Error> {
+        web_sys::window().ok_or(Error::Unsupported)
     }
 
-    pub fn share_text(_text: &str) -> Result<(), Error> {
-        Err(Error::Unsupported)
+    fn failed(error: wasm_bindgen::JsValue) -> Error {
+        Error::Failed(format!("{error:?}"))
     }
 
-    pub fn vibrate(_duration: Duration) -> Result<(), Error> {
-        Err(Error::Unsupported)
+    /// Opens a new tab (or the handler for `mailto:`, `tel:`). Browsers
+    /// block it outside a user gesture such as a click.
+    pub fn open_url(url: &str) -> Result<(), Error> {
+        let opened = window()?
+            .open_with_url_and_target_and_features(url, "_blank", "noopener")
+            .map_err(failed)?;
+        // `noopener` makes `open` return null even when it worked, so only
+        // an exception counts as a failure.
+        let _ = opened;
+        Ok(())
     }
 
+    /// The Web Share API, where the browser has it (most mobile browsers).
+    pub fn share_text(text: &str) -> Result<(), Error> {
+        let navigator = window()?.navigator();
+        let has_share = js_sys::Reflect::has(&navigator, &"share".into()).unwrap_or(false);
+        if !has_share {
+            return Err(Error::Unsupported);
+        }
+
+        let data = web_sys::ShareData::new();
+        data.set_text(text);
+        // The promise settles after the user picks a target or cancels;
+        // neither needs an answer here.
+        let _promise = navigator.share_with_data(&data);
+        Ok(())
+    }
+
+    /// The Vibration API (Android browsers; not Safari).
+    pub fn vibrate(duration: Duration) -> Result<(), Error> {
+        let navigator = window()?.navigator();
+        let has_vibrate = js_sys::Reflect::has(&navigator, &"vibrate".into()).unwrap_or(false);
+        if !has_vibrate {
+            return Err(Error::Unsupported);
+        }
+        let milliseconds = u32::try_from(duration.as_millis()).unwrap_or(u32::MAX);
+        if navigator.vibrate_with_duration(milliseconds) {
+            Ok(())
+        } else {
+            // Browsers refuse until the user has tapped the page.
+            Err(Error::Failed(
+                "the browser refused: vibration needs a tap on the page first".to_owned(),
+            ))
+        }
+    }
+
+    /// A page has no file system; [`web_storage`](super::web_storage) keeps
+    /// settings instead.
     pub fn data_dir() -> Result<PathBuf, Error> {
         Err(Error::Unsupported)
+    }
+}
+
+/// The page's `localStorage`, where `taim::storage` keeps settings on the
+/// web: per origin, kept across visits, a few megabytes at most.
+#[cfg(target_arch = "wasm32")]
+pub mod web_storage {
+    use super::Error;
+
+    fn storage() -> Result<web_sys::Storage, Error> {
+        web_sys::window()
+            .and_then(|window| window.local_storage().ok().flatten())
+            .ok_or(Error::Unsupported)
+    }
+
+    /// The value saved under `key`, if any.
+    pub fn read(key: &str) -> Result<Option<String>, Error> {
+        storage()?
+            .get_item(key)
+            .map_err(|error| Error::Failed(format!("{error:?}")))
+    }
+
+    /// Saves `value` under `key`. Fails when the browser's quota is full or
+    /// storage is disabled (some private windows).
+    pub fn write(key: &str, value: &str) -> Result<(), Error> {
+        storage()?
+            .set_item(key, value)
+            .map_err(|error| Error::Failed(format!("{error:?}")))
     }
 }
 
