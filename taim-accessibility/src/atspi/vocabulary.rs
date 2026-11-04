@@ -246,33 +246,42 @@ pub struct Action {
 /// An empty [`Actions`] yields an empty list, which is the whole point of
 /// the "a disabled control advertises no actions" rule: assistive
 /// technology offers the user nothing rather than something inert.
-pub fn actions(actions: Actions) -> Vec<Action> {
-    let mut list = Vec::new();
-
-    let mut push = |flag: Actions, name, description| {
-        if actions.contains(flag) {
-            list.push(Action { name, description });
-        }
-    };
-
-    push(Actions::ACTIVATE, "click", "Activate this control");
-    push(Actions::FOCUS, "grabFocus", "Move focus here");
-    push(Actions::INCREMENT, "increment", "Increase the value");
-    push(Actions::DECREMENT, "decrement", "Decrease the value");
-    push(Actions::SET_VALUE, "setValue", "Set the value");
-    push(
+const ACTION_DEFINITIONS: [(Actions, &str, &str); 7] = [
+    (Actions::ACTIVATE, "click", "Activate this control"),
+    (Actions::FOCUS, "grabFocus", "Move focus here"),
+    (Actions::INCREMENT, "increment", "Increase the value"),
+    (Actions::DECREMENT, "decrement", "Decrease the value"),
+    (
         Actions::TOGGLE_EXPANDED,
         "expandOrCollapse",
         "Expand or collapse",
-    );
-    push(
+    ),
+    (
         Actions::SCROLL_INTO_VIEW,
         "scrollIntoView",
         "Scroll into view",
-    );
-    push(Actions::DISMISS, "dismiss", "Dismiss");
+    ),
+    (Actions::DISMISS, "dismiss", "Dismiss"),
+];
 
-    list
+/// Lists argument-free actions in deterministic AT-SPI wire order.
+pub fn actions(actions: Actions) -> Vec<Action> {
+    ACTION_DEFINITIONS
+        .iter()
+        .filter(|(flag, _, _)| actions.contains(*flag))
+        .map(|(_, name, description)| Action { name, description })
+        .collect()
+}
+
+/// The semantic operation at the same stable wire index as [`actions`].
+/// SET_VALUE takes an argument and belongs to the AT-SPI Value interface,
+/// not the argument-free Action.DoAction method.
+pub fn action_flag(actions: Actions, index: usize) -> Option<Actions> {
+    ACTION_DEFINITIONS
+        .iter()
+        .filter(|(flag, _, _)| actions.contains(*flag))
+        .nth(index)
+        .map(|(flag, _, _)| *flag)
 }
 
 /// Maps a [`Live`] politeness to the `live` object attribute AT-SPI2
@@ -427,7 +436,8 @@ mod tests {
             .map(|action| action.name)
             .collect();
 
-        assert_eq!(names, vec!["increment", "decrement", "setValue"]);
+        assert_eq!(names, vec!["increment", "decrement"]);
+        assert_eq!(action_flag(Actions::SET_VALUE, 0), None);
     }
 
     #[test]

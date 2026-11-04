@@ -81,10 +81,11 @@ fn classify(main: Length, cross: Length, compress_main: bool, compress_cross: bo
         return Pass::Weighted;
     }
     if compress_cross && cross.fill_factor() > 0 {
-        if let Length::Fixed(size) = main {
-            if size.is_finite() && size >= 0.0 {
-                return Pass::CrossDeferred(size);
-            }
+        if let Length::Fixed(size) = main
+            && size.is_finite()
+            && size >= 0.0
+        {
+            return Pass::CrossDeferred(size);
         }
         return Pass::CrossProbe;
     }

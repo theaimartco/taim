@@ -39,7 +39,7 @@ pub struct LanguageServer {
 }
 
 impl LanguageServer {
-    pub fn start(root: &Path) -> Result<(Self, taim::Task<Message>), String> {
+    pub fn start(root: &Path) -> Result<(Self, taim_runtime::Task<Message>), String> {
         let executable =
             std::env::var_os("VIRGO_RUST_ANALYZER").unwrap_or_else(|| "rust-analyzer".into());
         let mut child = Command::new(executable)
@@ -133,7 +133,7 @@ impl LanguageServer {
             .map_err(|error| error.to_string())?;
         Ok((
             server,
-            taim::Task::run(receiver, Message::LanguageServerEvent),
+            taim_runtime::Task::run(receiver, Message::LanguageServerEvent),
         ))
     }
 

@@ -1,0 +1,177 @@
+{
+  "date": "2026-10-30",
+  "milestone": "Native hierarchy hardware/IME keyboard routing, shortcuts, repeats, translated text and generation/focus fencing",
+  "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+  "working_tree_dirty": true,
+  "runtime": {
+    "native-key-final": {
+      "status": "passed",
+      "serial": "emulator-5594",
+      "started_utc": "2026-10-30T10:09:19.724197+00:00",
+      "apk_sha256": "e416d87e7be07f7fe62a836d3b71488bfaa2e2c44eacabf256e52eaaddcfa3a3",
+      "driver_sha256": "81c2df63f91e452b6d15eff5605c9ba16b643b87cce748b86af2d3f241b2ed03",
+      "device": {
+        "sdk": "35",
+        "model": "sdk_gphone16k_x86_64",
+        "abi": "x86_64",
+        "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+        "page_size": 16384
+      },
+      "checks": 34,
+      "finished_utc": "2026-10-30T10:09:31.889255+00:00"
+    },
+    "native-key-ime-final": {
+      "status": "passed",
+      "serial": "emulator-5594",
+      "test_ime_sha256": "939d11b0d2c39e3ea6e8eba2891d9433f1ea9623d31feb7a22e5114027e5df97",
+      "checks": [
+        "commit",
+        "assert",
+        "delete-codepoints",
+        "assert",
+        "select",
+        "batch",
+        "finish",
+        "assert-all",
+        "select-all",
+        "commit",
+        "compose",
+        "finish",
+        "assert",
+        "save",
+        "stale",
+        "commit",
+        "assert",
+        "compose",
+        "finish",
+        "delete-codepoints",
+        "assert",
+        "assert-all",
+        "select-all",
+        "commit",
+        "assert-all",
+        "delete-codepoints",
+        "compose",
+        "finish",
+        "assert-all"
+      ]
+    }
+  },
+  "host_checks": {
+    "winit_lib": 61,
+    "native_ui_contract": 39,
+    "clippy_host": "passed -D warnings",
+    "clippy_arm64_counter_and_native_probe": "passed -D warnings",
+    "cargo_fmt_all_check": "passed",
+    "git_diff_check": "passed",
+    "python_compile": "passed"
+  },
+  "build_checks": {
+    "native_probe_abis": [
+      "arm64-v8a",
+      "x86_64"
+    ],
+    "standalone_sdk": 36,
+    "standalone_libraries": [
+      "lib/arm64-v8a/libtaim_app.so",
+      "lib/x86_64/libtaim_app.so"
+    ],
+    "apk_signature_and_16k_alignment": "passed; debug/development signing"
+  },
+  "artifacts": {
+    "target/android/x86_64/debug/native-view-probe/taim-native-view-probe.apk": {
+      "bytes": 19669483,
+      "sha256": "e416d87e7be07f7fe62a836d3b71488bfaa2e2c44eacabf256e52eaaddcfa3a3"
+    },
+    "target/android/arm64-v8a/debug/native-view-probe/taim-native-view-probe.apk": {
+      "bytes": 20308462,
+      "sha256": "284ab3551eb8dfc78ae48bc57d48021e66c23e671156546fa6a894207eb01fb0"
+    },
+    "target/android/x86_64/debug/taim-counter.apk": {
+      "bytes": 20001249,
+      "sha256": "509b0a4591d064e545203f0664d86f5f1b5e060f55db1cf3ff72a14f1d27c6eb"
+    },
+    "target/android/native-key-project/app/build/outputs/apk/debug/app-debug.apk": {
+      "bytes": 54374223,
+      "sha256": "c23e36e28b35c5364a7ca307767b6ddd455e6cb3d75089c39d25fc735e6be6fa"
+    }
+  },
+  "sources": {
+    "winit/src/android/keys.rs": {
+      "bytes": 5974,
+      "sha256": "0c136140d7f156d470e86849d642973ce826ffbb191c098a88b8361c7ae12c27"
+    },
+    "winit/src/android/mod.rs": {
+      "bytes": 1192,
+      "sha256": "c736b97f2c2b96ab26748e5b19bcf52b4051cc7223933b40ce28e6ddaaf8e3a1"
+    },
+    "winit/src/android/bridge.rs": {
+      "bytes": 42234,
+      "sha256": "34e9e680c0a7578e12e83ef07dee0d512741c278ef191b272331a6f36803e3de"
+    },
+    "winit/src/surface.rs": {
+      "bytes": 40873,
+      "sha256": "ca445ee793745cb76e5bb863b9f404bab431d69a63e7db87770c8720753ceb33"
+    },
+    "winit/src/shell.rs": {
+      "bytes": 18344,
+      "sha256": "b4c8230c5ef6d4d500ddee6ebc705cb701e35406eec5c0cafd61e878f40606d6"
+    },
+    "winit/android/com/theaimartco/taim/TaimActivity.java": {
+      "bytes": 35750,
+      "sha256": "4fa5fe56c6d58363643759afb708ee93570177e9a8aa706446586637f1ffa8aa"
+    },
+    "winit/android/com/theaimartco/taim/TaimNativeViews.java": {
+      "bytes": 20284,
+      "sha256": "7cc7672bb7ec7ec87f1f83e8c919d296b70dde045ae000cef1095c609d32946c"
+    },
+    "scripts/android/native-view-probe.py": {
+      "bytes": 3725,
+      "sha256": "c241456eaef90e2781b5bd973b248a25ee67dc485940966f0e1975cf4c695e86"
+    },
+    "scripts/android/native-view-test/NativeViewDriver.java": {
+      "bytes": 15534,
+      "sha256": "db04061067414af43c102dd733b7de9fb4bee996a8681a3e741a5b9f601ca058"
+    },
+    "scripts/android/native-view-test/AndroidManifest.xml": {
+      "bytes": 439,
+      "sha256": "d8ae7caecbaa62f66501ad38a25d4bba6f879c50639fc043c4befdbd45181f55"
+    },
+    "docs/android/native-views.md": {
+      "bytes": 9275,
+      "sha256": "0d4a607247f4281100a1cc59cf3b7ccb2d344af39e9616ee5b0e9b4f8f43d575"
+    },
+    "docs/android/plan.md": {
+      "bytes": 10043,
+      "sha256": "de2b57bad7608dd0c851cec52b9463261172ccf8de173f5288f855dd443948eb"
+    },
+    "docs/android/capabilities.md": {
+      "bytes": 3846,
+      "sha256": "3945c0c7591e0357be5abf810527b6668d69cc210dbbe3f307e317c4b6e80d2c"
+    }
+  },
+  "keyboard_checks": [
+    "Shell-injected letter typing",
+    "Hardware Backspace",
+    "Arrow navigation and forward deletion",
+    "Ctrl+A and replacement text",
+    "Shift capitalization",
+    "Real InputConnection sendKeyEvent repeats",
+    "Real InputConnection sendKeyEvent deletion",
+    "Native button Enter activation and Rust event round trip",
+    "Held modifier cancellation on focus loss",
+    "Stale native generation key rejection",
+    "Translated Unicode character event delivery",
+    "Orphan repeat rejection"
+  ],
+  "environment_notes": [
+    "Final API35 16KiB emulator runs use 4096 MiB guest RAM.",
+    "Earlier 2048 MiB runs encountered a system_server native crash in ShortcutPackage initialization and an Android low-memory-killer termination of the test IME. Those failed reports remain under target/android/runtime-smoke; final clean runs pass."
+  ],
+  "limitations": [
+    "Experimental Android support; physical keyboard layouts/OEM IME/API/device matrix remains pending.",
+    "Reconstructed winit events do not retain raw device IDs, scan codes, source flags, exact repeat/timing metadata or ACTION_MULTIPLE payloads absent from winit.",
+    "Modifiers/lock state established before native focus and cross-framework Tab traversal remain separate work.",
+    "Mouse/hover/stylus metadata forwarding, external GPU texture import/arbitrary layer interleaving and Camera2/player/Maps/WebView adapters remain pending."
+  ]
+}

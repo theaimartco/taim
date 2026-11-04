@@ -1,0 +1,309 @@
+{
+  "recorded_utc": "2026-10-30T23:39:30.669873+00:00",
+  "scope": "Framework-wide Android capability expansion; no Flutter parity/superiority claim",
+  "status": "WebView and foreground sensor snapshots implemented and tested; production clearance not granted",
+  "production_clearance": false,
+  "changes": [
+    "Built-in retained taim.web adapter and Rust content helpers; restrictive defaults and explicit JavaScript",
+    "Permission-free inventory and bounded fresh snapshots for 13 sensor kinds; typed decoder/client, drop/pause/deadline cleanup",
+    "Restore theme lighting and hinting when recreating renderer for memory pressure",
+    "Explicit generator --internet flag and reviewed Java host snapshots"
+  ],
+  "host_tests": {
+    "view_unit": 40,
+    "shell_unit": 72,
+    "ui_integration": 45,
+    "failed": 0
+  },
+  "checks": {
+    "supported_desktop_strict_clippy": "passed",
+    "android_arm64_native_probe_strict_clippy": "passed",
+    "desktop_accessibility_compile": "passed",
+    "rustfmt": "passed",
+    "python_compile": "passed",
+    "git_diff_check": "passed",
+    "generator_internet_opt_in": "passed"
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 19,
+    "baseline": false,
+    "full_release_gate": true
+  },
+  "release": {
+    "abis": [
+      "arm64-v8a",
+      "x86_64"
+    ],
+    "debuggable": false,
+    "signer": "development test certificate; not company production identity",
+    "apk_signature_and_16k_zip_alignment": "verified",
+    "aab_structure": "official bundletool validation passed",
+    "published": false
+  },
+  "reports": {
+    "webview-sensors-final-20261031": {
+      "path": "target/android/runtime-smoke/webview-sensors-final-20261031/report.json",
+      "sha256": "4791db684576d1f2e654e16209a6995d49be59cd74279c574889f5826382a04e",
+      "report": {
+        "status": "passed",
+        "serial": "emulator-5594",
+        "started_utc": "2026-10-30T23:35:29.815457+00:00",
+        "apk_sha256": "b0c0aeeb59b737ef882fa4580c4de70f713de9e3bfc33fa6a269f9fb7bc73516",
+        "driver_sha256": "38379aeca7d4fbb5456cbe33ec2ecd24b55cfd32bd9c4aaa2289208d9fee7799",
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "checks": 50,
+        "web": true,
+        "sensors": true,
+        "finished_utc": "2026-10-30T23:35:42.435688+00:00"
+      },
+      "current_source": true
+    },
+    "sensors-release-final-20261031": {
+      "path": "target/android/runtime-smoke/sensors-release-final-20261031/report.json",
+      "sha256": "29c2cfbaadddfc9546ead8ca6432cacf66f73353a521939ee9fb9df64f8594be",
+      "report": {
+        "status": "passed",
+        "serial": "emulator-5594",
+        "package": "com.theaimartco.taim.productionaudit",
+        "debuggable": false,
+        "apk_sha256": "d3f8e7cf253cda507f4710eeb676f1927c181251408503ffcb36fced1c5b3610",
+        "started_utc": "2026-10-30T23:35:58.854740+00:00",
+        "checks": [
+          "non-debuggable release launches with real nonblank counter pixels",
+          "real touch increments release counter pixels",
+          "release suspend/resume 1 retains process, state and rendered pixels",
+          "release suspend/resume 2 retains process, state and rendered pixels",
+          "release input remains functional after surface recreation",
+          "OS trim-memory retains release process, counter state and exact rendered pixels",
+          "OS background process death restores release counter pixels into a new process",
+          "release input remains functional after process restoration"
+        ],
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "eviction_preparation": "Settings foreground removes previous-app protection before am kill; no root, run-as or force-stop for eviction",
+        "launch": "Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity }\nStatus: ok\nLaunchState: COLD\nActivity: com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity\nTotalTime: 344\nWaitTime: 370\nComplete",
+        "initial_pid": "5330",
+        "trim_memory": "",
+        "restored_pid": "5631",
+        "finished_utc": "2026-10-30T23:36:28.284804+00:00"
+      },
+      "current_source": true
+    },
+    "sensors-access-final-20261031": {
+      "path": "target/android/runtime-smoke/sensors-access-final-20261031/report.json",
+      "sha256": "0f8a2a2be2e6e615f55ff559062a312a74664beb70f3926722ff97c919c3a26f",
+      "report": {
+        "status": "passed",
+        "production": true,
+        "serial": "emulator-5594",
+        "started_utc": "2026-10-30T23:38:27.832104+00:00",
+        "apk_sha256": "70a7af602ea2891db362e1d71c6a6e771e82b306db61d11210aa31c50a6a412e",
+        "driver_sha256": "858993fb01a142035aac704e995d09c6003f36be34975276ca4f0ae7e81b85a6",
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "checks": 33,
+        "history_checks": 2,
+        "revocation_checks": 1,
+        "finished_utc": "2026-10-30T23:38:37.478866+00:00"
+      },
+      "current_source": true
+    },
+    "production-final-release": {
+      "path": "target/android/runtime-smoke/production-final-release/report.json",
+      "sha256": "a02a44254efd8b2821becae64d7cffe81126f0a06871e6b7f30c9e00bd19be5b",
+      "report": {
+        "status": "failed",
+        "serial": "emulator-5594",
+        "package": "com.theaimartco.taim.productionaudit",
+        "debuggable": false,
+        "apk_sha256": "250bc4130bba13bd0b732d8543bdbe9f0be7f0626c49c578cd7f7d84cf892b09",
+        "started_utc": "2026-10-30T23:18:10.277991+00:00",
+        "checks": [
+          "non-debuggable release launches with real nonblank counter pixels",
+          "real touch increments release counter pixels",
+          "release suspend/resume 1 retains process, state and rendered pixels",
+          "release suspend/resume 2 retains process, state and rendered pixels",
+          "release input remains functional after surface recreation"
+        ],
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "eviction_preparation": "Settings foreground removes previous-app protection before am kill; no root, run-as or force-stop for eviction",
+        "launch": "Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity }\nStatus: ok\nLaunchState: COLD\nActivity: com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity\nTotalTime: 464\nWaitTime: 466\nComplete",
+        "initial_pid": "9983",
+        "restored_pid": "10264",
+        "error": "Release saved-task restoration failed",
+        "finished_utc": "2026-10-30T23:18:32.378572+00:00"
+      },
+      "current_source": false
+    },
+    "production-release-repro": {
+      "path": "target/android/runtime-smoke/production-release-repro/report.json",
+      "sha256": "05b2c876608b9ab5dc16ad9a135b6fd2e6b3e054e8626010806ed9b6441ade8a",
+      "report": {
+        "status": "passed",
+        "serial": "emulator-5594",
+        "package": "com.theaimartco.taim.productionaudit",
+        "debuggable": false,
+        "apk_sha256": "250bc4130bba13bd0b732d8543bdbe9f0be7f0626c49c578cd7f7d84cf892b09",
+        "started_utc": "2026-10-30T23:23:17.773776+00:00",
+        "checks": [
+          "non-debuggable release launches with real nonblank counter pixels",
+          "real touch increments release counter pixels",
+          "release suspend/resume 1 retains process, state and rendered pixels",
+          "release suspend/resume 2 retains process, state and rendered pixels",
+          "release input remains functional after surface recreation",
+          "OS background process death restores release counter pixels into a new process",
+          "release input remains functional after process restoration"
+        ],
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "eviction_preparation": "Settings foreground removes previous-app protection before am kill; no root, run-as or force-stop for eviction",
+        "launch": "Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity }\nStatus: ok\nLaunchState: COLD\nActivity: com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity\nTotalTime: 2020\nWaitTime: 2048\nComplete",
+        "initial_pid": "2380",
+        "restored_pid": "3538",
+        "finished_utc": "2026-10-30T23:23:52.534419+00:00"
+      },
+      "current_source": false
+    },
+    "webview-release-20261031": {
+      "path": "target/android/runtime-smoke/webview-release-20261031/report.json",
+      "sha256": "c02843c4ae2184e44ce23a30f8c2b0e6b9aa0855a41523f696eae04fb8036b39",
+      "report": {
+        "status": "passed",
+        "serial": "emulator-5594",
+        "package": "com.theaimartco.taim.productionaudit",
+        "debuggable": false,
+        "apk_sha256": "4bb504763b951bbb00f6d9e705a9c4b0e9d905f50a6878f9a987d4f91f4af74c",
+        "started_utc": "2026-10-30T23:29:15.100444+00:00",
+        "checks": [
+          "non-debuggable release launches with real nonblank counter pixels",
+          "real touch increments release counter pixels",
+          "release suspend/resume 1 retains process, state and rendered pixels",
+          "release suspend/resume 2 retains process, state and rendered pixels",
+          "release input remains functional after surface recreation",
+          "OS background process death restores release counter pixels into a new process",
+          "release input remains functional after process restoration"
+        ],
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "eviction_preparation": "Settings foreground removes previous-app protection before am kill; no root, run-as or force-stop for eviction",
+        "launch": "Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity }\nStatus: ok\nLaunchState: COLD\nActivity: com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity\nTotalTime: 515\nWaitTime: 533\nComplete",
+        "initial_pid": "4238",
+        "restored_pid": "4526",
+        "finished_utc": "2026-10-30T23:29:42.110230+00:00"
+      },
+      "current_source": false
+    }
+  },
+  "sources_sha256": {
+    "src/lib.rs": "590488d076c5eb91468e23669b8fe8277483ff6cc01fb6ed90dee39ee18e9328",
+    "view/src/lib.rs": "9f87b249494691662829bcd6b2383c07bdf3a1d28554fdedee1ae8d28e8baa4d",
+    "view/src/web.rs": "fa24834928fb4979be22989da8ee3665a859022e9298506889faa9321ba45dc3",
+    "winit/src/surface.rs": "21eb391480c70bb7b04bd3c63528332cea8c066d9a712ff6db2c2515c621c3cc",
+    "winit/src/android/mod.rs": "3aa9d8398e725e8125aaef143194cb587b310e7fe8beed0b2effebb49fd24816",
+    "winit/src/android/services.rs": "106c89569965d6ceb3759d046e9c146f6b68dc9fe0c291c07fdfa314ccd381ed",
+    "winit/src/android/sensors.rs": "85498f4d85f1cfdcc840f38ab93c79f86596bc6bfa36e0b69d64ed4bc3f48c5e",
+    "winit/android/com/theaimartco/taim/TaimSensors.java": "43b9ab501ef0b11e464e11250348df5378d0db04145b9f73251300de00817dd5",
+    "winit/android/com/theaimartco/taim/TaimWebView.java": "9eb02845d16d8083b4a48e72b1f7ab5c9fe1384e7bb2ecfab4729595c5f1fada",
+    "winit/android/com/theaimartco/taim/TaimNativeViews.java": "0e4c0985b2fb2be66727cf34263576694dedf8b1d41e7596b2af4b00587f3c77",
+    "winit/android/com/theaimartco/taim/TaimServices.java": "65274f67e938fba20746e835f796849d76f779e6cd2d00d4a66f735f32d49c30",
+    "scripts/android/project.py": "43092257997be622b468a9cd90882499160a339d90fad3e03fc6660dcc538045",
+    "scripts/android/native-view-probe.py": "81b8a6a383021efb6eda142e7fe664d655c55220006a5c6468b88049474c4122",
+    "scripts/android/native-view-test/NativeViewDriver.java": "e1f5c8b7e738d03538a5306d4806fe74992c1e88d64447f1b0aff4f1aea6218b",
+    "scripts/android/release-smoke.py": "994a1600260c14d3da4e3c091b3cae9c9a37a466c8be6d1c673468522b29e468",
+    "examples/android_native_view_probe/src/lib.rs": "578f7f83e914ae5453b85b34daf8dfbdcdb80241a2e98eb02ef8daaa9b983326",
+    "docs/android/webview.md": "c14a798be973cc9d05a684e7a8caac110c910fa11dba56082fbd6638fc45f129",
+    "docs/android/sensors.md": "53a91006243e88a8a82ccc5b7ad026f2adbb72ba8d88e4f1c5db00ed6db0da77",
+    "docs/android/capabilities.md": "0e08c11f409add60959990dd9247623bc829901bc40ac73f3078e3340e2014cb",
+    "docs/android/production-readiness.md": "45365a25fac79deda9de9f508d57bf2fab9806874a91585ea3e5a3ab8de72272"
+  },
+  "artifact_sha256": {
+    "target/android/production-audit-project/app/build/outputs/apk/release/app-release.apk": "d3f8e7cf253cda507f4710eeb676f1927c181251408503ffcb36fced1c5b3610",
+    "target/android/production-audit-project/app/build/outputs/bundle/release/app-release.aab": "2b93f61e1a24e351c2d17da8a7c56e2cd092fb006c30bd934e5692ceb84d3dcb",
+    "target/android/x86_64/debug/native-view-probe/taim-native-view-probe.apk": "b0c0aeeb59b737ef882fa4580c4de70f713de9e3bfc33fa6a269f9fb7bc73516",
+    "target/android/x86_64/debug/platform-probe/taim-platform-probe.apk": "70a7af602ea2891db362e1d71c6a6e771e82b306db61d11210aa31c50a6a412e"
+  },
+  "screenshots_sha256": {
+    "target/android/runtime-smoke/sensors-release-final-20261031/resume-1.png": "05e1db770742746471c56f9eedb14cb473ce946d28c8009fbdc9cab9a444c74b",
+    "target/android/runtime-smoke/sensors-release-final-20261031/after-trim.png": "0835e09b5c978a2ef1a89b56446d052081c2e1cf98c4a9095ed3902f4a7a370e",
+    "target/android/runtime-smoke/sensors-release-final-20261031/initial.png": "d3957501e1a6bc36fe48db33af18c6af748961c66779ec4c206f52d38bb3e9c2",
+    "target/android/runtime-smoke/sensors-release-final-20261031/before-death.png": "0835e09b5c978a2ef1a89b56446d052081c2e1cf98c4a9095ed3902f4a7a370e",
+    "target/android/runtime-smoke/sensors-release-final-20261031/restored.png": "01de7acc1ebaba592e4a6a01325043c703c69208493dbdccab831d54d980c7f9",
+    "target/android/runtime-smoke/sensors-release-final-20261031/restored-input.png": "819cc17c4cbe0f4178b94d3ea7b069e289794ca22121b61914cba569ff46fe97",
+    "target/android/runtime-smoke/sensors-release-final-20261031/incremented.png": "05e1db770742746471c56f9eedb14cb473ce946d28c8009fbdc9cab9a444c74b",
+    "target/android/runtime-smoke/sensors-release-final-20261031/resume-0.png": "05e1db770742746471c56f9eedb14cb473ce946d28c8009fbdc9cab9a444c74b",
+    "target/android/runtime-smoke/production-final-release/resume-1.png": "f274f896f162f6eeec921d382815dd4257377e32a63e2ef4564ad19b6e494b15",
+    "target/android/runtime-smoke/production-final-release/initial.png": "fc85f36a360bd1613ddb6c50eb7b733bb45c4d82da54a12f414e823cdf8c77b0",
+    "target/android/runtime-smoke/production-final-release/before-death.png": "7dc2938ae79604d23c394a35058dd145d9089ab738bceb0748d37be9a388d585",
+    "target/android/runtime-smoke/production-final-release/restored.png": "92479cce12b5fa60e43cfea66ee88e6e2fea4ffb8fa79d3e5a9c112f6ac669ea",
+    "target/android/runtime-smoke/production-final-release/incremented.png": "f274f896f162f6eeec921d382815dd4257377e32a63e2ef4564ad19b6e494b15",
+    "target/android/runtime-smoke/production-final-release/resume-0.png": "f274f896f162f6eeec921d382815dd4257377e32a63e2ef4564ad19b6e494b15",
+    "target/android/runtime-smoke/production-release-repro/resume-1.png": "a39faf1170d128c498bb1ad61160142248b1d912eeb355787332077f6f2ee30d",
+    "target/android/runtime-smoke/production-release-repro/initial.png": "348184953f96c96de61547459f5dbde5ddf4c6c82520954452e7f4441fd1944e",
+    "target/android/runtime-smoke/production-release-repro/before-death.png": "3425fa5a07938484c68c26db92758943245c5694948538e7586f0cc672636d2e",
+    "target/android/runtime-smoke/production-release-repro/restored.png": "25562fc5ca2c4ac7934f353c55784de83e2486c872a1c4b1dacb4d3636f4391f",
+    "target/android/runtime-smoke/production-release-repro/restored-input.png": "92da7248c9c52b6a59a0892be54b78a412744df480834bc94e49bb278c1c05c7",
+    "target/android/runtime-smoke/production-release-repro/incremented.png": "8ba6c21247189283905b8ca1a3fd15f754cc3e98d4314b5c352c398542af8fbb",
+    "target/android/runtime-smoke/production-release-repro/resume-0.png": "a39faf1170d128c498bb1ad61160142248b1d912eeb355787332077f6f2ee30d",
+    "target/android/runtime-smoke/webview-release-20261031/resume-1.png": "4a8579483aef76a7700622a847ed88be754e0d59bb76e43831f150a3ae833641",
+    "target/android/runtime-smoke/webview-release-20261031/initial.png": "2517501958a6fdb856a48859def9d633c195cc9f08565e8b5d02b8bc34edd8a0",
+    "target/android/runtime-smoke/webview-release-20261031/before-death.png": "ea97d21e7852e14dd0c6fe07278807681f2eb04987b92f1a08b89b23674bb3f3",
+    "target/android/runtime-smoke/webview-release-20261031/restored.png": "eacf090bdbcd01eefcf366aef345de6b137ac14e427dd1b9ad3b7293313616a2",
+    "target/android/runtime-smoke/webview-release-20261031/restored-input.png": "ef82a15ac1920366d788db0c7e9ffc45d1ee7864fa6e4565775025135b6edcd2",
+    "target/android/runtime-smoke/webview-release-20261031/incremented.png": "4a8579483aef76a7700622a847ed88be754e0d59bb76e43831f150a3ae833641",
+    "target/android/runtime-smoke/webview-release-20261031/resume-0.png": "4a8579483aef76a7700622a847ed88be754e0d59bb76e43831f150a3ae833641"
+  },
+  "logs_sha256": {
+    "target/android/runtime-smoke/capability-expansion-evidence-20261031/taim-sensor-desktop-final.log": "68c25178f010c1be4649e6f7b440c6880074d3388f3d50706d5faf29fa6c45ce",
+    "target/android/runtime-smoke/capability-expansion-evidence-20261031/lint-results-release.txt": "aa3a809aecd78279c5f8f43a9bf5e10de56c6a4a8a7bde944545f21788042890",
+    "target/android/runtime-smoke/capability-expansion-evidence-20261031/taim-sensor-ui-final.log": "9b36c7eb9f2b3acfa854b302b5d6a1b0c451cb67744b76bc11f5d2680948b08b",
+    "target/android/runtime-smoke/capability-expansion-evidence-20261031/taim-sensor-clippy-final.log": "2a4bd70e2c53a1e52f3fda557c454fd2b5fc7b179f65104de61698a774365453",
+    "target/android/runtime-smoke/capability-expansion-evidence-20261031/taim-sensor-bundle-final.log": "1e64f53219bbf98e770b585f8b4c3aacafa6a360dd556ff7e306bc9d49ce0ec7",
+    "target/android/runtime-smoke/capability-expansion-evidence-20261031/taim-sensor-unit-final.log": "db407ee7c60c6910cb5d8c1dcc8836f13c77da100ad1426cbeb0730ad15da71a",
+    "target/android/runtime-smoke/capability-expansion-evidence-20261031/taim-web-unit.log": "2e4e070cd036aeaa75df2480b48f1c1b31eccaf8eabfe2f857d3eba0d48a43cf",
+    "target/android/runtime-smoke/capability-expansion-evidence-20261031/taim-sensor-release-final.log": "8a5e949b5c6ab7e801b53afb9bc3783cea23225425c8a45a65198450d0a76f5a",
+    "target/android/runtime-smoke/capability-expansion-evidence-20261031/taim-sensor-arm-clippy-final.log": "1da4975bc1069b6912f0e0d9b9330afb5e63ec3aed4496504c32834280a3c2ed"
+  },
+  "limits": [
+    "Earlier exact-pixel colour/focus mismatch was not reproduced after fresh boot or on later artifacts; cause unconfirmed, failed report retained as open intermittent regression",
+    "Sensor timeout handler is exercised directly, not a wall-clock timing measurement",
+    "Sensor tests cover real emulator accelerometer; other physical sensor/provider/calibration/power matrices remain unverified",
+    "WebView real inline rendering/policy/scripting tested; physical providers and remote/TLS fault matrix remain unverified; navigation policy is not a complete network sandbox",
+    "Full release artifact is development-signed, not publication-cleared",
+    "Physical API26/ARM64/OEM/AT/IME, extended faults/soak and competitive Flutter benchmarks remain pending",
+    "Embedded camera/player/maps, push/foreground services, geofencing, Bluetooth/NFC/biometrics/billing and external GPU composition still require implementation/acceptance",
+    "Full renderless/optional-feature power-set certification was not performed; strict supported desktop and Android configurations passed"
+  ]
+}

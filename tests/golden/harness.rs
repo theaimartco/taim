@@ -37,9 +37,9 @@
 //! code. [`Harness`] pins the renderer backend and the clear colour; the
 //! caller pins scale and content.
 
-use taim::{Color, Rectangle, Size};
 use taim_core::Renderer as _;
 use taim_core::renderer::Headless as _;
+use taim_core::{Color, Rectangle, Size};
 use taim_renderer::Renderer;
 
 /// The environment variable that permits adopting a golden.

@@ -52,8 +52,9 @@
 //! [`Resource::Buffer`]: taim_profiler::Resource::Buffer
 //! [`Resource::Pipeline`]: taim_profiler::Resource::Pipeline
 
-use taim::widget::{column, container, row, text};
-use taim::{Element, Length};
+use taim::prelude::*;
+use taim::view::AnyView;
+
 use taim_profiler::Resource;
 use taim_profiler::events::Event;
 
@@ -142,7 +143,7 @@ impl Counts {
 }
 
 /// Renders the GPU resource panel.
-pub fn view<'a, Message: 'a>(events: &[Event]) -> Element<'a, Message> {
+pub fn view(events: &[Event]) -> AnyView {
     let counts = Counts::of(events);
 
     if !counts.any() {
@@ -157,39 +158,39 @@ pub fn view<'a, Message: 'a>(events: &[Event]) -> Element<'a, Message> {
                 .size(12),
                 text(MISSING).size(12),
             ]
-            .spacing(8)
-            .width(Length::Fill),
+            .gap(8.0)
+            .fill_width(),
         )
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
+        .center_x()
+        .fill_width()
+        .center_y()
+        .fill_height()
         .padding(12)
         .into();
     }
 
-    let rows = RESOURCES
-        .iter()
-        .fold(column![].spacing(2), |rows, resource| {
-            let index = index(*resource);
+    let rows = RESOURCES.iter().fold(column![].gap(2.0), |rows, resource| {
+        let index = index(*resource);
 
-            let rate = match counts.hit_rate(*resource) {
-                Some(rate) => format!("{:.0}% hit", rate * 100.0),
-                None => "unused".to_owned(),
-            };
+        let rate = match counts.hit_rate(*resource) {
+            Some(rate) => format!("{:.0}% hit", rate * 100.0),
+            None => "unused".to_owned(),
+        };
 
-            rows.push(
-                row![
-                    text(format!("{:<9}", resource.as_str())).size(12),
-                    text(format!("{:>6} hit", counts.hits[index])).size(11),
-                    text(format!("{:>6} miss", counts.misses[index])).size(11),
-                    text(rate).size(11),
-                    text(format!("{} bytes evicted", counts.evicted[index])).size(11),
-                ]
-                .spacing(10),
-            )
-        });
+        rows.push(
+            row![
+                text(format!("{:<9}", resource.as_str())).size(12),
+                text(format!("{:>6} hit", counts.hits[index])).size(11),
+                text(format!("{:>6} miss", counts.misses[index])).size(11),
+                text(rate).size(11),
+                text(format!("{} bytes evicted", counts.evicted[index])).size(11),
+            ]
+            .gap(10.0),
+        )
+    });
 
     column![text("Resources").size(14), rows, text(MISSING).size(11),]
-        .spacing(8)
+        .gap(8.0)
         .into()
 }
 

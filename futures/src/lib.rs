@@ -18,7 +18,7 @@ pub mod stream;
 pub mod subscription;
 
 pub use executor::Executor;
-pub use maybe::{MaybeSend, MaybeSync};
+pub use maybe::{MaybeSend, MaybeSync, requires_send_for_spawn};
 pub use platform::*;
 pub use runtime::Runtime;
 pub use scheduler::{CancelToken, SubscriptionEpoch, TaskId, TaskScheduler, WakeState};

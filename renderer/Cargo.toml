@@ -16,6 +16,8 @@ workspace = true
 [features]
 wgpu = ["taim_wgpu/default"]
 wgpu-bare = ["taim_wgpu"]
+vulkan = ["wgpu-bare", "taim_wgpu/vulkan"]
+android = ["vulkan", "taim_wgpu/gles"]
 tiny-skia = ["taim_tiny_skia"]
 image = ["taim_tiny_skia?/image", "taim_wgpu?/image"]
 svg = ["taim_tiny_skia?/svg", "taim_wgpu?/svg"]

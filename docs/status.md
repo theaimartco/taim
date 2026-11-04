@@ -4,6 +4,102 @@
 **Production release verdict:** NO-GO until every evidence gate in
 docs/release/production-gates.md is approved on a reviewed release commit.
 
+## Repository hardening checkpoint — 2026-11-01
+
+The current working tree passes workspace all-target/all-feature compilation,
+strict Clippy and the all-feature test suite: **2,418 passed, zero failed,
+12 ignored**. Five normally ignored AT-SPI transport tests were subsequently
+run explicitly on a private D-Bus session and passed, including native callback
+execution and focus acknowledgement after real CPU layout. Other ignored cases
+are not counted as executed acceptance. Workspace license checks also pass.
+Missing autofill metadata in accessibility test fixtures and Android host-test
+lint failures are repaired. Glass tests now verify the deliberate opaque
+fallback in legacy `web-colors` mode as well as physical rendering separately.
+
+Generated Android/Flutter output, SDK-local configuration, signing material and
+caches are ignored; 33 previously tracked OS/Python cache files are untracked
+without deleting local copies. Source bundling independently rejects these
+paths, including explicitly inventoried signing keys. Source, golden fixtures,
+attribution and documentation remain included. Fourteen example manifests now
+inherit the workspace license instead of leaving the license unspecified.
+
+The broader offline workspace/all-feature dependency audit flags unmaintained
+`bincode` 2.0.1 via `cargo-hot-protocol` and `rustybuzz` 0.20.1 via SVG text.
+These findings are not suppressed or resolved by the existing `paste`
+maintenance exception. This checkpoint does not certify a clean immutable
+release, physical devices, independent review or distribution signing.
+
+## Android checkpoint — 2026-10-29
+
+The native Android host now includes system bars/cutout/IME insets, caret panning,
+dark/reduced-motion preferences, system-font/script fallback and API 31+ native
+color-glyph rasterization. Normal and secure input connections support native
+composition, selection and deletion; password context remains redacted.
+
+ARM64/x86_64 development APKs build. The tested API 35/16 KiB emulator passes
+four touch increments and three surface suspend/resume cycles through GLES
+compatibility. Vulkan's upstream buffer corruption remains unresolved; startup
+roundtrips detect it and retry GLES. Android InputConnection protocol evidence
+covers mixed scripts, codepoint deletion, stale connections, password redaction
+and multiline editing. This does not certify every IME or physical GPU.
+
+See [native-host evidence](android/native-host-20261029.md), the
+[earlier Vulkan investigation](android/runtime-acceptance-20261028.md) and
+[Android ledger](android/plan.md). TalkBack, physical-device/ARM64 runtime,
+process restoration, distribution and Flutter comparison remain outstanding.
+Android remains unsupported for production.
+
+## Current local verification — 2026-10-26
+
+Priority is the core native UI framework and production reliability on
+Linux, Windows and macOS. GitHub Actions remains disabled at owner request.
+These results describe an uncommitted working tree, not a certified release.
+
+- Whole-workspace all-target/all-feature compilation, strict Clippy and
+  formatting: **PASS**.
+- Complete default-feature tests: **2,431 passed**, zero failures, six ignored.
+  Complete all-feature tests: **2,342 passed**, zero failures, six ignored.
+- Native view unit tests: **38 passed**. CPU-rendered native UI/IME integration:
+  **7 passed**, including cancellation and stale button release regressions.
+- Windows MSVC and Apple Silicon macOS facade type checks: **PASS** from Linux.
+  They do not verify OS runtime behavior, final linking or native accessibility.
+- Fresh external minimal and reactive-counter consumers: **PASS**, including
+  checks from an extracted source candidate with the network disabled.
+- Optimized Linux counter build and native window presentation on a private
+  X11 display: **PASS**. This is virtual-display smoke, not physical QA.
+- Public facade API docs: **PASS**. Reproducible source bundling, per-file
+  SHA-256 inventory and unapproved-candidate provenance are implemented.
+- Private D-Bus: **4 accessibility transport tests passed**; the normally ignored
+  live theme read/change race test was explicitly run and **passed**.
+- D-Bus moved to zbus 6.1; the Linux theme watcher is Taim-owned, runs off the
+  UI thread and cancels on shell shutdown. The unmaintained standalone
+  zvariant/zbus_names crates and mundy are removed from the lockfile.
+- Yanked Windows clipboard 5.4.1 replaced by 5.4.3. Dependency licenses: **PASS**.
+  Advisory policy: **PASS with a bounded maintenance exception** for the
+  build-time `paste` macro in released EXR/AVIF codecs. Its checksum, exact
+  consumers, advisory category and 2027-01-26 expiry are enforced by a required
+  guard. `paste` remains unmaintained; zero-exception policy still fails. See
+  [risk disposition](audit/dependency-maintenance-20261026.md).
+- No declared/resolved Iced Cargo dependency or exact inherited source blob.
+  Strict semantic-similarity audit: **NO_GO**, including eight token-identical
+  and 52 high-similarity files. These are heuristic review flags, not legal
+  authorship conclusions or original-source percentages.
+
+Core UI hardening includes bounded window-thread messaging, scoped tasks,
+IME composition, validated constraints, scroll chaining, presentation errors,
+calendar/time overflow protection and finite slider/progress geometry.
+Focus-loss/touch cancellation now reaches all views even when a sibling captures
+it, resets press/drag state and cannot commit a pull-to-refresh callback.
+IDE/Lab build migrations are complete; additional tooling polish is secondary.
+
+Remaining release gates include independent review of the maintenance risk,
+independent source review, native Windows/macOS and physical Wayland
+input/accessibility/GPU recovery checks, and packaging/signing of a reviewed
+immutable candidate. Release policy requires recorded local verification,
+not hosted CI. See [current evidence](audit/core-production-hardening-20261026.md).
+Historical checkpoints below retain the evidence available at their date;
+current results above supersede their build-blocker statements.
+
 ## Implemented foundations
 
 The repository includes a Rust GUI workspace with wgpu/software renderer
@@ -256,3 +352,14 @@ The five historical commented workflow files are not active CI. Hardware
 results, stable API compatibility, package publication and tag signatures
 are not yet certified. Do not advertise microsecond internal work as
 input-to-photon or physical display latency.
+
+## Core native UI boundary checks — 2026-10-25
+
+Date/month arithmetic saturates at supported year boundaries, public malformed
+calendar fields are normalized, and time offsets use wide arithmetic. Sliders
+and progress bars normalize reversed/non-finite ranges, preserve finite drawing
+fractions over the full f32 range and reject non-finite pointer coordinates.
+Infinite steps are rejected. Four boundary regression tests were added.
+`cargo test -p taim-view --locked`: **37 passed**, zero failures.
+Whole-workspace strict all-feature Clippy passed after these changes.
+These checks do not certify physical platform acceptance or source independence.

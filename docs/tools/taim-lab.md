@@ -1,10 +1,18 @@
 # Taim Lab and the profiler
 
-> Status: Phase 15, partial. The profiler — schema, collection, export,
-> and the runtime bridge — is built and tested. **Taim Lab itself, the
-> standalone inspector application, is not.** See
-> [What is not built](#what-is-not-built) for exactly what that means and
-> what it costs you today.
+> Status (2026-10-24): the inspector runs on TAIM's native view/shell API.
+> All nine panels build, 107 tests pass, and a private X11 display smoke
+> produced successful-present evidence. The hosted target is an explicit
+> legacy-widget fixture; this is not a remote attachment service or a
+> physical device certification. The overdraw/GPU panels still explain their
+> unavailable measurements rather than inventing data.
+
+The native shell uses a bounded window-thread mailbox for profiling ticks.
+Its timer continues while the inspector is occluded, coalesces pending ticks,
+and stops on detach/closure. Persistent outer scroll views retain scroll
+position while frame data updates. The headless native interaction test
+selects panels and a device profile, then detaches through the same callbacks
+as the windowed application.
 
 ## What this is for
 

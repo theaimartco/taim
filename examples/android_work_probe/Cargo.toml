@@ -1,0 +1,11 @@
+[package]
+license.workspace = true
+name = "android_work_probe"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+[lib]
+crate-type = ["cdylib"]
+[target.'cfg(target_os = "android")'.dependencies]
+taim = { workspace = true, features = ["wgpu-android", "measurement"] }
+serde_json = "1.0"

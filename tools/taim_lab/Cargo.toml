@@ -17,8 +17,11 @@ path = "src/main.rs"
 [dependencies]
 taim-profiler.workspace = true
 taim.workspace = true
-taim.features = []
+taim.features = ["tiny-skia", "x11", "wayland"]
 taim_core.workspace = true
 taim_futures.workspace = true
 taim_renderer.workspace = true
 taim_runtime.workspace = true
+
+# The hosted widget fixture is deliberately separate from the native inspector UI.
+taim_widget.workspace = true

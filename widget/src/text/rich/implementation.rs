@@ -199,22 +199,20 @@ where
         }
 
         match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                if state.hovered_link.is_some() {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+                if state.hovered_link.is_some() => {
                     state.span_pressed = state.hovered_link;
                     shell.capture_event();
                 }
-            }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
-                if state.span_pressed == state.hovered_link {
-                    if let Some(link) = state
+                if state.span_pressed == state.hovered_link
+                    && let Some(link) = state
                         .span_pressed
                         .and_then(|span| self.spans.as_ref().as_ref().get(span))
                         .and_then(|span| span.link.clone())
                     {
                         shell.publish(on_link_clicked(link));
                     }
-                }
 
                 state.span_pressed = None;
             }

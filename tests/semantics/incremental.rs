@@ -13,23 +13,23 @@
 //! `UserInterface::semantics` uses -- rather than a hand-rolled one, so
 //! what is tested here is what an application actually runs.
 
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
 use std::cell::RefCell;
 use std::rc::Rc;
-use taim::advanced::Layout;
-use taim::advanced::widget::{self, Widget};
-use taim::{Element, Length, Rectangle, Size, Theme};
+use taim_core::Layout;
 use taim_core::widget::tree::DirtyFlags;
 use taim_core::widget::visit::{self, Visit};
+use taim_core::widget::{self, Widget};
+use taim_core::{Length, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::semantics;
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 
@@ -49,9 +49,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Labeled {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
-        taim::advanced::layout::Node::new(Size::new(10.0, 10.0))
+        _limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
+        taim_core::layout::Node::new(Size::new(10.0, 10.0))
     }
 
     fn draw(
@@ -59,9 +59,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Labeled {
         _tree: &widget::Tree,
         _renderer: &mut Renderer,
         _theme: &Theme,
-        _style: &taim::advanced::renderer::Style,
+        _style: &taim_core::renderer::Style,
         _layout: Layout<'_>,
-        _cursor: taim::advanced::mouse::Cursor,
+        _cursor: taim_core::mouse::Cursor,
         _viewport: &Rectangle,
     ) {
     }
@@ -104,9 +104,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Group<Message> {
         &mut self,
         tree: &mut widget::Tree,
         renderer: &Renderer,
-        limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
-        taim::advanced::layout::Node::with_children(
+        limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
+        taim_core::layout::Node::with_children(
             Size::new(10.0 * self.children.len() as f32, 10.0),
             self.children
                 .iter_mut()
@@ -127,9 +127,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Group<Message> {
         _tree: &widget::Tree,
         _renderer: &mut Renderer,
         _theme: &Theme,
-        _style: &taim::advanced::renderer::Style,
+        _style: &taim_core::renderer::Style,
         _layout: Layout<'_>,
-        _cursor: taim::advanced::mouse::Cursor,
+        _cursor: taim_core::mouse::Cursor,
         _viewport: &Rectangle,
     ) {
     }
@@ -169,12 +169,12 @@ fn group(children: Vec<Element<'static, ()>>) -> Element<'static, ()> {
 /// meaningful, and returns the `(Tree, layout::Node)` pair the caller
 /// must keep alive alongside `root` for as long as a
 /// [`semantics::Widgets`] borrows them.
-fn layout_root(root: &mut Element<'_, ()>) -> (widget::Tree, taim::advanced::layout::Node) {
+fn layout_root(root: &mut Element<'_, ()>) -> (widget::Tree, taim_core::layout::Node) {
     let renderer = headless_renderer();
     let mut tree = widget::Tree::new(root.as_widget());
     tree.diff(root.as_widget_mut());
 
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
     let node = root.as_widget_mut().layout(&mut tree, &renderer, &limits);
 
     (tree, node)
@@ -184,7 +184,7 @@ fn layout_root(root: &mut Element<'_, ()>) -> (widget::Tree, taim::advanced::lay
 fn build(
     root: &mut Element<'_, ()>,
     tree: &mut widget::Tree,
-    node: &taim::advanced::layout::Node,
+    node: &taim_core::layout::Node,
 ) -> Vec<taim_core::semantics::Node> {
     semantics::build(&mut semantics::Widgets::new(
         root.as_widget_mut(),

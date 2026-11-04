@@ -47,7 +47,7 @@ pub struct TerminalSession {
 }
 
 impl TerminalSession {
-    pub fn start(root: &Path, id: usize) -> Result<(Self, taim::Task<Message>), String> {
+    pub fn start(root: &Path, id: usize) -> Result<(Self, taim_runtime::Task<Message>), String> {
         let rows = TERMINAL_COLLAPSED_ROWS;
         let cols = TERMINAL_COLUMNS;
         let pair = native_pty_system()
@@ -128,7 +128,10 @@ impl TerminalSession {
             cols,
         };
         session.refresh_visible();
-        Ok((session, taim::Task::run(receiver, |message| message)))
+        Ok((
+            session,
+            taim_runtime::Task::run(receiver, |message| message),
+        ))
     }
 
     pub fn write(&mut self, bytes: &[u8]) -> std::io::Result<()> {

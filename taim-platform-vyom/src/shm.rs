@@ -32,10 +32,11 @@ use std::io::{Seek, SeekFrom, Write};
 /// `Argb8888` is the one format `wl_shm` is required to support, so it needs
 /// no negotiation. Bytes are little-endian BGRA, which is what the software
 /// renderer already produces.
+#[cfg(unix)]
 pub const FORMAT: wayland_client::protocol::wl_shm::Format =
     wayland_client::protocol::wl_shm::Format::Argb8888;
 
-/// Bytes per pixel in [`FORMAT`].
+/// Bytes per pixel in a Wayland ARGB8888 buffer.
 pub const BYTES_PER_PIXEL: u32 = 4;
 
 /// A shared-memory allocation failure.
@@ -101,23 +102,10 @@ impl Backing {
             .filter(|total| *total <= i32::MAX as u64)
             .ok_or(Error::TooLarge { width, height })?;
 
-        let path = std::env::temp_dir().join(format!(
-            "taim-shm-{}-{:x}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|elapsed| elapsed.as_nanos())
-                .unwrap_or(0)
-        ));
-
-        let file = File::options()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open(&path)?;
-
-        // Unlink now; the descriptor keeps it alive.
-        let _ = std::fs::remove_file(&path);
+        // The OS-backed temporary file is private and anonymous. In
+        // particular, never ignore an unlink failure and then write pixels
+        // into a discoverable file with default filesystem permissions.
+        let file = tempfile::tempfile()?;
 
         file.set_len(total)?;
 
@@ -267,18 +255,15 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn the_backing_file_is_not_reachable_by_name() {
-        // A window's pixels are not public. The file is unlinked as soon as
-        // it is created; only the descriptor keeps it alive.
-        let backing = Backing::new(8, 8, 1).expect("temp dir is writable");
-        let entries = std::fs::read_dir(std::env::temp_dir()).expect("temp dir is readable");
-
-        let leaked = entries
-            .filter_map(Result::ok)
-            .filter(|entry| entry.file_name().to_string_lossy().starts_with("taim-shm-"))
-            .count();
-
-        assert_eq!(leaked, 0, "a backing file was left on disk");
+        use std::os::unix::fs::MetadataExt as _;
+        let backing = Backing::new(8, 8, 1).expect("anonymous backing is available");
+        assert_eq!(
+            backing.file().metadata().unwrap().nlink(),
+            0,
+            "this descriptor must have no filesystem directory entries"
+        );
         assert!(backing.total_bytes() > 0);
     }
 }

@@ -61,6 +61,8 @@ pub struct Node {
     /// The live region behavior of this node, if it announces changes
     /// proactively (e.g. a toast or a validation message).
     pub live: Option<Live>,
+    /// Explicit native autofill purpose; never inferred from a label.
+    pub autofill: Option<Autofill>,
 }
 
 impl Node {
@@ -78,7 +80,14 @@ impl Node {
             actions: Actions::empty(),
             children: Vec::new(),
             live: None,
+            autofill: None,
         }
+    }
+
+    /// Attaches an explicit autofill purpose without disclosing a secret value.
+    pub fn with_autofill(mut self, purpose: Autofill) -> Self {
+        self.autofill = Some(purpose);
+        self
     }
 
     /// Sets the [`Node::name`].
@@ -174,6 +183,27 @@ impl Node {
         self.children.push(child);
         self
     }
+}
+
+/// Platform autofill purpose, explicitly selected by an application.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Autofill {
+    /// Person's full name.
+    Name,
+    /// Account identifier.
+    Username,
+    /// Email address.
+    Email,
+    /// Existing password.
+    Password,
+    /// New password to generate/save.
+    NewPassword,
+    /// One-time verification code.
+    OneTimeCode,
+    /// Telephone number.
+    Phone,
+    /// Postal street address.
+    Address,
 }
 
 /// What kind of element a [`Node`] represents.

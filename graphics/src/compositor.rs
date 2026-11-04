@@ -50,6 +50,12 @@ pub trait Compositor: Sized {
     /// [`Surface`]: Self::Surface
     fn configure_surface(&mut self, surface: &mut Self::Surface, width: u32, height: u32);
 
+    /// Whether all device-bound resources require recreation. Backends without
+    /// device-loss notifications keep the default false.
+    fn is_device_lost(&self) -> bool {
+        false
+    }
+
     /// Returns [`Information`] used by this [`Compositor`].
     fn information(&self) -> Information;
 

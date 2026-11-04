@@ -60,16 +60,14 @@ fn range(
             )
         })
         .enumerate()
-        .filter_map(|(visual_line, (x, width))| {
-            (width > 0.0).then(|| {
-                Rectangle {
-                    x,
-                    width,
-                    y: (visual_line as i32 + y_offset) as f32 * line_height
-                        - buffer.scroll().vertical,
-                    height: line_height,
-                } * scale
-            })
+        .filter(|(_, (_, width))| *width > 0.0)
+        .map(|(visual_line, (x, width))| {
+            Rectangle {
+                x,
+                width,
+                y: (visual_line as i32 + y_offset) as f32 * line_height - buffer.scroll().vertical,
+                height: line_height,
+            } * scale
         })
         .collect::<Vec<_>>()
         .into();

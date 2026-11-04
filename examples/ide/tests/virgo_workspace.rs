@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use taim::widget::text_editor;
 use taim_futures::futures::{StreamExt, executor::block_on};
 use taim_ide::{Message, Studio};
 use taim_runtime::Action;
+use taim_widget::text_editor;
 
 fn workspace() -> PathBuf {
     static NEXT: AtomicU64 = AtomicU64::new(1);
@@ -1076,10 +1076,10 @@ fn search_scans_large_memory_mapped_files() {
     let task = ide.update(Message::GlobalSearchQueryChanged(
         "TAIM_ULTRA_SIMD_SECRET".into(),
     ));
-    if let Some(mut stream) = taim_runtime::task::into_stream(task) {
-        if let Some(Action::Output(result)) = block_on(stream.next()) {
-            let _ = ide.update(result);
-        }
+    if let Some(mut stream) = taim_runtime::task::into_stream(task)
+        && let Some(Action::Output(result)) = block_on(stream.next())
+    {
+        let _ = ide.update(result);
     }
     assert_eq!(ide.search.total_matches, 1);
     assert_eq!(ide.search.results[0].file_path, "huge_bundle.rs");

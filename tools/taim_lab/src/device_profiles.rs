@@ -22,8 +22,9 @@
 //! it would be a lie to imply otherwise: the target runs on this machine's
 //! renderer whatever profile is selected. See [`MISSING`].
 
-use taim::widget::{button, column, container, row, text};
-use taim::{Element, Length, Size};
+use taim::Size;
+use taim::prelude::*;
+use taim::view::AnyView;
 
 /// What a profile cannot simulate, and why.
 pub const MISSING: &str = "Capabilities are not simulated. A profile sets a viewport and a scale \
@@ -101,30 +102,28 @@ impl Profile {
 }
 
 /// Renders the profile picker.
-pub fn view<'a, Message: 'a + Clone>(
-    current: Size,
-    scale: f32,
-    on_select: impl Fn(Profile) -> Message,
-) -> Element<'a, Message> {
+pub fn view(current: Size, scale: f32, on_select: impl Fn(Profile) + 'static) -> AnyView {
+    let on_select = std::rc::Rc::new(on_select);
     let buttons = Profile::ALL
         .iter()
-        .fold(row![].spacing(6), |buttons, profile| {
+        .fold(row![].gap(6.0), |buttons, profile| {
             let selected = profile.matches(current, scale);
 
-            buttons.push(
-                button(text(profile.name).size(12))
-                    .on_press(on_select(*profile))
-                    .style(if selected {
-                        button::primary
-                    } else {
-                        button::secondary
-                    }),
-            )
+            let on_select = on_select.clone();
+            let profile = *profile;
+            let control = button(profile.name)
+                .label_view(text(profile.name).size(12))
+                .on_press(move || on_select(profile));
+            buttons.push(if selected {
+                control
+            } else {
+                control.secondary()
+            })
         });
 
     let rows = Profile::ALL
         .iter()
-        .fold(column![].spacing(2), |rows, profile| {
+        .fold(column![].gap(2.0), |rows, profile| {
             rows.push(
                 row![
                     text(format!("{:<9}", profile.name)).size(12),
@@ -140,7 +139,7 @@ pub fn view<'a, Message: 'a + Clone>(
                     ))
                     .size(11),
                 ]
-                .spacing(10),
+                .gap(10.0),
             )
         });
 
@@ -155,10 +154,10 @@ pub fn view<'a, Message: 'a + Clone>(
             rows,
             text(MISSING).size(11),
         ]
-        .spacing(10),
+        .gap(10.0),
     )
     .padding(12)
-    .width(Length::Fill)
+    .fill_width()
     .into()
 }
 

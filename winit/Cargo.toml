@@ -19,7 +19,7 @@ debug = []
 # Opt-in first-successful-present marker for the external application harness.
 measurement = []
 hinting = []
-linux-theme-detection = ["dep:mundy", "mundy/async-io", "mundy/color-scheme"]
+linux-theme-detection = ["dep:zbus"]
 image = ["taim_core/image", "arboard/image-data"]
 # Connects the retained semantic tree to the platform's assistive technology
 # over AT-SPI. Off by default because it pulls in zbus and an async runtime,
@@ -30,6 +30,9 @@ x11 = ["winit/x11"]
 wayland = ["winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita", "arboard/wayland-data-control"]
 
 [dependencies]
+serde_json = "1.0"
+serde = { workspace = true, features = ["derive"] }
+base64 = "0.22"
 taim_core.workspace = true
 taim_debug.workspace = true
 taim_graphics.workspace = true
@@ -47,7 +50,7 @@ tracing.workspace = true
 winit.workspace = true
 
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))'.dependencies]
 arboard.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -56,9 +59,13 @@ web-sys.features = ["Document", "Window", "HtmlCanvasElement"]
 wasm-bindgen-futures.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
-mundy.workspace = true
-mundy.optional = true
+zbus.workspace = true
+zbus.optional = true
 
 # Delete once we update to `winit 0.31`
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = { version = "0.5", features = ["relax-sign-encoding"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.22.4"
+winit = { workspace = true, features = ["android-native-activity"] }

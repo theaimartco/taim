@@ -91,6 +91,15 @@ pub struct Compositor {
 /// A compositor error.
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
+    /// The adapter returned incorrect bytes in a required buffer roundtrip.
+    #[error("graphics buffer integrity check failed: {0}")]
+    BufferIntegrity(String),
+    /// The native framebuffer cannot preserve the required channel precision.
+    #[error("graphics surface precision check failed: {0}")]
+    SurfacePrecision(String),
+    /// Renderer pipelines could not be initialized on the adapter.
+    #[error("graphics pipeline initialization failed: {0}")]
+    PipelineInitialization(String),
     /// The surface creation failed.
     #[error("the surface creation failed: {0}")]
     SurfaceCreationFailed(#[from] wgpu::CreateSurfaceError),
@@ -124,6 +133,42 @@ impl Compositor {
         compatible_window: impl compositor::Window,
         shell: Shell,
     ) -> Result<Self, Error> {
+        #[cfg(all(target_os = "android", feature = "gles"))]
+        {
+            let display = Arc::new(display);
+            let window = Arc::new(compatible_window);
+            match Self::request_once(settings, display.clone(), window.clone(), shell.clone()).await
+            {
+                Ok(compositor) => Ok(compositor),
+                Err(error)
+                    if settings.backends.contains(wgpu::Backends::GL)
+                        && settings.backends.contains(wgpu::Backends::VULKAN) =>
+                {
+                    log::warn!("Android Vulkan initialization rejected ({error}); trying GLES");
+                    Self::request_once(
+                        Settings {
+                            backends: wgpu::Backends::GL,
+                            ..settings
+                        },
+                        display,
+                        window,
+                        shell,
+                    )
+                    .await
+                }
+                Err(error) => Err(error),
+            }
+        }
+        #[cfg(not(all(target_os = "android", feature = "gles")))]
+        Self::request_once(settings, display, compatible_window, shell).await
+    }
+
+    async fn request_once(
+        settings: Settings,
+        display: impl compositor::Display,
+        compatible_window: impl compositor::Window,
+        shell: Shell,
+    ) -> Result<Self, Error> {
         let instance = wgpu::util::new_instance_with_webgpu_detection(wgpu::InstanceDescriptor {
             backends: settings.backends,
             flags: if cfg!(feature = "strict-assertions") {
@@ -148,10 +193,11 @@ impl Compositor {
             log::info!("Available adapters: {available_adapters:#?}");
         }
 
-        #[allow(unsafe_code)]
-        let compatible_surface = instance
-            .create_surface(wgpu::SurfaceTarget::Window(Box::new(compatible_window)))
-            .ok();
+        // Surface creation failures must reach the application. Suppressing
+        // them leads to a misleading adapter-selection error on Android.
+        let compatible_surface = Some(
+            instance.create_surface(wgpu::SurfaceTarget::Window(Box::new(compatible_window)))?,
+        );
 
         let power_preference = match settings.power_preference {
             backend::PowerPreference::None => wgpu::PowerPreference::None,
@@ -168,9 +214,14 @@ impl Compositor {
         let adapter = instance
             .request_adapter(&adapter_options)
             .await
-            .map_err(|_error| Error::NoAdapterFound(format!("{adapter_options:?}")))?;
+            .map_err(|error| Error::NoAdapterFound(format!("{error}; {adapter_options:?}")))?;
 
         log::info!("Selected: {:#?}", adapter.get_info());
+
+        #[cfg(all(target_os = "android", feature = "gles"))]
+        if adapter.get_info().backend == wgpu::Backend::Gl {
+            verify_egl_precision(&instance, &adapter)?;
+        }
 
         let (format, alpha_mode) = compatible_surface
             .as_ref()
@@ -211,10 +262,17 @@ impl Compositor {
             wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits()),
         ];
 
-        let limits = limits.into_iter().map(|limits| wgpu::Limits {
-            max_bind_groups: 2,
-            max_non_sampler_bindings: 2048,
-            ..limits
+        let limits = limits.into_iter().map(|limits| {
+            let limits = if adapter.get_info().backend == wgpu::Backend::Gl {
+                wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits())
+            } else {
+                limits
+            };
+            wgpu::Limits {
+                max_bind_groups: 2,
+                max_non_sampler_bindings: 2048,
+                ..limits
+            }
         });
 
         // Request SHADER_F16 only if the adapter supports it (e.g., not available in WebGL2)
@@ -240,6 +298,10 @@ impl Compositor {
 
             match result {
                 Ok((device, queue)) => {
+                    #[cfg(target_os = "android")]
+                    if adapter.get_info().backend == wgpu::Backend::Vulkan {
+                        verify_buffer_integrity(&device, &queue)?;
+                    }
                     let device_lost = Arc::new(AtomicBool::new(false));
 
                     {
@@ -251,6 +313,8 @@ impl Compositor {
                         });
                     }
 
+                    let validation = device.push_error_scope(wgpu::ErrorFilter::Validation);
+                    let internal = device.push_error_scope(wgpu::ErrorFilter::Internal);
                     let engine = Engine::new(
                         &adapter,
                         device,
@@ -260,6 +324,11 @@ impl Compositor {
                         shell,
                     );
 
+                    let internal_error = internal.pop().await;
+                    let validation_error = validation.pop().await;
+                    if let Some(error) = internal_error.or(validation_error) {
+                        return Err(Error::PipelineInitialization(error.to_string()));
+                    }
                     return Ok(Compositor {
                         instance,
                         adapter,
@@ -297,6 +366,115 @@ impl Compositor {
     pub fn is_device_lost(&self) -> bool {
         self.device_lost.load(Ordering::Relaxed)
     }
+}
+
+/// Query the owned EGL configuration without mutating driver resources. This
+/// also makes a manually assembled consumer missing the local patch fail
+/// explicitly instead of silently quantizing its entire UI to RGB565.
+#[cfg(all(target_os = "android", feature = "gles"))]
+#[allow(unsafe_code)]
+fn verify_egl_precision(instance: &wgpu::Instance, adapter: &wgpu::Adapter) -> Result<(), Error> {
+    // SAFETY: Both objects stay alive, are known GLES objects, and only read-only
+    // EGL configuration queries are performed. No HAL resource is destroyed,
+    // submitted, made current, or retained past either owner.
+    let raw_instance = unsafe { instance.as_hal::<wgpu_hal::api::Gles>() }
+        .ok_or_else(|| Error::SurfacePrecision("GLES instance unavailable".into()))?;
+    let raw_adapter = unsafe { adapter.as_hal::<wgpu_hal::api::Gles>() }
+        .ok_or_else(|| Error::SurfacePrecision("GLES adapter unavailable".into()))?;
+    let egl = raw_adapter
+        .adapter_context()
+        .egl_instance()
+        .ok_or_else(|| Error::SurfacePrecision("owned EGL context unavailable".into()))?;
+    let display = raw_instance.raw_display();
+    let config = raw_instance.egl_config();
+    // EGL 1.0 attributes: RED_SIZE, GREEN_SIZE, BLUE_SIZE, ALPHA_SIZE.
+    let mut bits = [0; 4];
+    for (slot, attribute) in bits.iter_mut().zip([0x3024, 0x3023, 0x3022, 0x3021]) {
+        *slot = egl
+            .get_config_attrib(display, config, attribute)
+            .map_err(|error| Error::SurfacePrecision(error.to_string()))?;
+    }
+    if bits.iter().any(|bits| *bits < 8) {
+        return Err(Error::SurfacePrecision(format!(
+            "EGL RGBA bits {bits:?}; require at least [8, 8, 8, 8]. Use the generated Android Cargo workspace with Taim's reviewed wgpu-hal patch"
+        )));
+    }
+    log::info!("Android EGL channel precision: RGBA={bits:?}");
+    Ok(())
+}
+
+/// Validate upload/readback once per Android Vulkan initialization. This is
+/// not a per-frame fence and does not change the renderer's memory policy.
+#[cfg(target_os = "android")]
+fn verify_buffer_integrity(device: &wgpu::Device, queue: &wgpu::Queue) -> Result<(), Error> {
+    use wgpu::util::DeviceExt;
+    const SIZE: u64 = 32768;
+    let mut expected: Vec<u8> = (0..SIZE)
+        .map(|index| ((index * 37 + index / 256 + 11) % 256) as u8)
+        .collect();
+    let source = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("taim.android.integrity.source"),
+        contents: &expected,
+        usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+    });
+    let output = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("taim.android.integrity.readback"),
+        size: SIZE,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    let mut belt = wgpu::util::StagingBelt::new(device.clone(), SIZE);
+    for phase in 0..3 {
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        if phase != 0 {
+            for byte in &mut expected {
+                *byte = byte.wrapping_add(53);
+            }
+            if phase == 1 {
+                queue.write_buffer(&source, 0, &expected);
+            } else {
+                belt.write_buffer(
+                    &mut encoder,
+                    &source,
+                    0,
+                    std::num::NonZeroU64::new(SIZE).expect("nonzero integrity size"),
+                )
+                .copy_from_slice(&expected);
+                belt.finish();
+            }
+        }
+        encoder.copy_buffer_to_buffer(&source, 0, &output, 0, SIZE);
+        let index = queue.submit([encoder.finish()]);
+        if phase == 2 {
+            belt.recall();
+        }
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        let slice = output.slice(..);
+        slice.map_async(wgpu::MapMode::Read, move |result| {
+            let _ = sender.send(result);
+        });
+        let _ = device
+            .poll(wgpu::PollType::Wait {
+                submission_index: Some(index),
+                timeout: Some(std::time::Duration::from_secs(2)),
+            })
+            .map_err(|error| Error::BufferIntegrity(error.to_string()))?;
+        receiver
+            .try_recv()
+            .map_err(|error| Error::BufferIntegrity(error.to_string()))?
+            .map_err(|error| Error::BufferIntegrity(error.to_string()))?;
+        let mapped = slice.get_mapped_range();
+        let matches = mapped.as_ref() == expected.as_slice();
+        drop(mapped);
+        output.unmap();
+        if !matches {
+            return Err(Error::BufferIntegrity(format!(
+                "upload/copy/readback bytes differ in phase {phase}"
+            )));
+        }
+    }
+    log::info!("Android Vulkan buffer integrity: PASS (mapped, queue, staging)");
+    Ok(())
 }
 
 /// Creates a [`Compositor`] with the given [`Settings`] and window.
@@ -369,6 +547,13 @@ pub fn present_to(
 
             let _submission = if hdr {
                 renderer.present_hdr(Some(background_color), view, format, viewport, display)
+            } else if !frame
+                .texture
+                .usage()
+                .contains(wgpu::TextureUsages::COPY_SRC)
+                || (color::GAMMA_CORRECTION && !format.is_srgb())
+            {
+                renderer.present_offscreen(background_color, view, &frame.texture, viewport)
             } else {
                 renderer.present(
                     Some(background_color),
@@ -457,7 +642,9 @@ impl graphics::Compositor for Compositor {
                 // copies a region of the presented frame into an offscreen
                 // target to post-process it. Without it, every effect is a
                 // validation error the moment a blur appears on screen.
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | (surface.get_capabilities(&self.adapter).usages
+                        & wgpu::TextureUsages::COPY_SRC),
                 format: self.format,
                 present_mode: self.settings.present_mode,
                 width,
@@ -467,6 +654,10 @@ impl graphics::Compositor for Compositor {
                 desired_maximum_frame_latency: self.settings.desired_maximum_frame_latency,
             },
         );
+    }
+
+    fn is_device_lost(&self) -> bool {
+        Compositor::is_device_lost(self)
     }
 
     fn information(&self) -> compositor::Information {

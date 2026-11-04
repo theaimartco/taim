@@ -1,9 +1,16 @@
 //! Raster and vector pictures.
+#[cfg(any(feature = "image", feature = "svg"))]
 use crate::cx::{DescribeCx, MeasureCx, PaintCx};
-use crate::layout::{Axis, Constraints, Sizing};
-use crate::{Color, Point, Rectangle, Size, View, semantics};
+use crate::layout::Constraints;
+#[cfg(any(feature = "image", feature = "svg"))]
+use crate::layout::{Axis, Sizing};
+#[cfg(any(feature = "image", feature = "svg"))]
+use crate::{Color, View, semantics};
+use crate::{Point, Rectangle, Size};
 
-use taim_core::{ContentFit, border};
+use taim_core::ContentFit;
+#[cfg(any(feature = "image", feature = "svg"))]
+use taim_core::border;
 
 #[cfg(feature = "image")]
 use taim_core::image::{self, Renderer as _};
@@ -62,6 +69,7 @@ fn placed(fit: ContentFit, natural: Size, bounds: Rectangle) -> Rectangle {
     )
 }
 
+#[cfg(any(feature = "image", feature = "svg"))]
 fn sizing(wanted: Wanted) -> Sizing {
     let axis = |side: Option<f32>| side.map_or(Axis::Hug, Axis::Fixed);
 

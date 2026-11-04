@@ -7,7 +7,7 @@
 //! a bus that went away — happens on the other side of that queue.
 
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 use taim_core::widget::Id;
 
@@ -73,7 +73,13 @@ pub enum Event {
 /// Cheap to clone; every clone shares one queue.
 #[derive(Debug, Clone, Default)]
 pub struct Events {
-    inner: Arc<Mutex<VecDeque<Event>>>,
+    inner: Arc<SharedEvents>,
+}
+
+#[derive(Debug, Default)]
+struct SharedEvents {
+    queue: Mutex<VecDeque<Event>>,
+    ready: Condvar,
 }
 
 impl Events {
@@ -95,6 +101,8 @@ impl Events {
         }
 
         queue.push_back(event);
+        drop(queue);
+        self.inner.ready.notify_one();
     }
 
     /// Takes everything queued so far, leaving the queue empty.
@@ -112,8 +120,44 @@ impl Events {
         self.lock().is_empty()
     }
 
+    #[cfg(feature = "atspi")]
+    pub(crate) fn wait_for_work(
+        &self,
+        running: &std::sync::atomic::AtomicBool,
+        timeout: Option<std::time::Duration>,
+    ) {
+        use std::sync::atomic::Ordering;
+        let queue = self.lock();
+        let waiting =
+            |queue: &mut VecDeque<Event>| queue.is_empty() && running.load(Ordering::Acquire);
+        if let Some(timeout) = timeout {
+            drop(
+                self.inner
+                    .ready
+                    .wait_timeout_while(queue, timeout, waiting)
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+            );
+        } else {
+            drop(
+                self.inner
+                    .ready
+                    .wait_while(queue, waiting)
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+            );
+        }
+    }
+
+    #[cfg(feature = "atspi")]
+    pub(crate) fn stop_waiting(&self, running: &std::sync::atomic::AtomicBool) {
+        // The shared lock makes stop-before-wait and stop-during-wait equivalent.
+        let _queue = self.lock();
+        running.store(false, std::sync::atomic::Ordering::Release);
+        self.inner.ready.notify_all();
+    }
+
     fn lock(&self) -> std::sync::MutexGuard<'_, VecDeque<Event>> {
         self.inner
+            .queue
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
@@ -211,6 +255,7 @@ mod tests {
             value: None,
             actions: Actions::ACTIVATE,
             live: None,
+            autofill: None,
         }
     }
 
@@ -333,5 +378,41 @@ mod tests {
             events.is_empty(),
             "a drained event must not be delivered twice"
         );
+    }
+    #[cfg(feature = "atspi")]
+    #[test]
+    fn event_wait_wakes_on_publication_and_shutdown_without_polling() {
+        use std::sync::atomic::AtomicBool;
+        use std::time::Duration;
+        let events = Events::new();
+        let running = Arc::new(AtomicBool::new(true));
+        let waiting = events.clone();
+        let thread_running = running.clone();
+        let (send, receive) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            waiting.wait_for_work(&thread_running, None);
+            send.send(()).unwrap();
+        });
+        assert!(receive.try_recv().is_err());
+        events.push(Event::Focused { id: None });
+        receive
+            .recv_timeout(Duration::from_secs(5))
+            .expect("publication woke the idle bridge");
+        worker.join().unwrap();
+        let _ = events.drain();
+        let waiting = events.clone();
+        let thread_running = running.clone();
+        let (send, receive) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            waiting.wait_for_work(&thread_running, None);
+            send.send(()).unwrap();
+        });
+        events.stop_waiting(&running);
+        receive
+            .recv_timeout(Duration::from_secs(5))
+            .expect("shutdown woke the bridge even without pending events");
+        worker.join().unwrap();
+        // Stop-before-wait must not lose the notification and park forever.
+        events.wait_for_work(&running, None);
     }
 }

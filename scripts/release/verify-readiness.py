@@ -11,7 +11,7 @@ import subprocess
 import sys
 
 REQUIRED_GATES = (
-    "hosted_ci_executed", "rust_clippy_tests", "wayland_vyom_presentation",
+    "local_verification_executed", "rust_clippy_tests", "wayland_vyom_presentation",
     "input_multilingual_ime", "real_screen_reader", "gpu_loss_recovery",
     "memory_gpu_idle_power", "physical_input_to_photon", "four_framework_comparison",
     "external_api_consumer", "security_license_review", "independent_rebuild",

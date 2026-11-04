@@ -5,23 +5,21 @@
 //! extent," plus variable-height positioning, jump-to-position,
 //! insert/remove reactivity, and focus traversal through virtualized
 //! content.
-use taim::advanced::widget::{self, Widget, operation};
-use taim::advanced::{Layout, Shell, mouse};
-use taim::widget::{text, text_input, virtual_list};
-use taim::{Length, Point, Rectangle, Size};
+use taim_core::widget::{self, Widget, operation};
+use taim_core::{Layout, Shell, mouse};
+use taim_core::{Length, Point, Rectangle, Size};
 use taim_core::{shell::Waker, window};
 use taim_renderer::Renderer;
+use taim_widget::{text, text_input, virtual_list};
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 
@@ -39,14 +37,14 @@ fn scroll(
     renderer: &Renderer,
     delta_y: f32,
 ) {
-    let event = taim::Event::Mouse(mouse::Event::WheelScrolled {
+    let event = taim_core::Event::Mouse(mouse::Event::WheelScrolled {
         delta: mouse::ScrollDelta::Pixels { x: 0.0, y: delta_y },
     });
 
     let mut messages = Vec::new();
     let mut shell = shell(&mut messages);
     let bounds = Rectangle::new(Point::ORIGIN, Size::new(200.0, VIEWPORT_HEIGHT));
-    let node = taim::advanced::layout::Node::new(Size::new(200.0, VIEWPORT_HEIGHT));
+    let node = taim_core::layout::Node::new(Size::new(200.0, VIEWPORT_HEIGHT));
 
     Widget::<(), taim::Theme, Renderer>::update(
         list,
@@ -69,7 +67,7 @@ fn a_hundred_thousand_rows_keeps_a_bounded_live_slot_count() {
         .height(Length::Fixed(VIEWPORT_HEIGHT));
 
     let mut tree = widget::Tree::new(&list as &dyn Widget<(), taim::Theme, Renderer>);
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
 
     let node =
         Widget::<(), taim::Theme, Renderer>::layout(&mut list, &mut tree, &renderer, &limits);
@@ -107,7 +105,7 @@ fn scrolling_to_the_end_brings_the_last_row_into_view() {
         .height(Length::Fixed(VIEWPORT_HEIGHT));
 
     let mut tree = widget::Tree::new(&list as &dyn Widget<(), taim::Theme, Renderer>);
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
 
     let _ = Widget::<(), taim::Theme, Renderer>::layout(&mut list, &mut tree, &renderer, &limits);
 
@@ -145,7 +143,7 @@ fn variable_height_rows_are_positioned_by_their_own_height_function() {
             .height(Length::Fixed(200.0));
 
     let mut tree = widget::Tree::new(&list as &dyn Widget<(), taim::Theme, Renderer>);
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, 200.0));
 
     let node =
         Widget::<(), taim::Theme, Renderer>::layout(&mut list, &mut tree, &renderer, &limits);
@@ -175,7 +173,7 @@ fn scrolling_repeatedly_keeps_the_live_slot_count_bounded() {
         .cache_extent(0.0);
 
     let mut tree = widget::Tree::new(&list as &dyn Widget<(), taim::Theme, Renderer>);
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
 
     let first_pass =
         Widget::<(), taim::Theme, Renderer>::layout(&mut list, &mut tree, &renderer, &limits);
@@ -197,7 +195,7 @@ fn scrolling_repeatedly_keeps_the_live_slot_count_bounded() {
 #[test]
 fn shrinking_the_item_count_shrinks_the_visible_content() {
     let renderer = headless_renderer();
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
 
     let mut ten_rows = virtual_list(10, ROW_HEIGHT, |i| text(format!("Row {i}")).into())
         .width(Length::Fixed(200.0))
@@ -232,7 +230,7 @@ fn focus_can_traverse_visible_virtualized_rows() {
     .height(Length::Fixed(VIEWPORT_HEIGHT));
 
     let mut tree = widget::Tree::new(&list as &dyn Widget<(), taim::Theme, Renderer>);
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
 
     let node =
         Widget::<(), taim::Theme, Renderer>::layout(&mut list, &mut tree, &renderer, &limits);
@@ -280,7 +278,7 @@ fn a_routed_live_value_does_not_rebuild_its_row_during_dispatch() {
     .height(Length::Fixed(VIEWPORT_HEIGHT));
 
     let mut tree = widget::Tree::new(&list as &dyn Widget<(), taim::Theme, Renderer>);
-    let limits = taim::advanced::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
+    let limits = taim_core::layout::Limits::new(Size::ZERO, Size::new(200.0, VIEWPORT_HEIGHT));
     let node =
         Widget::<(), taim::Theme, Renderer>::layout(&mut list, &mut tree, &renderer, &limits);
     builds.store(0, Ordering::Relaxed);
@@ -291,7 +289,7 @@ fn a_routed_live_value_does_not_rebuild_its_row_during_dispatch() {
     Widget::<(), taim::Theme, Renderer>::update(
         &mut list,
         &mut tree,
-        &taim::Event::Reactive(source),
+        &taim_core::Event::Reactive(source),
         Layout::new(&node),
         mouse::Cursor::Unavailable,
         &renderer,

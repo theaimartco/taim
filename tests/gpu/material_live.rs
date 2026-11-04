@@ -115,6 +115,15 @@ fn a_material_reaches_the_shader_and_lights_the_bevel() {
     let flat = card(&mut renderer, Material::OPAQUE);
     let glass = card(&mut renderer, Material::GLASS);
 
+    // Gamma-space compatibility intentionally disables physical materials.
+    if cfg!(feature = "web-colors") {
+        assert_eq!(
+            flat, glass,
+            "legacy blending must leave material lighting disabled"
+        );
+        return;
+    }
+
     assert_ne!(
         flat, glass,
         "a material changed nothing; it is not reaching the shader"
@@ -151,6 +160,15 @@ fn the_highlight_is_on_the_edge_and_not_the_middle() {
     let flat = card(&mut renderer, Material::OPAQUE);
     let polished = card(&mut renderer, Material::POLISHED);
 
+    // Gamma-space compatibility intentionally disables physical materials.
+    if cfg!(feature = "web-colors") {
+        assert_eq!(
+            flat, polished,
+            "legacy blending must leave material lighting disabled"
+        );
+        return;
+    }
+
     let centre_change = i16::from(at(&polished, 32, 32)) - i16::from(at(&flat, 32, 32));
 
     assert!(
@@ -175,6 +193,15 @@ fn a_rougher_material_spreads_its_highlight_more_softly() {
 
     let glass = card(&mut renderer, Material::GLASS);
     let frosted = card(&mut renderer, Material::FROSTED);
+
+    // Gamma-space compatibility intentionally disables physical materials.
+    if cfg!(feature = "web-colors") {
+        assert_eq!(
+            glass, frosted,
+            "legacy blending must leave material lighting disabled"
+        );
+        return;
+    }
 
     assert_ne!(glass, frosted, "roughness is not reaching the shader");
 
@@ -236,6 +263,15 @@ fn the_scene_light_is_configurable_and_moves_the_highlight() {
     });
 
     let from_upper_right = card(&mut renderer, Material::GLASS);
+
+    // Gamma-space compatibility intentionally disables physical materials.
+    if cfg!(feature = "web-colors") {
+        assert_eq!(
+            from_upper_left, from_upper_right,
+            "legacy blending must leave material lighting disabled"
+        );
+        return;
+    }
 
     assert_ne!(
         from_upper_left, from_upper_right,

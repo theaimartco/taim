@@ -125,6 +125,51 @@ struct Inner {
     entries: FxHashMap<Id, Entry>,
     snapshot: Arc<Snapshot>,
     next_path: u64,
+    action_handler: Option<ActionHandler>,
+}
+
+/// A bounded UI queue's pending accessibility operation.
+/// Dropping it without completion reports failure to the bus caller.
+#[derive(Debug)]
+pub struct ActionRequest {
+    /// The stable semantic target and requested operation.
+    pub action: taim_core::semantics::Action,
+    completion: futures::channel::oneshot::Sender<bool>,
+}
+
+impl ActionRequest {
+    /// Whether the caller disappeared before this request began executing.
+    pub fn is_cancelled(&self) -> bool {
+        self.completion.is_canceled()
+    }
+
+    /// Reports the actual UI-thread execution result, not queue admission.
+    pub fn complete(self, executed: bool) {
+        let _ = self.completion.send(executed);
+    }
+}
+
+#[derive(Clone)]
+struct ActionHandler(Arc<dyn Fn(ActionRequest) -> bool + Send + Sync>);
+
+impl std::fmt::Debug for ActionHandler {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("ActionHandler(..)")
+    }
+}
+
+fn required_action(request: &taim_core::semantics::Request) -> Actions {
+    use taim_core::semantics::Request;
+    match request {
+        Request::Activate => Actions::ACTIVATE,
+        Request::Focus => Actions::FOCUS,
+        Request::Increment => Actions::INCREMENT,
+        Request::Decrement => Actions::DECREMENT,
+        Request::SetValue(_) => Actions::SET_VALUE,
+        Request::ToggleExpanded => Actions::TOGGLE_EXPANDED,
+        Request::ScrollIntoView => Actions::SCROLL_INTO_VIEW,
+        Request::Dismiss => Actions::DISMISS,
+    }
 }
 
 impl Store {
@@ -156,6 +201,43 @@ impl Store {
             .iter()
             .find(|(_, candidate)| candidate.as_str() == path)
             .map(|(id, _)| id.clone())
+    }
+
+    /// Connects this store to a nonblocking, bounded UI-thread queue.
+    /// Return false when the queue is full or its window has closed.
+    pub fn set_action_handler(&self, send: impl Fn(ActionRequest) -> bool + Send + Sync + 'static) {
+        self.lock().action_handler = Some(ActionHandler(Arc::new(send)));
+    }
+
+    /// Validates a published target and enqueues its operation for live UI validation.
+    /// Completion resolves only after execution, or fails if the queue/window closes.
+    pub fn request_action(
+        &self,
+        path: &str,
+        request: taim_core::semantics::Request,
+    ) -> Option<futures::channel::oneshot::Receiver<bool>> {
+        let (target, handler) = {
+            let inner = self.lock();
+            let target = inner
+                .paths
+                .iter()
+                .find(|(_, candidate)| candidate.as_str() == path)?
+                .0;
+            let entry = inner.entries.get(target)?;
+            if entry.state.contains(State::DISABLED)
+                || !entry.actions.contains(required_action(&request))
+            {
+                return None;
+            }
+            (target.clone(), inner.action_handler.clone()?)
+        };
+        // Do not hold the snapshot lock while calling application queue code.
+        let (completion, receiver) = futures::channel::oneshot::channel();
+        let packet = ActionRequest {
+            action: taim_core::semantics::Action { target, request },
+            completion,
+        };
+        (handler.0)(packet).then_some(receiver)
     }
 
     /// Applies a batch of [`Change`]s and installs a fresh snapshot.
@@ -333,6 +415,7 @@ mod tests {
             value: None,
             actions: Actions::ACTIVATE,
             live: None,
+            autofill: None,
         }
     }
 
@@ -507,5 +590,93 @@ mod tests {
             "a snapshot already handed out must not change underneath its reader"
         );
         assert!(store.snapshot().get(&path).is_none());
+    }
+    #[test]
+    fn action_completion_reports_execution_not_queue_admission() {
+        let store = Store::new();
+        let id = Id::unique();
+        store.apply(&[Change::Added(entry(&id, None, &[0], "Run"))]);
+        let path = store.path_of(&id).unwrap();
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        store.set_action_handler(move |request| sender.try_send(request).is_ok());
+        let mut completion = store
+            .request_action(&path, taim_core::semantics::Request::Activate)
+            .unwrap();
+        assert_eq!(completion.try_recv().unwrap(), None);
+        let request = receiver.try_recv().unwrap();
+        assert_eq!(request.action.target, id);
+        request.complete(true);
+        assert_eq!(completion.try_recv().unwrap(), Some(true));
+    }
+
+    #[test]
+    fn action_queue_rejects_overflow_closed_windows_and_cancelled_callers() {
+        let store = Store::new();
+        let id = Id::unique();
+        store.apply(&[Change::Added(entry(&id, None, &[0], "Run"))]);
+        let path = store.path_of(&id).unwrap();
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        store.set_action_handler(move |request| sender.try_send(request).is_ok());
+        let completion = store
+            .request_action(&path, taim_core::semantics::Request::Activate)
+            .unwrap();
+        assert!(
+            store
+                .request_action(&path, taim_core::semantics::Request::Activate)
+                .is_none()
+        );
+        let request = receiver.try_recv().unwrap();
+        assert!(!request.is_cancelled());
+        drop(completion);
+        assert!(request.is_cancelled());
+        drop(request);
+        let mut waiting = store
+            .request_action(&path, taim_core::semantics::Request::Activate)
+            .unwrap();
+        drop(receiver);
+        assert!(waiting.try_recv().is_err());
+        assert!(
+            store
+                .request_action(&path, taim_core::semantics::Request::Activate)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn disabled_unknown_retired_and_unoffered_actions_never_reach_the_queue() {
+        let store = Store::new();
+        let id = Id::unique();
+        let mut node = entry(&id, None, &[0], "Run");
+        node.state.insert(State::DISABLED);
+        store.apply(&[Change::Added(node)]);
+        let path = store.path_of(&id).unwrap();
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = calls.clone();
+        store.set_action_handler(move |_| {
+            let _ = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            false
+        });
+        assert!(
+            store
+                .request_action(&path, taim_core::semantics::Request::Activate)
+                .is_none()
+        );
+        assert!(
+            store
+                .request_action("/unknown", taim_core::semantics::Request::Activate)
+                .is_none()
+        );
+        assert!(
+            store
+                .request_action(&path, taim_core::semantics::Request::Focus)
+                .is_none()
+        );
+        store.apply(&[Change::Removed(id)]);
+        assert!(
+            store
+                .request_action(&path, taim_core::semantics::Request::Activate)
+                .is_none()
+        );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 }

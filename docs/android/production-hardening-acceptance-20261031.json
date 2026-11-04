@@ -1,0 +1,379 @@
+{
+  "recorded_utc": "2026-10-30T23:20:35.920803+00:00",
+  "scope": "Framework-wide Android competition; no Flutter parity or superiority claim",
+  "status": "hardening implemented; final release pixel regression unresolved",
+  "production_clearance": false,
+  "host_tests": {
+    "view_unit": 40,
+    "ui_integration": 45,
+    "shell_unit": 70,
+    "failures": 0
+  },
+  "checks": {
+    "strict_host_clippy": "passed",
+    "strict_arm64_probe_clippy": "passed",
+    "desktop_accessibility_build": "passed",
+    "rust_format": "passed",
+    "diff_whitespace": "passed",
+    "python_compile": "passed"
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 19,
+    "full_release_gate": true,
+    "baseline": false
+  },
+  "signing": {
+    "identity": "development test certificate",
+    "owner_production_signed": false,
+    "published": false,
+    "apk_signature_and_16k_zip_alignment": "verified by release harness",
+    "aab_structure": "official bundletool validation passed",
+    "aab_signer_caveat": "Self-signed development certificate; jarsigner reports timestamp and manifest/entry-order warnings; not distribution clearance"
+  },
+  "reports": {
+    "production-final-access": {
+      "path": "target/android/runtime-smoke/production-final-access/report.json",
+      "sha256": "1de3b795cfc66ca1837758cb2a346c8f3c6703974463759071a9f6bbf6d7368d",
+      "report": {
+        "status": "passed",
+        "production": true,
+        "serial": "emulator-5594",
+        "started_utc": "2026-10-30T23:11:22.993391+00:00",
+        "apk_sha256": "257e4ed214caa0951fda17ccc45de4da27438ca2f3c8f1f4efee3b18830680f1",
+        "driver_sha256": "1f7e64d2af23cf2ea0c2232c29ca1ca38fb95e259721b748ae5e2e074fb22044",
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "checks": 33,
+        "history_checks": 2,
+        "revocation_checks": 1,
+        "finished_utc": "2026-10-30T23:11:32.589954+00:00"
+      },
+      "final_source": true
+    },
+    "production-final-release": {
+      "path": "target/android/runtime-smoke/production-final-release/report.json",
+      "sha256": "a02a44254efd8b2821becae64d7cffe81126f0a06871e6b7f30c9e00bd19be5b",
+      "report": {
+        "status": "failed",
+        "serial": "emulator-5594",
+        "package": "com.theaimartco.taim.productionaudit",
+        "debuggable": false,
+        "apk_sha256": "250bc4130bba13bd0b732d8543bdbe9f0be7f0626c49c578cd7f7d84cf892b09",
+        "started_utc": "2026-10-30T23:18:10.277991+00:00",
+        "checks": [
+          "non-debuggable release launches with real nonblank counter pixels",
+          "real touch increments release counter pixels",
+          "release suspend/resume 1 retains process, state and rendered pixels",
+          "release suspend/resume 2 retains process, state and rendered pixels",
+          "release input remains functional after surface recreation"
+        ],
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "eviction_preparation": "Settings foreground removes previous-app protection before am kill; no root, run-as or force-stop for eviction",
+        "launch": "Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity }\nStatus: ok\nLaunchState: COLD\nActivity: com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity\nTotalTime: 464\nWaitTime: 466\nComplete",
+        "initial_pid": "9983",
+        "restored_pid": "10264",
+        "error": "Release saved-task restoration failed",
+        "finished_utc": "2026-10-30T23:18:32.378572+00:00"
+      },
+      "final_source": true
+    },
+    "production-platform-regression": {
+      "path": "target/android/runtime-smoke/production-platform-regression/report.json",
+      "sha256": "85e6781cbec43f2d9f95c2b53bac27654e655332b4ab03461d60370a548c54e5",
+      "report": {
+        "status": "passed",
+        "serial": "emulator-5594",
+        "notifications": true,
+        "started_utc": "2026-10-30T22:53:52.326900+00:00",
+        "apk_sha256": "0928c2885aa338a37043254e0bf291796b32e0049dd48ee2a14cbadf31d51ebd",
+        "driver_sha256": "95b3ddc9a198cd4688592e57d7d8cc9b16cbaa207b71b0d17cec2116f0d28640",
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "checks": 14,
+        "cold_intent_checks": 1,
+        "finished_utc": "2026-10-30T22:53:58.463934+00:00"
+      },
+      "final_source": false
+    },
+    "production-native-regression": {
+      "path": "target/android/runtime-smoke/production-native-regression/report.json",
+      "sha256": "c88b67a14755abc2d3a967010bace7976de79e5991318b4ec51538cb0dd279b6",
+      "report": {
+        "status": "passed",
+        "serial": "emulator-5594",
+        "started_utc": "2026-10-30T22:55:04.741926+00:00",
+        "apk_sha256": "ba17341c26204884737d8528171d74131110594f22d41a0a2bac322a5e75f11e",
+        "driver_sha256": "819527dcf0be2799edf9cd949a52fac24abc90438c010ccf0c3df6441f476a26",
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "checks": 34,
+        "finished_utc": "2026-10-30T22:55:15.462592+00:00"
+      },
+      "final_source": false
+    },
+    "production-work-regression": {
+      "path": "target/android/runtime-smoke/production-work-regression/report.json",
+      "sha256": "a2698c216e9488fadefe6db7899394997eac3d3e3ba08feda9a867ce08768674",
+      "report": {
+        "status": "passed",
+        "serial": "emulator-5594",
+        "started_utc": "2026-10-30T22:55:45.429633+00:00",
+        "apk_sha256": "f8338fbda0d6c0ff13beb3bb3f2e2a3449770de510cd7d435d666869631138c9",
+        "driver_sha256": "9f4dc0e8e4729b4bdd2ea3530ea4a11f5987cf8f69ab9c8a1e03bf93f5470e70",
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "suite_pid": 7313,
+        "generation": "fc184044-d882-4317-b182-1853f5717ff2",
+        "suite_checks": 14,
+        "headless_checks": 3,
+        "worker_pid": 7527,
+        "finished_utc": "2026-10-30T22:55:56.576778+00:00"
+      },
+      "final_source": false
+    },
+    "production-counter-regression": {
+      "path": "target/android/runtime-smoke/production-counter-regression/report.json",
+      "sha256": "3a9ae618539a687e4ad62b0409567462fadc2810893654bcd86e8329e6bba7e3",
+      "report": {
+        "status": "passed",
+        "started_utc": "2026-10-30T22:56:14.725368+00:00",
+        "serial": "emulator-5594",
+        "apk_sha256": "702316d24ea5aa812c49b9c81d18dd6da98a631eca92af181503e08e68658110",
+        "tap": [
+          220,
+          520
+        ],
+        "counter_region": [
+          75,
+          340,
+          300,
+          90
+        ],
+        "checks": [
+          "first successful presentation and stable nonblank counter screenshot",
+          "touch increment 1 and counter-region pixel change",
+          "background/resume cycle 1: same process, retained pixels, recreated target presented",
+          "touch increment 2 and counter-region pixel change",
+          "background/resume cycle 2: same process, retained pixels, recreated target presented",
+          "touch increment 3 and counter-region pixel change",
+          "background/resume cycle 3: same process, retained pixels, recreated target presented",
+          "touch increment 4 and counter-region pixel change",
+          "saved task restored count pixels into a new process and next increment retained the value"
+        ],
+        "device": {
+          "model": "sdk_gphone16k_x86_64",
+          "sdk": "35",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "source": {
+          "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+          "working_tree_dirty": true,
+          "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+        },
+        "launch": "Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.theaimartco.taim.counter/com.theaimartco.taim.TaimActivity }\nStatus: ok\nLaunchState: COLD\nActivity: com.theaimartco.taim.counter/com.theaimartco.taim.TaimActivity\nTotalTime: 1048\nWaitTime: 1054\nComplete",
+        "pid": "7624",
+        "recreated_pid": "8037",
+        "final_counter": 5,
+        "limitations": [
+          "Emulator results do not certify physical GPU/device support",
+          "Presentation marker means successful compositor present, not scan-out latency",
+          "Pixel assertions depend on the supplied counter-only region",
+          "No IME, TalkBack, battery or Flutter comparison acceptance"
+        ],
+        "finished_utc": "2026-10-30T22:56:32.600295+00:00",
+        "artifacts_sha256": {
+          "app.log": "55b4ba7c169cc4967a4882453574f5cd71dc2972839cba067c90ceed4922f0d3",
+          "before-process-kill.log": "5d1461797f57a335dc779a605fc289599b107df64d6df63501623b74d05929d8",
+          "increment-1.png": "5a10151511ef2094bf9944e28c427e46660e3e24c071ca6ab8a2a51dac5c1bfe",
+          "increment-2.png": "bd1334dea65f3a5601733ea5dddd341a8d3ede30d3fd647a411ee4fe444dc0a1",
+          "increment-3.png": "04132cc5703d70b05ae865abd4a9eefe4a3eb2d6e39273564794deff11d17da1",
+          "increment-4.png": "df02bd570abac47b865eff4a2afa54988135be787d38e4f21ac2e71c3b622195",
+          "initial.png": "369e664db6805b6f02b5fbfe7c6b537ae29992a6a82d8ad6ce50629e3446de0a",
+          "process-restored-increment.png": "8b0053db4161fb2d0e9d148a4d1b94366225a90b1668fa348ac23befc1781349",
+          "process-restored.png": "3156fc2b3ce548b7655cb6fcb634f0698da77b64f1ea5e14ca304993698f6a03",
+          "resume-1.png": "5a10151511ef2094bf9944e28c427e46660e3e24c071ca6ab8a2a51dac5c1bfe",
+          "resume-2.png": "bd1334dea65f3a5601733ea5dddd341a8d3ede30d3fd647a411ee4fe444dc0a1",
+          "resume-3.png": "04132cc5703d70b05ae865abd4a9eefe4a3eb2d6e39273564794deff11d17da1",
+          "vulkan.json": "cc8b5df067f192f36107ed88edfd1b90bf2f09075be7f68bbb615508f76b3f7b"
+        }
+      },
+      "final_source": false
+    },
+    "production-ime-regression": {
+      "path": "target/android/runtime-smoke/production-ime-regression/report.json",
+      "sha256": "cb4c10d46362bf33e8b1c59750af31a088d911f62497d96324d837d124d034db",
+      "report": {
+        "status": "passed",
+        "serial": "emulator-5594",
+        "test_ime_sha256": "ecef01c85f9f0c6350a40ed6abaa30125cf6e50e2ecbea6064e1229d3c833516",
+        "checks": [
+          "commit",
+          "assert",
+          "delete-codepoints",
+          "assert",
+          "select",
+          "batch",
+          "finish",
+          "assert-all",
+          "select-all",
+          "commit",
+          "compose",
+          "finish",
+          "assert",
+          "save",
+          "stale",
+          "commit",
+          "assert",
+          "compose",
+          "finish",
+          "delete-codepoints",
+          "assert",
+          "assert-all",
+          "select-all",
+          "commit",
+          "assert-all",
+          "delete-codepoints",
+          "compose",
+          "finish",
+          "assert-all"
+        ]
+      },
+      "final_source": false
+    },
+    "production-release-accepted": {
+      "path": "target/android/runtime-smoke/production-release-accepted/report.json",
+      "sha256": "5358ea0f76685a4fba2c3b19392b5193b03236b3055d914bf2f31051a662d743",
+      "report": {
+        "status": "passed",
+        "serial": "emulator-5594",
+        "package": "com.theaimartco.taim.productionaudit",
+        "debuggable": false,
+        "apk_sha256": "a708c9294f5f610d9d8f0ce6d62375db9b8b2edd07acce0ce48245033ef51ba1",
+        "started_utc": "2026-10-30T23:04:10.995426+00:00",
+        "checks": [
+          "non-debuggable release launches with real nonblank counter pixels",
+          "real touch increments release counter pixels",
+          "release suspend/resume 1 retains process, state and rendered pixels",
+          "release suspend/resume 2 retains process, state and rendered pixels",
+          "release input remains functional after surface recreation",
+          "OS background process death restores release counter pixels into a new process",
+          "release input remains functional after process restoration"
+        ],
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "eviction_preparation": "Settings foreground removes previous-app protection before am kill; no root, run-as or force-stop for eviction",
+        "launch": "Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity }\nStatus: ok\nLaunchState: COLD\nActivity: com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity\nTotalTime: 888\nWaitTime: 931\nComplete",
+        "initial_pid": "9139",
+        "restored_pid": "9434",
+        "finished_utc": "2026-10-30T23:04:39.294815+00:00"
+      },
+      "final_source": false
+    },
+    "production-release-runtime": {
+      "path": "target/android/runtime-smoke/production-release-runtime/report.json",
+      "sha256": "f0cd16fc7d6ff378bc44747f040dd9c44d342dd3c4ea90ddbc70ba039c8aaece",
+      "report": {
+        "status": "failed",
+        "serial": "emulator-5594",
+        "package": "com.theaimartco.taim.productionaudit",
+        "debuggable": false,
+        "apk_sha256": "338bd06c8a6432c18816a20bb0e7b517c6d8e4e56b9cecaa74c707d8875e76f1",
+        "started_utc": "2026-10-30T22:59:19.191325+00:00",
+        "checks": [
+          "non-debuggable release launches with real nonblank counter pixels",
+          "real touch increments release counter pixels",
+          "release suspend/resume 1 retains process, state and rendered pixels",
+          "release suspend/resume 2 retains process, state and rendered pixels",
+          "release input remains functional after surface recreation"
+        ],
+        "device": {
+          "sdk": "35",
+          "model": "sdk_gphone16k_x86_64",
+          "abi": "x86_64",
+          "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+          "page_size": 16384
+        },
+        "launch": "Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity }\nStatus: ok\nLaunchState: COLD\nActivity: com.theaimartco.taim.productionaudit/com.theaimartco.taim.TaimActivity\nTotalTime: 995\nWaitTime: 1001\nComplete",
+        "initial_pid": "8589",
+        "error": "OS did not kill the background release process; no force-stop/run-as substitute is used",
+        "finished_utc": "2026-10-30T22:59:46.952402+00:00"
+      },
+      "final_source": false
+    }
+  },
+  "source_sha256": {
+    "view/src/root.rs": "628869ba245cf39c78749eae4343a2c1ec23ef0f688e9d5cfb93f58e6b813b7d",
+    "view/src/lib.rs": "f19f5a615d6a8765d23e7d1fc82d89e950a436b20309896ab16f20ce6a18b0e2",
+    "view/src/views/text_field.rs": "961a08b467719cf08af2affd6e4839db15e31b7fd77e6504eca31be00c3825de",
+    "view/src/views/editor.rs": "9d18e52ba264683cd4c22165fe7f27aca6a36989fcb1b1f56fa59a91b9da6859",
+    "winit/src/surface.rs": "6a64675a35ceb1a1ceb51cbf22ecedc2671478d8f6817dd2adc4b16e27b9a67f",
+    "winit/src/shell.rs": "1be638302e41131f120428073c8769437350baee71273969acfd0844636a4b44",
+    "winit/src/wake.rs": "f596aa1ed3ef9546eeed08cf19b40c4113c8c6d85081b7d96458409d9b37ba92",
+    "winit/src/android/semantics.rs": "4437112038cfc8f9e1a7e35a2305d6fe30471b6b4ce6e668f361e341a8433b04",
+    "winit/src/android/bridge.rs": "c11c1f119a561b1d501596e3611d403f97de7c8f27fde19c307352dfa507aad7",
+    "winit/android/com/theaimartco/taim/TaimActivity.java": "6a1908470cd59dd34fcd1cfed8add558e313fb9c6e563358b4bc2796f1b808f7",
+    "scripts/android/release-smoke.py": "c11ba5bd085d4ee244d7863da15ed22661b1a8f15ac1665f0213abadf5cb1f07",
+    "scripts/android/access-probe.py": "c19a3a9df32fa3708d083176f90f89889a8c1b983ea17b01802be5703932f2f6",
+    "scripts/android/access-test/AccessDriver.java": "e03f8ef9a8b8d983d37ff0554697a991df1a972d9fb6c243079cfb5362bcfe54",
+    "scripts/android/project.py": "17127334a5f000f29f27ba0bb3290f9bd5d3a3ec5dccef466dba8de02bd74e14",
+    "docs/android/production-readiness.md": "66102bc460ee952a52f5bdebdd259f90bbcb5bd0be72ccce2b6d4f0666cd20ab",
+    "scripts/android/templates/build.gradle.kts": "cec20badce17e9d79e7b655fd1abf4b148741b1b94920ac6f1beee8e19550242",
+    "scripts/android/templates/gradle.properties": "45470d929d980ce85c737cbd41e02f327b1cba514632cadc131c2b86363414bb",
+    "scripts/android/templates/settings.gradle.kts": "d532df5d805b7f4b656d6d1fa45c44191aa8df1aebe9dd8d90936f0ccad249ea",
+    "scripts/android/templates/build-rust.py": "84512ce36f6699a4782eac882703a69fbaf716f2270e63858a9ff9ed34d3985d",
+    "scripts/android/templates/gradle-bootstrap.py": "b4fa108b1c2bb0da863e8bfebaeb368d39856e08d5bccb96c5deb6147edc5e7f",
+    "scripts/android/templates/app/build.gradle.kts": "11291ac243ddf3212784d88b803eedd80cdb87e519cdc2f9d5f795189684b7fc",
+    "scripts/android/templates/__pycache__/build-rust.cpython-314.pyc": "dd198f559eedfd562c3dda6e0917107f98bc4ad9c5169cdf95f2d14b1be2af9e",
+    "scripts/android/templates/__pycache__/gradle-bootstrap.cpython-314.pyc": "ce64fd25e1c370f9379a465dd17aa2db0985d55b722c7b681cd52138a6801dd9",
+    "scripts/android/templates/app/src/main/AndroidManifest.xml": "bfe483c1447833c64fa2d1516cd05fd3a63e6207b3c027d51e6c2a5c27f37746",
+    "scripts/android/templates/app/src/main/res/xml/taim_data_extraction_rules.xml": "7a4e6defdcb7e21a8cdb4bb4cbdbbef15bcd4c6bae923372fbfa07f0642ac29a",
+    "scripts/android/templates/app/src/main/res/xml/taim_backup_rules.xml": "80be325e44eb49bec54794399e7de6b4d274513a3ebce30584889d06372f1a0a"
+  },
+  "artifacts": {
+    "target/android/production-audit-project/app/build/outputs/apk/release/app-release.apk": "250bc4130bba13bd0b732d8543bdbe9f0be7f0626c49c578cd7f7d84cf892b09",
+    "target/android/production-audit-project/app/build/outputs/bundle/release/app-release.aab": "1b1183d4a34347a990370946b5412752475afd74c6417e6fc38ddc111f45b295"
+  },
+  "logs": "target/android/runtime-smoke/production-audit-evidence",
+  "remaining": [
+    "Final release process-restoration pixel mismatch: counter restored to 2/new PID, background colour/focus appearance changed; cause unconfirmed",
+    "Physical ARM64/API26/OEM/GPU/accessibility/IME validation",
+    "Soak, storage/network faults, reboot/Doze/background OEM lifecycle",
+    "SDK breadth and external GPU composition gaps documented in capabilities.md",
+    "Physical Flutter comparative benchmarks",
+    "Owner signing, branding and current distribution requirements"
+  ]
+}

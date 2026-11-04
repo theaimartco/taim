@@ -34,20 +34,52 @@ pub(crate) fn is_activation(event: &Event) -> bool {
     )
 }
 
-/// Whether `event` is a primary click starting over the view.
-pub(crate) fn is_press(event: &Event) -> bool {
-    matches!(
-        event,
-        Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
-    )
+/// The device that owns a pending click or drag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Press {
+    Mouse,
+    Touch(taim_core::touch::Finger),
 }
 
-/// Whether `event` ends a primary click.
-pub(crate) fn is_release(event: &Event) -> bool {
-    matches!(
-        event,
-        Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
-    )
+impl Press {
+    pub(crate) fn start(event: &Event) -> Option<Self> {
+        match event {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => Some(Self::Mouse),
+            Event::Touch(taim_core::touch::Event::FingerPressed { id, .. }) => {
+                Some(Self::Touch(*id))
+            }
+            _ => None,
+        }
+    }
+
+    pub(crate) fn released_by(self, event: &Event) -> bool {
+        matches!(
+            (self, event),
+            (
+                Self::Mouse,
+                Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
+            )
+        ) || matches!((self, event), (Self::Touch(owner),
+                Event::Touch(taim_core::touch::Event::FingerLifted { id, .. })) if owner == *id)
+    }
+
+    pub(crate) fn cancelled_by(self, event: &Event) -> bool {
+        matches!(event, Event::Window(taim_core::window::Event::Unfocused))
+            || matches!((self, event), (Self::Touch(owner),
+                Event::Touch(taim_core::touch::Event::FingerLost { id, .. })) if owner == *id)
+    }
+
+    pub(crate) fn movement(self, event: &Event) -> Option<crate::Point> {
+        let position = match (self, event) {
+            (Self::Mouse, Event::Mouse(mouse::Event::CursorMoved { position })) => *position,
+            (
+                Self::Touch(owner),
+                Event::Touch(taim_core::touch::Event::FingerMoved { id, position, .. }),
+            ) if owner == *id => *position,
+            _ => return None,
+        };
+        (position.x.is_finite() && position.y.is_finite()).then_some(position)
+    }
 }
 
 /// The common semantic state flags of an interactive view.
@@ -196,15 +228,17 @@ pub(crate) enum Gesture {
 pub(crate) fn gesture(event: &Event, pointer: Option<crate::Point>) -> Option<Gesture> {
     use taim_core::touch;
 
+    if crate::tree::is_cancellation(event) {
+        return Some(Gesture::Up(None));
+    }
+
     Some(match event {
         Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => Gesture::Down(pointer?),
         Event::Mouse(mouse::Event::CursorMoved { position }) => Gesture::Move(*position),
         Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => Gesture::Up(pointer),
         Event::Touch(touch::Event::FingerPressed { position, .. }) => Gesture::Down(*position),
         Event::Touch(touch::Event::FingerMoved { position, .. }) => Gesture::Move(*position),
-        Event::Touch(
-            touch::Event::FingerLifted { position, .. } | touch::Event::FingerLost { position, .. },
-        ) => Gesture::Up(Some(*position)),
+        Event::Touch(touch::Event::FingerLifted { position, .. }) => Gesture::Up(Some(*position)),
         _ => return None,
     })
 }

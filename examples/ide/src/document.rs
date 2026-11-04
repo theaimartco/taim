@@ -1,7 +1,7 @@
 //! Multi-tab document manager and text editor state for Taim Studio.
 
 use std::cell::RefCell;
-use taim::widget::text_editor;
+use taim_widget::text_editor;
 
 /// Backing storage and viewport mode for an open document.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -108,7 +108,7 @@ impl Document {
         let metadata = std::fs::symlink_metadata(disk_path)?;
         let file_size = metadata.len();
 
-        const LARGE_FILE_THRESHOLD: u64 = 1 * 1024 * 1024; // 1MB
+        const LARGE_FILE_THRESHOLD: u64 = 1024 * 1024; // 1MB
 
         if file_size > LARGE_FILE_THRESHOLD {
             let file = std::fs::File::open(disk_path)?;
@@ -181,7 +181,7 @@ impl Document {
             query.clone()
         } else {
             let mut selected_text = self.content.selection();
-            if selected_text.as_ref().map_or(true, |s| s.is_empty()) {
+            if selected_text.as_ref().is_none_or(|s| s.is_empty()) {
                 self.content.perform(text_editor::Action::SelectWord);
                 selected_text = self.content.selection();
             }
@@ -217,15 +217,14 @@ impl Document {
                 } else {
                     0
                 };
-                if col_start < line.text.len() {
-                    if let Some(offset) = line.text[col_start..].find(&query) {
-                        let match_col = col_start + offset + query.len();
-                        let match_pos = text_editor::Position::new(line_idx, match_col);
-                        if !self.extra_cursors.contains(&match_pos) && match_pos != cursor.position
-                        {
-                            found = Some(match_pos);
-                            break;
-                        }
+                if col_start < line.text.len()
+                    && let Some(offset) = line.text[col_start..].find(&query)
+                {
+                    let match_col = col_start + offset + query.len();
+                    let match_pos = text_editor::Position::new(line_idx, match_col);
+                    if !self.extra_cursors.contains(&match_pos) && match_pos != cursor.position {
+                        found = Some(match_pos);
+                        break;
                     }
                 }
             }
@@ -273,12 +272,9 @@ impl Document {
         let is_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
         let bytes = text.as_bytes();
         let mut start = col;
-        if start == bytes.len() && start > 0 && is_ident(bytes[start - 1]) {
-            start -= 1;
-        } else if start < bytes.len()
-            && !is_ident(bytes[start])
-            && start > 0
+        if start > 0
             && is_ident(bytes[start - 1])
+            && (start == bytes.len() || !is_ident(bytes[start]))
         {
             start -= 1;
         }
@@ -350,10 +346,10 @@ impl Document {
     pub fn has_merge_conflicts(&self) -> bool {
         let count = self.content.line_count();
         for i in 0..count {
-            if let Some(line) = self.content.line(i) {
-                if line.text.trim_start().starts_with("<<<<<<<") {
-                    return true;
-                }
+            if let Some(line) = self.content.line(i)
+                && line.text.trim_start().starts_with("<<<<<<<")
+            {
+                return true;
             }
         }
         false
@@ -431,12 +427,12 @@ impl Document {
                 let text = line.text.trim();
                 if text.contains('{') && !text.contains('}') {
                     stack.push(i);
-                } else if text.contains('}') && !text.contains('{') {
-                    if let Some(start) = stack.pop() {
-                        if i > start {
-                            blocks.push((start, i));
-                        }
-                    }
+                } else if text.contains('}')
+                    && !text.contains('{')
+                    && let Some(start) = stack.pop()
+                    && i > start
+                {
+                    blocks.push((start, i));
                 }
             }
         }
@@ -514,7 +510,8 @@ impl Document {
                 // Sort extra cursors descending so edits at higher offsets do not
                 // invalidate coordinates of lower offsets.
                 let mut sorted_cursors = self.extra_cursors.clone();
-                sorted_cursors.sort_by(|a, b| (b.line, b.column).cmp(&(a.line, a.column)));
+                sorted_cursors
+                    .sort_by_key(|position| std::cmp::Reverse((position.line, position.column)));
 
                 let mut updated_cursors = Vec::with_capacity(sorted_cursors.len());
                 for pos in sorted_cursors {
@@ -680,7 +677,7 @@ impl DocumentManager {
     pub fn new() -> Self {
         let main_rs = r#"//! High-performance compute-raster demo powered by Taim.
 use taim::prelude::*;
-use taim::widget::{button, column, container, row, text};
+use taim_widget::{button, column, container, row, text};
 use taim::signal::Signal;
 
 pub fn main() -> taim::Result {

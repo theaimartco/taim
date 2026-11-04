@@ -8,13 +8,15 @@
 //! These drive a real `UserInterface` through a real frame and read the
 //! trace that falls out.
 
-use taim::widget::{button, column, text};
-use taim::{Element, Size, Theme};
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
+use taim_core::{Size, Theme};
 use taim_profiler::export;
 use taim_profiler::{Collector, Phase as Traced};
 use taim_renderer::Renderer;
 use taim_runtime::diagnostics::Trace;
 use taim_runtime::user_interface::{Cache, UserInterface};
+use taim_widget::{button, column, text};
 
 type Message = &'static str;
 
@@ -24,12 +26,10 @@ const WINDOW: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 

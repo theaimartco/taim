@@ -44,26 +44,29 @@ impl Date {
 
     /// The first day of this date's month.
     pub fn first_of_month(self) -> Self {
-        Self { day: 1, ..self }
+        Self::new(self.year, self.month, 1)
     }
 
     /// The same day `months` months later (earlier when negative), clamped
-    /// to the target month's length.
+    /// to the target month's length. Values beyond the supported year range
+    /// saturate at January of `i32::MIN` or December of `i32::MAX`.
     pub fn add_months(self, months: i32) -> Self {
-        let index = self.year * 12 + i32::from(self.month) - 1 + months;
-        let (year, month) = (index.div_euclid(12), index.rem_euclid(12) as u8 + 1);
-        Self::new(year, month, self.day)
+        let date = Self::new(self.year, self.month, self.day);
+        let index = (i64::from(date.year) * 12 + i64::from(date.month) - 1 + i64::from(months))
+            .clamp(i64::from(i32::MIN) * 12, i64::from(i32::MAX) * 12 + 11);
+        let (year, month) = (index.div_euclid(12) as i32, index.rem_euclid(12) as u8 + 1);
+        Self::new(year, month, date.day)
     }
 
     /// Day of the week, 0 for Monday to 6 for Sunday.
     pub fn weekday(self) -> u8 {
         // 1970-01-01 was a Thursday (3).
-        ((days_from_epoch(self) + 3).rem_euclid(7)) as u8
+        ((days_from_epoch(Self::new(self.year, self.month, self.day)) + 3).rem_euclid(7)) as u8
     }
 
     /// The month's English name.
     pub fn month_name(self) -> &'static str {
-        MONTHS[usize::from(self.month - 1)]
+        MONTHS[usize::from(self.month.clamp(1, 12) - 1)]
     }
 }
 
@@ -189,6 +192,10 @@ impl DatePicker {
 }
 
 impl View for DatePicker {
+    fn cancel_interaction(&mut self) {
+        self.pressed = None;
+    }
+
     fn measure(&mut self, cx: &mut MeasureCx<'_>, _constraints: Constraints) -> Size {
         let month = self.shown_month.get();
         self.title
@@ -271,7 +278,7 @@ impl View for DatePicker {
                 if at.and_then(|at| self.target_at(bounds, at)) == Some(pressed) {
                     match pressed {
                         Target::Previous => {
-                            self.visible.update(|month| *month = month.add_months(-1))
+                            self.visible.update(|month| *month = month.add_months(-1));
                         }
                         Target::Next => self.visible.update(|month| *month = month.add_months(1)),
                         Target::Day(day) => {
@@ -326,8 +333,9 @@ impl Time {
     /// The time `minutes` later (earlier when negative), wrapping at
     /// midnight.
     pub fn add_minutes(self, minutes: i32) -> Self {
-        let total =
-            (i32::from(self.hour) * 60 + i32::from(self.minute) + minutes).rem_euclid(24 * 60);
+        let time = Self::new(self.hour, self.minute);
+        let total = (i64::from(time.hour) * 60 + i64::from(time.minute) + i64::from(minutes))
+            .rem_euclid(24 * 60);
         Self::new((total / 60) as u8, (total % 60) as u8)
     }
 }
@@ -361,6 +369,57 @@ pub fn time_picker(time: State<Time>, step: u8) -> AnyView {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn calendar_arithmetic_saturates_at_supported_year_boundaries() {
+        assert_eq!(
+            Date::new(i32::MAX, 12, 31).add_months(i32::MAX),
+            Date::new(i32::MAX, 12, 31)
+        );
+        assert_eq!(
+            Date::new(i32::MIN, 1, 31).add_months(i32::MIN),
+            Date::new(i32::MIN, 1, 31)
+        );
+        assert_eq!(Date::new(0, 1, 31).add_months(-1), Date::new(-1, 12, 31));
+        for year in [i32::MIN, i32::MAX] {
+            assert!(Date::new(year, 2, 28).weekday() < 7);
+        }
+    }
+
+    #[test]
+    fn public_date_fields_are_normalized_before_calendar_operations() {
+        for month in [0, 255] {
+            let date = Date {
+                year: 2026,
+                month,
+                day: 255,
+            };
+            let normalized = Date::new(date.year, date.month, date.day);
+            assert_eq!(date.month_name(), normalized.month_name());
+            assert_eq!(date.weekday(), normalized.weekday());
+            assert_eq!(date.first_of_month(), normalized.first_of_month());
+            assert_eq!(date.add_months(0), normalized);
+        }
+    }
+
+    #[test]
+    fn time_offsets_accept_the_entire_public_integer_range() {
+        for offset in [i32::MIN, i32::MAX] {
+            let total = (23_i64 * 60 + 59 + i64::from(offset)).rem_euclid(1440);
+            assert_eq!(
+                Time::new(23, 59).add_minutes(offset),
+                Time::new((total / 60) as u8, (total % 60) as u8)
+            );
+        }
+        assert_eq!(
+            Time {
+                hour: 255,
+                minute: 255
+            }
+            .add_minutes(0),
+            Time::new(23, 59)
+        );
+    }
 
     #[test]
     fn weekdays_match_known_dates() {

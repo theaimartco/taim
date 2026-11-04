@@ -10,7 +10,7 @@ impl Default for Clipboard {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
 mod platform {
     use super::*;
 
@@ -188,8 +188,8 @@ mod platform {
                 height: image.size.height as usize,
             }),
             Content::Files(files) => set.file_list(&files),
-            content => {
-                log::warn!("unsupported clipboard content: {content:?}");
+            _ => {
+                log::warn!("unsupported clipboard content type");
                 Err(arboard::Error::ClipboardNotSupported)
             }
         };
@@ -280,7 +280,7 @@ mod platform {
 mod platform {
     use super::*;
 
-    /// Clipboard placeholder for targets without a browser adapter yet.
+    /// Explicitly unavailable clipboard for targets without a native adapter.
     pub struct Clipboard;
 
     impl Clipboard {
@@ -289,14 +289,143 @@ mod platform {
             Self
         }
 
-        /// Reports that browser clipboard reads are not wired yet.
+        /// Reports that platform clipboard reads are not wired yet.
         pub fn read(&self, _kind: Kind, callback: impl FnOnce(Result<Content, Error>)) {
             callback(Err(Error::ClipboardUnavailable));
         }
 
-        /// Reports that browser clipboard writes are not wired yet.
+        /// Reports that platform clipboard writes are not wired yet.
         pub fn write(&mut self, _content: Content, callback: impl FnOnce(Result<(), Error>)) {
             callback(Err(Error::ClipboardUnavailable));
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
+mod platform {
+    use super::*;
+    use crate::android::{Request, services};
+    use std::sync::mpsc::{self, SyncSender};
+    type Read = Box<dyn FnOnce(Result<Content, Error>) + Send>;
+    type Write = Box<dyn FnOnce(Result<(), Error>) + Send>;
+    enum Command {
+        Read(Kind, Read),
+        Write(Content, Write),
+    }
+    /// Foreground Android ClipboardManager adapter with a bounded worker queue.
+    pub struct Clipboard {
+        commands: Option<SyncSender<Command>>,
+    }
+    impl Clipboard {
+        /// Creates the native clipboard worker. Unsupported formats fail explicitly.
+        pub fn new() -> Self {
+            let (commands, receive) = mpsc::sync_channel(8);
+            let worker = std::thread::Builder::new()
+                .name("taim-android-clipboard".into())
+                .spawn(move || {
+                    while let Ok(command) = receive.recv() {
+                        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            let client = services();
+                            match command {
+                                Command::Read(kind, callback) => {
+                                    let html = match kind {
+                                        Kind::Text => false,
+                                        Kind::Html => true,
+                                        _ => {
+                                            callback(Err(Error::ContentNotAvailable));
+                                            return;
+                                        }
+                                    };
+                                    let result = client
+                                        .ok_or(Error::ClipboardUnavailable)
+                                        .and_then(|client| {
+                                            futures::executor::block_on(
+                                                client.request(Request::ClipboardRead { html }),
+                                            )
+                                            .map_err(|_| Error::ClipboardUnavailable)
+                                        })
+                                        .and_then(|value| {
+                                            value
+                                                .as_str()
+                                                .map(|text| {
+                                                    if html {
+                                                        Content::Html(text.into())
+                                                    } else {
+                                                        Content::Text(text.into())
+                                                    }
+                                                })
+                                                .ok_or(Error::ContentNotAvailable)
+                                        });
+                                    callback(result);
+                                }
+                                Command::Write(content, callback) => {
+                                    let (text, html) = match content {
+                                        Content::Text(text) => (text, None),
+                                        Content::Html(text) => (String::new(), Some(text)),
+                                        _ => {
+                                            callback(Err(Error::ContentNotAvailable));
+                                            return;
+                                        }
+                                    };
+                                    if text.len() + html.as_ref().map_or(0, String::len)
+                                        > 4 * 1024 * 1024
+                                    {
+                                        callback(Err(Error::ConversionFailure));
+                                        return;
+                                    }
+                                    let result = client
+                                        .ok_or(Error::ClipboardUnavailable)
+                                        .and_then(|client| {
+                                            futures::executor::block_on(client.request(
+                                                Request::ClipboardWrite {
+                                                    text,
+                                                    html,
+                                                    sensitive: false,
+                                                },
+                                            ))
+                                            .map(|_| ())
+                                            .map_err(|_| Error::ClipboardUnavailable)
+                                        });
+                                    callback(result);
+                                }
+                            }
+                        }));
+                    }
+                });
+            Self {
+                commands: worker.ok().map(|_| commands),
+            }
+        }
+        /// Reads foreground text/HTML without blocking the event loop.
+        pub fn read(
+            &self,
+            kind: Kind,
+            callback: impl FnOnce(Result<Content, Error>) + Send + 'static,
+        ) {
+            self.enqueue(Command::Read(kind, Box::new(callback)));
+        }
+        /// Writes text/HTML without blocking the event loop.
+        pub fn write(
+            &mut self,
+            content: Content,
+            callback: impl FnOnce(Result<(), Error>) + Send + 'static,
+        ) {
+            self.enqueue(Command::Write(content, Box::new(callback)));
+        }
+        fn enqueue(&self, command: Command) {
+            let failed = match &self.commands {
+                Some(send) => send.try_send(command).err().map(|error| match error {
+                    mpsc::TrySendError::Full(command)
+                    | mpsc::TrySendError::Disconnected(command) => command,
+                }),
+                None => Some(command),
+            };
+            if let Some(command) = failed {
+                match command {
+                    Command::Read(_, callback) => callback(Err(Error::ClipboardOccupied)),
+                    Command::Write(_, callback) => callback(Err(Error::ClipboardOccupied)),
+                }
+            }
         }
     }
 }

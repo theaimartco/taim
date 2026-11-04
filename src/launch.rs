@@ -94,6 +94,25 @@ impl App {
         self
     }
 
+    /// Runs from an Android `android_main` entry point.
+    ///
+    /// The activity is explicit; host registries use weak references. Package
+    /// `winit/android/com/theaimartco/taim/TaimActivity.java` as the manifest
+    /// activity for native editor, insets and system-preference integration.
+    #[cfg(target_os = "android")]
+    pub fn run_android(self, activity: crate::android::AndroidApp) -> Result {
+        taim_winit::run_android(
+            taim_winit::App {
+                title: self.title,
+                settings: self.settings,
+                window: self.window,
+                build: self.build,
+            },
+            activity,
+        )
+        .map_err(Into::into)
+    }
+
     /// Opens the window and runs until it closes.
     pub fn run(self) -> Result {
         taim_winit::run(taim_winit::App {

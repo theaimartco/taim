@@ -23,13 +23,14 @@
 //!
 //! [`Role::SecureField`]: taim_core::semantics::Role::SecureField
 
-use taim::widget::{Column, column, container, row, scrollable, text};
-use taim::{Element, Length};
+use taim::prelude::*;
+use taim::view::AnyView;
+
 use taim_core::security::{Audience, Privacy};
 use taim_core::semantics::{Actions, Node, Role, State};
 
 /// Renders the semantic forest.
-pub fn view<'a, Message: 'a>(forest: &[Node]) -> Element<'a, Message> {
+pub fn view(forest: &[Node]) -> AnyView {
     if forest.is_empty() {
         return container(
             column![
@@ -40,26 +41,25 @@ pub fn view<'a, Message: 'a>(forest: &[Node]) -> Element<'a, Message> {
                 )
                 .size(12),
             ]
-            .spacing(6),
+            .gap(6.0),
         )
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
+        .center_x()
+        .fill_width()
+        .center_y()
+        .fill_height()
         .into();
     }
 
-    let mut rows = column![].spacing(2);
+    let mut rows = column![].gap(2.0);
     let mut counts = Counts::default();
 
     for node in forest {
         rows = walk(node, 0, rows, &mut counts);
     }
 
-    column![
-        text(counts.describe()).size(13),
-        scrollable(rows).height(Length::Fill),
-    ]
-    .spacing(8)
-    .into()
+    column![text(counts.describe()).size(13), rows,]
+        .gap(8.0)
+        .into()
 }
 
 /// What the forest adds up to.
@@ -124,12 +124,12 @@ fn names_matter(role: Role) -> bool {
     )
 }
 
-fn walk<'a, Message: 'a>(
+fn walk(
     node: &Node,
     depth: usize,
-    rows: Column<'a, Message>,
+    rows: taim::view::views::Stack,
     counts: &mut Counts,
-) -> Column<'a, Message> {
+) -> taim::view::views::Stack {
     counts.record(node);
 
     let mut rows = rows.push(node_row(node, depth));
@@ -141,7 +141,7 @@ fn walk<'a, Message: 'a>(
     rows
 }
 
-fn node_row<'a, Message: 'a>(node: &Node, depth: usize) -> Element<'a, Message> {
+fn node_row(node: &Node, depth: usize) -> AnyView {
     let indent = "  ".repeat(depth);
 
     let name = match &node.name {
@@ -157,7 +157,7 @@ fn node_row<'a, Message: 'a>(node: &Node, depth: usize) -> Element<'a, Message> 
         text(describe_actions(node.actions)).size(11),
         text(describe_value(node)).size(11),
     ]
-    .spacing(10)
+    .gap(10.0)
     .into()
 }
 
@@ -330,7 +330,7 @@ mod tests {
         let mut forest = node(Role::Button).with_name("Save");
         forest.children = vec![node(Role::StaticText).with_name("Save")];
 
-        let rows: Column<'_, ()> = Column::new();
+        let rows: taim::view::views::Stack = column([]);
         let _ = walk(&forest, 0, rows, &mut counts);
 
         assert_eq!(counts.nodes, 2);

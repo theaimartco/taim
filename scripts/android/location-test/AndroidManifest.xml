@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.theaimartco.taim.locationdriver">
+    <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35" />
+    <application android:label="Taim mock-location test driver" android:debuggable="true" android:allowBackup="false" />
+    <instrumentation android:name=".LocationDriver" android:targetPackage="com.theaimartco.taim.locationprobe" />
+</manifest>

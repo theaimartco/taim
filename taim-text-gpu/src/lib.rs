@@ -389,6 +389,7 @@ pub struct TextAtlas {
     frame: u64,
     mode: ColorMode,
     format: wgpu::TextureFormat,
+    fallback: Option<fn(&mut FontSystem, CacheKey) -> Option<cosmic_text::SwashImage>>,
 }
 
 impl TextAtlas {
@@ -419,7 +420,17 @@ impl TextAtlas {
             frame: 0,
             mode,
             format,
+            fallback: None,
         }
+    }
+
+    /// Supplies an optional rasterizer for glyph formats the default scaler
+    /// cannot draw. Its results use the same bounded atlas and eviction policy.
+    pub fn set_fallback_rasterizer(
+        &mut self,
+        rasterizer: fn(&mut FontSystem, CacheKey) -> Option<cosmic_text::SwashImage>,
+    ) {
+        self.fallback = Some(rasterizer);
     }
 
     /// Ends an atlas usage epoch while retaining warm glyphs for reuse.
@@ -456,7 +467,18 @@ impl TextAtlas {
             return Ok(record.allocation.map(|_| record));
         }
 
-        let Some(image) = swash.get_image_uncached(font_system, key) else {
+        let image = swash.get_image_uncached(font_system, key);
+        let image = if image
+            .as_ref()
+            .is_none_or(|image| image.placement.width == 0 || image.placement.height == 0)
+        {
+            self.fallback
+                .and_then(|rasterize| rasterize(font_system, key))
+                .or(image)
+        } else {
+            image
+        };
+        let Some(image) = image else {
             return Ok(None);
         };
         let width = image.placement.width;

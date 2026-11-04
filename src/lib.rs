@@ -36,7 +36,7 @@
 
 #[cfg(all(
     target_family = "unix",
-    not(target_os = "macos"),
+    not(any(target_os = "macos", target_os = "android")),
     not(feature = "wayland"),
     not(feature = "x11"),
 ))]
@@ -57,9 +57,9 @@ pub use launch::{App, app, launch, prelude};
 pub use taim_view as view;
 
 pub use crate::core::{
-    Background, Border, Color, Degrees, Font, Gradient, Padding, Pixels, Point, Radians,
-    Rectangle, Settings, Shadow, Size, Theme, Transformation, Vector, alignment, border, color,
-    font, gradient, keyboard, mouse, padding, semantics, theme, time,
+    Background, Border, Color, Degrees, Font, Gradient, Padding, Pixels, Point, Radians, Rectangle,
+    Settings, Shadow, Size, Theme, Transformation, Vector, alignment, border, color, font,
+    gradient, keyboard, mouse, padding, semantics, theme, time,
 };
 pub use taim_signal::{Memo, Signal};
 
@@ -92,3 +92,33 @@ pub use taim_renderer::wgpu::wgpu;
 
 /// What running an application returns.
 pub type Result = std::result::Result<(), Error>;
+
+/// Android application host types, shared with Taim's window shell.
+#[cfg(target_os = "android")]
+pub mod android {
+    pub use taim_winit::android::{
+        BILLING_CHANNEL, PUSH_CHANNEL, Price, PricingPhase, Product, ProductKind, Purchase,
+        PurchaseState, PurchaseUpdate, PushEvent, PushMessage, PushNotification, SubscriptionOffer,
+    };
+    pub use taim_winit::android::{
+        BLUETOOTH_CHANNEL, BleConnection, BleDevice, BleScanOptions, BluetoothEvent,
+        BluetoothStatus, FOREGROUND_CHANNEL, ForegroundService, ForegroundServiceType,
+        GEOFENCE_CHANNEL, GattCharacteristic, GattService, Geofence, GeofenceStatus,
+        GeofenceTransition, NFC_CHANNEL, NdefContent, NdefRecord, NfcStatus, NfcTag,
+    };
+    pub use taim_winit::android::{
+        BiometricAuthenticator, BiometricAvailability, BiometricKey, BiometricKeyKind,
+        BiometricPolicy, BiometricPrompt, BiometricStatus, BiometricStrength, SealedData,
+    };
+    pub use taim_winit::android::{
+        Haptic, LocationAccuracy, LocationEnd, LocationFix, LocationOptions, LocationSubscription,
+        LocationWatchOptions, MAX_TRANSFER, MediaCapture, MediaKind, MediaPicker, Notification,
+        NotificationChannel, NotificationImportance, NotificationTap, NotificationVisibility,
+        PermissionState, PermissionStatus, PlatformEvent, Request, ServiceError, Services,
+        SpecialAccess, WorkBackoff, WorkConstraints, WorkContext, WorkError, WorkInput,
+        WorkNetwork, WorkPolicy, WorkResult, WorkSchedule, WorkSpec, WorkState, services,
+    };
+    pub use taim_winit::android::{SensorKind, SensorOptions, SensorReading};
+    pub use taim_winit::android_background_worker as background_worker;
+    pub use taim_winit::winit::platform::android::activity::AndroidApp;
+}

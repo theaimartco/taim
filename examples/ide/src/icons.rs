@@ -2,7 +2,7 @@
 
 use crate::SidebarView;
 use std::sync::OnceLock;
-use taim::widget::svg;
+use taim_widget::svg;
 
 const EXPLORER: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#b8b8b8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v13H7z"/><path d="M14 3v5h4M4 7v14h11"/></svg>"##;
 const SEARCH: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#b8b8b8" stroke-width="1.7" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>"##;

@@ -109,6 +109,7 @@ impl PaintCx<'_> {
 
 /// Available while handling an event.
 pub struct EventCx<'a> {
+    pub(crate) renderer: Option<&'a Renderer>,
     pub(crate) now: crate::Instant,
     pub(crate) bounds: Rectangle,
     pub(crate) pointer: Option<Point>,
@@ -136,6 +137,11 @@ pub(crate) struct Focus {
 }
 
 impl EventCx<'_> {
+    /// The active renderer when dispatching through a platform shell.
+    /// Pure routing tests using `Root::handle` do not supply a renderer.
+    pub fn renderer(&self) -> Option<&Renderer> {
+        self.renderer
+    }
     /// The time of this event; start animations from it.
     pub fn now(&self) -> crate::Instant {
         self.now

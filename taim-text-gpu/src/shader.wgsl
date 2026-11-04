@@ -30,13 +30,10 @@ var<uniform> viewport: Viewport;
 
 @vertex
 fn vertex(input: GlyphInput) -> GlyphOutput {
-    let corners = array<vec2<u32>, 4>(
-        vec2<u32>(0u, 0u),
-        vec2<u32>(1u, 0u),
-        vec2<u32>(0u, 1u),
-        vec2<u32>(1u, 1u),
-    );
-    let corner = corners[input.vertex_index];
+    // The four strip corners are encoded directly. This avoids dynamically
+    // indexing a shader-local array on GLES compilers.
+    let index = min(input.vertex_index, 3u);
+    let corner = vec2<u32>(index & 1u, (index >> 1u) & 1u);
     let offset = corner * input.size;
     let pixel = input.position + vec2<i32>(offset);
     let safe_viewport = max(viewport.size, vec2<u32>(1u));

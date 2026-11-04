@@ -42,7 +42,7 @@ pub struct Toggle {
     shown: Prop<bool>,
     enabled: Prop<bool>,
     gap: f32,
-    pressed: bool,
+    pressed: Option<look::Press>,
     id: widget::Id,
 }
 
@@ -58,7 +58,7 @@ impl Toggle {
             shown: value.into_prop(),
             enabled: Prop::fixed(true),
             gap: 8.0,
-            pressed: false,
+            pressed: None,
             id: widget::Id::unique(),
         }
     }
@@ -84,7 +84,14 @@ impl Toggle {
 }
 
 impl View for Toggle {
+    fn cancel_interaction(&mut self) {
+        self.pressed = None;
+    }
+
     fn measure(&mut self, cx: &mut MeasureCx<'_>, constraints: Constraints) -> Size {
+        if !self.enabled.get() {
+            self.pressed = None;
+        }
         let indicator = self.shape.indicator();
         let offset = indicator.width + self.gap;
         let room = Size::new(
@@ -171,34 +178,63 @@ impl View for Toggle {
     }
 
     fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
-        if !self.enabled.get() {
+        if self.pressed.is_some_and(|press| press.cancelled_by(event)) {
+            self.pressed = None;
+            cx.request_paint();
             return Handled::No;
         }
-
-        if look::is_press(event) && cx.is_hovered() {
-            self.pressed = true;
+        if !self.enabled.get() {
+            self.pressed = None;
+            return Handled::No;
+        }
+        if let Some(press) = look::Press::start(event)
+            && cx.is_hovered()
+            && self.pressed.is_none()
+        {
+            self.pressed = Some(press);
             cx.request_focus();
+            cx.request_paint();
             return Handled::Yes;
         }
-
-        if look::is_release(event) && self.pressed {
-            self.pressed = false;
+        if self.pressed.is_some_and(|press| press.released_by(event)) {
+            self.pressed = None;
             if cx.is_hovered() {
                 self.flip(cx);
             }
             return Handled::Yes;
         }
-
         if cx.has_focus() && look::is_activation(event) {
             self.flip(cx);
             return Handled::Yes;
         }
-
-        if matches!(event, Event::Mouse(mouse::Event::CursorMoved { .. })) {
+        if matches!(
+            event,
+            Event::Mouse(mouse::Event::CursorMoved { .. })
+                | Event::Touch(taim_core::touch::Event::FingerMoved { .. })
+        ) {
             cx.request_paint();
         }
-
         Handled::No
+    }
+
+    fn accessibility_action(
+        &mut self,
+        cx: &mut EventCx<'_>,
+        request: &semantics::Request,
+    ) -> Handled {
+        match request {
+            semantics::Request::Activate if self.enabled.get() => {
+                self.pressed = None;
+                cx.request_focus();
+                self.flip(cx);
+                Handled::Yes
+            }
+            semantics::Request::Focus if self.focusable() => {
+                cx.request_focus();
+                Handled::Yes
+            }
+            _ => Handled::No,
+        }
     }
 
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
@@ -209,7 +245,11 @@ impl View for Toggle {
             semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::Checkbox)
                 .with_name(self.name.get())
                 .with_state(state)
-                .with_actions(semantics::Actions::ACTIVATE),
+                .with_actions(if self.enabled.get() {
+                    semantics::Actions::ACTIVATE | semantics::Actions::FOCUS
+                } else {
+                    semantics::Actions::empty()
+                }),
         )
     }
 

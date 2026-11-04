@@ -88,9 +88,7 @@ where
         let max_width = max_width.into().0;
 
         self.columns = Constraint::MaxWidth(Pixels(
-            (max_width.is_finite() && max_width > 0.0)
-                .then_some(max_width)
-                .unwrap_or(1.0),
+            if max_width.is_finite() && max_width > 0.0 { max_width } else { 1.0 },
         ));
         self
     }
@@ -250,9 +248,7 @@ pub fn aspect_ratio(width: impl Into<Pixels>, height: impl Into<Pixels>) -> Sizi
     let ratio = width / height;
 
     Sizing::AspectRatio(
-        (ratio.is_finite() && ratio > 0.0)
-            .then_some(ratio)
-            .unwrap_or(1.0),
+        if ratio.is_finite() && ratio > 0.0 { ratio } else { 1.0 },
     )
 }
 
@@ -261,14 +257,12 @@ impl Sizing {
     fn normalized(self) -> Self {
         match self {
             Self::AspectRatio(ratio) => Self::AspectRatio(
-                (ratio.is_finite() && ratio > 0.0)
-                    .then_some(ratio)
-                    .unwrap_or(1.0),
+                if ratio.is_finite() && ratio > 0.0 { ratio } else { 1.0 },
             ),
             Self::EvenlyDistribute(Length::Fixed(height)) => {
                 Self::EvenlyDistribute(Length::Fixed(finite_nonnegative(height)))
             }
-            other => other,
+            other @ Self::EvenlyDistribute(_) => other,
         }
     }
 }

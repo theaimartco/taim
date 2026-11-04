@@ -4,13 +4,13 @@
 //! ("an icon-only control's accessible name is mandatory"). This proves
 //! the real widget honors it, and behaves the way a button must.
 
-use taim::advanced::widget::{self, Widget};
-use taim::advanced::{Layout, Shell, layout, mouse};
-use taim::widget::icon_button;
-use taim::{Event, Point, Rectangle, Size, Theme};
 use taim_core::semantics::{Actions, Role, State};
+use taim_core::widget::{self, Widget};
+use taim_core::{Event, Point, Rectangle, Size, Theme};
+use taim_core::{Layout, Shell, layout, mouse};
 use taim_core::{shell::Waker, window};
 use taim_renderer::Renderer;
+use taim_widget::icon_button;
 use taim_widget::icon_button as icon_button_mod;
 
 type Message = &'static str;
@@ -21,12 +21,10 @@ const BOUNDS: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 

@@ -49,7 +49,7 @@ impl Frame {
         if let Err(error) = self.buffers.fill_path(
             &mut self.fill_tessellator,
             path,
-            &buffers::fill_options(fill.rule),
+            buffers::fill_options(fill.rule),
             &style,
         ) {
             log::warn!("TAIM fill tessellation skipped: {error:?}");
@@ -130,7 +130,7 @@ impl geometry::frame::Backend for Frame {
         if let Err(error) = self.buffers.fill_rectangle(
             &mut self.fill_tessellator,
             &rectangle,
-            &buffers::fill_options(fill.rule),
+            buffers::fill_options(fill.rule),
             &style,
         ) {
             log::warn!("TAIM rectangle fill skipped: {error:?}");
@@ -198,7 +198,7 @@ impl geometry::frame::Backend for Frame {
                     LineHeight::Absolute(height) => {
                         LineHeight::Absolute(Pixels(height.0 * scale_y))
                     }
-                    relative => relative,
+                    relative @ LineHeight::Relative(_) => relative,
                 }
             } else {
                 text.line_height

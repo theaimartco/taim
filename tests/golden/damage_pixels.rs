@@ -27,12 +27,14 @@
 //! event needs work this suite does not have yet, and a test that pretended
 //! otherwise would be worse than an honest gap. Recorded in `Capstone.md`.
 
-use taim::widget::{column, container, text};
-use taim::{Element, Rectangle, Size, Theme};
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
 use taim_core::Renderer as _;
 use taim_core::renderer::Headless as _;
 use taim_core::theme::Base as _;
+use taim_core::{Rectangle, Size, Theme};
 use taim_renderer::Renderer;
+use taim_widget::{column, container, text};
 
 const WIDTH: u32 = 240;
 const HEIGHT: u32 = 120;

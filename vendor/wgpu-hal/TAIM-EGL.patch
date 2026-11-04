@@ -1,0 +1,24 @@
+--- a/src/gles/egl.rs
++++ b/src/gles/egl.rs
+@@ -127,9 +127,21 @@
+         for &(_, tier_attr) in tiers[..=tier_max].iter() {
+             attributes.extend_from_slice(tier_attr);
+         }
++        // TAIM: Android GLES must not silently choose an RGB565 EGL config
++        // when the driver lacks sRGB-window support. This is independent of
++        // the Java SurfaceHolder format: EGL config selection controls the
++        // actual framebuffer precision. Keep other platforms unchanged.
++        #[cfg(target_os = "android")]
++        attributes.extend_from_slice(&[
++            khronos_egl::RED_SIZE, 8,
++            khronos_egl::GREEN_SIZE, 8,
++            khronos_egl::BLUE_SIZE, 8,
++            khronos_egl::ALPHA_SIZE, 8,
++        ]);
+         // make sure the Alpha is enough to support sRGB
+         match srgb_kind {
+             SrgbFrameBufferKind::None => {}
++            _ if cfg!(target_os = "android") => {} // already requested above
+             _ => {
+                 attributes.push(khronos_egl::ALPHA_SIZE);
+                 attributes.push(8);

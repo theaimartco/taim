@@ -83,6 +83,8 @@ pub const FEEDBACK_TIMEOUT: Duration = Duration::from_millis(200);
 pub struct Scheduler {
     state: State,
     active_motions: FxHashSet<MotionId>,
+    animation_interval: Duration,
+    last_frame: Option<Instant>,
 }
 
 /// Work queued while a submitted frame waits for presentation feedback.
@@ -161,7 +163,21 @@ impl Scheduler {
         Self {
             state: State::Idle,
             active_motions: FxHashSet::default(),
+            animation_interval: Duration::ZERO,
+            last_frame: None,
         }
+    }
+
+    /// Sets the minimum interval for continuous animation frames.
+    /// Zero preserves an externally paced backend's behavior. Explicit redraws
+    /// and platform expose requests remain independent of animation pacing.
+    pub fn set_animation_interval(&mut self, interval: Duration) {
+        self.animation_interval = interval;
+    }
+
+    fn animation_due(&self, now: Instant) -> bool {
+        self.last_frame
+            .is_none_or(|last| now.saturating_duration_since(last) >= self.animation_interval)
     }
 
     /// Requests a frame at the given `deadline`.
@@ -311,6 +327,7 @@ impl Scheduler {
             State::Submitted { .. } | State::Suspended { .. } => return,
         };
 
+        self.last_frame = Some(now);
         self.state = State::Submitted {
             submitted_at: now,
             resume_to,
@@ -352,13 +369,13 @@ impl Scheduler {
     /// `false` while [`State::Suspended`], while
     /// [`State::Submitted`] (until feedback or timeout, via
     /// [`Scheduler::tick`]), or while [`State::Requested`] with a
-    /// deadline still in the future. `true` for [`State::Animating`]
-    /// (every tick produces a frame) or [`State::Requested`] whose
+    /// deadline still in the future. `true` for a due animation frame
+    /// or [`State::Requested`] whose
     /// deadline has passed.
     pub fn should_produce_frame(&self, now: Instant) -> bool {
         match self.state {
             State::Idle | State::Submitted { .. } | State::Suspended { .. } => false,
-            State::Animating => true,
+            State::Animating => self.animation_due(now),
             State::Requested { deadline } => now >= deadline,
         }
     }
@@ -374,7 +391,7 @@ impl Scheduler {
                 self.state = State::Idle;
                 true
             }
-            State::Animating => true,
+            State::Animating => self.animation_due(now),
             State::Idle
             | State::Requested { .. }
             | State::Submitted { .. }
@@ -391,8 +408,9 @@ impl Scheduler {
     /// before checking [`Scheduler::should_produce_frame`] again (e.g.
     /// to compute a `ControlFlow::WaitUntil` target), or `None` if no
     /// deadline applies ([`State::Idle`] with nothing pending, or
-    /// [`State::Animating`], which wants to run as soon as possible on
-    /// every tick rather than waiting for a specific instant).
+    /// an animation with zero cadence or without a previous frame). A paced
+    /// animation returns its next frame deadline; unrepresentable deadlines
+    /// return `None` without overflowing.
     ///
     /// [`State::Submitted`]'s deadline is when its
     /// [`FEEDBACK_TIMEOUT`] will elapse, so a caller that only wakes up
@@ -400,7 +418,15 @@ impl Scheduler {
     /// callback instead of waiting forever.
     pub fn deadline(&self) -> Option<Instant> {
         match self.state {
-            State::Idle | State::Animating => None,
+            State::Idle => None,
+            State::Animating => {
+                if self.animation_interval.is_zero() {
+                    None
+                } else {
+                    self.last_frame
+                        .and_then(|last| last.checked_add(self.animation_interval))
+                }
+            }
             State::Requested { deadline } => Some(deadline),
             State::Submitted { submitted_at, .. } => Some(submitted_at + FEEDBACK_TIMEOUT),
             State::Suspended { .. } => None,
@@ -730,5 +756,40 @@ mod tests {
         scheduler.feedback_received();
 
         assert!(scheduler.should_produce_frame(t(1)));
+    }
+    #[test]
+    fn continuous_animation_obeys_its_frame_interval() {
+        let mut scheduler = Scheduler::new();
+        scheduler.set_animation_interval(Duration::from_millis(16));
+        scheduler.request_animation();
+        assert!(scheduler.begin_frame(t(0)));
+        scheduler.submit(t(0));
+        scheduler.feedback_received();
+        assert!(!scheduler.should_produce_frame(t(15)));
+        assert!(!scheduler.begin_frame(t(15)));
+        assert_eq!(scheduler.deadline(), Some(t(16)));
+        assert!(scheduler.begin_frame(t(16)));
+        scheduler.submit(t(16));
+        scheduler.feedback_received();
+        assert_eq!(scheduler.deadline(), Some(t(32)));
+        scheduler.stop_animating();
+        assert_eq!(scheduler.deadline(), None);
+    }
+
+    #[test]
+    fn pacing_does_not_delay_explicit_work_or_overflow_huge_intervals() {
+        let mut scheduler = Scheduler::new();
+        scheduler.set_animation_interval(Duration::MAX);
+        scheduler.request_animation();
+        scheduler.submit(t(0));
+        scheduler.feedback_received();
+        assert!(!scheduler.should_produce_frame(t(100)));
+        assert_eq!(scheduler.deadline(), None);
+        scheduler.stop_animating();
+        scheduler.request_redraw_at(t(5));
+        assert!(scheduler.begin_frame(t(5)));
+        scheduler.set_animation_interval(Duration::ZERO);
+        scheduler.request_animation();
+        assert!(scheduler.should_produce_frame(t(6)));
     }
 }

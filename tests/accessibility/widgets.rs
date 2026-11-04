@@ -11,16 +11,18 @@
 //! `taim_accessibility::Tree`, and assert the tree an assistive
 //! technology would actually receive.
 
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
 use taim_accessibility::focus::Focus;
 use taim_accessibility::tree::Tree as SemanticTree;
 use taim_accessibility::{Dispatch, Router};
 
-use taim::advanced::widget;
-use taim::advanced::{Layout, layout};
-use taim::widget::{button, checkbox, radio, slider, text, text_input, toggler};
-use taim::{Element, Size, Theme};
 use taim_core::semantics::{Actions, Role, State, Value};
+use taim_core::widget;
+use taim_core::{Layout, layout};
+use taim_core::{Size, Theme};
 use taim_renderer::Renderer;
+use taim_widget::{button, checkbox, radio, slider, text, text_input, toggler};
 
 type Message = ();
 
@@ -30,12 +32,10 @@ const BOUNDS: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 

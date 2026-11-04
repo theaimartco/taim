@@ -40,8 +40,7 @@ mod tests {
 
     #[test]
     fn invalid_blur_cannot_leak_into_shadow_geometry() {
-        let mut shadow = Shadow::default();
-        shadow.blur_radius = f32::NAN;
+        let mut shadow = Shadow { blur_radius: f32::NAN, ..Shadow::default() };
         assert_eq!(shadow.normalized().blur_radius, 0.0);
         shadow.blur_radius = -10.0;
         assert_eq!(shadow.normalized().blur_radius, 0.0);
@@ -51,8 +50,7 @@ mod tests {
 
     #[test]
     fn transparent_shadow_culling_is_conservative() {
-        let mut shadow = Shadow::default();
-        shadow.color = Color::TRANSPARENT;
+        let mut shadow = Shadow { color: Color::TRANSPARENT, ..Shadow::default() };
         assert!(shadow.is_fully_transparent());
         shadow.color = Color::BLACK;
         assert!(!shadow.is_fully_transparent());

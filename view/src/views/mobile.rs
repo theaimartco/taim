@@ -58,6 +58,7 @@ enum Look {
 }
 
 struct Segment {
+    id: widget::Id,
     glyph: Option<Label>,
     label: Label,
 }
@@ -89,6 +90,7 @@ impl Segments {
             look,
             segments: items
                 .map(|(glyph, label)| Segment {
+                    id: widget::Id::unique(),
                     glyph: glyph.map(|glyph| Label::new(glyph, glyph_size)),
                     label: Label::new(label, label_size),
                 })
@@ -119,6 +121,10 @@ impl Segments {
 }
 
 impl View for Segments {
+    fn cancel_interaction(&mut self) {
+        self.pressed = None;
+    }
+
     fn sizing(&self) -> Sizing {
         Sizing {
             width: Axis::Fill(1),
@@ -256,7 +262,7 @@ impl View for Segments {
             state.set(semantics::State::SELECTED, index == selected);
             group = group.with_child(
                 semantics::Node::new(
-                    widget::Id::unique(),
+                    segment.id.clone(),
                     self.slot(bounds, index as f32),
                     semantics::Role::Tab,
                 )
@@ -298,6 +304,10 @@ pub struct Chip {
 }
 
 impl View for Chip {
+    fn cancel_interaction(&mut self) {
+        self.pressed = false;
+    }
+
     fn measure(&mut self, cx: &mut MeasureCx<'_>, _constraints: Constraints) -> Size {
         let label = self.label.measure(cx);
         Size::new(label.width + 24.0, label.height + 14.0)
@@ -368,6 +378,7 @@ impl View for Chip {
 /// loads.
 pub fn skeleton(width: f32, height: f32) -> Skeleton {
     Skeleton {
+        id: widget::Id::unique(),
         size: Size::new(width, height),
         born: Instant::now(),
     }
@@ -375,6 +386,7 @@ pub fn skeleton(width: f32, height: f32) -> Skeleton {
 
 /// See [`skeleton`].
 pub struct Skeleton {
+    id: widget::Id,
     size: Size,
     born: Instant,
 }
@@ -400,7 +412,7 @@ impl View for Skeleton {
 
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
         Some(
-            semantics::Node::new(widget::Id::unique(), cx.bounds(), semantics::Role::Group)
+            semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::Group)
                 .with_state(semantics::State::BUSY),
         )
     }
@@ -421,6 +433,7 @@ pub fn avatar(name: impl Into<String>) -> Avatar {
         .collect();
 
     Avatar {
+        id: widget::Id::unique(),
         initials: Label::new(initials, Some(14.0)),
         diameter: 40.0,
         hue: name.bytes().fold(0_u32, |hash, byte| {
@@ -432,6 +445,7 @@ pub fn avatar(name: impl Into<String>) -> Avatar {
 
 /// See [`avatar`].
 pub struct Avatar {
+    id: widget::Id,
     name: String,
     initials: Label,
     diameter: f32,
@@ -476,7 +490,7 @@ impl View for Avatar {
 
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
         Some(
-            semantics::Node::new(widget::Id::unique(), cx.bounds(), semantics::Role::Image)
+            semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::Image)
                 .with_name(self.name.clone()),
         )
     }
@@ -486,6 +500,7 @@ impl View for Avatar {
 /// while the count is zero.
 pub fn badge(content: impl Into<AnyView>, count: impl IntoProp<u32>) -> Badge {
     Badge {
+        id: widget::Id::unique(),
         content: Child::new(content.into()),
         count: count.into_prop(),
         number: Label::new("", Some(10.0)),
@@ -494,6 +509,7 @@ pub fn badge(content: impl Into<AnyView>, count: impl IntoProp<u32>) -> Badge {
 
 /// See [`badge`].
 pub struct Badge {
+    id: widget::Id,
     content: Child,
     count: Prop<u32>,
     number: Label,
@@ -542,12 +558,8 @@ impl View for Badge {
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
         let count = self.count.get();
         (count > 0).then(|| {
-            semantics::Node::new(
-                widget::Id::unique(),
-                cx.bounds(),
-                semantics::Role::StaticText,
-            )
-            .with_name(format!("{count} unread"))
+            semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::StaticText)
+                .with_name(format!("{count} unread"))
         })
     }
 

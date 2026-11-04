@@ -1,0 +1,19 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools" tools:ignore="UnusedAttribute">
+    @PERMISSIONS@
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:glEsVersion="0x00030000" android:required="true" />
+    <uses-feature android:name="android.hardware.vulkan.level" android:version="1" android:required="false" />
+    <application android:label="Taim App" android:icon="@drawable/taim_app_icon" android:allowBackup="false" android:fullBackupContent="@xml/taim_backup_rules" android:dataExtractionRules="@xml/taim_data_extraction_rules" android:hasCode="true"
+        android:enableOnBackInvokedCallback="true" android:extractNativeLibs="false"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        @MEDIA_PROVIDER@
+        @BACKGROUND_SERVICE@
+        @EXTENSIONS@
+        <activity android:name="com.theaimartco.taim.TaimActivity" android:exported="true" android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|density|uiMode">
+            <meta-data android:name="android.app.lib_name" android:value="taim_app" />
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+@DEEP_LINK@
+        </activity>
+    </application>
+</manifest>

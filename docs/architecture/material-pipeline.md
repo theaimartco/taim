@@ -128,6 +128,15 @@ highlight. `wgpu/src/layer.rs` substitutes `OPAQUE` under `web-colors`.
 - **Only quads.** Text, images, and meshes have no material.
 - **No G-buffer.** See below.
 
+## Native view integration — 2026-11-01
+
+The limitations in the earlier checkpoint above are historical: live material
+backdrop capture/refraction and configurable scene lighting are now implemented.
+Native containers expose `.glass()`, `.frosted_glass()` and an explicit opaque
+accessibility fallback. Rough transmissive surfaces now scatter the backdrop
+through a bounded nine-tap filter. See [glass surfaces](../design/glass-surfaces.md)
+for the current contract, GPU cost and platform limitations.
+
 ## 7. The deferred G-buffer
 
 The full deferred G-buffer described in `future.md` — per-pixel material id,

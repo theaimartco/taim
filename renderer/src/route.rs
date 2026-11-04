@@ -452,6 +452,13 @@ where
         }
     }
 
+    fn is_device_lost(&self) -> bool {
+        match self {
+            Self::Preferred(compositor) => compositor.is_device_lost(),
+            Self::Recovery(compositor) => compositor.is_device_lost(),
+        }
+    }
+
     fn information(&self) -> compositor::Information {
         match self {
             Self::Preferred(compositor) => compositor.information(),

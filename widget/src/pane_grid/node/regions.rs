@@ -97,7 +97,6 @@ impl Node {
     }
 
     /// Visit one immutable packed geometry plan for both painting and hit testing.
-
     ///
     /// Keeping output callbacks separate means pane-only and split-only
     /// callers do not allocate the other result map.

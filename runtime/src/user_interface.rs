@@ -114,6 +114,16 @@ where
         cache: Cache,
         renderer: &mut Renderer,
     ) -> Self {
+        Self::build_ref(root, bounds, cache, renderer)
+    }
+
+    /// Builds with shared renderer metrics, without painting.
+    pub fn build_ref<E: Into<Element<'a, Message, Theme, Renderer>>>(
+        root: E,
+        bounds: Size,
+        cache: Cache,
+        renderer: &Renderer,
+    ) -> Self {
         let mut root = root.into();
 
         let Cache {
@@ -255,6 +265,19 @@ where
         events: &[Event],
         cursor: mouse::Cursor,
         renderer: &mut Renderer,
+        messages: &mut Vec<Message>,
+    ) -> (State, Vec<event::Status>) {
+        self.update_ref(window, waker, events, cursor, renderer, messages)
+    }
+
+    /// Dispatches events using shared renderer metrics, without painting.
+    pub fn update_ref(
+        &mut self,
+        window: &dyn Window,
+        waker: &shell::Waker,
+        events: &[Event],
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
         messages: &mut Vec<Message>,
     ) -> (State, Vec<event::Status>) {
         self.trace.begin(diagnostics::Phase::Event);

@@ -15,6 +15,7 @@ const FILTERS: [&str; 3] = ["Unread", "Starred", "Muted"];
 
 pub fn main() -> taim::Result {
     taim::launch("Taim — Mobile Shell", |cx| {
+        let tasks = cx.tasks();
         let destination = cx.signal(0_usize);
         let section = cx.signal(0_usize);
         let query = cx.signal(String::new());
@@ -71,7 +72,7 @@ pub fn main() -> taim::Result {
             tabs(SECTIONS, section),
             pull_to_refresh(page, refreshing).on_refresh(move || {
                 // Stand-in for real work: finish after a moment.
-                spawn(async move {
+                let _ = tasks.spawn(async move {
                     std::thread::sleep(Duration::from_millis(900));
                     let _ = refreshing.set(false);
                     let _ = notice.set(Some("Refreshed".to_owned()));

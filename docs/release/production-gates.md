@@ -6,10 +6,11 @@ publications should be created solely because CI passes.
 
 ## Required gates
 
-1. Green active GitHub Actions verification on the proposed commit:
+1. Recorded local verification on the proposed immutable commit:
    pinned toolchain, format, lint, workspace tests, visual goldens,
-   AT-SPI bus and harness contract tests. Previous five workflows
-   were commented out and did not constitute active CI.
+   AT-SPI bus and harness contract tests. Run the manual verifier and retain
+   hashed logs. GitHub Actions is disabled at owner request and is not a
+   release prerequisite; the same executable checks remain required.
 2. Evidence under docs/testing/wayland-vyom-device-acceptance.md
    collected on the claimed target hardware. Native VYOM support cannot be
    claimed from generic Wayland/winit tests.
@@ -42,14 +43,15 @@ security disclosure and deprecation policies without inventing an SLA.
 | Linux x86-64 via winit/Wayland and X11 | Implemented; physical QA not signed |
 | Native VYOM/Smithay Wayland | Experimental; physical presentation not accepted |
 | Windows/macOS | Platform code present; physical QA not accepted |
-| Android/iOS | Unsupported until native device verification |
+| Android | Experimental ARM64/x86_64 builds; API 35/4 KiB emulator smoke passes; tested 16 KiB GLES smoke passes; Vulkan corruption remains guarded; physical QA pending ([evidence](../android/native-host-20261029.md)) |
+| iOS | Unsupported until native device verification |
 | Web/WASM | Compile support only; functional device/browser QA pending |
 
 ## Latest gate ledger
 
 | Gate | Status |
 |---|---|
-| Hosted CI for proposed hardening branch | UNVERIFIED UNTIL RUNS COMPLETE |
+| Local verification on immutable release candidate | COMPLETE EVIDENCE REQUIRED |
 | Real Wayland frame presentation | NOT RUN |
 | Real VYOM-native display path | NOT RUN |
 | Input, multilingual IME, screen-reader acceptance | NOT RUN |

@@ -7,10 +7,12 @@
 //! stops agreeing to) produce frames, submit work, or lay
 //! out/paint anything.
 
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
 use std::time::{Duration, Instant};
-use taim::advanced::widget::{self, Widget};
-use taim::advanced::{Layout, mouse, renderer};
-use taim::{Element, Length, Rectangle, Size, Theme};
+use taim_core::widget::{self, Widget};
+use taim_core::{Layout, mouse, renderer};
+use taim_core::{Length, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::frame_scheduler::{MotionId, Scheduler};
 use taim_runtime::user_interface::{self, UserInterface};
@@ -36,10 +38,10 @@ impl<Message> Widget<Message, Theme, Renderer> for Quiet {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
+        _limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
         self.layout_calls.set(self.layout_calls.get() + 1);
-        taim::advanced::layout::Node::new(Size::new(10.0, 10.0))
+        taim_core::layout::Node::new(Size::new(10.0, 10.0))
     }
 
     fn draw(
@@ -57,12 +59,10 @@ impl<Message> Widget<Message, Theme, Renderer> for Quiet {
 }
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 
@@ -175,7 +175,7 @@ fn an_unchanging_real_ui_settles_and_stops_requesting_redraws() {
     // Promote the frame's recorded layer exactly as the compositor does at
     // the beginning of the next frame. The second draw must replay that
     // retained display list without re-entering the widget.
-    taim::advanced::Renderer::reset(&mut renderer, Rectangle::with_size(Size::new(200.0, 200.0)));
+    taim_core::Renderer::reset(&mut renderer, Rectangle::with_size(Size::new(200.0, 200.0)));
     ui.draw(
         &mut renderer,
         &Theme::Light,

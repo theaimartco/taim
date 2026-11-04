@@ -24,7 +24,7 @@ impl Cache {
                 Ok(()) => return,
                 Err(callback) => callback,
             };
-            return self.allocate_image_now(handle, callback);
+            self.allocate_image_now(handle, callback);
         }
 
         #[cfg(target_arch = "wasm32")]

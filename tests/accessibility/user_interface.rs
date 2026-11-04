@@ -12,12 +12,14 @@
 //! These tests call the same public method an application calls, on a
 //! real `UserInterface` built from real widgets.
 
-use taim::widget::{button, checkbox, column, container, float, pick_list, pin, row, space, text};
-use taim::{Element, Point, Size, Theme};
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
 use taim_core::mouse;
 use taim_core::semantics::{Node, Role, State};
+use taim_core::{Point, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::user_interface::{Cache, UserInterface};
+use taim_widget::{button, checkbox, column, container, float, pick_list, pin, row, space, text};
 
 type Message = &'static str;
 
@@ -27,12 +29,10 @@ const WINDOW: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 
@@ -344,7 +344,7 @@ fn an_open_dropdown_reaches_the_application_through_its_overlay() {
     let _ = ui.update(
         &taim_core::window::Headless,
         &taim_core::shell::Waker::noop(),
-        &[taim::Event::Mouse(mouse::Event::ButtonPressed(
+        &[taim_core::Event::Mouse(mouse::Event::ButtonPressed(
             mouse::Button::Left,
         ))],
         mouse::Cursor::Available(Point::new(20.0, 10.0)),

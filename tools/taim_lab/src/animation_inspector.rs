@@ -24,8 +24,8 @@
 //! is invisible — the screen looks still. `is_animating` catches exactly
 //! that, and [`Activity`] is built to make it obvious.
 
-use taim::widget::{column, container, text};
-use taim::{Element, Length};
+use taim::prelude::*;
+use taim::view::AnyView;
 
 /// What this panel cannot show, and why.
 pub const MISSING: &str = "Timelines, velocity and spring state are not shown. `UserInterface` \
@@ -85,7 +85,7 @@ impl Activity {
 }
 
 /// Renders the animation inspector.
-pub fn view<'a, Message: 'a>(activity: Activity, is_animating: bool) -> Element<'a, Message> {
+pub fn view(activity: Activity, is_animating: bool) -> AnyView {
     let headline = if is_animating { "Animating" } else { "Still" };
 
     let verdict = if activity.is_suspicious() {
@@ -106,9 +106,10 @@ pub fn view<'a, Message: 'a>(activity: Activity, is_animating: bool) -> Element<
             text(verdict).size(13),
             text(MISSING).size(11),
         ]
-        .spacing(8),
+        .gap(8.0),
     )
-    .center_x(Length::Fill)
+    .center_x()
+    .fill_width()
     .padding(12)
     .into()
 }

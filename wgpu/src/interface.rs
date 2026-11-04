@@ -392,11 +392,7 @@ impl renderer::Headless for Renderer {
             return None;
         }
 
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::from_env().unwrap_or(wgpu::Backends::PRIMARY),
-            flags: wgpu::InstanceFlags::empty(),
-            ..wgpu::InstanceDescriptor::new_without_display_handle()
-        });
+        let instance = headless_instance();
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -453,4 +449,36 @@ impl renderer::Headless for Renderer {
             background_color,
         )
     }
+}
+
+/// Headless consumers can create renderers concurrently. Retain one driver
+/// instance per backend set instead of repeatedly initializing and tearing
+/// down the process-wide native loader from different threads. Devices and
+/// queues remain independent. Different backend overrides keep separate
+/// instances, so explicit backend selection still works.
+fn headless_instance() -> wgpu::Instance {
+    let backends = wgpu::Backends::from_env().unwrap_or(wgpu::Backends::PRIMARY);
+    let create = || {
+        wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends,
+            flags: wgpu::InstanceFlags::empty(),
+            ..wgpu::InstanceDescriptor::new_without_display_handle()
+        })
+    };
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use std::collections::BTreeMap;
+        use std::sync::{Mutex, OnceLock, PoisonError};
+        static INSTANCES: OnceLock<Mutex<BTreeMap<u32, wgpu::Instance>>> = OnceLock::new();
+        INSTANCES
+            .get_or_init(Mutex::default)
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .entry(backends.bits())
+            .or_insert_with(create)
+            .clone()
+    }
+    #[cfg(target_arch = "wasm32")]
+    create()
 }

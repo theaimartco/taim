@@ -137,6 +137,7 @@ impl Capabilities {
     }
 }
 
+#[cfg(unix)]
 impl From<Vec<wayland_client::globals::Global>> for Capabilities {
     fn from(globals: Vec<wayland_client::globals::Global>) -> Self {
         Self::new(globals.into_iter().map(|global| Global {

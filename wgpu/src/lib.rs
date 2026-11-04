@@ -217,6 +217,7 @@ pub struct Renderer {
     /// that resolves it onto the surface. `None` on the standard-range path,
     /// which draws straight to the surface exactly as it always has.
     hdr: Option<(display::Target, core::color::DisplayTransform)>,
+    surface_target: Option<color::SurfaceTarget>,
 
     /// A copy of the frame as it stood before a transmissive layer drew,
     /// and the bind group that reads it.
@@ -281,6 +282,7 @@ impl Renderer {
             frame_damage: None,
             light: core::material::SceneLight::KEY,
             hdr: None,
+            surface_target: None,
             quad_backdrop: None,
             color_conversion: None,
 
@@ -422,6 +424,38 @@ impl Renderer {
         self.staging_belt.finish();
         let submission = self.engine.queue.submit([encoder.finish()]);
         self.staging_belt.recall();
+        submission
+    }
+
+    /// Draws through a retained copyable SDR texture and resolves to the surface.
+    pub(crate) fn present_offscreen(
+        &mut self,
+        background: Color,
+        view: &wgpu::TextureView,
+        texture: &wgpu::Texture,
+        viewport: &Viewport,
+    ) -> wgpu::SubmissionIndex {
+        if self
+            .surface_target
+            .as_ref()
+            .is_none_or(|target| !target.fits(texture.size(), texture.format()))
+        {
+            self.surface_target = Some(color::SurfaceTarget::new(
+                &self.engine.device,
+                texture.size(),
+                texture.format(),
+            ));
+        }
+        let target = self
+            .surface_target
+            .take()
+            .expect("surface target initialized");
+        let mut encoder = self.draw(Some(background), &target.view, &target.texture, viewport);
+        target.resolve(&mut encoder, view);
+        self.staging_belt.finish();
+        let submission = self.engine.queue.submit([encoder.finish()]);
+        self.staging_belt.recall();
+        self.surface_target = Some(target);
         submission
     }
 

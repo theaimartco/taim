@@ -5,9 +5,8 @@
 //! tree, connect a second client the way Orca does, and ask it questions
 //! over D-Bus.
 //!
-//! Skipped, not failed, when there is no accessibility bus — that is the
-//! ordinary state of a CI box, and a suite that goes red because nobody
-//! is running a screen reader teaches its readers to ignore it.
+//! Ignored in ordinary test runs. Execute explicitly under `dbus-run-session`
+//! with `-- --ignored`; an unavailable bus is then a failure, never a passing skip.
 
 #![cfg(feature = "atspi")]
 
@@ -18,8 +17,8 @@ use taim_accessibility::tree::Change;
 use taim_core::semantics::{Actions, Role, State};
 use taim_core::widget::Id;
 use taim_core::{Point, Rectangle, Size, SmolStr};
+use zbus::OwnedObjectPath;
 use zbus::interface;
-use zbus::zvariant::OwnedObjectPath;
 
 use std::sync::OnceLock;
 
@@ -78,11 +77,8 @@ fn ensure_bus() -> bool {
 
         zbus::block_on(async {
             zbus::connection::Builder::session()
-                .ok()?
                 .name("org.a11y.Bus")
-                .ok()?
                 .serve_at("/org/a11y/bus", A11yBus { address })
-                .ok()?
                 .build()
                 .await
                 .ok()
@@ -92,27 +88,9 @@ fn ensure_bus() -> bool {
     has_bus()
 }
 
-/// Whether a missing bus is a skip or a failure.
-///
-/// CI sets this. Without it a runner whose D-Bus failed to start would go
-/// green on a suite that ran nothing — which is the exact shape of the bug
-/// F-15 was: a transport nobody noticed was doing nothing.
-fn bus_required() -> bool {
-    std::env::var("TAIM_ATSPI_REQUIRE_BUS").is_ok_and(|value| value == "1")
-}
-
 macro_rules! needs_bus {
     () => {
-        if !ensure_bus() {
-            assert!(
-                !bus_required(),
-                "TAIM_ATSPI_REQUIRE_BUS=1 but no bus was reachable and none could \
-                 be stood up: run under `dbus-run-session --`"
-            );
-
-            eprintln!("skipping: no accessibility bus on this machine");
-            return;
-        }
+        assert!(ensure_bus(), "accessibility bus unavailable: run explicitly under dbus-run-session -- with -- --ignored");
     };
 }
 
@@ -129,6 +107,7 @@ fn entry(id: &Id, parent: Option<&Id>, order: Order, role: Role, name: &str) -> 
         value: None,
         actions: Actions::ACTIVATE | Actions::FOCUS,
         live: None,
+        autofill: None,
     }
 }
 
@@ -165,7 +144,7 @@ impl Reader {
 
     async fn call<T>(&self, path: &str, interface: &str, method: &str) -> zbus::Result<T>
     where
-        T: for<'d> zbus::zvariant::Type + serde::de::DeserializeOwned + 'static,
+        T: for<'d> zbus::Type + serde::de::DeserializeOwned + 'static,
     {
         let reply = self
             .connection
@@ -196,7 +175,7 @@ impl Reader {
             )
             .await?;
 
-        let value: zbus::zvariant::OwnedValue = reply.body().deserialize()?;
+        let value: zbus::OwnedVariant = reply.body().deserialize()?;
 
         String::try_from(value)
             .map_err(|_| zbus::Error::Failure(format!("{name} was not a string")))
@@ -204,6 +183,7 @@ impl Reader {
 }
 
 #[test]
+#[ignore = "requires a private accessibility bus; run with dbus-run-session and --ignored"]
 fn a_screen_reader_can_walk_an_taim_tree_over_the_bus() {
     needs_bus!();
 
@@ -292,6 +272,7 @@ fn a_screen_reader_can_walk_an_taim_tree_over_the_bus() {
 }
 
 #[test]
+#[ignore = "requires a private accessibility bus; run with dbus-run-session and --ignored"]
 fn a_node_reports_its_geometry_and_state_over_the_bus() {
     needs_bus!();
 
@@ -359,6 +340,7 @@ fn a_node_reports_its_geometry_and_state_over_the_bus() {
 }
 
 #[test]
+#[ignore = "requires a private accessibility bus; run with dbus-run-session and --ignored"]
 fn a_node_offers_its_actions_over_the_bus() {
     needs_bus!();
 
@@ -414,6 +396,7 @@ fn a_node_offers_its_actions_over_the_bus() {
 }
 
 #[test]
+#[ignore = "requires a private accessibility bus; run with dbus-run-session and --ignored"]
 fn a_retired_node_stops_being_served() {
     // The quiet failure: a node leaves the tree, its object stays on the
     // bus, and a reader keeps reading a control that is no longer on
@@ -496,4 +479,107 @@ fn a_retired_node_stops_being_served() {
             "a retired object must not answer, it must be gone"
         );
     });
+}
+
+#[test]
+#[ignore = "requires a private accessibility bus; run with dbus-run-session and --ignored"]
+fn bus_actions_execute_native_callbacks_on_the_ui_thread_and_acknowledge_the_result() {
+    needs_bus!();
+    use std::cell::Cell;
+    use std::rc::Rc;
+    use std::time::Duration;
+    use taim_view::Root;
+    use taim_view::views::button;
+
+    let owner = std::thread::current().id();
+    let clicks = Rc::new(Cell::new(0));
+    let observed = clicks.clone();
+    let mut root = Root::new(|_| {
+        button("Native action").on_press(move || {
+            assert_eq!(std::thread::current().id(), owner);
+            observed.set(observed.get() + 1);
+        })
+    });
+    let size = taim_core::Size::new(320.0, 120.0);
+    let renderer = zbus::block_on(<taim_view::Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
+    .expect("CPU renderer for visible native controls");
+    root.layout(&renderer, size);
+    let mut published = taim_accessibility::Tree::from_forest(&[root.describe(size)]);
+    let store = Store::new();
+    store.apply(&taim_accessibility::Tree::new().diff(&published));
+    let id = root.describe(size).children[0].id.clone();
+    let path = store.path_of(&id).unwrap();
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    store.set_action_handler(move |request| sender.try_send(request).is_ok());
+    let (_server, reader) = zbus::block_on(async {
+        let mut server = Server::start(store.clone(), "Native action test")
+            .await
+            .unwrap()
+            .unwrap();
+        server.sync().await.unwrap();
+        let reader = Reader::attach_to(&server).await;
+        (server, reader)
+    });
+    let (done, finished) = std::sync::mpsc::channel();
+    let client = std::thread::spawn(move || {
+        zbus::block_on(async move {
+            let clicked: bool = reader
+                .connection
+                .call_method(
+                    Some(reader.bus_name.as_str()),
+                    path.as_str(),
+                    Some("org.a11y.atspi.Action"),
+                    "DoAction",
+                    &(0_i32,),
+                )
+                .await
+                .unwrap()
+                .body()
+                .deserialize()
+                .unwrap();
+            done.send(clicked).unwrap();
+            let focused: bool = reader
+                .connection
+                .call_method(
+                    Some(reader.bus_name.as_str()),
+                    path.as_str(),
+                    Some("org.a11y.atspi.Component"),
+                    "GrabFocus",
+                    &(),
+                )
+                .await
+                .unwrap()
+                .body()
+                .deserialize()
+                .unwrap();
+            focused
+        })
+    });
+    for index in 0..2 {
+        let request = receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("bus request reached the native UI queue");
+        if index == 0 {
+            assert!(
+                finished.try_recv().is_err(),
+                "bus must await actual execution"
+            );
+        }
+        let result = root.accessibility_action(&request.action, taim_core::time::Instant::now());
+        let next = taim_accessibility::Tree::from_forest(&[root.describe(size)]);
+        store.apply(&published.diff(&next));
+        published = next;
+        request.complete(result.captured);
+    }
+    assert!(client.join().unwrap());
+    assert!(finished.recv_timeout(Duration::from_secs(1)).unwrap());
+    assert_eq!(clicks.get(), 1);
+    assert!(
+        root.describe(size).children[0]
+            .state
+            .contains(taim_core::semantics::State::FOCUSED)
+    );
 }

@@ -20,6 +20,9 @@ taim_core.workspace = true
 taim-gesture.workspace = true
 rustc-hash.workspace = true
 thiserror.workspace = true
+tempfile = "3"
+
+[target.'cfg(unix)'.dependencies]
 wayland-client = "0.31.14"
 wayland-protocols = { version = "0.32.13", features = ["client", "staging"] }
 

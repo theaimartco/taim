@@ -13,7 +13,7 @@ use taim_core::text::{self, Editor as _, LineHeight, Renderer as _, Wrapping};
 use taim_core::{Font, Pixels, Theme, clipboard, input_method, widget};
 
 use std::cell::{Cell, RefCell};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 
 type Engine = <Renderer as text::Renderer>::Editor;
 
@@ -140,7 +140,7 @@ impl std::fmt::Debug for Buffer {
 /// An editable, scrollable block of text showing `buffer`.
 pub fn text_editor(buffer: &Buffer) -> TextEditor {
     TextEditor {
-        buffer: buffer.clone(),
+        buffer: *buffer,
         font: None,
         size: None,
         line_height: LineHeight::default(),
@@ -150,7 +150,7 @@ pub fn text_editor(buffer: &Buffer) -> TextEditor {
         colors: Box::new(Plain),
         on_action: None,
         styled_for: RefCell::new(None),
-        dragging: false,
+        dragging: None,
         awaiting_paste: false,
         clicks: Clicks::default(),
         area: Cell::new(Rectangle::default()),
@@ -171,7 +171,7 @@ pub struct TextEditor {
     on_action: Option<Box<dyn Fn(&Action)>>,
     /// Theme the colors were last computed for.
     styled_for: RefCell<Option<String>>,
-    dragging: bool,
+    dragging: Option<super::look::Press>,
     awaiting_paste: bool,
     clicks: Clicks,
     area: Cell<Rectangle>,
@@ -335,6 +335,32 @@ impl TextEditor {
 }
 
 impl View for TextEditor {
+    fn cancel_interaction(&mut self) {
+        self.dragging = None;
+        self.awaiting_paste = false;
+    }
+
+    fn input_method(&self, bounds: Rectangle) -> input_method::InputMethod {
+        let area = self.text_area(bounds);
+        let position = self.buffer.with(|engine| match engine.selection() {
+            Selection::Caret(at) => at,
+            Selection::Range(ranges) => ranges.first().map_or(Point::ORIGIN, Rectangle::position),
+        });
+        input_method::InputMethod::Enabled {
+            cursor: Rectangle::new(
+                area.position() + (position - Point::ORIGIN),
+                Size::new(
+                    1.5,
+                    self.line_height
+                        .to_absolute(self.size.unwrap_or(Pixels(14.0)))
+                        .0,
+                ),
+            ),
+            purpose: input_method::Purpose::Normal,
+            preedit: None,
+        }
+    }
+
     fn sizing(&self) -> Sizing {
         Sizing::FILL
     }
@@ -376,7 +402,7 @@ impl View for TextEditor {
                     wrapping,
                     hint,
                 },
-            )
+            );
         });
 
         room
@@ -421,28 +447,28 @@ impl View for TextEditor {
         let selection = engine.selection();
         let line = self.line_height.to_absolute(size).0;
 
-        if engine.is_empty() {
-            if let Some(placeholder) = &self.placeholder {
-                use text::Renderer as _;
-                cx.renderer().fill_text(
-                    text::Text {
-                        content: placeholder.clone(),
-                        bounds: area.size(),
-                        size,
-                        line_height: self.line_height,
-                        font,
-                        align_x: text::Alignment::Default,
-                        align_y: taim_core::alignment::Vertical::Top,
-                        shaping: text::Shaping::Advanced,
-                        wrapping: self.wrapping,
-                        ellipsis: text::Ellipsis::None,
-                        hint_factor: hint,
-                    },
-                    area.position(),
-                    palette.background.strongest.color,
-                    area,
-                );
-            }
+        if engine.is_empty()
+            && let Some(placeholder) = &self.placeholder
+        {
+            use text::Renderer as _;
+            cx.renderer().fill_text(
+                text::Text {
+                    content: placeholder.clone(),
+                    bounds: area.size(),
+                    size,
+                    line_height: self.line_height,
+                    font,
+                    align_x: text::Alignment::Default,
+                    align_y: taim_core::alignment::Vertical::Top,
+                    shaping: text::Shaping::Advanced,
+                    wrapping: self.wrapping,
+                    ellipsis: text::Ellipsis::None,
+                    hint_factor: hint,
+                },
+                area.position(),
+                palette.background.strongest.color,
+                area,
+            );
         }
 
         let origin = area.position() - Point::ORIGIN;
@@ -486,12 +512,44 @@ impl View for TextEditor {
         });
     }
 
+    fn editor_state(&self) -> Option<input_method::EditorState> {
+        let content = self.buffer.text();
+        let cursor = self.buffer.cursor();
+        let byte = |position: text::editor::Position| {
+            let start = content
+                .split_inclusive('\n')
+                .take(position.line)
+                .map(str::len)
+                .sum::<usize>();
+            (start + position.column).min(content.len())
+        };
+        let selection = byte(cursor.selection.unwrap_or(cursor.position))..byte(cursor.position);
+        Some(
+            input_method::EditorState {
+                content,
+                selection,
+                composing: None,
+                multiline: true,
+            }
+            .normalized(),
+        )
+    }
+
     fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+        if self.dragging.is_some_and(|press| press.cancelled_by(event)) {
+            self.dragging = None;
+            cx.request_paint();
+            return Handled::No;
+        }
         let area = self.text_area(cx.bounds());
         let local = |at: Point| Point::new(at.x - area.x, at.y - area.y);
 
         match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) if cx.is_hovered() => {
+            event
+                if super::look::Press::start(event).is_some()
+                    && cx.is_hovered()
+                    && self.dragging.is_none() =>
+            {
                 cx.request_focus();
                 let Some(at) = cx.pointer() else {
                     return Handled::Yes;
@@ -505,16 +563,25 @@ impl View for TextEditor {
                 if matches!(action, Action::SelectWord | Action::SelectLine) {
                     self.buffer.perform(Action::Click(local(at)));
                 }
-                self.dragging = true;
+                self.dragging = super::look::Press::start(event);
                 self.apply(cx, action);
                 Handled::Yes
             }
-            Event::Mouse(mouse::Event::CursorMoved { position }) if self.dragging => {
-                self.apply(cx, Action::Drag(local(*position)));
+            event
+                if self
+                    .dragging
+                    .and_then(|press| press.movement(event))
+                    .is_some() =>
+            {
+                let position = self
+                    .dragging
+                    .and_then(|press| press.movement(event))
+                    .expect("matched owned pointer movement");
+                self.apply(cx, Action::Drag(local(position)));
                 Handled::Yes
             }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) if self.dragging => {
-                self.dragging = false;
+            event if self.dragging.is_some_and(|press| press.released_by(event)) => {
+                self.dragging = None;
                 Handled::Yes
             }
             Event::Mouse(mouse::Event::WheelScrolled { delta }) if cx.is_hovered() => {
@@ -537,15 +604,44 @@ impl View for TextEditor {
                 text,
                 ..
             }) if cx.has_focus() => self.key(cx, key, *modifiers, text.as_deref()),
+            Event::InputMethod(input_method::Event::Edit(state)) if cx.has_focus() => {
+                let state = state.clone().normalized();
+                if state.composing.is_some() {
+                    return Handled::Yes;
+                }
+                if self.buffer.text() != state.content {
+                    self.buffer.set_text(&state.content);
+                }
+                let position = |offset: usize| {
+                    let prefix = &state.content[..offset];
+                    text::editor::Position::new(
+                        prefix.bytes().filter(|b| *b == b'\n').count(),
+                        prefix.rsplit('\n').next().unwrap_or_default().len(),
+                    )
+                };
+                let caret = position(state.selection.end);
+                let anchor = position(state.selection.start);
+                self.buffer.with(|engine| {
+                    engine.move_to(Cursor {
+                        position: caret,
+                        selection: (caret != anchor).then_some(anchor),
+                    });
+                });
+                self.buffer.touch();
+                cx.request_layout();
+                Handled::Yes
+            }
             Event::InputMethod(input_method::Event::Commit(text)) if cx.has_focus() => {
                 for character in text.chars() {
                     self.apply(cx, Action::Edit(Edit::Insert(character)));
                 }
                 Handled::Yes
             }
-            Event::Clipboard(clipboard::Event::Read(Ok(content))) if self.awaiting_paste => {
+            Event::Clipboard(clipboard::Event::Read(result)) if self.awaiting_paste => {
                 self.awaiting_paste = false;
-                if let clipboard::Content::Text(text) = &**content {
+                if let Ok(content) = result
+                    && let clipboard::Content::Text(text) = &**content
+                {
                     self.apply(cx, Action::Edit(Edit::Paste(Arc::new(text.clone()))));
                 }
                 Handled::Yes
@@ -557,7 +653,8 @@ impl View for TextEditor {
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
         let node = semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::TextField)
             .with_name(self.placeholder.clone().unwrap_or_default())
-            .with_state(look::interactive_state(true, cx.has_focus()));
+            .with_state(look::interactive_state(true, cx.has_focus()))
+            .with_actions(semantics::Actions::FOCUS);
 
         Some(node.with_value(semantics::Value::Text(self.buffer.text().into())))
     }

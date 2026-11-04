@@ -67,6 +67,10 @@ impl Drawer {
 }
 
 impl View for Drawer {
+    fn cancel_interaction(&mut self) {
+        self.drag = None;
+    }
+
     fn sizing(&self) -> Sizing {
         Sizing::FILL
     }
@@ -113,6 +117,11 @@ impl View for Drawer {
     }
 
     fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+        if crate::tree::is_cancellation(event) {
+            self.drag = None;
+            cx.request_paint();
+            return Handled::No;
+        }
         let bounds = cx.bounds();
         let now = cx.now();
         let progress = self.progress(now);
@@ -178,6 +187,8 @@ impl View for Drawer {
     fn children(&mut self, visit: &mut dyn FnMut(&mut Child)) {
         if self.painted.get() > 0.0 {
             visit(&mut self.content);
+        } else {
+            self.content.deactivate();
         }
     }
 }
@@ -262,6 +273,10 @@ impl Sheet {
 }
 
 impl View for Sheet {
+    fn cancel_interaction(&mut self) {
+        self.drag = None;
+    }
+
     fn sizing(&self) -> Sizing {
         Sizing::FILL
     }
@@ -326,6 +341,11 @@ impl View for Sheet {
     }
 
     fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+        if crate::tree::is_cancellation(event) {
+            self.drag = None;
+            cx.request_paint();
+            return Handled::No;
+        }
         let bounds = cx.bounds();
         let fraction = self.current(cx.now()).max(0.0);
         if fraction <= 0.0 && self.drag.is_none() {
@@ -400,6 +420,8 @@ impl View for Sheet {
     fn children(&mut self, visit: &mut dyn FnMut(&mut Child)) {
         if self.painted.get() > 0.0 {
             visit(&mut self.content);
+        } else {
+            self.content.deactivate();
         }
     }
 }
@@ -575,6 +597,7 @@ impl View for Snackbar {
 /// threshold sets `refreshing` and runs the refresh action.
 pub fn pull_to_refresh(content: impl Into<AnyView>, refreshing: State<bool>) -> PullToRefresh {
     PullToRefresh {
+        id: widget::Id::unique(),
         content: Child::new(content.into()),
         refreshing,
         busy: refreshing.into_prop(),
@@ -587,6 +610,7 @@ pub fn pull_to_refresh(content: impl Into<AnyView>, refreshing: State<bool>) -> 
 
 /// See [`pull_to_refresh`].
 pub struct PullToRefresh {
+    id: widget::Id,
     content: Child,
     refreshing: State<bool>,
     busy: Prop<bool>,
@@ -609,6 +633,11 @@ impl PullToRefresh {
 }
 
 impl View for PullToRefresh {
+    fn cancel_interaction(&mut self) {
+        self.drag = None;
+        self.settle = Tween::new(if self.busy.get() { HOLD } else { 0.0 });
+    }
+
     fn sizing(&self) -> Sizing {
         Sizing::FILL
     }
@@ -680,6 +709,14 @@ impl View for PullToRefresh {
     }
 
     fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+        if crate::tree::is_cancellation(event) {
+            self.drag = None;
+            cx.request_paint();
+            self.settle
+                .go(if self.busy.get() { HOLD } else { 0.0 }, cx.now());
+            cx.request_animation();
+            return Handled::No;
+        }
         let bounds = cx.bounds();
 
         match look::gesture(event, cx.pointer()) {
@@ -720,7 +757,7 @@ impl View for PullToRefresh {
 
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
         self.busy.get().then(|| {
-            semantics::Node::new(widget::Id::unique(), cx.bounds(), semantics::Role::Group)
+            semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::Group)
                 .with_state(semantics::State::BUSY)
         })
     }

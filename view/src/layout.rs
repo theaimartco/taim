@@ -75,8 +75,9 @@ impl Constraints {
     /// Brings `size` into range. Non-finite sizes collapse to the minimum.
     pub fn clamp(&self, size: Size) -> Size {
         let fit = |value: f32, min: f32, max: f32| {
+            let (min, max) = bounds(min, max);
             if value.is_finite() {
-                value.clamp(min, max.max(min))
+                value.clamp(min, max)
             } else {
                 min
             }
@@ -111,13 +112,20 @@ impl Constraints {
     /// Applies `sizing`: fixed axes become tight, fill axes take the
     /// maximum when it is finite.
     pub fn with_sizing(&self, sizing: Sizing) -> Self {
-        let axis = |axis: Axis, min: f32, max: f32| match axis {
-            Axis::Fixed(length) => {
-                let length = length.clamp(min, max.max(min));
-                (length, length)
+        let axis = |axis: Axis, min: f32, max: f32| {
+            let (min, max) = bounds(min, max);
+            match axis {
+                Axis::Fixed(length) => {
+                    let length = if length.is_finite() {
+                        length.clamp(min, max)
+                    } else {
+                        min
+                    };
+                    (length, length)
+                }
+                Axis::Fill(_) if max.is_finite() => (max, max),
+                Axis::Fill(_) | Axis::Hug => (min, max),
             }
-            Axis::Fill(_) if max.is_finite() => (max, max),
-            Axis::Fill(_) | Axis::Hug => (min, max),
         };
 
         let (min_width, max_width) = axis(sizing.width, self.min.width, self.max.width);
@@ -128,6 +136,15 @@ impl Constraints {
             max: Size::new(max_width, max_height),
         }
     }
+}
+
+// Public constraints may be assembled directly by custom views. Keep their
+// numeric bounds valid before calling f32::clamp, which panics on NaN bounds.
+// Infinity is useful only as an unbounded maximum, never as a minimum.
+fn bounds(min: f32, max: f32) -> (f32, f32) {
+    let min = if min.is_finite() { min.max(0.0) } else { 0.0 };
+    let max = if max.is_nan() { min } else { max.max(min) };
+    (min, max)
 }
 
 #[cfg(test)]
@@ -161,6 +178,46 @@ mod tests {
 
         assert_eq!(sized.min, Size::new(40.0, 100.0));
         assert_eq!(sized.max, Size::new(40.0, 100.0));
+    }
+
+    #[test]
+    fn malformed_public_constraints_always_produce_finite_sizes() {
+        let values = [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -10.0, 0.0, 50.0];
+        for min in values {
+            for max in values {
+                let constraints = Constraints {
+                    min: Size::new(min, min),
+                    max: Size::new(max, max),
+                };
+                for value in values {
+                    let size = constraints.clamp(Size::new(value, value));
+                    assert!(size.width.is_finite() && size.width >= 0.0);
+                    for axis in [Axis::Fixed(value), Axis::Fill(1), Axis::Hug] {
+                        let sized = constraints.with_sizing(Sizing {
+                            width: axis,
+                            height: axis,
+                        });
+                        assert!(sized.min.width.is_finite() && sized.min.width >= 0.0);
+                        assert!(!sized.max.width.is_nan());
+                        assert!(sized.max.width >= sized.min.width);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn non_finite_fixed_size_uses_parent_minimum() {
+        let constraints = Constraints {
+            min: Size::new(10.0, 20.0),
+            max: Size::new(100.0, f32::INFINITY),
+        };
+        let sized = constraints.with_sizing(Sizing {
+            width: Axis::Fixed(f32::NAN),
+            height: Axis::Fixed(f32::INFINITY),
+        });
+        assert_eq!(sized.min, constraints.min);
+        assert_eq!(sized.max, constraints.min);
     }
 
     #[test]

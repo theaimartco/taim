@@ -643,6 +643,10 @@ where
                 }
             }
             Event::InputMethod(event) => match event {
+                // Full native snapshots are consumed by the persistent-view root.
+                input_method::Event::Edit(_)
+                | input_method::Event::DeleteSurrounding { .. }
+                | input_method::Event::Submit => {}
                 input_method::Event::Opened | input_method::Event::Closed => {
                     let state = state::<Renderer>(tree);
 

@@ -27,16 +27,19 @@
 //!
 //! Deliberately awkward. Read `harness`'s module docs before doing it.
 
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
 use super::harness::{Harness, Image, Tolerance};
+use taim_core::alignment::Alignment::Center;
 
-use taim::widget::icon::{self, Icon};
-use taim::widget::segmented_control::Segment;
-use taim::widget::tabs::Tab;
-use taim::widget::{
+use taim_core::{Size, Theme};
+use taim_widget::icon::{self, Icon};
+use taim_widget::segmented_control::Segment;
+use taim_widget::tabs::Tab;
+use taim_widget::{
     accordion, avatar, badge, button, checkbox, chip, column, container, progress_bar, radio, row,
     search_bar, segmented_control, skeleton, slider, stepper, tabs, text, text_input, toggler,
 };
-use taim::{Center, Element, Size, Theme};
 
 /// No message is ever produced: these are pictures, not interactions.
 type Case<'a> = Element<'a, ()>;
@@ -55,6 +58,7 @@ const THEMES: [(&str, Theme); 2] = [("light", Theme::Light), ("dark", Theme::Dar
 fn check(name: &str, size: (u32, u32), tolerance: Tolerance, build: impl Fn() -> Case<'static>) {
     let harness = Harness::default_directory()
         .with_updates(std::env::var(super::harness::UPDATE_ENV).is_ok());
+    let mut failures = Vec::new();
 
     for (suffix, theme) in THEMES {
         let case = format!("{name}_{suffix}");
@@ -74,10 +78,10 @@ fn check(name: &str, size: (u32, u32), tolerance: Tolerance, build: impl Fn() ->
             // Write the artifact before failing, so CI has something to
             // upload and a reviewer has something to look at.
             harness.write_diff(&case, &image);
+            failures.push(outcome.report(&case));
         }
-
-        assert!(!outcome.is_failure(), "{}", outcome.report(&case));
     }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 /// Pixels differing from the background, i.e. ink actually drawn.
@@ -341,16 +345,16 @@ fn icon_sizes() {
 #[test]
 fn app_bar_with_title() {
     check("app_bar", (300, 72), Tolerance::TEXT, || {
-        taim::widget::app_bar(text("Inbox").size(18)).into()
+        taim_widget::app_bar(text("Inbox").size(18)).into()
     });
 }
 
 #[test]
 fn bottom_nav_bar_selected() {
-    use taim::widget::bottom_nav_bar::Item;
+    use taim_widget::bottom_nav_bar::Item;
 
     check("bottom_nav_bar", (300, 80), Tolerance::TEXT, || {
-        taim::widget::bottom_nav_bar(
+        taim_widget::bottom_nav_bar(
             [
                 (Icon::HOME, "Home"),
                 (Icon::SEARCH, "Search"),
@@ -375,7 +379,7 @@ fn bottom_nav_bar_selected() {
 #[test]
 fn list_tile_row() {
     check("list_tile", (300, 72), Tolerance::TEXT, || {
-        taim::widget::list_tile(text("Ada Lovelace").size(15))
+        taim_widget::list_tile(text("Ada Lovelace").size(15))
             .on_press(())
             .into()
     });
@@ -384,14 +388,14 @@ fn list_tile_row() {
 #[test]
 fn snackbar_visible() {
     check("snackbar", (300, 96), Tolerance::TEXT, || {
-        taim::widget::snackbar(text("Message sent").size(14), true).into()
+        taim_widget::snackbar(text("Message sent").size(14), true).into()
     });
 }
 
 #[test]
 fn carousel_dots() {
     check("carousel", (280, 120), Tolerance::TEXT, || {
-        taim::widget::carousel((0..3).map(|page| {
+        taim_widget::carousel((0..3).map(|page| {
             container(text(format!("Page {page}")).size(15))
                 .padding(20)
                 .into()
@@ -403,7 +407,7 @@ fn carousel_dots() {
 #[test]
 fn icon_button_glyph() {
     check("icon_button", (72, 72), Tolerance::TEXT, || {
-        taim::widget::icon_button(Icon::SETTINGS.codepoint(), "Settings")
+        taim_widget::icon_button(Icon::SETTINGS.codepoint(), "Settings")
             .font(icon::FONT)
             .on_press(())
             .into()
@@ -412,10 +416,10 @@ fn icon_button_glyph() {
 
 #[test]
 fn date_picker_month() {
-    use taim::widget::date::Date;
+    use taim_widget::date::Date;
 
     check("date_picker", (320, 300), Tolerance::TEXT, || {
-        taim::widget::date_picker(Date::new(2026, 8, 1))
+        taim_widget::date_picker(Date::new(2026, 8, 1))
             .selected(Date::new(2026, 8, 20))
             .today(Date::new(2026, 8, 13))
             .on_select(|_| ())
@@ -425,10 +429,10 @@ fn date_picker_month() {
 
 #[test]
 fn time_picker_columns() {
-    use taim::widget::time_picker::Time;
+    use taim_widget::time_picker::Time;
 
     check("time_picker", (240, 200), Tolerance::TEXT, || {
-        taim::widget::time_picker(Time::new(9, 30))
+        taim_widget::time_picker(Time::new(9, 30))
             .minute_step(15)
             .on_change(|_| ())
             .into()
@@ -454,7 +458,7 @@ fn badge_dot_and_count() {
 #[test]
 fn pull_to_refresh_idle() {
     check("pull_to_refresh", (280, 120), Tolerance::TEXT, || {
-        taim::widget::pull_to_refresh(container(text("Pull me").size(14)).padding(20), false)
+        taim_widget::pull_to_refresh(container(text("Pull me").size(14)).padding(20), false)
             .on_refresh(())
             .into()
     });

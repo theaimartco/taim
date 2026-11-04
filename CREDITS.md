@@ -1,5 +1,13 @@
 # Credits
 
+## Vendored GPU backend patch
+
+`vendor/wgpu-hal` contains gfx-rs developers' `wgpu-hal` 29.0.4 under its
+original MIT/Apache-2.0 licenses. Taim's local Android EGL precision change is
+documented in `TAIM-PATCH.md` and `TAIM-EGL.patch`; upstream and patched file
+hashes are retained in `TAIM-UPSTREAM.json`. This is attributed third-party
+source, not an independently authored Taim GPU implementation.
+
 ## iced
 
 Taim is a fork of [iced](https://github.com/iced-rs/iced), created by

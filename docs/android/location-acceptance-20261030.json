@@ -1,0 +1,111 @@
+{
+  "date": "2026-10-30",
+  "milestone": "Foreground location status/cache/fresh fixes, bounded subscriptions and pause/drop cleanup",
+  "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+  "working_tree_dirty": true,
+  "runtime": {
+    "status": "passed",
+    "serial": "emulator-5594",
+    "started_utc": "2026-10-30T04:26:07.498303+00:00",
+    "apk_sha256": "a56de2008dc8c5aac84297731354120731be8a6f58b688868dd6c258accb151b",
+    "driver_sha256": "e4e18ae5387f2ed9641c56159120c365f37836012a3523e252849af672bac900",
+    "device": {
+      "sdk": "35",
+      "model": "sdk_gphone16k_x86_64",
+      "abi": "x86_64",
+      "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+      "page_size": 16384
+    },
+    "original_location_enabled": "true",
+    "original_mock_mode": "deny",
+    "checks": 16,
+    "settings_restored": true,
+    "finished_utc": "2026-10-30T04:26:17.352228+00:00"
+  },
+  "regressions": {
+    "platform_notifications": {
+      "status": "passed",
+      "serial": "emulator-5594",
+      "notifications": true,
+      "started_utc": "2026-10-30T04:28:38.411409+00:00",
+      "apk_sha256": "2b3ddb6785cb6475650d673a6449d6aae4b813c7ddd8d80f68d66b7ad1c328dd",
+      "driver_sha256": "a66f63a99ee76166adcdedf880e759b3eed21dd420f7afd566472cb6af36486b",
+      "device": {
+        "sdk": "35",
+        "model": "sdk_gphone16k_x86_64",
+        "abi": "x86_64",
+        "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+        "page_size": 16384
+      },
+      "checks": 14,
+      "cold_intent_checks": 1,
+      "finished_utc": "2026-10-30T04:28:44.259475+00:00"
+    },
+    "media": {
+      "status": "passed",
+      "serial": "emulator-5594",
+      "started_utc": "2026-10-30T04:28:50.003765+00:00",
+      "apk_sha256": "b202954967487263f95ba5844c712ecae6465ce5a44d02c4a1ad03d947c09753",
+      "driver_sha256": "002032bd509f30295b6b936b3ca6d9399630cd917c43d3a4e8e45cf06c76eeb7",
+      "limitations": [
+        "External-UID responders verify protocol/grants, not hardware or video encoding",
+        "Only real system-picker cancellation is automated; physical selection/camera/viewer matrix remains pending"
+      ],
+      "device": {
+        "sdk": "35",
+        "model": "sdk_gphone16k_x86_64",
+        "abi": "x86_64",
+        "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+        "page_size": 16384
+      },
+      "checks": 18,
+      "finished_utc": "2026-10-30T04:28:59.832520+00:00"
+    }
+  },
+  "checks": {
+    "host_unit_tests": 55,
+    "strict_host_native_views_clippy": "passed",
+    "strict_arm64_four_android_examples_clippy": "passed",
+    "standalone_arm64_x86_64_assemble_debug": "passed",
+    "generated_apk_signature": "verified development signature",
+    "generated_apk_zipalign_16k": "passed",
+    "foreground_manifest": "coarse and fine only; no background location or foreground service"
+  },
+  "artifact_sha256": {
+    "target/android/x86_64/debug/location-probe/taim-location-probe.apk": "a56de2008dc8c5aac84297731354120731be8a6f58b688868dd6c258accb151b",
+    "target/android/location-template-check/app/build/outputs/apk/debug/app-debug.apk": "c1fa7945468d52860c852d161bed55d7458aa9bd9e5680d96c092975abfe1c4a",
+    "target/android/runtime-smoke/location-accepted/location-driver.apk": "e4e18ae5387f2ed9641c56159120c365f37836012a3523e252849af672bac900"
+  },
+  "source_sha256": {
+    "Cargo.lock": "6bbd3f8cce47259fa77bd14db4cdd05cfe01e6e4bfa6d8c24d3909195c08b5fe",
+    "Cargo.toml": "547630d1e292d685f65b56c2d29a3713a028f779f98ae4a5febc6cd9199ee1de",
+    "examples/android_location_probe/Cargo.toml": "ffda059cca56a9292bb3f133c7f59435346d006a53139e9856a9dca6e56eba43",
+    "examples/android_location_probe/android/AndroidManifest.xml": "81372364fcf1cc1571df3127560ce2cf9dbfe27ae1b388219ee08b384315b5e5",
+    "examples/android_location_probe/src/lib.rs": "e8c84c84b8b60b62fa1225c476b18dcc2d2f64af3f18989ed37a2e43e9b810a0",
+    "scripts/android/counter.py": "d98fff182fb4a28b67b438976aea4e0873da4a8c818ba5331f7f87410502d2ad",
+    "scripts/android/location-probe.py": "638f040b8122528d9f7692897ed14ae03d93f0083c53e9fb67557348d987a809",
+    "scripts/android/location-test/AndroidManifest.xml": "b1660356286df731c9f88417bd9dbec744db74d509fbf4f358f6e7d8b926180e",
+    "scripts/android/location-test/LocationDriver.java": "06b341813cd36a2e122abcb8f1992054243708e42939f93f9e08607ed2077aa5",
+    "scripts/android/project.py": "06522100dcac209ddc4be31e6ddba0e46df399632a62ddfa6494f667fbc62e4d",
+    "src/lib.rs": "1dfac84d4c57d6b6efb170ab2efbcfc3c7beb45b87fc6bda62c430fb58301f1a",
+    "winit/Cargo.toml": "468e839925e29330cc86195b054e4c408bd6bb806df2057046e05400bbb07010",
+    "winit/android/com/theaimartco/taim/TaimActivity.java": "8597d25c1e1aa1a96dfd640d869d9cf5f41259ed8d707cea0929728d571d09e6",
+    "winit/android/com/theaimartco/taim/TaimLocation.java": "b88626fbddb6fe19f26d75f5b45bbbb623887b5930f656c0be1116776064b04f",
+    "winit/android/com/theaimartco/taim/TaimServices.java": "4d3d32c221b252a32ac259df66f2587045e93560b345bc0723a6e6e0a18ac7ba",
+    "winit/src/android/bridge.rs": "1463af189621a17671cd1d0416ca3c48278ed68d2279a4c049befee587808474",
+    "winit/src/android/location.rs": "7b91eb02d37b4d7d66f205bb38498fa72b0771182d364324b7fc108342ed1cac",
+    "winit/src/android/mod.rs": "465114905950887446f70a4e85cb84070dc3e9322143c611753139c06c1b0f5b",
+    "winit/src/android/services.rs": "75a1e9b9c991e16702fe3b6573c4eb9051f5360ab9b51f72d7f94218b513f50b"
+  },
+  "evidence_directory": "target/android/runtime-smoke/location-accepted",
+  "notes": [
+    "Failed location-01 retained: Android would not replace a newer cached fix with an older injected timestamp; fixture now waits for actual cache ageing.",
+    "Mock GPS/network providers were removed by the driver; original location setting and fixture mock app-op were restored."
+  ],
+  "limitations": [
+    "Synthetic OS-provider tests on API35 x86_64 16KiB emulator only; no physical GPS/OEM/energy/API26 runtime acceptance",
+    "Only resumed-Activity location; no background service, geofencing or sensor adapter",
+    "Abandoning a watch creation future before acknowledgement leaves any created native watch bounded by its configured expiry/pause cleanup",
+    "All artifacts in this record are development-signed debug builds, not store releases"
+  ]
+}

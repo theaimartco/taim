@@ -43,8 +43,8 @@
 //! own type, and all of them are registered at the same path. Hence the
 //! newtypes over [`Node`]: they are one object, seen from three sides.
 
-use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 use zbus::{Connection, interface, proxy};
+use zbus::{ObjectPath, OwnedObjectPath};
 
 use crate::atspi::store::{NULL_PATH, Object, ROOT_PATH, Store};
 use crate::atspi::vocabulary;
@@ -111,7 +111,7 @@ pub async fn connect() -> zbus::Result<Option<Connection>> {
     let address: zbus::Address = address.parse()?;
 
     Ok(Some(
-        zbus::connection::Builder::address(address)?.build().await?,
+        zbus::connection::Builder::address(address).build().await?,
     ))
 }
 
@@ -124,6 +124,13 @@ pub struct Node {
 }
 
 impl Node {
+    async fn perform(&self, request: taim_core::semantics::Request) -> bool {
+        let Some(completion) = self.store.request_action(&self.path, request) else {
+            return false;
+        };
+        completion.await.unwrap_or(false)
+    }
+
     /// This node, as of the current snapshot.
     ///
     /// `None` for a node that has since been removed. A reader asking
@@ -588,11 +595,11 @@ impl Component {
         1.0
     }
 
-    /// Focus cannot be grabbed from the bus yet: doing so has to reach the
-    /// widget tree, which lives on the UI thread and has no channel back.
-    /// Reports failure rather than claiming to have done it.
-    fn grab_focus(&self) -> bool {
-        false
+    /// Requests focus on the UI thread and returns its execution result.
+    async fn grab_focus(&self) -> bool {
+        self.node
+            .perform(taim_core::semantics::Request::Focus)
+            .await
     }
 }
 
@@ -659,15 +666,26 @@ impl Action {
             .unwrap_or_default()
     }
 
-    /// Performs the `index`-th action.
-    ///
-    /// Always reports failure today. Performing one has to reach the
-    /// widget on the UI thread, which needs a channel back that does not
-    /// exist yet — and reporting success for something that did not happen
-    /// is the worse failure: a user would be told their button was
-    /// pressed.
-    fn do_action(&self, _index: i32) -> bool {
-        false
+    /// Executes the indexed operation through the UI queue, awaiting its result.
+    async fn do_action(&self, index: i32) -> bool {
+        use taim_core::semantics::{Actions, Request};
+        let Some(object) = self.node.object() else {
+            return false;
+        };
+        let Ok(index) = usize::try_from(index) else {
+            return false;
+        };
+        let request = match vocabulary::action_flag(object.actions, index) {
+            Some(Actions::ACTIVATE) => Request::Activate,
+            Some(Actions::FOCUS) => Request::Focus,
+            Some(Actions::INCREMENT) => Request::Increment,
+            Some(Actions::DECREMENT) => Request::Decrement,
+            Some(Actions::TOGGLE_EXPANDED) => Request::ToggleExpanded,
+            Some(Actions::SCROLL_INTO_VIEW) => Request::ScrollIntoView,
+            Some(Actions::DISMISS) => Request::Dismiss,
+            _ => return false,
+        };
+        self.node.perform(request).await
     }
 }
 

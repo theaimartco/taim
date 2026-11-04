@@ -1,0 +1,90 @@
+{
+  "date": "2026-10-30",
+  "milestone": "System media selection, delegated photo/video capture, viewer dispatch and URI lifecycle",
+  "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+  "working_tree_dirty": true,
+  "runtime": {
+    "status": "passed",
+    "serial": "emulator-5594",
+    "started_utc": "2026-10-30T03:59:44.987108+00:00",
+    "apk_sha256": "67b02bdc7d819f447fa589b9d0375db71f788a210517bd8a6f412383236f6be3",
+    "driver_sha256": "0de97259c127c5eb337951c4c337fa85a36c8df0fba07fd529d18205bcaa0fd3",
+    "limitations": [
+      "External-UID responders verify protocol/grants, not hardware or video encoding",
+      "Only real system-picker cancellation is automated; physical selection/camera/viewer matrix remains pending"
+    ],
+    "device": {
+      "sdk": "35",
+      "model": "sdk_gphone16k_x86_64",
+      "abi": "x86_64",
+      "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+      "page_size": 16384
+    },
+    "checks": 18,
+    "finished_utc": "2026-10-30T03:59:54.454948+00:00"
+  },
+  "platform_notification_regression": {
+    "status": "passed",
+    "serial": "emulator-5594",
+    "notifications": true,
+    "started_utc": "2026-10-30T04:03:00.280320+00:00",
+    "apk_sha256": "9e16026c92f99391be9de09df4dcf5c4424672d87810bf8c2a37f09d6177653b",
+    "driver_sha256": "d58f9875d85c9a90d1d3b93f0666c588755f7bc93ba7e7b02ed3ba03e9181b1c",
+    "device": {
+      "sdk": "35",
+      "model": "sdk_gphone16k_x86_64",
+      "abi": "x86_64",
+      "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+      "page_size": 16384
+    },
+    "checks": 14,
+    "cold_intent_checks": 1,
+    "finished_utc": "2026-10-30T04:03:06.704207+00:00"
+  },
+  "checks": {
+    "host_unit_tests": 53,
+    "strict_host_native_views_clippy": "passed",
+    "strict_arm64_android_clippy": "passed",
+    "standalone_arm64_x86_64_assemble_debug": "passed",
+    "generated_apk_signature": "verified development signature",
+    "generated_apk_zipalign_16k": "passed",
+    "private_capture_provider_merged_manifest": "verified; applicationId authority resolved; no camera or broad storage/media permissions declared"
+  },
+  "artifact_sha256": {
+    "target/android/x86_64/debug/media-probe/taim-media-probe.apk": "67b02bdc7d819f447fa589b9d0375db71f788a210517bd8a6f412383236f6be3",
+    "target/android/media-template-check/app/build/outputs/apk/debug/app-debug.apk": "11f3972031142b9592f31af1e1344fa8468de521b49f16f1f26f2192591fba51",
+    "target/android/runtime-smoke/media-accepted/media-driver.apk": "0de97259c127c5eb337951c4c337fa85a36c8df0fba07fd529d18205bcaa0fd3"
+  },
+  "source_sha256": {
+    "Cargo.lock": "d6097376fa636e8bbfb20a406f734264bf0d380a9884cb0900fcbcd12d410471",
+    "Cargo.toml": "aac890d4aca87b0d72c68b3775c0d5572881dcf503b8536b91efdae797152e8d",
+    "examples/android_media_probe/Cargo.toml": "effb0dda0609639406ee40b581adff51b7f7651d9922f7daf6fb2037774d2aaa",
+    "examples/android_media_probe/android/AndroidManifest.xml": "2626cf91ae4149804d2e93c6a4793dbc93249d618ed0a4be5cc3ee06159d6288",
+    "examples/android_media_probe/android/java/com/theaimartco/taim/TaimMediaProbeActivity.java": "75d11a6eeee8c5f7c66eece0398c82a93f73e931184adb32d5c3c8445714c750",
+    "examples/android_media_probe/src/lib.rs": "991cd704d6854e9e4f8c0d4cfdd51af39e593a092867c173fb373407f8828f0b",
+    "scripts/android/counter.py": "0e024487f8ad4b6b0deec1950d02545eda964cd49c7e9a9fa1554a89c7aeeecc",
+    "scripts/android/media-probe.py": "243e3425ea6975e274414dbb31fdbf68051026aa50722966d9224648c9d81d30",
+    "scripts/android/media-test/AndroidManifest.xml": "15c9f3a4e6005b9d29611b0f5a8feff6b02a85e341fd6a5c88654506f208b9d0",
+    "scripts/android/media-test/MediaDriver.java": "6ef42bd571847dff0043ff5d3747f471c8700f8126282541e022f37534998c9c",
+    "scripts/android/media-test/MediaProvider.java": "3291e5ee8d203ee330231dae8d339db1b73c978f233720a50701fc020361576e",
+    "scripts/android/media-test/MediaResponder.java": "0d16594630de002fc40a3d0c64c65612737a2c0c72e5e307fe004107002eae62",
+    "scripts/android/project.py": "9a0344b8bd021de4ba8c294c814311374128872f229964dace305579c43d00bc",
+    "scripts/android/templates/app/src/main/AndroidManifest.xml": "e30774ebabc8e1d941f840519d644e2664ba1779768217214ae443ad56a31c11",
+    "src/lib.rs": "eed686abd31341de86c09d569a8b8880472a6adde51ad8f604f5047ce8a9b831",
+    "winit/android/com/theaimartco/taim/TaimMedia.java": "65ecaf4d32ed15ebb565a70c3eac10f1ee9c20ca98c9081cacc98ee12cdf1018",
+    "winit/android/com/theaimartco/taim/TaimMediaProvider.java": "fe789051ca9aad1cccea0d33c0cde93fe476af189591bc24b132a40e88bc9c43",
+    "winit/android/com/theaimartco/taim/TaimServices.java": "6e2e9ab797dd5b00e3ecba3eed442715dd722e6264d33457e8a309cc11c29cc6",
+    "winit/src/android/bridge.rs": "80910b6ba7a7cdfbbc4c3364a5c9de0c9b5651fdcce69d2693063b2fa9074734",
+    "winit/src/android/media.rs": "f7847ebd24cd2c264972d34b9af9938ec5874106fa240fe807476eb8c8be3a7c",
+    "winit/src/android/mod.rs": "fb03c390a71c44f79047f10f3fd9b787ca2188fc09cd65e8c0143bbcb987164e",
+    "winit/src/android/services.rs": "2f9315bbc69d399cd7fd6c1bb69abbdcc50f1fb48759354bd0f145dfcb6075b0"
+  },
+  "evidence_directory": "target/android/runtime-smoke/media-accepted",
+  "limitations": [
+    "API35 x86_64 16KiB emulator runtime only; physical/OEM/API26 runtime unaccepted",
+    "Camera protocol uses an external-UID test responder; JPEG is encoded, video bytes are not real encoded video",
+    "Real system-picker cancellation automated; actual system media selection and hardware capture remain acceptance work",
+    "No embedded Camera2/CameraX surface or inline video player; native viewer dispatch is implemented",
+    "All generated artifacts in this record are development-signed debug APKs, not store releases"
+  ]
+}

@@ -1,6 +1,6 @@
 use std::time::Instant;
-use taim::advanced::renderer::Headless;
 use taim::{Color, Rectangle, Size};
+use taim_core::renderer::Headless;
 use taim_core::renderer::Renderer as _;
 use taim_renderer::Renderer;
 use taim_runtime::user_interface::{Cache, UserInterface};
@@ -216,7 +216,7 @@ fn short_document_stays_at_gutter_origin_after_pane_changes() {
         assert!(
             messages.iter().any(|message| matches!(
                 message,
-                taim_ide::Message::EditorAction(taim::widget::text_editor::Action::Click(_))
+                taim_ide::Message::EditorAction(taim_widget::text_editor::Action::Click(_))
             )),
             "clicking the drawn first line did not reach the editor: panel={panel}, split={split}, expanded={expanded}, messages={messages:?}"
         );
@@ -292,7 +292,7 @@ fn workspace_performance_probe() {
     let mut present_times = Vec::new();
     for frame in 0..34 {
         let _ = studio.update(taim_ide::Message::EditorAction(
-            taim::widget::text_editor::Action::Edit(taim::widget::text_editor::Edit::Insert('x')),
+            taim_widget::text_editor::Action::Edit(taim_widget::text_editor::Edit::Insert('x')),
         ));
         let begin = Instant::now();
         let mut ui = UserInterface::build(studio.view(), logical, cache, &mut renderer);

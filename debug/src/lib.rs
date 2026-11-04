@@ -200,7 +200,10 @@ pub fn is_stale() -> bool {
     hot_reload::is_stale()
 }
 
-#[cfg(all(feature = "hot", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "hot", debug_assertions, not(target_arch = "wasm32")))]
+mod hot_transport;
+
+#[cfg(all(feature = "hot", debug_assertions, not(target_arch = "wasm32")))]
 mod hot_reload {
     use std::collections::BTreeSet;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -211,8 +214,8 @@ mod hot_reload {
     static REGISTERED: OnceLock<BTreeSet<u64>> = OnceLock::new();
 
     pub fn init() {
-        cargo_hot::connect();
-        cargo_hot::subsecond::register_handler(Arc::new(|| {
+        super::hot_transport::connect();
+        subsecond::register_handler(Arc::new(|| {
             if REGISTERED.get().is_none() {
                 let functions = std::mem::take(&mut *PENDING.lock().expect("lock hot functions"));
                 let _ = REGISTERED.set(functions);
@@ -223,7 +226,7 @@ mod hot_reload {
 
     pub fn call<O>(work: impl FnOnce() -> O) -> O {
         let mut work = Some(work);
-        let mut function = cargo_hot::subsecond::HotFn::current(move || {
+        let mut function = subsecond::HotFn::current(move || {
             work.take().expect("hot function already consumed")()
         });
         let address = function.ptr_address().0;
@@ -240,7 +243,7 @@ mod hot_reload {
     }
 
     pub fn on_hotpatch(callback: impl Fn() + Send + Sync + 'static) {
-        cargo_hot::subsecond::register_handler(Arc::new(callback));
+        subsecond::register_handler(Arc::new(callback));
     }
 
     pub fn is_stale() -> bool {
@@ -248,7 +251,7 @@ mod hot_reload {
     }
 }
 
-#[cfg(any(not(feature = "hot"), target_arch = "wasm32"))]
+#[cfg(any(not(feature = "hot"), not(debug_assertions), target_arch = "wasm32"))]
 mod hot_reload {
     pub fn init() {}
 
@@ -260,5 +263,24 @@ mod hot_reload {
 
     pub fn is_stale() -> bool {
         false
+    }
+}
+
+#[cfg(all(test, feature = "hot", not(debug_assertions)))]
+mod release_tests {
+    #[test]
+    fn enabling_hot_feature_in_release_keeps_only_the_local_call_path() {
+        let mut calls = 0;
+        assert_eq!(
+            super::hot(|| {
+                calls += 1;
+                42
+            }),
+            42
+        );
+        assert_eq!(calls, 1);
+        super::hot_reload::init();
+        super::on_hotpatch(|| panic!("release must not register a native patch callback"));
+        assert!(!super::is_stale());
     }
 }

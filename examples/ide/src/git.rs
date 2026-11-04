@@ -202,7 +202,7 @@ impl GitState {
                 kind: DiffLineKind::Context,
                 old_line_num: Some(1),
                 new_line_num: Some(1),
-                content: "use taim::widget::{button, row, column, text};".to_string(),
+                content: "use taim_widget::{button, row, column, text};".to_string(),
             },
             DiffLine {
                 kind: DiffLineKind::Deletion,
@@ -514,13 +514,13 @@ impl GitState {
     }
 
     pub fn refresh_commit_history(&mut self) {
-        if let Some(root) = self.repo_root.as_ref() {
-            if let Ok(output) = git_output(root, &["log", "-5", "--pretty=format:%s"]) {
-                self.commit_history = String::from_utf8_lossy(&output)
-                    .lines()
-                    .map(str::to_string)
-                    .collect();
-            }
+        if let Some(root) = self.repo_root.as_ref()
+            && let Ok(output) = git_output(root, &["log", "-5", "--pretty=format:%s"])
+        {
+            self.commit_history = String::from_utf8_lossy(&output)
+                .lines()
+                .map(str::to_string)
+                .collect();
         }
     }
 

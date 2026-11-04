@@ -81,7 +81,10 @@ pub fn build(cx: &mut Scope) -> AnyView {
         level: cx.signal(0.4),
         quantity: cx.signal(3),
         query: cx.signal(String::new()),
-        notes: Buffer::new(cx, "Multi-line notes.\nClick, drag, double-click a word,\nor type here."),
+        notes: Buffer::new(
+            cx,
+            "Multi-line notes.\nClick, drag, double-click a word,\nor type here.",
+        ),
         filters: [cx.signal(true), cx.signal(false), cx.signal(false)],
         mode: cx.signal(0),
         size: cx.signal("Medium"),
@@ -107,11 +110,12 @@ pub fn build(cx: &mut Scope) -> AnyView {
     cx.reduced_motion(model.reduced_motion);
 
     // Choosing a day is worth a notice.
+    let tasks = cx.tasks();
     let body = scroll(
         container(rebuild(model.group, move |group: &usize| {
             Some(match group {
                 0 => controls(model),
-                1 => collections(model),
+                1 => collections(model, tasks.clone()),
                 2 => pickers(model),
                 _ => surfaces(model),
             })
@@ -335,7 +339,7 @@ fn controls(model: Model) -> AnyView {
     .into()
 }
 
-fn collections(model: Model) -> AnyView {
+fn collections(model: Model, tasks: TaskScope) -> AnyView {
     let listing = rebuild(model.loading, |loading: &bool| {
         Some(if *loading {
             column(views![
@@ -378,7 +382,7 @@ fn collections(model: Model) -> AnyView {
             )
             .on_refresh(move || {
                 let loading = model.loading;
-                spawn(async move {
+                let _ = tasks.spawn(async move {
                     std::thread::sleep(std::time::Duration::from_millis(900));
                     let _ = loading.set(false);
                 });
@@ -504,14 +508,8 @@ fn gradient_swatch() -> taim::view::image_handle::Handle {
     let (width, height) = (96_u32, 48_u32);
     let pixels = (0..height)
         .flat_map(|y| {
-            (0..width).flat_map(move |x| {
-                [
-                    (x * 255 / width) as u8,
-                    (y * 255 / height) as u8,
-                    200,
-                    255,
-                ]
-            })
+            (0..width)
+                .flat_map(move |x| [(x * 255 / width) as u8, (y * 255 / height) as u8, 200, 255])
         })
         .collect::<Vec<u8>>();
 

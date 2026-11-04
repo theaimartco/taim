@@ -107,18 +107,18 @@ impl Cache {
             return None;
         }
         let tree = self.tree(handle)?;
-        let mut image = tiny_skia::Pixmap::new(size.width, size.height)?;
+        let mut svg_image = resvg::tiny_skia::Pixmap::new(size.width, size.height)?;
         let tree_size = tree.size();
         if tree_size.width() <= 0.0 || tree_size.height() <= 0.0 {
             self.fail_raster(key);
             return None;
         }
-        let raster_transform = tiny_skia::Transform::from_scale(
+        let raster_transform = resvg::tiny_skia::Transform::from_scale(
             size.width as f32 / tree_size.width(),
             size.height as f32 / tree_size.height(),
         );
         let rendered = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            resvg::render(&tree, raster_transform, &mut image.as_mut());
+            resvg::render(&tree, raster_transform, &mut svg_image.as_mut());
         }));
         if let Err(error) = rendered {
             log::warn!("TAIM SVG rasterization recovered from panic: {error:?}");
@@ -126,6 +126,12 @@ impl Cache {
             return None;
         }
 
+        // Both versions store premultiplied RGBA8. Transfer the allocation
+        // without copying; the software scene backend retains its own API.
+        let mut image = tiny_skia::Pixmap::from_vec(
+            svg_image.take(),
+            tiny_skia::IntSize::from_wh(size.width, size.height)?,
+        )?;
         convert_pixels(&mut image, key.color);
         self.raster_bytes += required;
         let _ = self.rasters.insert(

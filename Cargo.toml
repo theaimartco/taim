@@ -43,6 +43,10 @@ default = ["wgpu", "tiny-skia", "crisp", "hinting", "linux-theme-detection", "x1
 wgpu = ["wgpu-bare", "taim_renderer/wgpu"]
 # Enables the `wgpu` GPU-accelerated renderer with the minimum required features (no backends!)
 wgpu-bare = ["taim_renderer/wgpu-bare"]
+# GPU renderer with Vulkan only, suitable for the initial Android host.
+wgpu-vulkan = ["wgpu-bare", "taim_renderer/vulkan"]
+# Android prefers validated Vulkan and falls back to GLES when it cannot initialize reliably.
+wgpu-android = ["wgpu-bare", "taim_renderer/android"]
 # Enables the `tiny-skia` software renderer
 tiny-skia = ["taim_renderer/tiny-skia"]
 # Enables raster images, decoded window icons and image clipboard support
@@ -90,7 +94,7 @@ linux-theme-detection = ["taim_winit/linux-theme-detection"]
 x11 = ["taim_renderer/x11", "taim_winit/x11"]
 # Enables the Unix Wayland backend
 wayland = ["taim_renderer/wayland", "taim_winit/wayland"]
-# Enables the VYOM platform backend
+# Enables VYOM protocol models; the native Wayland transport is Unix-only
 vyom = ["dep:taim-platform-vyom"]
 # Delivers the semantic tree to assistive technology over AT-SPI.
 #
@@ -119,6 +123,11 @@ image.workspace = true
 image.optional = true
 
 [dev-dependencies]
+# Historical widget/runtime contracts are tested against their owning crates,
+# independently of the application facade's signal/view API.
+taim_runtime.workspace = true
+taim_futures.workspace = true
+taim_widget = { workspace = true, features = ["taim", "signal", "canvas", "image", "svg", "highlighter", "markdown", "qr_code"] }
 taim-accessibility.workspace = true
 taim-design.workspace = true
 taim-gesture.workspace = true
@@ -235,6 +244,7 @@ panic = "abort"
 strip = "symbols"
 
 [workspace]
+exclude = ["vendor/wgpu-hal"]
 members = [
     "taim-accessibility",
     "taim-atlas",
@@ -252,6 +262,15 @@ members = [
     "core",
     "debug",
     "examples/counter",
+    "examples/android_counter",
+    "examples/android_gpu_probe",
+    "examples/android_platform_probe",
+    "examples/android_media_probe",
+    "examples/android_location_probe",
+    "examples/android_biometric_probe",
+    "examples/android_integrations_probe",
+    "examples/android_work_probe",
+    "examples/android_native_view_probe",
     "examples/gallery",
     "examples/todos",
     "examples/ide",
@@ -283,7 +302,7 @@ keywords = ["gui", "ui", "graphics", "vyom", "wayland"]
 rust-version = "1.92"
 
 [workspace.dependencies]
-zbus = "5.17"
+zbus = "6.1"
 taim-accessibility = { version = "0.15.0-dev", path = "taim-accessibility" }
 taim_atlas = { version = "0.15.0-dev", path = "taim-atlas" }
 taim-design = { version = "0.15.0-dev", path = "taim-design" }
@@ -312,11 +331,10 @@ taim_widget = { version = "0.15.0-dev", path = "widget" }
 taim_winit = { version = "0.15.0-dev", path = "winit", default-features = false }
 
 arboard = { version = "3.6", default-features = false }
-bincode = "1.3"
 bitflags = "2.0"
 bytemuck = { version = "1.0", features = ["derive"] }
 bytes = "1.6"
-cargo-hot = { version = "0.1", package = "cargo-hot-protocol" }
+subsecond = "0.7.9"
 cosmic-text = "0.19"
 futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 glam = "0.33.2"
@@ -327,7 +345,6 @@ kurbo = "0.10"
 log = "0.4"
 lyon = "1.0"
 lyon_path = "1.0"
-mundy = { version = "0.2", default-features = false }
 nom = "8"
 num-traits = "0.2"
 ouroboros = "0.18"
@@ -335,7 +352,7 @@ png = "0.18"
 pulldown-cmark = "0.12"
 qrcode = { version = "0.13", default-features = false }
 raw-window-handle = "0.6"
-resvg = { version = "0.45", default-features = false }
+resvg = { version = "0.48.1", default-features = false, features = ["svgz"] }
 rfd = "0.16"
 rustc-hash = "2.0"
 semver = "1.0"
@@ -358,7 +375,7 @@ wasm-bindgen-futures = "0.4"
 wasmtimer = "0.4.2"
 web-sys = "=0.3.85"
 web-time = "1.1"
-wgpu = { version = "29", default-features = false, features = ["std", "wgsl"] }
+wgpu = { version = "=29.0.4", default-features = false, features = ["std", "wgsl"] }
 winit = { version = "0.30.8", default-features = false, features = ["rwh_06"] }
 
 [workspace.lints.rust]
@@ -388,3 +405,8 @@ useless_conversion = "deny"
 
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "forbid"
+
+# Android EGL framebuffer precision fix; generated Android consumer projects
+# must carry this root-level patch too (Cargo does not inherit patches).
+[patch.crates-io]
+wgpu-hal = { path = "vendor/wgpu-hal" }

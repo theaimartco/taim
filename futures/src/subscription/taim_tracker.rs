@@ -148,11 +148,14 @@ impl Tracker {
                 }
             };
 
-            let _ = self.active.insert(identity, Execution {
-                _cancel_on_drop: cancel_on_drop,
-                event_sink: Some(event_sink),
-                observed_epoch: epoch,
-            });
+            let _ = self.active.insert(
+                identity,
+                Execution {
+                    _cancel_on_drop: cancel_on_drop,
+                    event_sink: Some(event_sink),
+                    observed_epoch: epoch,
+                },
+            );
             new_tasks.push(Box::pin(future));
         }
 
@@ -171,7 +174,11 @@ impl Tracker {
         let mut remaining = self
             .active
             .values()
-            .filter(|live| live.event_sink.as_ref().is_some_and(|sink| !sink.is_closed()))
+            .filter(|live| {
+                live.event_sink
+                    .as_ref()
+                    .is_some_and(|sink| !sink.is_closed())
+            })
             .count();
 
         if remaining == 0 {
@@ -180,7 +187,9 @@ impl Tracker {
 
         let mut owned = Some(event);
         for live in self.active.values_mut() {
-            let Some(sink) = live.event_sink.as_mut() else { continue };
+            let Some(sink) = live.event_sink.as_mut() else {
+                continue;
+            };
             if sink.is_closed() {
                 live.event_sink = None;
                 continue;
@@ -232,7 +241,9 @@ mod tests {
     }
 
     fn batch(ids: &[u64]) -> impl Iterator<Item = Box<dyn Recipe<Output = u32>>> + '_ {
-        ids.iter().copied().map(|id| Box::new(Constant { id }) as Box<dyn Recipe<Output = u32>>)
+        ids.iter()
+            .copied()
+            .map(|id| Box::new(Constant { id }) as Box<dyn Recipe<Output = u32>>)
     }
 
     #[test]
@@ -269,7 +280,7 @@ mod tests {
         assert_eq!(tasks.len(), 1);
         let _ = tracker.update(batch(&[]), sink);
         futures::executor::block_on(tasks.pop().expect("one task"));
-        assert!(matches!(receiver.try_next(), Ok(None) | Err(_)));
+        assert!(receiver.try_recv().is_err());
     }
 
     #[test]
@@ -280,7 +291,7 @@ mod tests {
         for task in tasks {
             futures::executor::block_on(task);
         }
-        assert!(matches!(receiver.try_next(), Ok(Some(42))));
+        assert!(matches!(receiver.try_recv(), Ok(42)));
     }
 
     #[test]

@@ -32,19 +32,15 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::adapter::Events;
 use super::server::Server;
 use super::store::Store;
 
-/// How long the bridge waits between drains when the queue is empty.
-///
-/// A poll rather than a condvar: the queue is written from the UI thread on
-/// every frame that changes anything, and 20 ms is far below the threshold at
-/// which a screen reader user notices latency, while costing one wakeup per
-/// 50th of a second on an idle application.
-const IDLE_POLL: Duration = Duration::from_millis(20);
+/// Backoff for discovering or reconnecting an unavailable accessibility bus.
+const RETRY_MIN: Duration = Duration::from_secs(1);
+const RETRY_MAX: Duration = Duration::from_secs(30);
 
 /// A running AT-SPI bridge.
 ///
@@ -53,6 +49,14 @@ const IDLE_POLL: Duration = Duration::from_millis(20);
 #[derive(Debug)]
 pub struct Bridge {
     running: Arc<AtomicBool>,
+    events: Events,
+}
+
+struct RunningGuard(Arc<AtomicBool>);
+impl Drop for RunningGuard {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
 }
 
 impl Bridge {
@@ -65,14 +69,19 @@ impl Bridge {
 
         let thread_running = Arc::clone(&running);
 
-        // Not a scoped thread and not joined on drop: see the type's docs.
-        let _ = std::thread::Builder::new()
+        let thread_events = events.clone();
+        let exited = Arc::clone(&running);
+        if let Err(error) = std::thread::Builder::new()
             .name("taim-atspi".to_owned())
             .spawn(move || {
-                run(store, events, name, thread_running);
-            });
-
-        Self { running }
+                let _guard = RunningGuard(exited);
+                run(store, thread_events, name, thread_running);
+            })
+        {
+            running.store(false, Ordering::Release);
+            log::warn!("accessibility bridge thread could not start: {error}");
+        }
+        Self { running, events }
     }
 
     /// Whether the bridge's thread is still running.
@@ -83,52 +92,46 @@ impl Bridge {
 
 impl Drop for Bridge {
     fn drop(&mut self) {
-        self.running.store(false, Ordering::Release);
+        self.events.stop_waiting(&self.running);
     }
 }
 
-/// The bridge's loop.
-///
-/// Synchronous, with each D-Bus call driven by `zbus::block_on`. The thread
-/// belongs to the bridge and has nothing else to do, so an async timer would
-/// buy nothing over an ordinary sleep, and this way the bridge does not pin
-/// the crate to a particular async runtime.
+/// Bus I/O stays on this worker. Its idle wait is signalled by event publication
+/// or shutdown; only an unavailable/disconnected bus needs a retry deadline.
 fn run(store: Store, events: Events, name: String, running: Arc<AtomicBool>) {
-    let server = match zbus::block_on(Server::start(store, &name)) {
-        Ok(Some(server)) => Some(server),
-        // No bus: park rather than spin. The ordinary case with no assistive
-        // technology running.
-        Ok(None) => None,
-        Err(error) => {
-            log::warn!("accessibility bridge could not start: {error}");
-            None
-        }
-    };
-
-    let Some(mut server) = server else {
-        // Still drain, so the UI thread's bounded queue cannot fill and begin
-        // dropping the oldest events.
-        while running.load(Ordering::Acquire) {
-            let _ = events.drain();
-            std::thread::sleep(IDLE_POLL);
-        }
-
-        return;
-    };
-
-    log::info!("accessibility bridge connected as '{name}'");
-
+    let mut server = None;
+    let mut retry_delay = RETRY_MIN;
+    let mut retry_at = Instant::now();
     while running.load(Ordering::Acquire) {
-        let drained = events.drain();
-
-        if !drained.is_empty()
-            && let Err(error) = zbus::block_on(server.sync())
-        {
-            // A failed sync is not fatal: objects already served keep reading
-            // through to the store, and the next drain retries.
-            log::warn!("accessibility sync failed: {error}");
+        let mut connected = false;
+        if server.is_none() && Instant::now() >= retry_at {
+            match zbus::block_on(Server::start(store.clone(), &name)) {
+                Ok(Some(next)) => {
+                    server = Some(next);
+                    connected = true;
+                    retry_delay = RETRY_MIN;
+                    log::info!("accessibility bridge connected as '{name}'");
+                }
+                Ok(None) => {}
+                Err(error) => log::debug!("accessibility bridge unavailable: {error}"),
+            }
+            retry_at = Instant::now() + retry_delay;
+            if server.is_none() {
+                retry_delay = (retry_delay * 2).min(RETRY_MAX);
+            }
         }
-
-        std::thread::sleep(IDLE_POLL);
+        let drained = events.drain();
+        if let Some(active) = &mut server
+            && (connected || !drained.is_empty())
+            && let Err(error) = zbus::block_on(active.sync())
+        {
+            log::warn!("accessibility sync failed; reconnecting: {error}");
+            server = None;
+            retry_at = Instant::now() + RETRY_MIN;
+        }
+        let timeout = server
+            .is_none()
+            .then(|| retry_at.saturating_duration_since(Instant::now()));
+        events.wait_for_work(&running, timeout);
     }
 }

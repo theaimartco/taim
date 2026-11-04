@@ -15,10 +15,12 @@
 //!
 //! These tests call the public methods an application calls.
 
-use taim::widget::{column, container, row, space, stack};
-use taim::{Element, Point, Size, Theme};
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
+use taim_core::{Point, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::user_interface::{Cache, UserInterface};
+use taim_widget::{column, container, row, space, stack};
 
 type Message = &'static str;
 
@@ -28,12 +30,10 @@ const WINDOW: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 

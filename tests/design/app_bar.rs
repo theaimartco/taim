@@ -6,25 +6,25 @@
 //! the widget is a container: no actions, no focus, affordances delegated
 //! to real controls in its slots.
 
-use taim::advanced::widget::{self, Widget};
-use taim::advanced::{Layout, layout};
-use taim::widget::{app_bar, icon_button, space, text};
-use taim::{Element, Rectangle, Size, Theme};
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
 use taim_core::semantics::Role;
+use taim_core::widget::{self, Widget};
+use taim_core::{Layout, layout};
+use taim_core::{Rectangle, Size, Theme};
 use taim_renderer::Renderer;
 use taim_widget::app_bar as app_bar_mod;
+use taim_widget::{app_bar, icon_button, space, text};
 
 type Message = &'static str;
 
 const WIDTH: f32 = 400.0;
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 

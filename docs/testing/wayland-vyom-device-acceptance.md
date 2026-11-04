@@ -26,7 +26,7 @@ Run from a clean checkout at the candidate commit:
     cargo clippy --workspace --all-targets -- -D warnings
     cargo test --workspace
     cargo test --test golden
-    TAIM_ATSPI_REQUIRE_BUS=1 dbus-run-session -- cargo test -p taim-accessibility --features atspi --test atspi_bus
+    TAIM_ATSPI_REQUIRE_BUS=1 dbus-run-session -- cargo test -p taim-accessibility --features atspi --test atspi_bus -- --ignored
     cargo build --release -p taim-showcase
     cargo build --release -p mobile_shell --features taim/measurement
 

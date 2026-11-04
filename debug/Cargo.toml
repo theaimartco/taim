@@ -11,12 +11,12 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-hot = ["dep:cargo-hot"]
+hot = ["dep:subsecond"]
 
 [dependencies]
 taim_core.workspace = true
 taim_futures.workspace = true
 log.workspace = true
 
-cargo-hot.workspace = true
-cargo-hot.optional = true
+subsecond.workspace = true
+subsecond.optional = true

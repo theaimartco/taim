@@ -91,6 +91,8 @@ pub struct Entry {
     pub actions: Actions,
     /// Live-region behavior, if this node announces proactively.
     pub live: Option<Live>,
+    /// Explicit autofill purpose.
+    pub autofill: Option<taim_core::semantics::Autofill>,
 }
 
 impl Entry {
@@ -113,6 +115,7 @@ impl Entry {
             value: node.value().cloned(),
             actions: node.actions,
             live: node.live,
+            autofill: node.autofill,
         }
     }
 
@@ -145,6 +148,7 @@ impl Entry {
             || self.value != other.value
             || self.actions != other.actions
             || self.live != other.live
+            || self.autofill != other.autofill
     }
 
     /// Whether only this node's bounds differ from `other`'s.
@@ -164,6 +168,7 @@ impl Entry {
             && self.value == other.value
             && self.actions == other.actions
             && self.live == other.live
+            && self.autofill == other.autofill
     }
 }
 

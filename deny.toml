@@ -18,6 +18,11 @@ feature-depth = 1
 version = 2
 yanked = "deny"
 ignore = [
+    # Maintenance-only, build-time proc macro in the released EXR/AVIF codecs.
+    # The local policy guard restricts exact parents and expiry; this does not waive new
+    # vulnerability advisories. Absolute expiry and checksum/type/edge guards:
+    # scripts/audit/check-dependency-policy.py. Review by 2027-01-26.
+    { id = "RUSTSEC-2024-0436", reason = "Pinned build-time macro via pulp 0.22.3 and rav1e 0.8.1; preserve EXR/AVIF pending upstream pastey releases. See docs/audit/dependency-maintenance-20261026.md" },
     # quick-xml v0.39.4, pulled in transitively by `wayland-scanner`
     # (wayland-client -> smithay-client-toolkit -> winit -> taim_winit),
     # is used only to parse `wayland-scanner`'s bundled, build-time

@@ -1,8 +1,8 @@
 //! Headless semantic and state verification tests for Taim Studio.
 
-use taim::widget::text_editor;
 use taim_ide::terminal::PanelTab;
 use taim_ide::{Message, Studio, ThemeMode};
+use taim_widget::text_editor;
 
 #[test]
 fn test_studio_initialization() {
@@ -576,7 +576,7 @@ fn feature() {
 ";
     // Replace active doc content with conflicted code
     if let Some(doc) = studio.docs.active_mut() {
-        doc.content = taim::widget::text_editor::Content::with_text(conflicted);
+        doc.content = taim_widget::text_editor::Content::with_text(conflicted);
     }
     let doc = studio.docs.active().unwrap();
     assert!(doc.has_merge_conflicts());
@@ -600,7 +600,7 @@ fn compute() {
 }
 ";
     if let Some(doc) = studio.docs.active_mut() {
-        doc.content = taim::widget::text_editor::Content::with_text(sample);
+        doc.content = taim_widget::text_editor::Content::with_text(sample);
     }
     assert!(studio.docs.active().unwrap().is_line_foldable(0));
 

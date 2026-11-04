@@ -90,6 +90,19 @@ where
         }
     }
 
+    fn semantics(&self, tree: &widget::Tree, layout: Layout<'_>) -> Option<crate::core::semantics::Node> {
+        use crate::core::semantics::{Actions, Node, Role, State as Flags, Value};
+        let state = tree.state.downcast_ref::<State<Highlighter>>();
+        let mut flags = Flags::FOCUSABLE;
+        if state.is_focused() { flags |= Flags::FOCUSED; }
+        let actions = if self.on_edit.is_some() { Actions::FOCUS | Actions::SET_VALUE } else { Actions::FOCUS };
+        Some(Node::new(tree.id().clone(), layout.bounds(), Role::TextField)
+            .with_name(self.placeholder.as_deref().unwrap_or("Code editor"))
+            .with_state(flags)
+            .with_actions(actions)
+            .with_value(Value::Text(self.content.text().into())))
+    }
+
     fn update(
         &mut self,
         tree: &mut widget::Tree,

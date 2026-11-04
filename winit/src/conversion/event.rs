@@ -140,7 +140,7 @@ fn keyboard_event(
 ) -> keyboard::Event {
     // The layout-independent key ("the key labeled S", even with Shift
     // held) drives shortcuts; the modified key and text drive typing.
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
     let (bare_key, text) = {
         use winit::platform::modifier_supplement::KeyEventExtModifierSupplement;
 
@@ -152,7 +152,7 @@ fn keyboard_event(
         )
     };
 
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(target_arch = "wasm32", target_os = "android"))]
     let (bare_key, text) = (event.logical_key.clone(), event.text.clone());
 
     // Function keys on some platforms produce private-use glyphs as "text";

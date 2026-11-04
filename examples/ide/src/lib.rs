@@ -8,6 +8,7 @@ pub mod extensions;
 pub mod git;
 pub mod icons;
 pub mod lsp;
+mod native_host;
 pub mod notifications;
 pub mod palette;
 pub mod recovery;
@@ -36,11 +37,17 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
-use taim::widget::{
+use taim_core::Length::Fill;
+use taim_core::alignment::Alignment::Center;
+use taim_core::{Color, Length, Padding, Pixels, Theme};
+use taim_futures::Subscription;
+use taim_runtime::Task;
+use taim_widget::{
     button, column, container, mouse_area, row, rule, scrollable, space, stack, svg, text,
     text_editor, text_input, tooltip,
 };
-use taim::{Center, Color, Element, Fill, Length, Padding, Pixels, Subscription, Task, Theme};
+/// The IDE's retained widget contract, isolated from TAIM's native facade.
+pub type Element<'a, M, T = Theme, R = taim::Renderer> = taim_core::Element<'a, M, T, R>;
 
 /// Available UI theme variants for Taim Studio.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -165,7 +172,7 @@ pub enum Message {
 
     // --- Global Workspace Search ---
     GlobalSearchQueryChanged(String),
-    SearchFinished(Option<(u64, GlobalSearchState)>),
+    SearchFinished(Option<(u64, Box<GlobalSearchState>)>),
     GlobalSearchReplaceQueryChanged(String),
     SearchHitSelected(String, usize, usize),
     ToggleSearchCase,
@@ -319,15 +326,13 @@ pub fn parse_compiler_location(text: &str) -> Option<(String, usize, usize)> {
         let mut segments = clean.split(':');
         if let (Some(file), Some(line_str), Some(col_str)) =
             (segments.next(), segments.next(), segments.next())
-        {
-            if (file.ends_with(".rs")
+            && (file.ends_with(".rs")
                 || file.ends_with(".toml")
                 || file.ends_with(".json")
                 || file.ends_with(".md"))
-                && let (Ok(line), Ok(col)) = (line_str.parse::<usize>(), col_str.parse::<usize>())
-            {
-                return Some((file.to_string(), line, col));
-            }
+            && let (Ok(line), Ok(col)) = (line_str.parse::<usize>(), col_str.parse::<usize>())
+        {
+            return Some((file.to_string(), line, col));
         }
     }
     None
@@ -454,96 +459,6 @@ fn shortcut_message(
         return terminal::keyboard_bytes(key, modifiers).map(Message::TerminalRawInput);
     }
     None
-}
-
-#[cfg(test)]
-mod shortcut_tests {
-    use super::*;
-    use taim::keyboard::{Key, Modifiers, key::Named};
-
-    fn context() -> ShortcutContext {
-        ShortcutContext {
-            terminal_focused: false,
-            palette_open: false,
-            palette_selection: None,
-            find_open: false,
-            autocomplete_open: false,
-            autocomplete_selection: 0,
-        }
-    }
-
-    #[test]
-    fn primary_shortcuts_route_to_working_actions() {
-        let cmd = Modifiers::COMMAND;
-        assert!(matches!(
-            shortcut_message(Key::Character("p"), cmd, context()),
-            Some(Message::OpenCommandPalette(false))
-        ));
-        assert!(matches!(
-            shortcut_message(Key::Character("p"), cmd | Modifiers::SHIFT, context()),
-            Some(Message::OpenCommandPalette(true))
-        ));
-        assert!(matches!(
-            shortcut_message(Key::Character("s"), cmd, context()),
-            Some(Message::SaveDocument)
-        ));
-        assert!(matches!(
-            shortcut_message(Key::Character("w"), cmd, context()),
-            Some(Message::CloseActiveTab)
-        ));
-        assert!(matches!(
-            shortcut_message(Key::Character("f"), cmd | Modifiers::SHIFT, context()),
-            Some(Message::RevealSidebarView(SidebarView::Search))
-        ));
-        assert!(matches!(
-            shortcut_message(Key::Character("d"), cmd, context()),
-            Some(Message::SelectNextOccurrence)
-        ));
-        assert!(matches!(
-            shortcut_message(Key::Named(Named::Escape), Modifiers::NONE, context()),
-            Some(Message::ClearExtraCursors)
-        ));
-    }
-
-    #[test]
-    fn palette_find_and_terminal_keep_their_own_keys() {
-        let palette = ShortcutContext {
-            palette_open: true,
-            palette_selection: Some(42),
-            ..context()
-        };
-        assert!(matches!(
-            shortcut_message(Key::Named(Named::Enter), Modifiers::NONE, palette),
-            Some(Message::PaletteItemChosen(42))
-        ));
-        assert!(matches!(
-            shortcut_message(Key::Named(Named::ArrowDown), Modifiers::NONE, palette),
-            Some(Message::PaletteSelectNext)
-        ));
-        let find = ShortcutContext {
-            find_open: true,
-            ..context()
-        };
-        assert!(matches!(
-            shortcut_message(Key::Named(Named::Enter), Modifiers::SHIFT, find),
-            Some(Message::FindPrev)
-        ));
-        let terminal = ShortcutContext {
-            terminal_focused: true,
-            ..context()
-        };
-        assert!(
-            matches!(shortcut_message(Key::Character("c"), Modifiers::CTRL, terminal), Some(Message::TerminalRawInput(bytes)) if bytes == [3])
-        );
-        assert!(matches!(
-            shortcut_message(Key::Character("p"), Modifiers::COMMAND, terminal),
-            Some(Message::OpenCommandPalette(false))
-        ));
-        assert!(matches!(
-            shortcut_message(Key::Named(Named::Tab), Modifiers::CTRL, terminal),
-            Some(Message::CycleEditor(1))
-        ));
-    }
 }
 
 impl Default for Studio {
@@ -991,10 +906,10 @@ impl Studio {
         self.tree.selected_id = node_id;
         self.saving_as = false;
         self.save_as_path.clear();
-        if self.language_server_status == lsp::ServerStatus::Ready {
-            if let Some(server) = &mut self.language_server {
-                let _ = server.did_open(&relative, &content, lsp::language_id(&relative));
-            }
+        if self.language_server_status == lsp::ServerStatus::Ready
+            && let Some(server) = &mut self.language_server
+        {
+            let _ = server.did_open(&relative, &content, lsp::language_id(&relative));
         }
         self.flush_recovery();
         self.refresh_git();
@@ -1108,12 +1023,12 @@ impl Studio {
                 ));
             }
         }
-        if self.language_server_status == lsp::ServerStatus::Ready {
-            if let Some(server) = &mut self.language_server {
-                for (old, new, text, language) in renamed_documents {
-                    let _ = server.did_close(&old);
-                    let _ = server.did_open(&new, &text, language);
-                }
+        if self.language_server_status == lsp::ServerStatus::Ready
+            && let Some(server) = &mut self.language_server
+        {
+            for (old, new, text, language) in renamed_documents {
+                let _ = server.did_close(&old);
+                let _ = server.did_open(&new, &text, language);
             }
         }
         self.tree.selected_id = node_id;
@@ -1478,7 +1393,7 @@ impl Studio {
             let id = self.docs.reserve_virtual_id();
             let name = clean_path
                 .split('/')
-                .last()
+                .next_back()
                 .unwrap_or(&clean_path)
                 .to_string();
             let syntax = crate::tree::syntax_for_path(&disk_path);
@@ -1573,22 +1488,21 @@ impl Studio {
                         }
                     }
                 } else {
-                    let ext = node.path.split('.').last().unwrap_or("");
+                    let ext = node.path.split('.').next_back().unwrap_or("");
                     if matches!(ext, "rs" | "toml" | "py" | "js" | "ts" | "c" | "cpp" | "h") {
                         let disk_path = root.join(&node.path);
-                        if let Ok(file) = std::fs::File::open(&disk_path) {
-                            if let Ok(mmap) = unsafe { memmap2::Mmap::map(&file) } {
-                                for pat in patterns {
-                                    let pat_bytes = pat.as_bytes();
-                                    if let Some(offset) = mmap
-                                        .windows(pat_bytes.len())
-                                        .position(|window| window == pat_bytes)
-                                    {
-                                        let line_num =
-                                            mmap[..offset].iter().filter(|&&b| b == b'\n').count()
-                                                + 1;
-                                        return Some((node.path.clone(), line_num));
-                                    }
+                        if let Ok(file) = std::fs::File::open(&disk_path)
+                            && let Ok(mmap) = unsafe { memmap2::Mmap::map(&file) }
+                        {
+                            for pat in patterns {
+                                let pat_bytes = pat.as_bytes();
+                                if let Some(offset) = mmap
+                                    .windows(pat_bytes.len())
+                                    .position(|window| window == pat_bytes)
+                                {
+                                    let line_num =
+                                        mmap[..offset].iter().filter(|&&b| b == b'\n').count() + 1;
+                                    return Some((node.path.clone(), line_num));
                                 }
                             }
                         }
@@ -1754,14 +1668,13 @@ impl Studio {
             .documents
             .iter()
             .position(|doc| doc.path == entry.path)
+            && self.docs.documents[existing].is_dirty
         {
-            if self.docs.documents[existing].is_dirty {
-                self.report_error(
-                    "Restore failed",
-                    "This file already has unsaved edits; save or close it first".to_string(),
-                );
-                return;
-            }
+            self.report_error(
+                "Restore failed",
+                "This file already has unsaved edits; save or close it first".to_string(),
+            );
+            return;
         }
         let disk_changed = entry.disk_snapshot.as_ref().is_some_and(|snapshot| {
             self.disk_path(&entry.path)
@@ -1805,11 +1718,11 @@ impl Studio {
             self.report_error("Recovery backup failed", error.to_string());
             return;
         }
-        if let Some(store) = &mut self.recovery_store {
-            if let Err(error) = store.dismiss(index) {
-                self.report_error("Recovery cleanup failed", error.to_string());
-                return;
-            }
+        if let Some(store) = &mut self.recovery_store
+            && let Err(error) = store.dismiss(index)
+        {
+            self.report_error("Recovery cleanup failed", error.to_string());
+            return;
         }
         if disk_changed {
             self.notifications.push(
@@ -1825,10 +1738,10 @@ impl Studio {
     }
 
     fn refresh_git(&mut self) {
-        if self.git.repo_root.is_none() {
-            if let Some(root) = &self.workspace_root {
-                self.git = GitState::for_workspace(root);
-            }
+        if self.git.repo_root.is_none()
+            && let Some(root) = &self.workspace_root
+        {
+            self.git = GitState::for_workspace(root);
         }
         if self.git.repo_root.is_some() {
             if let Err(error) = self.git.refresh_workspace() {
@@ -1887,15 +1800,14 @@ impl Studio {
                 }
                 self.terminal
                     .log(LogLevel::Success, format!("Saved {}", path));
-                if self.language_server_status == lsp::ServerStatus::Ready {
-                    if let Some(error) = self
+                if self.language_server_status == lsp::ServerStatus::Ready
+                    && let Some(error) = self
                         .language_server
                         .as_mut()
                         .and_then(|server| server.did_save(&path, &content).err())
-                    {
-                        self.language_server_status = lsp::ServerStatus::Failed;
-                        self.report_error("Language server sync failed", error.to_string());
-                    }
+                {
+                    self.language_server_status = lsp::ServerStatus::Failed;
+                    self.report_error("Language server sync failed", error.to_string());
                 }
                 self.flush_recovery();
                 self.refresh_git();
@@ -1905,40 +1817,38 @@ impl Studio {
     }
 
     fn refresh_search(&mut self) {
-        if let Some(root) = &self.workspace_root {
-            if self.search.cached_fingerprint != self.workspace_fingerprint
-                || self.search.cached_buffers.is_empty()
-            {
-                let mut buffers: Vec<(String, Arc<str>)> = Vec::new();
-                fn collect(root: &Path, node: &FileNode, buffers: &mut Vec<(String, Arc<str>)>) {
-                    if node.is_dir {
-                        for child in &node.children {
-                            collect(root, child, buffers);
-                        }
-                    } else {
-                        let path = root.join(&node.path);
-                        if let Ok(metadata) = path.metadata() {
-                            let len = metadata.len();
-                            if len > 0 && len <= 100_000_000 {
-                                if len <= 1_000_000 {
-                                    if let Ok(content) = std::fs::read_to_string(&path) {
-                                        buffers.push((node.path.clone(), content.into()));
-                                    }
-                                } else if let Ok(file) = std::fs::File::open(&path) {
-                                    if let Ok(mmap) = unsafe { memmap2::Mmap::map(&file) } {
-                                        if let Ok(content) = std::str::from_utf8(&mmap) {
-                                            buffers.push((node.path.clone(), content.into()));
-                                        }
-                                    }
+        if let Some(root) = &self.workspace_root
+            && (self.search.cached_fingerprint != self.workspace_fingerprint
+                || self.search.cached_buffers.is_empty())
+        {
+            let mut buffers: Vec<(String, Arc<str>)> = Vec::new();
+            fn collect(root: &Path, node: &FileNode, buffers: &mut Vec<(String, Arc<str>)>) {
+                if node.is_dir {
+                    for child in &node.children {
+                        collect(root, child, buffers);
+                    }
+                } else {
+                    let path = root.join(&node.path);
+                    if let Ok(metadata) = path.metadata() {
+                        let len = metadata.len();
+                        if len > 0 && len <= 100_000_000 {
+                            if len <= 1_000_000 {
+                                if let Ok(content) = std::fs::read_to_string(&path) {
+                                    buffers.push((node.path.clone(), content.into()));
                                 }
+                            } else if let Ok(file) = std::fs::File::open(&path)
+                                && let Ok(mmap) = unsafe { memmap2::Mmap::map(&file) }
+                                && let Ok(content) = std::str::from_utf8(&mmap)
+                            {
+                                buffers.push((node.path.clone(), content.into()));
                             }
                         }
                     }
                 }
-                collect(root, &self.tree.root, &mut buffers);
-                self.search.cached_buffers = Arc::new(buffers);
-                self.search.cached_fingerprint = self.workspace_fingerprint;
             }
+            collect(root, &self.tree.root, &mut buffers);
+            self.search.cached_buffers = Arc::new(buffers);
+            self.search.cached_fingerprint = self.workspace_fingerprint;
         }
         let dirty_docs: Vec<(&str, String)> = self
             .docs
@@ -2291,12 +2201,11 @@ impl Studio {
                                     if let Ok(content) = std::fs::read_to_string(&path) {
                                         state.append_file(&relative, &content);
                                     }
-                                } else if let Ok(file) = std::fs::File::open(&path) {
-                                    if let Ok(mmap) = unsafe { memmap2::Mmap::map(&file) } {
-                                        if let Ok(content) = std::str::from_utf8(&mmap) {
-                                            state.append_file(&relative, content);
-                                        }
-                                    }
+                                } else if let Ok(file) = std::fs::File::open(&path)
+                                    && let Ok(mmap) = unsafe { memmap2::Mmap::map(&file) }
+                                    && let Ok(content) = std::str::from_utf8(&mmap)
+                                {
+                                    state.append_file(&relative, content);
                                 }
                             }
                         }
@@ -2306,7 +2215,9 @@ impl Studio {
                 })
                 .await
             },
-            Message::SearchFinished,
+            |result| {
+                Message::SearchFinished(result.map(|(revision, state)| (revision, Box::new(state))))
+            },
         )
     }
 
@@ -2384,19 +2295,21 @@ impl Studio {
             autocomplete_open: self.autocomplete.is_open,
             autocomplete_selection: self.autocomplete.selected_index,
         };
-        let keyboard = taim::keyboard::listen()
-            .with(context)
-            .filter_map(|(context, event)| {
-                if let taim::keyboard::Event::KeyPressed { key, modifiers, .. } = event {
-                    shortcut_message(key.as_ref(), modifiers, context)
-                } else {
-                    None
-                }
-            });
+        let keyboard =
+            taim_futures::keyboard::listen()
+                .with(context)
+                .filter_map(|(context, event)| {
+                    if let taim::keyboard::Event::KeyPressed { key, modifiers, .. } = event {
+                        shortcut_message(key.as_ref(), modifiers, context)
+                    } else {
+                        None
+                    }
+                });
         if self.workspace_root.is_some() {
             Subscription::batch([
                 keyboard,
-                taim::time::every(Duration::from_secs(2)).map(|_| Message::WorkspacePoll),
+                taim_futures::backend::native::smol::time::every(Duration::from_secs(2))
+                    .map(|_| Message::WorkspacePoll),
             ])
         } else {
             keyboard
@@ -2449,7 +2362,7 @@ impl Studio {
                     _ => None,
                 };
                 if let Some(id) = focus {
-                    Task::batch([reveal, taim::widget::operation::focus(id)])
+                    Task::batch([reveal, native_host::focus(id)])
                 } else {
                     reveal
                 }
@@ -2482,7 +2395,7 @@ impl Studio {
                 self.terminal_raw_focus = false;
                 self.docs.toggle_find();
                 if self.docs.find_open {
-                    taim::widget::operation::focus("virgo-editor-find")
+                    native_host::focus("virgo-editor-find")
                 } else {
                     Task::none()
                 }
@@ -2492,7 +2405,7 @@ impl Studio {
                 if !self.docs.find_open {
                     self.docs.toggle_find();
                 }
-                taim::widget::operation::focus("virgo-editor-find")
+                native_host::focus("virgo-editor-find")
             }
             Message::CloseFind => {
                 self.docs.find_open = false;
@@ -2513,7 +2426,7 @@ impl Studio {
             Message::OpenCommandPalette(action_mode) => {
                 self.terminal_raw_focus = false;
                 self.palette.open(action_mode);
-                taim::widget::operation::focus("virgo-command-palette")
+                native_host::focus("virgo-command-palette")
             }
             Message::CloseCommandPalette => {
                 self.palette.close();
@@ -2726,7 +2639,7 @@ impl Studio {
                 } else {
                     return self.update(Message::NewScratchpad);
                 }
-                taim::widget::operation::focus("virgo-new-file")
+                native_host::focus("virgo-new-file")
             }
             Message::NewFilePathChanged(path) => {
                 self.new_file_path = path;
@@ -2754,7 +2667,7 @@ impl Studio {
                 self.deleting_path = None;
                 self.activity.active_view = SidebarView::Explorer;
                 self.show_sidebar = true;
-                taim::widget::operation::focus("virgo-rename-file")
+                native_host::focus("virgo-rename-file")
             }
             Message::RenameNameChanged(name) => {
                 self.rename_name = name;
@@ -2847,10 +2760,8 @@ impl Studio {
                 if let Some(doc) = self.docs.split_doc_mut() {
                     doc.perform(action);
                 }
-                if edited {
-                    if let Some(index) = index {
-                        self.sync_document_change_to_language_server(index);
-                    }
+                if edited && let Some(index) = index {
+                    self.sync_document_change_to_language_server(index);
                 }
                 let search = if edited
                     && self.workspace_root.is_some()
@@ -2879,10 +2790,9 @@ impl Studio {
                 })
             }
             Message::SelectNextOccurrence => {
-                let index = if self.docs.focused_pane == 1 && self.docs.split_tab.is_some() {
-                    self.docs.split_tab.unwrap()
-                } else {
-                    self.docs.active_tab
+                let index = match (self.docs.focused_pane, self.docs.split_tab) {
+                    (1, Some(index)) => index,
+                    _ => self.docs.active_tab,
                 };
                 if let Some(doc) = self.docs.documents.get_mut(index) {
                     doc.select_next_occurrence();
@@ -2890,10 +2800,9 @@ impl Studio {
                 Task::none()
             }
             Message::ClearExtraCursors => {
-                let index = if self.docs.focused_pane == 1 && self.docs.split_tab.is_some() {
-                    self.docs.split_tab.unwrap()
-                } else {
-                    self.docs.active_tab
+                let index = match (self.docs.focused_pane, self.docs.split_tab) {
+                    (1, Some(index)) => index,
+                    _ => self.docs.active_tab,
                 };
                 if let Some(doc) = self.docs.documents.get_mut(index) {
                     doc.clear_extra_cursors();
@@ -2972,7 +2881,7 @@ impl Studio {
                 self.save_as_path.clear();
                 self.activity.active_view = SidebarView::Explorer;
                 self.show_sidebar = true;
-                taim::widget::operation::focus("virgo-save-as")
+                native_host::focus("virgo-save-as")
             }
             Message::SaveAsPathChanged(path) => {
                 self.save_as_path = path;
@@ -3095,12 +3004,10 @@ impl Studio {
                         .terminal
                         .terminals
                         .get(self.terminal.active_terminal_idx)
+                        && let Some(session) = self.terminal_sessions.get_mut(&instance.id)
+                        && let Err(error) = session.write(b"cargo run\r")
                     {
-                        if let Some(session) = self.terminal_sessions.get_mut(&instance.id) {
-                            if let Err(error) = session.write(b"cargo run\r") {
-                                self.report_error("Run failed", error.to_string());
-                            }
-                        }
+                        self.report_error("Run failed", error.to_string());
                     }
                     return task;
                 }
@@ -3188,12 +3095,12 @@ impl Studio {
                 self.schedule_search(false)
             }
             Message::SearchFinished(result) => {
-                if let Some((revision, completed)) = result {
-                    if self.search_revision.load(Ordering::Relaxed) == revision {
-                        self.search.results = completed.results;
-                        self.search.total_matches = completed.total_matches;
-                        self.search.is_searching = false;
-                    }
+                if let Some((revision, completed)) = result
+                    && self.search_revision.load(Ordering::Relaxed) == revision
+                {
+                    self.search.results = completed.results;
+                    self.search.total_matches = completed.total_matches;
+                    self.search.is_searching = false;
                 }
                 Task::none()
             }
@@ -3535,10 +3442,10 @@ impl Studio {
                 Task::none()
             }
             Message::DiscardRecovery(index) => {
-                if let Some(store) = &mut self.recovery_store {
-                    if let Err(error) = store.dismiss(index) {
-                        self.report_error("Discard failed", error.to_string());
-                    }
+                if let Some(store) = &mut self.recovery_store
+                    && let Err(error) = store.dismiss(index)
+                {
+                    self.report_error("Discard failed", error.to_string());
                 }
                 Task::none()
             }
@@ -3581,12 +3488,11 @@ impl Studio {
                     .terminal
                     .terminals
                     .get_mut(self.terminal.active_terminal_idx)
+                    && let Some(session) = self.terminal_sessions.get_mut(&instance.id)
                 {
-                    if let Some(session) = self.terminal_sessions.get_mut(&instance.id) {
-                        let command = std::mem::take(&mut instance.input);
-                        if let Err(error) = session.write(format!("{command}\r").as_bytes()) {
-                            self.report_error("Terminal input failed", error.to_string());
-                        }
+                    let command = std::mem::take(&mut instance.input);
+                    if let Err(error) = session.write(format!("{command}\r").as_bytes()) {
+                        self.report_error("Terminal input failed", error.to_string());
                     }
                 }
                 Task::none()
@@ -3596,10 +3502,9 @@ impl Studio {
                     .terminal
                     .terminals
                     .get(self.terminal.active_terminal_idx)
+                    && let Some(session) = self.terminal_sessions.get_mut(&instance.id)
                 {
-                    if let Some(session) = self.terminal_sessions.get_mut(&instance.id) {
-                        let _ = session.write(&[3]);
-                    }
+                    let _ = session.write(&[3]);
                 }
                 Task::none()
             }
@@ -3638,18 +3543,15 @@ impl Studio {
                 Task::none()
             }
             Message::TerminalRawInput(bytes) => {
-                if self.terminal_raw_focus {
-                    if let Some(instance) = self
+                if self.terminal_raw_focus
+                    && let Some(instance) = self
                         .terminal
                         .terminals
                         .get(self.terminal.active_terminal_idx)
-                    {
-                        if let Some(session) = self.terminal_sessions.get_mut(&instance.id) {
-                            if let Err(error) = session.write(&bytes) {
-                                self.report_error("Terminal input failed", error.to_string());
-                            }
-                        }
-                    }
+                    && let Some(session) = self.terminal_sessions.get_mut(&instance.id)
+                    && let Err(error) = session.write(&bytes)
+                {
+                    self.report_error("Terminal input failed", error.to_string());
                 }
                 Task::none()
             }
@@ -3669,10 +3571,9 @@ impl Studio {
                     .terminal
                     .terminals
                     .get_mut(self.terminal.active_terminal_idx)
+                    && let Some(session) = self.terminal_sessions.get_mut(&instance.id)
                 {
-                    if let Some(session) = self.terminal_sessions.get_mut(&instance.id) {
-                        instance.lines = session.scroll(delta).to_vec();
-                    }
+                    instance.lines = session.scroll(delta).to_vec();
                 }
                 Task::none()
             }
@@ -3684,10 +3585,10 @@ impl Studio {
                     terminal::TERMINAL_COLLAPSED_ROWS
                 };
                 for instance in &mut self.terminal.terminals {
-                    if let Some(session) = self.terminal_sessions.get_mut(&instance.id) {
-                        if session.resize(rows, terminal::TERMINAL_COLUMNS).is_ok() {
-                            instance.lines = session.scroll(0).to_vec();
-                        }
+                    if let Some(session) = self.terminal_sessions.get_mut(&instance.id)
+                        && session.resize(rows, terminal::TERMINAL_COLUMNS).is_ok()
+                    {
+                        instance.lines = session.scroll(0).to_vec();
                     }
                 }
                 Task::none()
@@ -3797,19 +3698,17 @@ impl Studio {
                 let cursor = doc.content.cursor().position;
                 let word = doc.word_under_cursor();
 
-                if self.language_server_status == lsp::ServerStatus::Ready {
-                    if let Some(server) = self.language_server.as_mut() {
-                        match server.definition(&path, cursor.line, cursor.column) {
-                            Ok(id) => {
-                                self.lsp_definition_request = Some(id);
-                                return Task::none();
-                            }
-                            Err(error) => {
-                                self.terminal.log(
-                                    LogLevel::Warning,
-                                    format!("LSP definition error: {error}"),
-                                );
-                            }
+                if self.language_server_status == lsp::ServerStatus::Ready
+                    && let Some(server) = self.language_server.as_mut()
+                {
+                    match server.definition(&path, cursor.line, cursor.column) {
+                        Ok(id) => {
+                            self.lsp_definition_request = Some(id);
+                            return Task::none();
+                        }
+                        Err(error) => {
+                            self.terminal
+                                .log(LogLevel::Warning, format!("LSP definition error: {error}"));
                         }
                     }
                 }
@@ -3827,19 +3726,17 @@ impl Studio {
                 let cursor = doc.content.cursor().position;
                 let word = doc.word_under_cursor();
 
-                if self.language_server_status == lsp::ServerStatus::Ready {
-                    if let Some(server) = self.language_server.as_mut() {
-                        match server.references(&path, cursor.line, cursor.column) {
-                            Ok(id) => {
-                                self.lsp_references_request = Some(id);
-                                return Task::none();
-                            }
-                            Err(error) => {
-                                self.terminal.log(
-                                    LogLevel::Warning,
-                                    format!("LSP references error: {error}"),
-                                );
-                            }
+                if self.language_server_status == lsp::ServerStatus::Ready
+                    && let Some(server) = self.language_server.as_mut()
+                {
+                    match server.references(&path, cursor.line, cursor.column) {
+                        Ok(id) => {
+                            self.lsp_references_request = Some(id);
+                            return Task::none();
+                        }
+                        Err(error) => {
+                            self.terminal
+                                .log(LogLevel::Warning, format!("LSP references error: {error}"));
                         }
                     }
                 }
@@ -3860,17 +3757,17 @@ impl Studio {
                 let cursor = doc.content.cursor().position;
                 let word = doc.word_under_cursor();
 
-                if self.language_server_status == lsp::ServerStatus::Ready {
-                    if let Some(server) = self.language_server.as_mut() {
-                        match server.hover(&path, cursor.line, cursor.column) {
-                            Ok(id) => {
-                                self.lsp_hover_request = Some(id);
-                                return Task::none();
-                            }
-                            Err(error) => {
-                                self.terminal
-                                    .log(LogLevel::Warning, format!("LSP hover error: {error}"));
-                            }
+                if self.language_server_status == lsp::ServerStatus::Ready
+                    && let Some(server) = self.language_server.as_mut()
+                {
+                    match server.hover(&path, cursor.line, cursor.column) {
+                        Ok(id) => {
+                            self.lsp_hover_request = Some(id);
+                            return Task::none();
+                        }
+                        Err(error) => {
+                            self.terminal
+                                .log(LogLevel::Warning, format!("LSP hover error: {error}"));
                         }
                     }
                 }
@@ -3985,47 +3882,39 @@ impl Studio {
                             == self.lsp_definition_request
                         {
                             self.lsp_definition_request = None;
-                            if let Some(locations) = lsp::parse_definition_result(&value) {
-                                if let Some(first) = locations.first() {
-                                    let target_path = self
-                                        .language_server
-                                        .as_ref()
-                                        .and_then(|s| s.relative_path(&first.uri))
-                                        .unwrap_or_else(|| first.uri.clone());
-                                    self.jump_to_file_location(
-                                        &target_path,
-                                        first.line,
-                                        first.column,
-                                    );
-                                }
+                            if let Some(locations) = lsp::parse_definition_result(&value)
+                                && let Some(first) = locations.first()
+                            {
+                                let target_path = self
+                                    .language_server
+                                    .as_ref()
+                                    .and_then(|s| s.relative_path(&first.uri))
+                                    .unwrap_or_else(|| first.uri.clone());
+                                self.jump_to_file_location(&target_path, first.line, first.column);
                             }
                         } else if value.get("id").and_then(serde_json::Value::as_u64)
                             == self.lsp_references_request
                         {
                             self.lsp_references_request = None;
-                            if let Some(locations) = lsp::parse_references_result(&value) {
-                                if let Some(first) = locations.first() {
-                                    let target_path = self
-                                        .language_server
-                                        .as_ref()
-                                        .and_then(|s| s.relative_path(&first.uri))
-                                        .unwrap_or_else(|| first.uri.clone());
-                                    self.jump_to_file_location(
-                                        &target_path,
-                                        first.line,
-                                        first.column,
-                                    );
-                                }
+                            if let Some(locations) = lsp::parse_references_result(&value)
+                                && let Some(first) = locations.first()
+                            {
+                                let target_path = self
+                                    .language_server
+                                    .as_ref()
+                                    .and_then(|s| s.relative_path(&first.uri))
+                                    .unwrap_or_else(|| first.uri.clone());
+                                self.jump_to_file_location(&target_path, first.line, first.column);
                             }
                         } else if value.get("id").and_then(serde_json::Value::as_u64)
                             == self.lsp_hover_request
                         {
                             self.lsp_hover_request = None;
-                            if let Some((sig, doc)) = lsp::parse_hover_result(&value) {
-                                if let Some(active_doc) = self.docs.active() {
-                                    let symbol = active_doc.word_under_cursor().unwrap_or_default();
-                                    self.hover.show(&symbol, &sig, &doc);
-                                }
+                            if let Some((sig, doc)) = lsp::parse_hover_result(&value)
+                                && let Some(active_doc) = self.docs.active()
+                            {
+                                let symbol = active_doc.word_under_cursor().unwrap_or_default();
+                                self.hover.show(&symbol, &sig, &doc);
                             }
                         } else {
                             self.publish_language_diagnostics(&value);
@@ -4100,10 +3989,10 @@ impl Studio {
         center_col = center_col.push(self.view_breadcrumbs());
 
         // Merge conflict banner if active document has conflicts
-        if let Some(doc) = self.docs.active() {
-            if doc.has_merge_conflicts() {
-                center_col = center_col.push(self.view_merge_conflict_banner());
-            }
+        if let Some(doc) = self.docs.active()
+            && doc.has_merge_conflicts()
+        {
+            center_col = center_col.push(self.view_merge_conflict_banner());
         }
 
         // Editor Area or Git Diff View
@@ -4776,35 +4665,35 @@ impl Studio {
                 .padding(8),
             );
         }
-        if let Some(store) = &self.recovery_store {
-            if !store.pending().is_empty() {
-                let mut drafts = column![
-                    text(format!("UNSAVED DRAFTS ({})", store.pending().len()))
-                        .size(10)
-                        .style(text::secondary)
-                ]
-                .spacing(6)
-                .padding(8);
-                for (index, candidate) in store.pending().iter().enumerate() {
-                    drafts = drafts.push(
-                        column![
-                            text(&candidate.entry.path).size(11),
-                            row![
-                                button(text("Restore").size(10))
-                                    .style(button::secondary)
-                                    .on_press(Message::RestoreRecovery(index)),
-                                button(text("Discard").size(10))
-                                    .style(button::text)
-                                    .on_press(Message::DiscardRecovery(index)),
-                            ]
-                            .spacing(6),
+        if let Some(store) = &self.recovery_store
+            && !store.pending().is_empty()
+        {
+            let mut drafts = column![
+                text(format!("UNSAVED DRAFTS ({})", store.pending().len()))
+                    .size(10)
+                    .style(text::secondary)
+            ]
+            .spacing(6)
+            .padding(8);
+            for (index, candidate) in store.pending().iter().enumerate() {
+                drafts = drafts.push(
+                    column![
+                        text(&candidate.entry.path).size(11),
+                        row![
+                            button(text("Restore").size(10))
+                                .style(button::secondary)
+                                .on_press(Message::RestoreRecovery(index)),
+                            button(text("Discard").size(10))
+                                .style(button::text)
+                                .on_press(Message::DiscardRecovery(index)),
                         ]
-                        .spacing(4),
-                    );
-                }
-                let height = (44.0 + store.pending().len() as f32 * 54.0).min(210.0);
-                sidebar_col = sidebar_col.push(scrollable(drafts).height(Pixels(height)));
+                        .spacing(6),
+                    ]
+                    .spacing(4),
+                );
             }
+            let height = (44.0 + store.pending().len() as f32 * 54.0).min(210.0);
+            sidebar_col = sidebar_col.push(scrollable(drafts).height(Pixels(height)));
         }
         if !self.trash_entries.is_empty() {
             let mut trash = column![
@@ -7245,11 +7134,7 @@ impl Drop for Studio {
 
 /// Runs the Taim Studio application.
 pub fn run() -> taim::Result {
-    taim::application(Studio::new, Studio::update, Studio::view)
-        .title("Taim Studio — IDE Engine (120 FPS Native)")
-        .theme(Studio::theme)
-        .subscription(Studio::subscription)
-        .run()
+    native_host::run(Studio::new(), taim::Backend::Best)
 }
 
 /// Launches Virgo on a real folder. The executable uses this entry point.
@@ -7270,21 +7155,12 @@ pub fn run_with_workspace(root: PathBuf) -> Result<(), Box<dyn std::error::Error
                 taim::Backend::Best
             }
         });
-    Ok(taim::application(
-        move || {
-            let (mut studio, startup) =
-                Studio::with_workspace(root.clone()).expect("cannot load workspace");
-            let language_server = studio.start_language_server();
-            (studio, Task::batch([startup, language_server]))
-        },
-        Studio::update,
-        Studio::view,
-    )
-    .title("Virgo IDE")
-    .backend(backend)
-    .theme(Studio::theme)
-    .subscription(Studio::subscription)
-    .run()?)
+    let (mut studio, startup) = Studio::with_workspace(root)?;
+    let language_server = studio.start_language_server();
+    Ok(native_host::run(
+        (studio, Task::batch([startup, language_server])),
+        backend,
+    )?)
 }
 
 static SAVE_ID: AtomicU64 = AtomicU64::new(1);
@@ -7307,7 +7183,7 @@ fn graphite_button_style(active: bool, status: button::Status) -> button::Style 
 fn graphite_highlight(
     highlight: &taim_highlighter::Highlight,
     _theme: &Theme,
-) -> taim::advanced::text::highlighter::Format<taim::Font> {
+) -> taim_core::text::highlighter::Format<taim::Font> {
     use taim_highlighter::Scope;
     let shade = match highlight.scope() {
         Scope::Comment => 0x8C,
@@ -7320,7 +7196,7 @@ fn graphite_highlight(
         Scope::Punctuation => 0xA9,
         Scope::Text => 0xD8,
     };
-    taim::advanced::text::highlighter::Format {
+    taim_core::text::highlighter::Format {
         color: Some(Color::from_rgb8(shade, shade, shade)),
         font: highlight.font(),
     }
@@ -7457,4 +7333,94 @@ fn write_new_atomic(path: &Path, content: &[u8]) -> std::io::Result<()> {
     })();
     let _ = std::fs::remove_file(&temporary);
     result
+}
+
+#[cfg(test)]
+mod shortcut_tests {
+    use super::*;
+    use taim::keyboard::{Key, Modifiers, key::Named};
+
+    fn context() -> ShortcutContext {
+        ShortcutContext {
+            terminal_focused: false,
+            palette_open: false,
+            palette_selection: None,
+            find_open: false,
+            autocomplete_open: false,
+            autocomplete_selection: 0,
+        }
+    }
+
+    #[test]
+    fn primary_shortcuts_route_to_working_actions() {
+        let cmd = Modifiers::COMMAND;
+        assert!(matches!(
+            shortcut_message(Key::Character("p"), cmd, context()),
+            Some(Message::OpenCommandPalette(false))
+        ));
+        assert!(matches!(
+            shortcut_message(Key::Character("p"), cmd | Modifiers::SHIFT, context()),
+            Some(Message::OpenCommandPalette(true))
+        ));
+        assert!(matches!(
+            shortcut_message(Key::Character("s"), cmd, context()),
+            Some(Message::SaveDocument)
+        ));
+        assert!(matches!(
+            shortcut_message(Key::Character("w"), cmd, context()),
+            Some(Message::CloseActiveTab)
+        ));
+        assert!(matches!(
+            shortcut_message(Key::Character("f"), cmd | Modifiers::SHIFT, context()),
+            Some(Message::RevealSidebarView(SidebarView::Search))
+        ));
+        assert!(matches!(
+            shortcut_message(Key::Character("d"), cmd, context()),
+            Some(Message::SelectNextOccurrence)
+        ));
+        assert!(matches!(
+            shortcut_message(Key::Named(Named::Escape), Modifiers::NONE, context()),
+            Some(Message::ClearExtraCursors)
+        ));
+    }
+
+    #[test]
+    fn palette_find_and_terminal_keep_their_own_keys() {
+        let palette = ShortcutContext {
+            palette_open: true,
+            palette_selection: Some(42),
+            ..context()
+        };
+        assert!(matches!(
+            shortcut_message(Key::Named(Named::Enter), Modifiers::NONE, palette),
+            Some(Message::PaletteItemChosen(42))
+        ));
+        assert!(matches!(
+            shortcut_message(Key::Named(Named::ArrowDown), Modifiers::NONE, palette),
+            Some(Message::PaletteSelectNext)
+        ));
+        let find = ShortcutContext {
+            find_open: true,
+            ..context()
+        };
+        assert!(matches!(
+            shortcut_message(Key::Named(Named::Enter), Modifiers::SHIFT, find),
+            Some(Message::FindPrev)
+        ));
+        let terminal = ShortcutContext {
+            terminal_focused: true,
+            ..context()
+        };
+        assert!(
+            matches!(shortcut_message(Key::Character("c"), Modifiers::CTRL, terminal), Some(Message::TerminalRawInput(bytes)) if bytes == [3])
+        );
+        assert!(matches!(
+            shortcut_message(Key::Character("p"), Modifiers::COMMAND, terminal),
+            Some(Message::OpenCommandPalette(false))
+        ));
+        assert!(matches!(
+            shortcut_message(Key::Named(Named::Tab), Modifiers::CTRL, terminal),
+            Some(Message::CycleEditor(1))
+        ));
+    }
 }

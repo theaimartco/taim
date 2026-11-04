@@ -12,8 +12,8 @@
 //! the question, and a suite that goes red on such a machine teaches its
 //! readers to ignore it.
 
-use taim::{Color, Rectangle, Size};
 use taim_core::Renderer as _;
+use taim_core::{Color, Rectangle, Size};
 use taim_wgpu::Renderer;
 use taim_wgpu::graphics::Viewport;
 

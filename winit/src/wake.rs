@@ -9,10 +9,13 @@ use winit::event_loop::EventLoopProxy;
 /// Something that happened off the event loop and needs its attention.
 #[derive(Debug)]
 pub(crate) enum Wake {
+    /// Coalesced native insets/editor state from the Android UI thread.
+    #[cfg(target_os = "android")]
+    Android,
     /// State read by a window's views changed.
     Changed(window::Id),
     /// A clipboard read finished.
-    Clipboard(window::Id, clipboard::Event),
+    Clipboard(window::Id, taim_view::PasteToken, clipboard::Event),
     /// The desktop's color scheme changed.
     #[cfg_attr(
         not(all(feature = "linux-theme-detection", target_os = "linux")),

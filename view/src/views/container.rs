@@ -11,6 +11,8 @@ pub fn container(child: impl Into<AnyView>) -> Container {
         border: Border::default(),
         align: (0.0, 0.0),
         sizing: Sizing::HUG,
+        material: taim_core::material::Material::OPAQUE,
+        reduce_transparency: false,
     }
 }
 
@@ -24,9 +26,42 @@ pub struct Container {
     /// left/top, 1 is right/bottom.
     align: (f32, f32),
     sizing: Sizing,
+    material: taim_core::material::Material,
+    reduce_transparency: bool,
 }
 
 impl Container {
+    /// A rounded glass surface with refracted backdrop and lit edges on GPU.
+    ///
+    /// Put content behind this container using `layers` to see refraction.
+    /// Software rendering retains the readable tint and border. This does
+    /// not use a platform-native Apple effect.
+    pub fn glass(mut self) -> Self {
+        self.material = taim_core::material::Material::GLASS;
+        self.border = Border::default()
+            .rounded(24.0)
+            .width(1.0)
+            .color(Color::from_rgba(1.0, 1.0, 1.0, 0.35));
+        self
+    }
+
+    /// A rougher, more diffuse glass surface for text-heavy panels.
+    pub fn frosted_glass(self) -> Self {
+        Self {
+            material: taim_core::material::Material::FROSTED,
+            ..self.glass()
+        }
+    }
+
+    /// Uses an opaque surface without backdrop capture or refraction.
+    ///
+    /// Applications should pass their accessibility/transparency preference;
+    /// this flag is explicit and does not query an operating-system setting.
+    pub fn reduce_transparency(mut self, reduce: bool) -> Self {
+        self.reduce_transparency = reduce;
+        self
+    }
+
     /// Space around the child.
     pub fn padding(mut self, padding: impl Into<Padding>) -> Self {
         self.padding = padding.into();
@@ -107,6 +142,10 @@ impl Container {
 }
 
 impl View for Container {
+    fn is_layer(&self) -> bool {
+        self.material.transmission > 0.0 && !self.reduce_transparency
+    }
+
     fn sizing(&self) -> Sizing {
         self.sizing
     }
@@ -137,13 +176,38 @@ impl View for Container {
     }
 
     fn paint(&self, cx: &mut PaintCx<'_>) {
-        if self.background.is_none() && self.border.width == 0.0 {
+        let glass = self.material.transmission > 0.0;
+        if !glass && self.background.is_none() && self.border.width == 0.0 {
             return;
         }
 
         let bounds = cx.bounds();
-        let fill = self.background.unwrap_or(Color::TRANSPARENT);
-        cx.fill(bounds, fill, self.border);
+        let fill = self.background.unwrap_or_else(|| {
+            if glass {
+                cx.theme().palette().background.base.color
+            } else {
+                Color::TRANSPARENT
+            }
+        });
+        if !glass || self.reduce_transparency {
+            let fill = if glass {
+                Color { a: 1.0, ..fill }
+            } else {
+                fill
+            };
+            cx.fill(bounds, fill, self.border);
+        } else {
+            use taim_core::Renderer as _;
+            cx.renderer().fill_quad(
+                taim_core::renderer::Quad {
+                    bounds,
+                    border: self.border,
+                    material: self.material,
+                    ..Default::default()
+                },
+                fill,
+            );
+        }
     }
 
     fn describe(&self, _cx: &DescribeCx<'_>) -> Option<semantics::Node> {

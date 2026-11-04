@@ -11,7 +11,7 @@
 //! propagation manually to prove the primitives compose the way that
 //! future caller will need.
 
-use taim::advanced::widget::tree::{self, DirtyFlags, Revision, Tree};
+use taim_core::widget::tree::{self, DirtyFlags, Revision, Tree};
 
 /// A minimal stand-in for "a container noticed one of its children is
 /// dirty and marked itself dirty too," which is the propagation rule

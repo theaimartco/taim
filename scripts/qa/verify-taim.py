@@ -20,7 +20,7 @@ DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 
 def commands(python: str = sys.executable) -> list[tuple[str, list[str]]]:
     """Preserve command order: source evidence before expensive build tests."""
-    return [
+    checks = [
         ("source_lineage", [
             python, "scripts/audit/source-lineage-gate.py",
             "--strict", "--output", "artifacts/taim-local/source-lineage.json",
@@ -46,16 +46,38 @@ def commands(python: str = sys.executable) -> list[tuple[str, list[str]]]:
             "cargo", "clippy", "--workspace", "--all-targets",
             "--all-features", "--locked", "--", "-D", "warnings",
         ]),
+        ("public_api_docs", ["cargo", "rustdoc", "-p", "taim", "--lib", "--all-features", "--locked", "--", "-D", "warnings"]),
         ("workspace_tests", [
             "cargo", "test", "--workspace", "--all-features", "--locked",
         ]),
+        ("production_tests", ["cargo", "test", "--workspace", "--locked"]),
         ("cpu_golden_tests", ["cargo", "test", "--test", "golden", "--locked"]),
         ("frame_time_contract", ["cargo", "test", "-p", "taim_bench", "frame_time", "--locked"]),
         ("license_and_advisory_check", ["cargo", "deny", "check", "licenses", "advisories"]),
+        ("dependency_maintenance_policy", [python, "scripts/audit/check-dependency-policy.py"]),
+        ("external_consumer", ["bash", "scripts/release/external-consumer-smoke.sh"]),
+        ("source_bundle", [python, "scripts/release/build-source-bundle.py"]),
+        ("dependency_sbom", [python, "scripts/release/sbom.py", "--all-features",
+                             "--output", "artifacts/taim-local/cargo.spdx.json"]),
         ("package_inventory", [
             "cargo", "package", "-p", "taim", "--list", "--allow-dirty",
         ]),
     ]
+    if sys.platform.startswith("linux"):
+        checks.extend([
+            ("atspi_private_bus", [
+                "dbus-run-session", "--", "cargo", "test", "-p", "taim-accessibility",
+                "--features", "atspi", "--test", "atspi_bus", "--locked", "--", "--ignored",
+            ]),
+            ("desktop_theme_private_bus", [
+                "dbus-run-session", "--", "cargo", "test", "-p", "taim_winit",
+                "--features", "linux-theme-detection", "--lib",
+                "system_theme::tests::portal_initial_read_and_racing_changes_are_delivered_in_order",
+                "--locked", "--", "--ignored",
+            ]),
+        ])
+    return checks
+
 
 
 def classify(results: list[dict], all_tools_present: bool) -> str:

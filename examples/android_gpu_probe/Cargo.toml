@@ -1,0 +1,14 @@
+[package]
+license.workspace = true
+name = "android_gpu_probe"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[target.'cfg(target_os = "android")'.dependencies]
+wgpu = { workspace = true, features = ["vulkan", "gles"] }
+android-activity = { version = "0.6.1", features = ["native-activity"] }
+futures = { workspace = true, features = ["executor"] }

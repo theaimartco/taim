@@ -13,6 +13,10 @@ use crate::{Event, Instant, Point, Rectangle, Size, Vector, mouse, semantics};
 /// Views own their state. The runtime keeps the tree alive between frames
 /// and asks again only when a signal a view depends on changes.
 pub trait View: 'static {
+    /// Optional Android hierarchy slot. The native child owns its own drawing, input and accessibility.
+    fn native_view(&self) -> Option<crate::NativeViewDescriptor> {
+        None
+    }
     /// How the view wants to be sized; parents use this to share space.
     fn sizing(&self) -> Sizing {
         Sizing::HUG
@@ -30,9 +34,30 @@ pub trait View: 'static {
     fn paint_over(&self, _cx: &mut PaintCx<'_>) {}
 
     /// Reacts to `event`. Children see every event first; a view only sees
-    /// events none of its children handled.
+    /// events none of its children handled. Focus loss and touch cancellation
+    /// are lifecycle notifications and always reach every view, even if captured.
     fn event(&mut self, _cx: &mut EventCx<'_>, _event: &Event) -> Handled {
         Handled::No
+    }
+
+    /// Cancels temporary interactions when this view is deactivated.
+    /// This must be idempotent and must not activate controls or discard model data.
+    fn cancel_interaction(&mut self) {}
+
+    /// Performs a validated accessibility request on the window thread.
+    /// The runtime checks the live semantic identity, enabled state and
+    /// advertised actions before calling this method.
+    fn accessibility_action(
+        &mut self,
+        cx: &mut EventCx<'_>,
+        request: &semantics::Request,
+    ) -> Handled {
+        if *request == semantics::Request::Focus && self.focusable() {
+            cx.request_focus();
+            Handled::Yes
+        } else {
+            Handled::No
+        }
     }
 
     /// Describes the view to assistive technology.
@@ -51,8 +76,32 @@ pub trait View: 'static {
         false
     }
 
+    /// A one-shot redraw deadline, for caret blinks and other idle timers.
+    /// Returning a deadline avoids keeping a continuous animation active.
+    fn redraw_at(&self) -> Option<Instant> {
+        None
+    }
+
     /// Whether the view can take keyboard focus (and be reached with Tab).
     fn focusable(&self) -> bool {
+        false
+    }
+
+    /// The platform text input request when this view has keyboard focus.
+    /// `bounds` is in window logical coordinates, including ancestor scroll.
+    fn input_method(&self, _bounds: Rectangle) -> taim_core::input_method::InputMethod {
+        taim_core::input_method::InputMethod::Disabled
+    }
+
+    /// Native input-connection context. Secure controls leave this unavailable
+    /// so their contents and length are never exported to platform editors.
+    fn editor_state(&self) -> Option<taim_core::input_method::EditorState> {
+        None
+    }
+
+    /// Whether this subtree currently owns modal keyboard and accessibility focus.
+    /// Background controls are excluded until the scope closes; prior focus is restored.
+    fn is_modal(&self) -> bool {
         false
     }
 
@@ -143,9 +192,12 @@ impl<V: View> From<V> for AnyView {
     }
 }
 
-/// A view as held by its parent: the view plus where the parent put it.
+/// A view as held by its parent: its stable identity and assigned frame.
+/// Moving a retained child preserves focus; replacing it creates a new identity.
 #[derive(Debug)]
 pub struct Child {
+    pub(crate) identity: taim_core::widget::Id,
+    active: std::cell::Cell<bool>,
     view: AnyView,
     /// Position relative to the parent's top-left corner, and measured size.
     frame: Rectangle,
@@ -155,8 +207,25 @@ impl Child {
     /// Wraps `view`, not yet measured.
     pub fn new(view: impl Into<AnyView>) -> Self {
         Self {
+            identity: taim_core::widget::Id::unique(),
+            active: std::cell::Cell::new(false),
             view: view.into(),
             frame: Rectangle::default(),
+        }
+    }
+
+    pub(crate) fn activate(&self) {
+        self.active.set(true);
+    }
+
+    /// Cancels interactions once when an owned subtree is omitted from `View::children`.
+    /// Custom conditional containers should call this when hiding a retained child.
+    pub fn deactivate(&mut self) {
+        if self.active.replace(false) {
+            self.view.as_view_mut().cancel_interaction();
+            self.view
+                .as_view_mut()
+                .children(&mut |child| child.deactivate());
         }
     }
 
@@ -202,5 +271,39 @@ impl Child {
     /// The child view, mutably.
     pub fn view_mut(&mut self) -> &mut dyn View {
         self.view.as_view_mut()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    struct Probe(Rc<Cell<usize>>);
+    impl View for Probe {
+        fn measure(&mut self, _: &mut MeasureCx<'_>, _: Constraints) -> Size {
+            Size::ZERO
+        }
+        fn paint(&self, _: &mut PaintCx<'_>) {}
+        fn describe(&self, _: &DescribeCx<'_>) -> Option<semantics::Node> {
+            None
+        }
+        fn cancel_interaction(&mut self) {
+            self.0.set(self.0.get() + 1);
+        }
+    }
+
+    #[test]
+    fn a_retained_child_is_cancelled_once_per_deactivation() {
+        let calls = Rc::new(Cell::new(0));
+        let mut child = Child::new(Probe(calls.clone()));
+        child.activate();
+        child.deactivate();
+        child.deactivate();
+        assert_eq!(calls.get(), 1);
+        child.activate();
+        child.deactivate();
+        assert_eq!(calls.get(), 2);
     }
 }

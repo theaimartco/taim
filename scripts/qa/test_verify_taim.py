@@ -43,10 +43,13 @@ class LocalVerificationTests(unittest.TestCase):
 
     def test_release_requirements_are_in_local_gate(self):
         steps = dict(module.commands())
+        self.assertIn("external_consumer", steps)
         self.assertIn("release_contract_tests", steps)
         self.assertIn("cpu_golden_tests", steps)
+        self.assertEqual(steps["production_tests"], ["cargo", "test", "--workspace", "--locked"])
         self.assertIn("frame_time_contract", steps)
         self.assertIn("license_and_advisory_check", steps)
+        self.assertIn("dependency_maintenance_policy", steps)
 
     def test_strict_source_audit_is_mandatory(self):
         name, cmd = module.commands()[0]

@@ -5,7 +5,20 @@
 //! `docs/architecture/taim-api.md` for the design.
 #![cfg_attr(docsrs, feature(doc_cfg))]
 mod cx;
+mod ime;
 mod layout;
+mod native;
+mod web;
+pub use native::{
+    AndroidView, NativeViewDescriptor, NativeViewError, NativeViewPlacement, android_view,
+};
+pub use web::{AndroidWebContent, android_web_view, android_web_view_with_script};
+mod map;
+pub use map::{AndroidMap, MapMarker, MapType, android_map_view};
+mod media;
+pub use media::{
+    AndroidVideo, CameraLens, VideoFit, VideoSource, android_camera_preview, android_video_view,
+};
 mod root;
 mod state;
 mod tree;
@@ -27,8 +40,8 @@ pub fn svg_handle(bytes: &'static [u8]) -> taim_core::svg::Handle {
 
 pub use cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 pub use layout::{Axis, Constraints, Sizing};
-pub use root::{Response, Root};
-pub use state::{IntoProp, Invalidation, Prop, Scope, State, spawn};
+pub use root::{PasteToken, Response, Root};
+pub use state::{IntoProp, Invalidation, Prop, Scope, Sender, State, TaskScope, spawn};
 pub use view::{AnyView, Child, Handled, View};
 
 pub use taim_core::{
@@ -56,5 +69,13 @@ pub mod prelude {
         rebuild, row, rule, scaffold, scroll, search, segmented, sheet, skeleton, slider, snackbar,
         space, stepper, switch, tabs, text, text_editor, text_field, time_picker, tooltip, when,
     };
-    pub use crate::{AnyView, Scope, State, View, spawn};
+    pub use crate::{
+        AndroidMap, AndroidVideo, AndroidView, AndroidWebContent, AnyView, CameraLens, MapMarker,
+        MapType, Scope, State, TaskScope, VideoFit, VideoSource, View, android_camera_preview,
+        android_map_view, android_video_view, android_view, android_web_view,
+        android_web_view_with_script, spawn,
+    };
 }
+
+mod restoration;
+pub use restoration::RestorationError;

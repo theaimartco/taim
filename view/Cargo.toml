@@ -19,9 +19,17 @@ image = ["taim_renderer/image"]
 svg = ["taim_renderer/svg"]
 
 [dependencies]
+thiserror.workspace = true
 taim_core.workspace = true
 taim_renderer.workspace = true
 taim-signal.workspace = true
 unicode-segmentation.workspace = true
 futures = { workspace = true, features = ["executor"] }
 log.workspace = true
+
+[dependencies.serde]
+workspace = true
+features = ["derive"]
+
+[dependencies.serde_json]
+version = "1.0"

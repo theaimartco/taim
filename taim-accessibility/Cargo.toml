@@ -22,6 +22,7 @@ atspi = ["dep:zbus", "dep:log"]
 
 [dependencies]
 bitflags.workspace = true
+futures.workspace = true
 taim_core.workspace = true
 rustc-hash.workspace = true
 smol_str.workspace = true
@@ -29,6 +30,10 @@ zbus = { workspace = true, optional = true }
 log = { workspace = true, optional = true }
 
 [dev-dependencies]
+taim-view.workspace = true
+# The native bus-action fixture must lay out real, visible controls before
+# publishing them; the renderer-free stub has zero-sized hidden semantics.
+taim_renderer = { workspace = true, features = ["tiny-skia", "x11"] }
 serde = "1"
 # `tests/atspi_bus.rs` drives the transport the way a screen reader does:
 # from outside the crate, over a real bus. That needs its own handle on

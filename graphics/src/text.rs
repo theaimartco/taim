@@ -1,5 +1,7 @@
 //! TAIM text storage, shaping, and backend conversion.
 
+#[cfg(target_os = "android")]
+pub mod android;
 pub mod cache;
 pub mod editor;
 pub mod paragraph;

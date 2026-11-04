@@ -30,9 +30,9 @@ them behind the old shape.
 5. **Accessibility and hit-testing are part of the contract,** not opt-in
    extras with silent defaults.
 
-Non-goals: source compatibility with existing applications (a shim exists
-only for the migration window), and changing the renderer or windowing
-backends (they sit below this API).
+Non-goals: source compatibility with existing applications, and changing
+renderer or windowing backends. The former compatibility host has been
+removed; historical applications still require migration.
 
 ## Applications
 
@@ -58,15 +58,19 @@ fn main() -> taim::Result {
 - Event handlers are plain closures (`on_press(move || …)`). They change
   signals; the runtime turns those changes into the minimal
   `StateDelta` (layout, paint, or nothing).
-- Async work: `cx.spawn(async move { … })` runs on the executor and may
-  set signals when it completes. Subscriptions become
-  `cx.listen(stream, |item| …)`.
-- Several windows: `cx.open_window(settings, root)` returns a window
-  handle; closing is `handle.close()`.
+- Async work: `cx.spawn(async move { … })` starts work owned by this
+  window. Event handlers capture `let tasks = cx.tasks()` and call
+  `tasks.spawn(async move { … })`. Closing the window cancels pending
+  futures; a poll already executing retains the state until it returns.
+  Cancellation is cooperative, so blocking work should still be bounded.
+  The free `spawn` function is detached and should not capture window state.
+- Stream subscriptions and multiple-window handles are planned API, not
+  implemented `Scope` methods.
 
 The old entry points (`taim::application`, `taim::run_app`,
-`taim::native::app`) keep working during migration through the
-compatibility host described below, and are removed at the end.
+`taim::native::app`) and the program crate have been removed. The remaining
+compatibility discussion below is historical migration design, not an
+available host. New applications use `launch` or `app(...).run()`.
 
 ## Views
 

@@ -1,0 +1,18 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.theaimartco.taim.workprobe" android:versionCode="1" android:versionName="0.1.0">
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-feature android:glEsVersion="0x00030000" android:required="true" />
+    <application android:label="Taim work probe" android:hasCode="true" android:debuggable="true"
+        android:enableOnBackInvokedCallback="true" android:allowBackup="false" android:extractNativeLibs="false"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <service android:name="com.theaimartco.taim.TaimWorkService" android:exported="true" android:permission="android.permission.BIND_JOB_SERVICE">
+            <meta-data android:name="com.theaimartco.taim.work.lib_name" android:value="android_work_probe" />
+        </service>
+        <activity android:name="com.theaimartco.taim.TaimActivity" android:exported="true" android:launchMode="singleTop" android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|density|uiMode">
+            <meta-data android:name="android.app.lib_name" android:value="android_work_probe" />
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity>
+    </application>
+</manifest>

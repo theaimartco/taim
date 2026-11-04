@@ -8,14 +8,38 @@ use crate::{keyboard, mouse, semantics};
 use std::ops::RangeInclusive;
 use taim_core::widget;
 
+// Public ranges must never introduce NaN coordinates or invalid clamp bounds.
+fn normalized_range(range: RangeInclusive<f32>) -> RangeInclusive<f32> {
+    let start = if range.start().is_finite() {
+        *range.start()
+    } else {
+        0.0
+    };
+    let end = if range.end().is_finite() {
+        *range.end()
+    } else {
+        start
+    };
+    start.min(end)..=start.max(end)
+}
+
+fn range_fraction(range: &RangeInclusive<f32>, value: f32) -> f32 {
+    let span = f64::from(*range.end()) - f64::from(*range.start());
+    if value.is_nan() || span <= 0.0 {
+        return 0.0;
+    }
+    ((f64::from(value) - f64::from(*range.start())) / span).clamp(0.0, 1.0) as f32
+}
+
 /// A horizontal slider that moves `value` within `range`.
+/// Reversed endpoints are ordered; non-finite endpoints collapse to a finite range.
 pub fn slider(range: RangeInclusive<f32>, value: State<f32>) -> Slider {
     Slider {
-        range,
+        range: normalized_range(range),
         value,
         shown: value.into_prop(),
         step: None,
-        dragging: false,
+        dragging: None,
         hovered: false,
         id: widget::Id::unique(),
     }
@@ -27,7 +51,7 @@ pub struct Slider {
     value: State<f32>,
     shown: Prop<f32>,
     step: Option<f32>,
-    dragging: bool,
+    dragging: Option<look::Press>,
     hovered: bool,
     id: widget::Id,
 }
@@ -39,33 +63,50 @@ impl Slider {
     /// Snaps the value to multiples of `step` from the start of the range;
     /// also the arrow-key increment.
     pub fn step(mut self, step: f32) -> Self {
-        self.step = (step > 0.0).then_some(step);
+        self.step = (step.is_finite() && step > 0.0).then_some(step);
         self
     }
 
-    fn span(&self) -> f32 {
-        (self.range.end() - self.range.start()).max(f32::EPSILON)
+    fn span(&self) -> f64 {
+        (f64::from(*self.range.end()) - f64::from(*self.range.start())).max(f64::from(f32::EPSILON))
     }
 
     fn snap(&self, raw: f32) -> f32 {
-        let start = *self.range.start();
+        let start = f64::from(*self.range.start());
+        let end = f64::from(*self.range.end());
+        let raw = if raw.is_nan() {
+            start
+        } else {
+            f64::from(raw).clamp(start, end)
+        };
         let snapped = match self.step {
-            Some(step) => start + ((raw - start) / step).round() * step,
+            Some(step) => start + ((raw - start) / f64::from(step)).round() * f64::from(step),
             None => raw,
         };
-        snapped.clamp(start, *self.range.end())
+        snapped.clamp(start, end) as f32
     }
 
     fn set_from_pointer(&self, bounds: Rectangle, x: f32) {
+        if !x.is_finite() || !bounds.x.is_finite() || !bounds.width.is_finite() {
+            return;
+        }
         let usable = (bounds.width - THUMB).max(1.0);
         let fraction = ((x - bounds.x - THUMB / 2.0) / usable).clamp(0.0, 1.0);
-        let _ = self
-            .value
-            .set(self.snap(self.range.start() + fraction * self.span()));
+        let _ = self.value.set(self.snap(
+            (f64::from(*self.range.start())
+                + f64::from(fraction)
+                    * (f64::from(*self.range.end()) - f64::from(*self.range.start())))
+                as f32,
+        ));
     }
 }
 
 impl View for Slider {
+    fn cancel_interaction(&mut self) {
+        self.dragging = None;
+        self.hovered = false;
+    }
+
     fn sizing(&self) -> Sizing {
         Sizing {
             width: Axis::Fill(1),
@@ -86,7 +127,7 @@ impl View for Slider {
     fn paint(&self, cx: &mut PaintCx<'_>) {
         let bounds = cx.bounds();
         let palette = *cx.theme().palette();
-        let fraction = ((self.shown.get() - self.range.start()) / self.span()).clamp(0.0, 1.0);
+        let fraction = range_fraction(&self.range, self.shown.get());
         let usable = (bounds.width - THUMB).max(0.0);
         let center_y = bounds.y + bounds.height / 2.0;
 
@@ -104,7 +145,7 @@ impl View for Slider {
         cx.fill(track, palette.background.strong.color, rounded);
         cx.fill(filled, palette.primary.base.color, rounded);
 
-        let edge = if self.hovered || self.dragging {
+        let edge = if self.hovered || self.dragging.is_some() {
             palette.primary.strong.color
         } else {
             palette.primary.base.color
@@ -124,23 +165,38 @@ impl View for Slider {
     }
 
     fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+        if self.dragging.is_some_and(|press| press.cancelled_by(event)) {
+            self.dragging = None;
+            self.hovered = false;
+            cx.request_paint();
+            return Handled::No;
+        }
         let bounds = cx.bounds();
-
-        match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) if cx.is_hovered() => {
-                self.dragging = true;
-                cx.request_focus();
-                if let Some(at) = cx.pointer() {
-                    self.set_from_pointer(bounds, at.x);
-                }
-                Handled::Yes
+        if let Some(press) = look::Press::start(event)
+            && cx.is_hovered()
+            && self.dragging.is_none()
+        {
+            self.dragging = Some(press);
+            cx.request_focus();
+            if let Some(at) = cx.pointer() {
+                self.set_from_pointer(bounds, at.x);
             }
-            Event::Mouse(mouse::Event::CursorMoved { position }) => {
-                if self.dragging {
-                    self.set_from_pointer(bounds, position.x);
-                    return Handled::Yes;
-                }
-
+            cx.request_paint();
+            return Handled::Yes;
+        }
+        if let Some(press) = self.dragging {
+            if let Some(position) = press.movement(event) {
+                self.set_from_pointer(bounds, position.x);
+                return Handled::Yes;
+            }
+            if press.released_by(event) {
+                self.dragging = None;
+                cx.request_paint();
+                return Handled::Yes;
+            }
+        }
+        match event {
+            Event::Mouse(mouse::Event::CursorMoved { .. }) => {
                 let hovered = cx.is_hovered();
                 if hovered != self.hovered {
                     self.hovered = hovered;
@@ -148,18 +204,13 @@ impl View for Slider {
                 }
                 Handled::No
             }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) if self.dragging => {
-                self.dragging = false;
-                cx.request_paint();
-                Handled::Yes
-            }
             Event::Keyboard(keyboard::Event::KeyPressed {
                 key: keyboard::Key::Named(named),
                 ..
             }) if cx.has_focus() => {
                 use keyboard::key::Named;
 
-                let step = self.step.unwrap_or(self.span() / 100.0);
+                let step = self.step.unwrap_or((self.span() / 100.0) as f32);
                 let current = self.value.get();
                 let next = match named {
                     Named::ArrowLeft | Named::ArrowDown => current - step,
@@ -188,7 +239,7 @@ impl View for Slider {
     }
 
     fn cursor(&self) -> Option<mouse::Interaction> {
-        Some(if self.dragging {
+        Some(if self.dragging.is_some() {
             mouse::Interaction::Grabbing
         } else {
             mouse::Interaction::Grab
@@ -201,9 +252,10 @@ impl View for Slider {
 }
 
 /// A bar showing how far `value` is through `range`.
+/// Reversed endpoints are ordered and non-finite endpoints are normalized.
 pub fn progress(range: RangeInclusive<f32>, value: impl IntoProp<f32>) -> Progress {
     Progress {
-        range,
+        range: normalized_range(range),
         value: value.into_prop(),
         id: widget::Id::unique(),
     }
@@ -218,8 +270,7 @@ pub struct Progress {
 
 impl Progress {
     fn fraction(&self) -> f32 {
-        let span = (self.range.end() - self.range.start()).max(f32::EPSILON);
-        ((self.value.get() - self.range.start()) / span).clamp(0.0, 1.0)
+        range_fraction(&self.range, self.value.get())
     }
 }
 
@@ -330,6 +381,26 @@ mod tests {
         let bounds = Rectangle::new(Point::ORIGIN, Size::new(116.0, THUMB));
         slider.set_from_pointer(bounds, 58.0);
         assert_eq!(value.get(), 5.0);
+    }
+
+    #[test]
+    fn malformed_and_extreme_ranges_remain_finite() {
+        let mut scope = Scope::new(Arc::default());
+        let value = scope.signal(0.0_f32);
+        for range in [10.0..=0.0, f32::NAN..=f32::INFINITY, -f32::MAX..=f32::MAX] {
+            let slider = slider(range.clone(), value).step(f32::INFINITY);
+            assert!(slider.snap(f32::NAN).is_finite());
+            assert!(slider.snap(f32::MAX).is_finite());
+            slider.set_from_pointer(Rectangle::with_size(Size::new(116.0, THUMB)), 58.0);
+            assert!(value.get().is_finite());
+            assert!(progress(range, f32::NAN).fraction().is_finite());
+        }
+        assert_eq!(progress(-f32::MAX..=f32::MAX, 0.0).fraction(), 0.5);
+        let slider = slider(-f32::MAX..=f32::MAX, value);
+        slider.set_from_pointer(Rectangle::with_size(Size::new(116.0, THUMB)), 58.0);
+        assert_eq!(value.get(), 0.0);
+        slider.set_from_pointer(Rectangle::with_size(Size::new(116.0, THUMB)), f32::NAN);
+        assert_eq!(value.get(), 0.0);
     }
 
     #[test]

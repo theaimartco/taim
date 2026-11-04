@@ -6,18 +6,20 @@
 //! real widget reports what a real `taim_accessibility::Focus` needs to
 //! enforce that, and that the two compose.
 
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
 use taim_accessibility::focus::{Focus, Scope};
 use taim_accessibility::tree::Tree as SemanticTree;
 
-use taim::advanced::widget::{self, Widget};
-use taim::advanced::{Layout, Shell, layout, mouse};
-use taim::widget::{button, dialog, text};
-use taim::{Element, Event, Point, Rectangle, Size, Theme};
 use taim_core::keyboard;
 use taim_core::semantics::{Actions, Role};
+use taim_core::widget::{self, Widget};
+use taim_core::{Event, Point, Rectangle, Size, Theme};
+use taim_core::{Layout, Shell, layout, mouse};
 use taim_core::{shell::Waker, window};
 use taim_renderer::Renderer;
 use taim_widget::dialog as dialog_mod;
+use taim_widget::{button, dialog, text};
 
 type Message = &'static str;
 
@@ -27,12 +29,10 @@ const WINDOW: Size = Size {
 };
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 

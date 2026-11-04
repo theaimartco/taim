@@ -37,6 +37,24 @@ fn has_backdrop() -> bool {
     return textureDimensions(backdrop_texture).x > 1u;
 }
 
+// A bounded nine-tap tent for rough glass. Clear glass retains its single
+// sample, while frost scatters the transmitted backdrop, including at the
+// flat centre. No extra full-screen blur targets or per-pane allocations.
+fn sample_rough_backdrop(position_px: vec2<f32>, offset_px: vec2<f32>, roughness: f32) -> vec3<f32> {
+    let radius = clamp((roughness - 0.08) * 12.0, 0.0, 8.0);
+    if radius <= 0.0 {
+        return sample_backdrop(position_px, offset_px);
+    }
+    var color = vec3<f32>(0.0);
+    for (var y = -1; y <= 1; y = y + 1) {
+        for (var x = -1; x <= 1; x = x + 1) {
+            let weight = f32((2 - abs(x)) * (2 - abs(y)));
+            color += sample_backdrop(position_px, offset_px + vec2<f32>(f32(x), f32(y)) * radius) * weight;
+        }
+    }
+    return color / 16.0;
+}
+
 // What a transmissive quad shows of the scene behind it, per channel.
 //
 // Lives here rather than in `material.wgsl` because it samples a texture,
@@ -72,15 +90,15 @@ fn quad_transmission(
     let tilt_length = length(tilt);
 
     if tilt_length <= 1.1754944e-38 {
-        return sample_backdrop(position_px, vec2<f32>(0.0));
+        return sample_rough_backdrop(position_px, vec2<f32>(0.0), material.roughness);
     }
 
     let direction = tilt / tilt_length;
     let offsets = dispersed_refraction_offsets(cos_theta, material);
 
     return vec3<f32>(
-        sample_backdrop(position_px, direction * offsets.r).r,
-        sample_backdrop(position_px, direction * offsets.g).g,
-        sample_backdrop(position_px, direction * offsets.b).b,
+        sample_rough_backdrop(position_px, direction * offsets.r, material.roughness).r,
+        sample_rough_backdrop(position_px, direction * offsets.g, material.roughness).g,
+        sample_rough_backdrop(position_px, direction * offsets.b, material.roughness).b,
     );
 }

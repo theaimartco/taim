@@ -22,9 +22,10 @@ pub fn text_field(placeholder: impl IntoProp<String>, value: State<String>) -> T
         shown: value.into_prop(),
         on_submit: None,
         secret: false,
+        autofill: None,
         padding: Padding::from([6.0, 10.0]),
         caret: Caret::at(0),
-        dragging: false,
+        dragging: None,
         awaiting_paste: false,
         shaped: None,
         scroll: Cell::new(0.0),
@@ -39,9 +40,10 @@ pub struct TextField {
     shown: Prop<String>,
     on_submit: Option<Box<dyn Fn()>>,
     secret: bool,
+    autofill: Option<semantics::Autofill>,
     padding: Padding,
     caret: Caret,
-    dragging: bool,
+    dragging: Option<super::look::Press>,
     awaiting_paste: bool,
     /// The displayed text (value, bullets, or placeholder), shaped.
     shaped: Option<(Paragraph, bool)>,
@@ -144,6 +146,12 @@ impl TextField {
     /// Runs `action` when Enter is pressed.
     pub fn on_submit(mut self, action: impl Fn() + 'static) -> Self {
         self.on_submit = Some(Box::new(action));
+        self
+    }
+
+    /// Opts this field into a native autofill purpose. Secret values remain redacted.
+    pub fn autofill(mut self, purpose: semantics::Autofill) -> Self {
+        self.autofill = Some(purpose);
         self
     }
 
@@ -305,6 +313,11 @@ impl TextField {
 }
 
 impl View for TextField {
+    fn cancel_interaction(&mut self) {
+        self.dragging = None;
+        self.awaiting_paste = false;
+    }
+
     fn sizing(&self) -> Sizing {
         Sizing {
             width: Axis::Fill(1),
@@ -439,28 +452,46 @@ impl View for TextField {
     }
 
     fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+        if self.dragging.is_some_and(|press| press.cancelled_by(event)) {
+            self.dragging = None;
+            cx.request_paint();
+            return Handled::No;
+        }
         let bounds = cx.bounds();
 
         match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) if cx.is_hovered() => {
+            event
+                if super::look::Press::start(event).is_some()
+                    && cx.is_hovered()
+                    && self.dragging.is_none() =>
+            {
                 cx.request_focus();
                 if let Some(at) = cx.pointer() {
                     let position = self.caret_from_pointer(bounds, at);
                     self.caret.move_to(position, false);
                     self.caret.anchor = Some(position);
                 }
-                self.dragging = true;
+                self.dragging = super::look::Press::start(event);
                 cx.request_paint();
                 Handled::Yes
             }
-            Event::Mouse(mouse::Event::CursorMoved { position }) if self.dragging => {
-                let target = self.caret_from_pointer(bounds, *position);
+            event
+                if self
+                    .dragging
+                    .and_then(|press| press.movement(event))
+                    .is_some() =>
+            {
+                let position = self
+                    .dragging
+                    .and_then(|press| press.movement(event))
+                    .expect("matched owned pointer movement");
+                let target = self.caret_from_pointer(bounds, position);
                 self.caret.position = target;
                 cx.request_paint();
                 Handled::Yes
             }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) if self.dragging => {
-                self.dragging = false;
+            event if self.dragging.is_some_and(|press| press.released_by(event)) => {
+                self.dragging = None;
                 Handled::Yes
             }
             Event::Keyboard(keyboard::Event::KeyPressed {
@@ -469,14 +500,102 @@ impl View for TextField {
                 text,
                 ..
             }) if cx.has_focus() => self.key(cx, key, *modifiers, text.as_deref()),
+            Event::InputMethod(input_method::Event::Edit(state))
+                if cx.has_focus() && !self.secret =>
+            {
+                let state = state.clone().normalized();
+                if state.composing.is_some() || state.content.contains(['\r', '\n']) {
+                    return Handled::Yes;
+                }
+                let position = state.content[..state.selection.end].graphemes(true).count();
+                let anchor = state.content[..state.selection.start]
+                    .graphemes(true)
+                    .count();
+                let _ = self.value.set(state.content);
+                self.caret = Caret {
+                    position,
+                    anchor: (anchor != position).then_some(anchor),
+                };
+                cx.request_layout();
+                Handled::Yes
+            }
+            Event::InputMethod(input_method::Event::DeleteSurrounding {
+                before,
+                after,
+                codepoints,
+            }) if cx.has_focus() => {
+                let value = self.value.get();
+                let (start, end) = self
+                    .caret
+                    .selection()
+                    .unwrap_or((self.caret.position, self.caret.position));
+                let (start, end) = (edit::byte(&value, start), edit::byte(&value, end));
+                let before = (*before).min(262144);
+                let after = (*after).min(262144);
+                let from = if *codepoints {
+                    value[..start]
+                        .char_indices()
+                        .rev()
+                        .nth(before.saturating_sub(1))
+                        .map_or(0, |(index, _)| index)
+                } else {
+                    input_method::utf16_to_utf8(
+                        &value,
+                        input_method::utf8_to_utf16(&value, start).saturating_sub(before),
+                    )
+                };
+                let from = if before == 0 { start } else { from };
+                let to = if *codepoints {
+                    value[end..]
+                        .char_indices()
+                        .nth(after)
+                        .map_or(value.len(), |(index, _)| end + index)
+                } else {
+                    let offset = input_method::utf8_to_utf16(&value, end).saturating_add(after);
+                    let at = input_method::utf16_to_utf8(&value, offset);
+                    if input_method::utf8_to_utf16(&value, at) < offset {
+                        value[at..]
+                            .chars()
+                            .next()
+                            .map_or(at, |character| at + character.len_utf8())
+                    } else {
+                        at
+                    }
+                };
+                let mut next = String::with_capacity(value.len());
+                next.push_str(&value[..from]);
+                next.push_str(&value[start..end]);
+                next.push_str(&value[to..]);
+                let left = next[..from].graphemes(true).count();
+                let right = next[..from + end - start].graphemes(true).count();
+                let reversed = self
+                    .caret
+                    .anchor
+                    .is_some_and(|anchor| self.caret.position < anchor);
+                let _ = self.value.set(next);
+                self.caret = Caret {
+                    position: if reversed { left } else { right },
+                    anchor: (left != right).then_some(if reversed { right } else { left }),
+                };
+                cx.request_layout();
+                Handled::Yes
+            }
+            Event::InputMethod(input_method::Event::Submit) if cx.has_focus() => {
+                if let Some(submit) = &self.on_submit {
+                    submit();
+                }
+                Handled::Yes
+            }
             Event::InputMethod(input_method::Event::Commit(text)) if cx.has_focus() => {
                 self.insert(text);
                 cx.request_paint();
                 Handled::Yes
             }
-            Event::Clipboard(clipboard::Event::Read(Ok(content))) if self.awaiting_paste => {
+            Event::Clipboard(clipboard::Event::Read(result)) if self.awaiting_paste => {
                 self.awaiting_paste = false;
-                if let clipboard::Content::Text(text) = &**content {
+                if let Ok(content) = result
+                    && let clipboard::Content::Text(text) = &**content
+                {
                     let line = text.lines().next().unwrap_or_default().to_owned();
                     self.insert(&line);
                     cx.request_paint();
@@ -495,9 +614,15 @@ impl View for TextField {
         };
         let node = semantics::Node::new(self.id.clone(), cx.bounds(), role)
             .with_name(self.placeholder.get())
-            .with_state(look::interactive_state(true, cx.has_focus()));
+            .with_state(look::interactive_state(true, cx.has_focus()))
+            .with_actions(semantics::Actions::FOCUS);
 
         // `with_value` refuses to disclose secure fields by itself.
+        let node = if let Some(purpose) = self.autofill {
+            node.with_autofill(purpose)
+        } else {
+            node
+        };
         Some(node.with_value(semantics::Value::Text(self.shown.get().into())))
     }
 
@@ -507,6 +632,36 @@ impl View for TextField {
 
     fn focusable(&self) -> bool {
         true
+    }
+
+    fn editor_state(&self) -> Option<input_method::EditorState> {
+        if self.secret {
+            return None;
+        }
+        let content = self.shown.get();
+        let selection = edit::byte(&content, self.caret.anchor.unwrap_or(self.caret.position))
+            ..edit::byte(&content, self.caret.position);
+        Some(input_method::EditorState {
+            content,
+            selection,
+            composing: None,
+            multiline: false,
+        })
+    }
+
+    fn input_method(&self, bounds: Rectangle) -> input_method::InputMethod {
+        let area = self.text_area(bounds);
+        let x = (area.x + self.caret_x(self.caret.position) - self.scroll.get())
+            .clamp(area.x, area.x + area.width.max(0.0));
+        input_method::InputMethod::Enabled {
+            cursor: Rectangle::new(Point::new(x, area.y), Size::new(1.5, area.height)),
+            purpose: if self.secret {
+                input_method::Purpose::Secure
+            } else {
+                input_method::Purpose::Normal
+            },
+            preedit: None,
+        }
     }
 }
 

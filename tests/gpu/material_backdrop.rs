@@ -153,6 +153,48 @@ fn at(pixels: &[u8], x: u32, y: u32) -> [u8; 4] {
     ]
 }
 
+#[test]
+fn frosted_glass_softens_backdrop_inside_the_flat_pane() {
+    needs_gpu!(renderer);
+    let stripes = |renderer: &mut Renderer| {
+        for x in 0..SIZE {
+            renderer.fill_quad(
+                Quad {
+                    bounds: Rectangle {
+                        x: x as f32,
+                        y: 0.0,
+                        width: 1.0,
+                        height: SIZE as f32,
+                    },
+                    ..Default::default()
+                },
+                if x % 2 == 0 {
+                    Color::WHITE
+                } else {
+                    Color::BLACK
+                },
+            );
+        }
+    };
+    let clear = through_pane(&mut renderer, Material::GLASS, stripes);
+    let frost = through_pane(&mut renderer, Material::FROSTED, stripes);
+    if cfg!(feature = "web-colors") {
+        assert_eq!(
+            clear, frost,
+            "legacy gamma blending must disable physical glass scattering"
+        );
+        return;
+    }
+    let contrast =
+        |pixels: &[u8]| (i32::from(at(pixels, 30, 32)[0]) - i32::from(at(pixels, 31, 32)[0])).abs();
+    assert!(
+        contrast(&frost) < contrast(&clear) / 2,
+        "rough glass must scatter backdrop details, clear={}, frosted={}",
+        contrast(&clear),
+        contrast(&frost)
+    );
+}
+
 /// Pixels inside the pane, on its horizontal centre line.
 ///
 /// The centre line, because that is where an SDF's horizontal gradient is
@@ -190,6 +232,15 @@ fn a_transmissive_pane_shows_what_is_behind_it() {
 
     let opaque = through_pane(&mut renderer, Material::OPAQUE, block_at(20.0));
     let glass = through_pane(&mut renderer, Material::GLASS, block_at(20.0));
+
+    if cfg!(feature = "web-colors") {
+        assert_eq!(
+            pane_row(&opaque),
+            pane_row(&glass),
+            "legacy blending must leave physical transmission disabled"
+        );
+        return;
+    }
 
     assert_ne!(
         pane_row(&opaque),
@@ -236,6 +287,14 @@ fn a_pane_bends_what_it_transmits_rather_than_translating_it() {
 
     let row_a = pane_row(&glass_a);
     let row_b = pane_row(&glass_b);
+
+    if cfg!(feature = "web-colors") {
+        assert_eq!(
+            row_a, row_b,
+            "legacy blending must leave physical transmission disabled"
+        );
+        return;
+    }
 
     assert_ne!(row_a, row_b, "moving the backdrop changed nothing");
 
@@ -322,6 +381,15 @@ fn a_pane_separates_colour_at_its_bevel() {
         red_blue_split,
     );
 
+    if cfg!(feature = "web-colors") {
+        assert_eq!(
+            pane_row(&dispersive),
+            pane_row(&achromatic),
+            "legacy blending must leave physical transmission disabled"
+        );
+        return;
+    }
+
     assert_ne!(
         pane_row(&dispersive),
         pane_row(&achromatic),
@@ -401,6 +469,15 @@ fn a_gradient_pane_shades_its_material_like_a_solid_one() {
 
     let opaque = gradient_pane(&mut renderer, Material::OPAQUE);
     let glass = gradient_pane(&mut renderer, Material::GLASS);
+
+    if cfg!(feature = "web-colors") {
+        assert_eq!(
+            pane_row(&opaque),
+            pane_row(&glass),
+            "legacy blending must leave physical transmission disabled"
+        );
+        return;
+    }
 
     assert_ne!(
         pane_row(&opaque),

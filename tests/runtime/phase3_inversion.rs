@@ -1,159 +1,37 @@
-//! Phase 3 Architecture and Runtime Inversion Verification Tests.
-//!
-//! Validates the end-to-end execution path:
-//! Native App -> AppRunner -> Event Loop -> FrameGate -> TaskScheduler.
-//! Validates that legacy Program execution adapts seamlessly through ProgramAdapter into the native path.
-
-use taim::window;
-use taim::{
-    App, AppContext, AppRunner, Element, FrameRequest, Program, ProgramAdapter, Settings, Task,
-    Theme, WindowContext,
-};
+//! Native view-root lifecycle and platform frame-gate contracts.
+//! Program/AppRunner were removed; these exercise the live root contract.
+use taim::prelude::*;
+use taim::view::Root;
+use taim_core::window;
 use taim_winit::frame_gate::{DirtyFlags, FrameGate, PlatformEvent};
 
-use taim::advanced::widget::{Tree, Widget};
-use taim::advanced::{Layout, renderer};
-use taim::{Length, Rectangle, Size};
-
-struct TestWidget;
-
-impl<Message, Theme, Renderer: taim::advanced::Renderer> Widget<Message, Theme, Renderer>
-    for TestWidget
-{
-    fn size(&self) -> Size<Length> {
-        Size::new(Length::Shrink, Length::Shrink)
-    }
-
-    fn layout(
-        &mut self,
-        _tree: &mut Tree,
-        _renderer: &Renderer,
-        _limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
-        taim::advanced::layout::Node::new(Size::new(100.0, 50.0))
-    }
-
-    fn draw(
-        &self,
-        _tree: &Tree,
-        _renderer: &mut Renderer,
-        _theme: &Theme,
-        _style: &renderer::Style,
-        _layout: Layout<'_>,
-        _cursor: taim::advanced::mouse::Cursor,
-        _viewport: &Rectangle,
-    ) {
-    }
-}
-
-struct MockApp;
-
-impl App for MockApp {
-    type State = u32;
-    type Message = u32;
-    type Theme = Theme;
-    type Renderer = ();
-    type Executor = taim::executor::Default;
-
-    fn name() -> &'static str {
-        "mock_app"
-    }
-
-    fn boot(&self, _context: &mut AppContext) -> (Self::State, Task<Self::Message>) {
-        (100, Task::none())
-    }
-
-    fn update(
-        &self,
-        state: &mut Self::State,
-        message: Self::Message,
-        context: &mut AppContext,
-    ) -> Task<Self::Message> {
-        *state += message;
-        context.request_redraw();
-        Task::none()
-    }
-
-    fn view<'a>(
-        &self,
-        _state: &'a Self::State,
-        _window: &WindowContext,
-    ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
-        Element::new(TestWidget)
-    }
-}
-
-struct MockLegacyProgram;
-
-impl Program for MockLegacyProgram {
-    type State = u32;
-    type Message = u32;
-    type Theme = Theme;
-    type Renderer = ();
-    type Executor = taim::executor::Default;
-
-    fn name() -> &'static str {
-        "mock_legacy_program"
-    }
-
-    fn settings(&self) -> Settings {
-        Settings::default()
-    }
-
-    fn window(&self) -> Option<window::Settings> {
-        None
-    }
-
-    fn boot(&self) -> (Self::State, Task<Self::Message>) {
-        (200, Task::none())
-    }
-
-    fn update(&self, state: &mut Self::State, message: Self::Message) -> Task<Self::Message> {
-        *state += message;
-        Task::none()
-    }
-
-    fn view<'a>(
-        &self,
-        _state: &'a Self::State,
-        _window: window::Id,
-    ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
-        Element::new(TestWidget)
-    }
+#[test]
+fn native_state_updates_invalidate_the_persistent_view_root() {
+    let mut state = None;
+    let mut root = Root::new(|cx| {
+        let count = cx.signal(100_u32);
+        state = Some(count);
+        text(move || format!("Count: {}", count.get()))
+    });
+    // Reactive closures establish their dependencies on the first layout.
+    use taim_core::renderer::Headless as _;
+    let renderer = taim_futures::futures::executor::block_on(taim::Renderer::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
+    .expect("CPU renderer");
+    root.layout(&renderer, taim::Size::new(320.0, 120.0));
+    assert_eq!(root.take_changes(), (false, false));
+    state.unwrap().update(|count| *count += 50);
+    assert_eq!(state.unwrap().get(), 150);
+    assert_eq!(root.take_changes(), (true, true));
+    assert_eq!(root.take_changes(), (false, false));
 }
 
 #[test]
-fn test_native_app_does_not_use_program_runtime() {
-    let app = MockApp;
-    assert!(!MockApp::is_legacy_compat());
-
-    let (mut runner, _task) = AppRunner::new(app);
-    assert!(!runner.is_legacy_compat());
-    assert_eq!(*runner.state(), 100);
-
-    let win_ctx = WindowContext::new(window::Id::unique(), 1.0);
-    assert_eq!(runner.title(&win_ctx), "mock_app - Taim");
-
-    let _ = runner.update(50);
-    assert_eq!(*runner.state(), 150);
-    assert_eq!(runner.context_mut().take_request(), FrameRequest::Redraw);
-}
-
-#[test]
-fn test_legacy_program_executes_through_native_app_runtime() {
-    let program = MockLegacyProgram;
-    let adapter = ProgramAdapter::new(program);
-    assert!(ProgramAdapter::<MockLegacyProgram>::is_legacy_compat());
-
-    let (mut runner, _task) = AppRunner::new(adapter);
-    assert!(runner.is_legacy_compat());
-    assert_eq!(*runner.state(), 200);
-
-    let win_ctx = WindowContext::new(window::Id::unique(), 1.0);
-    assert_eq!(runner.title(&win_ctx), "Mock Legacy Program - Taim");
-
-    let _ = runner.update(75);
-    assert_eq!(*runner.state(), 275);
+fn building_an_application_does_not_open_a_platform_window() {
+    let app = taim::app("Native contract", |_| text("Ready"));
+    assert!(format!("{app:?}").contains("Native contract"));
 }
 
 #[test]

@@ -3,8 +3,12 @@ use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_ma
 
 use taim::border;
 use taim::mouse;
-use taim::widget::{canvas, center_y, column, container, row, scrollable, space, text};
-use taim::{Center, Color, Element, Fill, Length, Never, Point, Rectangle, Size, Theme};
+use taim_widget::{canvas, center_y, column, container, row, scrollable, space, text};
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
+use taim_core::Length::Fill;
+use taim_core::alignment::Alignment::Center;
+use taim_core::{Color, Length, Never, Point, Rectangle, Size, Theme};
 use taim_futures::futures::executor;
 use taim_renderer::Renderer;
 use taim_renderer::core::renderer::{self, Headless as _};

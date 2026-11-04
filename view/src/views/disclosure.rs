@@ -61,6 +61,10 @@ impl Stepper {
 }
 
 impl View for Stepper {
+    fn cancel_interaction(&mut self) {
+        self.pressed = None;
+    }
+
     fn measure(&mut self, cx: &mut MeasureCx<'_>, _constraints: Constraints) -> Size {
         self.number.set(&self.shown.get().to_string());
         let number = self.number.measure(cx);
@@ -169,6 +173,7 @@ impl View for Stepper {
 /// `content` with `tip` shown above it while the pointer rests on it.
 pub fn tooltip(content: impl Into<AnyView>, tip: impl Into<String>) -> Tooltip {
     Tooltip {
+        id: widget::Id::unique(),
         content: Child::new(content.into()),
         tip: Label::new(tip, Some(12.0)),
         hovered: false,
@@ -177,6 +182,7 @@ pub fn tooltip(content: impl Into<AnyView>, tip: impl Into<String>) -> Tooltip {
 
 /// See [`tooltip`].
 pub struct Tooltip {
+    id: widget::Id,
     content: Child,
     tip: Label,
     hovered: bool,
@@ -235,7 +241,7 @@ impl View for Tooltip {
 
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
         Some(
-            semantics::Node::new(widget::Id::unique(), cx.bounds(), semantics::Role::Group)
+            semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::Group)
                 .with_description(self.tip.text()),
         )
     }
@@ -267,6 +273,7 @@ pub fn accordion<T: Into<String>>(
         sections: sections
             .into_iter()
             .map(|(title, body)| Section {
+                id: widget::Id::unique(),
                 title: Label::new(title, Some(15.0)),
                 chevron: Label::new("›", Some(18.0)),
                 body: Child::new(body),
@@ -276,11 +283,13 @@ pub fn accordion<T: Into<String>>(
         open,
         shown: open.into_prop(),
         pressed: None,
+        exposed: None,
         id: widget::Id::unique(),
     }
 }
 
 struct Section {
+    id: widget::Id,
     title: Label,
     chevron: Label,
     body: Child,
@@ -293,12 +302,17 @@ pub struct Accordion {
     open: State<Option<usize>>,
     shown: Prop<Option<usize>>,
     pressed: Option<usize>,
+    exposed: Option<usize>,
     id: widget::Id,
 }
 
 const HEADER: f32 = 44.0;
 
 impl View for Accordion {
+    fn cancel_interaction(&mut self) {
+        self.pressed = None;
+    }
+
     fn sizing(&self) -> Sizing {
         Sizing {
             width: Axis::Fill(1),
@@ -409,7 +423,7 @@ impl View for Accordion {
             state.set(semantics::State::EXPANDED, open == Some(index));
             group = group.with_child(
                 semantics::Node::new(
-                    widget::Id::unique(),
+                    section.id.clone(),
                     section.header.get(),
                     semantics::Role::Button,
                 )
@@ -426,6 +440,12 @@ impl View for Accordion {
 
     fn children(&mut self, visit: &mut dyn FnMut(&mut Child)) {
         let open = self.shown.get();
+        if self.exposed != open {
+            if let Some(previous) = self.exposed.and_then(|index| self.sections.get_mut(index)) {
+                previous.body.deactivate();
+            }
+            self.exposed = open;
+        }
         if let Some(section) = open.and_then(|index| self.sections.get_mut(index)) {
             visit(&mut section.body);
         }
@@ -435,6 +455,7 @@ impl View for Accordion {
 /// Swipeable pages, one visible at a time, bound to `page`.
 pub fn carousel(pages: impl IntoIterator<Item = AnyView>, page: State<usize>) -> Carousel {
     Carousel {
+        id: widget::Id::unique(),
         pages: pages.into_iter().map(Child::new).collect(),
         page,
         shown: page.into_prop(),
@@ -448,6 +469,7 @@ pub fn carousel(pages: impl IntoIterator<Item = AnyView>, page: State<usize>) ->
 
 /// See [`carousel`].
 pub struct Carousel {
+    id: widget::Id,
     pages: Vec<Child>,
     page: State<usize>,
     shown: Prop<usize>,
@@ -460,6 +482,10 @@ pub struct Carousel {
 }
 
 impl View for Carousel {
+    fn cancel_interaction(&mut self) {
+        self.drag = None;
+    }
+
     fn sizing(&self) -> Sizing {
         Sizing::FILL
     }
@@ -525,6 +551,11 @@ impl View for Carousel {
     }
 
     fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
+        if crate::tree::is_cancellation(event) {
+            self.drag = None;
+            cx.request_paint();
+            return Handled::No;
+        }
         let width = self.width.get().max(1.0);
         let last = self.pages.len().saturating_sub(1) as f32;
 
@@ -571,12 +602,9 @@ impl View for Carousel {
 
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
         Some(
-            semantics::Node::new(widget::Id::unique(), cx.bounds(), semantics::Role::Group)
-                .with_name(format!(
-                    "Page {} of {}",
-                    self.shown.get() + 1,
-                    self.pages.len()
-                )),
+            semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::Group).with_name(
+                format!("Page {} of {}", self.shown.get() + 1, self.pages.len()),
+            ),
         )
     }
 

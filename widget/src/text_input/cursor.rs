@@ -3,6 +3,7 @@ use crate::text_input::Value;
 
 /// The cursor of a text input.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Default)]
 pub struct Cursor {
     anchor: usize,
     head: usize,
@@ -23,11 +24,6 @@ pub enum State {
     },
 }
 
-impl Default for Cursor {
-    fn default() -> Self {
-        Self { anchor: 0, head: 0 }
-    }
-}
 
 impl Cursor {
     /// Returns the [`State`] of the [`Cursor`].

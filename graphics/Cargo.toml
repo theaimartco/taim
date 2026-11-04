@@ -49,3 +49,6 @@ kamadak-exif.optional = true
 
 lyon_path.workspace = true
 lyon_path.optional = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+unicode-script = "0.5.8"

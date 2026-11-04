@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.theaimartco.taim.mediadriver">
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
+    <application android:label="Taim media test driver" android:debuggable="true" android:allowBackup="false">
+        <activity android:name=".MediaResponder" android:exported="true" android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+        <provider android:name=".MediaProvider" android:authorities="com.theaimartco.taim.mediadriver.media" android:exported="false" android:grantUriPermissions="true" />
+    </application>
+    <instrumentation android:name=".MediaDriver" android:targetPackage="com.theaimartco.taim.mediaprobe" />
+</manifest>

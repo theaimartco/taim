@@ -2,7 +2,8 @@
 
 ## Device Coverage
 - Desktop (Windows, macOS, Linux)
-- Mobile (iOS, Android - Tier 2)
+- Android: ARM64/x86_64 builds; API 35/4 KiB emulator smoke passes; tested 16 KiB GLES smoke passes; Vulkan corruption remains guarded; physical acceptance pending ([evidence](../android/native-host-20261029.md))
+- iOS: unsupported; native verification pending
 
 ## Language Coverage
 - LTR (English, Spanish)

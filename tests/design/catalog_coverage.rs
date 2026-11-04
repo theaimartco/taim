@@ -83,7 +83,6 @@ mod static_assertions {
     // These three are behind features, so their assertions have to be too --
     // otherwise a default-feature build fails to compile a test about
     // coverage rather than reporting one.
-    #[cfg(feature = "markdown")]
     const _: fn() = || {
         fn assert_impl<T: taim_widget::markdown::Catalog>() {}
         assert_impl::<Theme>();
@@ -95,7 +94,6 @@ mod static_assertions {
         assert_impl::<Theme>();
     };
 
-    #[cfg(feature = "qr_code")]
     const _: fn() = || {
         fn assert_impl<T: taim_widget::qr_code::Catalog>() {}
         assert_impl::<Theme>();

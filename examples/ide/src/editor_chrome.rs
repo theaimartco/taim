@@ -1,9 +1,9 @@
 //! Editor gutter and scrollbar tied to the text editor's real viewport.
 
-use taim::widget::Canvas;
-use taim::widget::canvas::{self, Program};
 use taim::{Color, Point, Rectangle, Size};
 use taim_core::text::Alignment;
+use taim_widget::Canvas;
+use taim_widget::canvas::{self, Program};
 
 use crate::Message;
 
@@ -60,14 +60,14 @@ impl EditorViewport {
 
 pub fn gutter(viewport: EditorViewport) -> Canvas<Gutter, Message> {
     Canvas::new(Gutter(viewport))
-        .width(taim::Length::Fixed(48.0))
-        .height(taim::Length::Fill)
+        .width(taim_core::Length::Fixed(48.0))
+        .height(taim_core::Length::Fill)
 }
 
 pub fn scrollbar(viewport: EditorViewport) -> Canvas<Scrollbar, Message> {
     Canvas::new(Scrollbar(viewport))
-        .width(taim::Length::Fixed(16.0))
-        .height(taim::Length::Fill)
+        .width(taim_core::Length::Fixed(16.0))
+        .height(taim_core::Length::Fill)
 }
 
 pub fn minimap(
@@ -75,8 +75,8 @@ pub fn minimap(
     density: std::sync::Arc<[u8]>,
 ) -> Canvas<Minimap, Message> {
     Canvas::new(Minimap { viewport, density })
-        .width(taim::Length::Fixed(52.0))
-        .height(taim::Length::Fill)
+        .width(taim_core::Length::Fixed(52.0))
+        .height(taim_core::Length::Fill)
 }
 
 fn line_string(line_1_based: usize) -> String {
@@ -209,7 +209,7 @@ pub struct ScrollbarState {
 pub struct Scrollbar(EditorViewport);
 
 impl Scrollbar {
-    fn thumb(self: &Self, height: f32) -> (f32, f32) {
+    fn thumb(&self, height: f32) -> (f32, f32) {
         if height <= 0.0 {
             return (0.0, 0.0);
         }

@@ -25,8 +25,9 @@
 
 use std::time::{Duration, Instant};
 
-use taim::widget::{button, checkbox, column, container, row, scrollable, slider, text};
-use taim::{Color, Element, Rectangle, Size, Theme};
+use taim::{Color, Rectangle, Size, Theme};
+use taim_widget::{button, checkbox, container, scrollable, slider, text};
+type Element<'a, M> = taim_core::Element<'a, M, Theme, Renderer>;
 use taim_core::semantics;
 use taim_core::widget::visit::Visit;
 use taim_profiler::events::{Event, Phase, Resource};
@@ -325,8 +326,8 @@ impl Hosted {
     /// confidently wrong rather than absent.
     pub fn new(collector: Collector) -> Option<Self> {
         let renderer = taim_futures::futures::executor::block_on(
-            <Renderer as taim::advanced::renderer::Headless>::new(
-                taim::advanced::renderer::Settings::default(),
+            <Renderer as taim_core::renderer::Headless>::new(
+                taim_core::renderer::Settings::default(),
                 Some("tiny-skia"),
             ),
         )?;
@@ -426,7 +427,7 @@ impl Hosted {
             (self.bounds.width * self.scale).round() as u32,
             (self.bounds.height * self.scale).round() as u32,
         );
-        let _ = <Renderer as taim::advanced::renderer::Headless>::screenshot(
+        let _ = <Renderer as taim_core::renderer::Headless>::screenshot(
             &mut self.renderer,
             physical,
             self.scale,
@@ -517,9 +518,9 @@ impl Hosted {
     /// enough text to shape. A synthetic tree of one widget would profile
     /// the profiler.
     fn view(&self) -> Element<'static, ()> {
-        let rows = (0..40).fold(column![].spacing(4), |rows, index| {
+        let rows = (0..40).fold(taim_widget::column![].spacing(4), |rows, index| {
             rows.push(
-                row![
+                taim_widget::row![
                     text(format!("row {index}")),
                     text("shaped text \u{2014} with some length to it"),
                 ]
@@ -528,9 +529,9 @@ impl Hosted {
         });
 
         container(
-            column![
+            taim_widget::column![
                 text("Hosted target").size(20),
-                row![
+                taim_widget::row![
                     button("press"),
                     checkbox(self.toggled).label("toggle"),
                     slider(0.0..=100.0, self.amount, |_| ()),

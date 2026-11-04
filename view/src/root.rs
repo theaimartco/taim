@@ -14,8 +14,9 @@ use crate::layout::Constraints;
 use crate::state::{Invalidation, Scope};
 use crate::tree;
 use crate::{AnyView, Child, Color, Event, Handled, Instant, Point, Rectangle, Renderer, Size};
-use crate::{Theme, mouse, semantics};
+use crate::{Theme, keyboard, mouse, semantics};
 
+use taim_core::input_method::{self, InputMethod, Preedit};
 use taim_core::widget;
 
 use std::sync::Arc;
@@ -28,9 +29,36 @@ pub struct Root {
     invalidation: Arc<Invalidation>,
     theme: Theme,
     focus: Focus,
+    focus_identity: Option<widget::Id>,
+    modal_focus: Vec<ModalFocus>,
     /// Theme name and scale the shell last applied.
     applied: Option<(String, f32)>,
     id: widget::Id,
+    preedit: Option<Preedit>,
+    composition: crate::ime::Composition,
+    system_motion_reduced: bool,
+    paste_sequence: u64,
+    pending_paste: Option<PendingPaste>,
+}
+
+/// Opaque single-use identity for one asynchronous clipboard read.
+/// It contains no editor text and is scoped to its originating Root.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PasteToken {
+    root: widget::Id,
+    sequence: u64,
+}
+struct PendingPaste {
+    sequence: u64,
+    target: widget::Id,
+    editor: Option<input_method::EditorState>,
+    purpose: Option<input_method::Purpose>,
+}
+
+struct ModalFocus {
+    identity: widget::Id,
+    path: Vec<u16>,
+    restore: Option<widget::Id>,
 }
 
 /// What handling one event asked of the shell.
@@ -51,6 +79,81 @@ pub struct Response {
 }
 
 impl Root {
+    /// Capture the focused destination before starting an asynchronous clipboard read.
+    /// A newer request supersedes the old one; no secret editor text is retained.
+    pub fn begin_paste(&mut self) -> Option<PasteToken> {
+        self.pending_paste = None;
+        let target = self.focused_identity()?;
+        self.paste_sequence = self.paste_sequence.checked_add(1)?;
+        let purpose = self.paste_purpose();
+        let editor = if purpose == Some(input_method::Purpose::Secure) {
+            None
+        } else {
+            self.editor_state().map(|(_, state)| state)
+        };
+        self.pending_paste = Some(PendingPaste {
+            sequence: self.paste_sequence,
+            target,
+            editor,
+            purpose,
+        });
+        Some(PasteToken {
+            root: self.id.clone(),
+            sequence: self.paste_sequence,
+        })
+    }
+    /// Authorize one completion only if its original editor and editing context remain current.
+    /// Call before delivering the Clipboard event; rejected old reads cannot cancel a newer read.
+    pub fn accept_paste(&mut self, token: &PasteToken) -> bool {
+        self.reconcile_focus();
+        if token.root != self.id
+            || self
+                .pending_paste
+                .as_ref()
+                .is_none_or(|pending| pending.sequence != token.sequence)
+        {
+            return false;
+        }
+        let Some(pending) = self.pending_paste.take() else {
+            return false;
+        };
+        if self.focused_identity() != Some(pending.target)
+            || self.paste_purpose() != pending.purpose
+        {
+            return false;
+        }
+        let editor = if pending.purpose == Some(input_method::Purpose::Secure) {
+            None
+        } else {
+            self.editor_state().map(|(_, state)| state)
+        };
+        editor == pending.editor
+    }
+    fn paste_purpose(&mut self) -> Option<input_method::Purpose> {
+        match self.input_method() {
+            InputMethod::Enabled { purpose, .. } => Some(purpose),
+            InputMethod::Disabled => None,
+        }
+    }
+
+    /// Current native hierarchy slots after layout. Active Taim modals hide every native slot.
+    pub fn native_views(&mut self) -> Vec<crate::NativeViewPlacement> {
+        tree::native_views(&mut self.child)
+    }
+    /// Release Taim keyboard/composition ownership when a native control takes input.
+    pub fn release_focus(&mut self, now: Instant) -> Response {
+        let mut response = self.handle(
+            &Event::Window(taim_core::window::Event::Unfocused),
+            None,
+            now,
+        );
+        self.focus.current = None;
+        self.focus_identity = None;
+        self.preedit = None;
+        self.composition.clear();
+        response.paint = true;
+        response
+    }
     /// Builds the tree by calling `build` once with a fresh scope.
     pub fn new<V: Into<AnyView>>(build: impl FnOnce(&mut Scope) -> V) -> Self {
         let invalidation = Arc::new(Invalidation::default());
@@ -63,9 +166,81 @@ impl Root {
             invalidation,
             theme: Theme::Light,
             focus: Focus::default(),
+            focus_identity: None,
+            modal_focus: Vec::new(),
             applied: None,
             id: widget::Id::unique(),
+            preedit: None,
+            composition: crate::ime::Composition::default(),
+            system_motion_reduced: false,
+            paste_sequence: 0,
+            pending_paste: None,
         }
+    }
+
+    /// Whether a modal or application navigation can consume a back gesture.
+    pub fn handles_back(&mut self) -> bool {
+        self.reconcile_focus();
+        !self.modal_focus.is_empty()
+            || self
+                .scope
+                .settings
+                .back
+                .as_ref()
+                .is_some_and(|(enabled, _)| enabled.get())
+    }
+
+    /// Dismisses the active modal first, then invokes enabled app navigation.
+    pub fn back(&mut self, now: Instant) -> Response {
+        self.reconcile_focus();
+        if !self.modal_focus.is_empty() {
+            let key = keyboard::Key::Named(keyboard::key::Named::Escape);
+            let response = self.handle(
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: key.clone(),
+                    modified_key: key,
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                    text: None,
+                    repeat: false,
+                }),
+                None,
+                now,
+            );
+            if response.captured {
+                return response;
+            }
+        }
+        if let Some((enabled, action)) = &self.scope.settings.back
+            && enabled.get()
+        {
+            action();
+            return Response {
+                captured: true,
+                paint: true,
+                ..Response::default()
+            };
+        }
+        Response::default()
+    }
+
+    /// Builds a scope using a versioned, explicitly opted-in state checkpoint.
+    pub fn new_restored<V: Into<AnyView>>(
+        snapshot: &str,
+        build: impl FnOnce(&mut Scope) -> V,
+    ) -> Self {
+        Self::new(|cx| {
+            cx.restoration.load(snapshot);
+            build(cx)
+        })
+    }
+
+    /// Serializes only values registered with `Scope::restorable`.
+    pub fn restoration_snapshot(&self) -> Result<String, crate::RestorationError> {
+        self.scope.restoration.snapshot()
     }
 
     /// Calls `wake` (from any thread) whenever state the tree reads changes.
@@ -76,7 +251,11 @@ impl Root {
     /// What state changes owe the window since the last call: `(paint,
     /// layout)`.
     pub fn take_changes(&self) -> (bool, bool) {
+        let more = self.scope.receive();
         let owed = self.invalidation.take();
+        if more {
+            self.invalidation.mark(Invalidation::LAYOUT);
+        }
         (
             owed & (Invalidation::PAINT | Invalidation::LAYOUT) != 0,
             owed & Invalidation::LAYOUT != 0,
@@ -90,21 +269,32 @@ impl Root {
 
     /// The window zoom the application chose (1.0 by default).
     pub fn scale(&self) -> f32 {
-        self.scope
+        let scale = self
+            .scope
             .settings
             .scale
             .as_ref()
-            .map_or(1.0, crate::Prop::get)
+            .map_or(1.0, crate::Prop::get);
+        if scale.is_finite() && scale > 0.0 {
+            scale
+        } else {
+            1.0
+        }
     }
 
     /// Applies the application's motion preference and reports whether its
     /// theme or zoom changed since the last call.
     pub fn settings_changed(&mut self) -> bool {
+        let _ = self.scope.receive();
         use taim_core::theme::Base as _;
 
-        if let Some(reduced) = &self.scope.settings.reduced_motion {
-            crate::state::set_motion_reduced(reduced.get());
-        }
+        crate::state::set_motion_reduced(
+            self.scope
+                .settings
+                .reduced_motion
+                .as_ref()
+                .map_or(self.system_motion_reduced, crate::Prop::get),
+        );
 
         let current = (
             self.theme()
@@ -115,6 +305,73 @@ impl Root {
         let changed = self.applied.as_ref() != Some(&current);
         self.applied = Some(current);
         changed
+    }
+
+    /// Sets the platform preference, overridden by an explicit app preference.
+    pub fn set_system_motion_reduced(&mut self, reduced: bool) -> bool {
+        if self.system_motion_reduced == reduced {
+            return false;
+        }
+        self.system_motion_reduced = reduced;
+        crate::state::set_motion_reduced(
+            self.scope
+                .settings
+                .reduced_motion
+                .as_ref()
+                .map_or(reduced, crate::Prop::get),
+        );
+        true
+    }
+
+    /// Stable identity of the focused view, without disclosing editor contents.
+    pub fn focused_identity(&mut self) -> Option<widget::Id> {
+        self.reconcile_focus();
+        self.focus_identity.clone()
+    }
+
+    /// Semantic node identity at keyboard focus. This differs from the retained
+    /// child identity used to track focus through reparenting.
+    pub fn focused_semantic_identity(&mut self) -> Option<widget::Id> {
+        self.reconcile_focus();
+        let focused = self.focus.current.as_deref()?;
+        let mut identity = None;
+        tree::walk(
+            &mut self.child,
+            Point::ORIGIN,
+            &mut Vec::new(),
+            &mut |view, bounds, path| {
+                if path == focused {
+                    identity = view
+                        .describe(&crate::DescribeCx {
+                            bounds,
+                            focused: true,
+                            _marker: std::marker::PhantomData,
+                        })
+                        .map(|node| node.id);
+                }
+            },
+        );
+        identity
+    }
+
+    /// Public native-editor context for the focused view and its stable identity.
+    pub fn editor_state(&mut self) -> Option<(widget::Id, input_method::EditorState)> {
+        self.reconcile_focus();
+        let focused = self.focus.current.as_deref()?;
+        let mut state = None;
+        tree::walk(
+            &mut self.child,
+            Point::ORIGIN,
+            &mut Vec::new(),
+            &mut |view, _, path| {
+                if path == focused {
+                    state = view.editor_state();
+                }
+            },
+        );
+        state
+            .zip(self.focus_identity.clone())
+            .map(|(state, id)| (id, state.normalized()))
     }
 
     /// Sets the theme views paint with.
@@ -130,6 +387,65 @@ impl Root {
         };
         let _ = self.child.measure(&mut cx, Constraints::loose(size));
         self.child.place(Point::ORIGIN);
+        self.reconcile_focus();
+    }
+
+    fn reconcile_focus(&mut self) {
+        let previous = self.focus_identity.clone();
+        let scopes = tree::modal_scopes(&mut self.child, &mut Vec::new(), &mut Vec::new());
+        let shared = self
+            .modal_focus
+            .iter()
+            .zip(&scopes)
+            .take_while(|(old, (id, _))| old.identity == *id)
+            .count();
+        let modal_changed = shared != self.modal_focus.len() || shared != scopes.len();
+        if shared < self.modal_focus.len() {
+            self.focus_identity = self.modal_focus[shared].restore.clone();
+            self.modal_focus.truncate(shared);
+        }
+        for (index, (identity, path)) in scopes.into_iter().enumerate() {
+            if index < shared {
+                self.modal_focus[index].path = path;
+            } else {
+                self.modal_focus.push(ModalFocus {
+                    identity,
+                    path: path.clone(),
+                    restore: self.focus_identity.clone(),
+                });
+                tree::cancel_outside_scope(&mut self.child, &path);
+                self.keep_focus_within(Some(&path));
+            }
+        }
+        let scope = self.modal_focus.last().map(|scope| scope.path.clone());
+        self.keep_focus_within(scope.as_deref());
+        if modal_changed || previous != self.focus_identity {
+            self.pending_paste = None;
+        }
+        if previous != self.focus_identity {
+            self.invalidation.mark(Invalidation::PAINT);
+            self.preedit = None;
+        }
+    }
+
+    fn keep_focus_within(&mut self, scope: Option<&[u16]>) {
+        self.focus.current = self
+            .focus_identity
+            .as_ref()
+            .and_then(|identity| tree::focus_path(&mut self.child, identity, &mut Vec::new()))
+            .filter(|path| scope.is_none_or(|scope| path.starts_with(scope)));
+        if self.focus.current.is_none()
+            && let Some(scope) = scope
+        {
+            self.focus.current = tree::focusables(&mut self.child)
+                .into_iter()
+                .find(|path| path.starts_with(scope));
+        }
+        self.focus_identity = self
+            .focus
+            .current
+            .as_deref()
+            .and_then(|path| tree::focus_identity(&mut self.child, path));
     }
 
     /// Paints the tree as of `now`.
@@ -156,6 +472,41 @@ impl Root {
             &mut Vec::new(),
             &mut painter,
         );
+        self.reconcile_focus();
+        if let InputMethod::Enabled {
+            cursor,
+            purpose,
+            preedit: Some(preedit),
+        } = self.input_method()
+        {
+            self.composition
+                .paint(renderer, &self.theme, cursor, purpose, &preedit);
+        } else {
+            self.composition.clear();
+        }
+    }
+
+    /// The focused view's text input request in window logical coordinates.
+    /// Non-text focus disables the platform input method.
+    pub fn input_method(&mut self) -> InputMethod {
+        let Some(focused) = self.focus.current.as_deref() else {
+            return InputMethod::Disabled;
+        };
+        let mut request = InputMethod::Disabled;
+        tree::walk(
+            &mut self.child,
+            Point::ORIGIN,
+            &mut Vec::new(),
+            &mut |view, bounds, path| {
+                if path == focused {
+                    request = view.input_method(bounds);
+                }
+            },
+        );
+        if let InputMethod::Enabled { preedit, .. } = &mut request {
+            *preedit = self.preedit.clone();
+        }
+        request
     }
 
     /// Whether anything is still moving at `now`.
@@ -163,15 +514,146 @@ impl Root {
         tree::any_animating(&mut self.child, now)
     }
 
+    /// The earliest one-shot deadline requested by any view.
+    pub fn redraw_at(&mut self) -> Option<Instant> {
+        let mut earliest = None;
+        tree::walk(
+            &mut self.child,
+            Point::ORIGIN,
+            &mut Vec::new(),
+            &mut |view, _, _| {
+                if let Some(deadline) = view.redraw_at() {
+                    earliest =
+                        Some(earliest.map_or(deadline, |previous: Instant| previous.min(deadline)));
+                }
+            },
+        );
+        earliest
+    }
+
     /// Routes one event: keyboard input to the focused view, everything
     /// else to every view, topmost first.
     pub fn handle(&mut self, event: &Event, pointer: Option<Point>, now: Instant) -> Response {
-        let mut requests = Requests::default();
+        self.handle_inner(None, event, pointer, now)
+    }
+
+    /// Routes an event with access to the active rendering backend for
+    /// custom views that need its text metrics or widget interoperation.
+    pub fn handle_with_renderer(
+        &mut self,
+        renderer: &Renderer,
+        event: &Event,
+        pointer: Option<Point>,
+        now: Instant,
+    ) -> Response {
+        self.handle_inner(Some(renderer), event, pointer, now)
+    }
+
+    fn handle_inner(
+        &mut self,
+        renderer: Option<&Renderer>,
+        event: &Event,
+        pointer: Option<Point>,
+        now: Instant,
+    ) -> Response {
+        self.reconcile_focus();
+        if matches!(
+            event,
+            Event::Keyboard(keyboard::Event::KeyPressed { .. })
+                | Event::InputMethod(_)
+                | Event::Mouse(mouse::Event::ButtonPressed(_))
+                | Event::Touch(taim_core::touch::Event::FingerPressed { .. })
+                | Event::Window(taim_core::window::Event::Unfocused)
+        ) {
+            self.pending_paste = None;
+        }
+        // Match the core pointer policy: malformed active samples are ignored;
+        // terminal touch events still reach routing so they can cancel owners.
+        let invalid = |point: Point| !point.x.is_finite() || !point.y.is_finite();
+        let invalid_active = match event {
+            Event::Mouse(mouse::Event::CursorMoved { position }) => invalid(*position),
+            Event::Mouse(mouse::Event::ButtonPressed(_)) => pointer.is_some_and(invalid),
+            Event::Touch(
+                taim_core::touch::Event::FingerPressed { position, .. }
+                | taim_core::touch::Event::FingerMoved { position, .. },
+            ) => invalid(*position),
+            _ => false,
+        };
+        if invalid_active {
+            return Response::default();
+        }
+        let pointer = match event {
+            Event::Touch(taim_core::touch::Event::FingerLost { .. }) => None,
+            Event::Touch(touch) => {
+                let point = touch.position();
+                (point.x.is_finite() && point.y.is_finite()).then_some(point)
+            }
+            _ => pointer,
+        };
+        let mut composition_cleared = false;
+        match event {
+            Event::InputMethod(input_method::Event::Edit(state))
+                if state.composing.is_some() && self.input_method().is_enabled() =>
+            {
+                let state = state.clone().normalized();
+                self.preedit = state.composing.map(|range| Preedit {
+                    content: state.content[range].to_owned(),
+                    selection: None,
+                    text_size: None,
+                });
+                return Response {
+                    captured: true,
+                    paint: true,
+                    ..Response::default()
+                };
+            }
+            Event::InputMethod(input_method::Event::Edit(_)) => {
+                self.preedit = None;
+            }
+            Event::InputMethod(input_method::Event::Preedit(content, selection))
+                if self.input_method().is_enabled() =>
+            {
+                self.preedit = (!content.is_empty()).then(|| Preedit {
+                    content: content.clone(),
+                    selection: selection.clone().filter(|range| {
+                        range.start <= range.end
+                            && range.end <= content.len()
+                            && content.is_char_boundary(range.start)
+                            && content.is_char_boundary(range.end)
+                    }),
+                    text_size: None,
+                });
+                return Response {
+                    captured: true,
+                    paint: true,
+                    ..Response::default()
+                };
+            }
+            Event::InputMethod(input_method::Event::Commit(_) | input_method::Event::Closed)
+            | Event::Window(taim_core::window::Event::Unfocused) => {
+                composition_cleared = self.preedit.take().is_some();
+            }
+            // During composition the IME owns editing/navigation keys. The
+            // final Commit is the only event allowed to change the buffer.
+            Event::Keyboard(keyboard::Event::KeyPressed { .. }) if self.preedit.is_some() => {
+                return Response {
+                    captured: true,
+                    ..Response::default()
+                };
+            }
+            _ => {}
+        }
+        let previous_focus = self.focus.current.clone();
+        let mut requests = Requests {
+            paint: composition_cleared,
+            ..Requests::default()
+        };
         let everything = Some(Rectangle::INFINITE);
         self.focus.taken = false;
 
         let handled = {
             let mut router = tree::Router {
+                renderer,
                 now,
                 pointer,
                 requests: &mut requests,
@@ -179,7 +661,12 @@ impl Root {
             };
 
             if tree::is_focused_input(event) {
-                match router.focus.current.clone() {
+                match router
+                    .focus
+                    .current
+                    .clone()
+                    .or_else(|| self.modal_focus.last().map(|scope| scope.path.clone()))
+                {
                     Some(target) => tree::deliver(
                         &mut self.child,
                         Point::ORIGIN,
@@ -212,14 +699,99 @@ impl Root {
 
         // Tab moves focus when the focused view did not use it.
         if !captured && let Some(backwards) = tree::tab_press(event) {
-            let order = tree::focusables(&mut self.child);
+            let order: Vec<_> = tree::focusables(&mut self.child)
+                .into_iter()
+                .filter(|path| {
+                    self.modal_focus
+                        .last()
+                        .is_none_or(|scope| path.starts_with(&scope.path))
+                })
+                .collect();
             self.focus.current = tree::tab(&order, self.focus.current.as_deref(), backwards);
             requests.paint = true;
             captured = true;
         }
 
+        self.focus_identity = self
+            .focus
+            .current
+            .as_deref()
+            .and_then(|path| tree::focus_identity(&mut self.child, path));
+        if self.focus_identity.is_none() && self.focus.current.take().is_some() {
+            requests.paint = true;
+        }
+        if previous_focus != self.focus.current {
+            self.preedit = None;
+        }
+
+        self.reconcile_focus();
+
         Response {
             captured,
+            paint: requests.paint || requests.layout || requests.animate,
+            layout: requests.layout,
+            animate: requests.animate,
+            copy: requests.copy,
+            paste: requests.paste,
+        }
+    }
+
+    /// Executes a semantic action against the current live view tree.
+    /// Stale identities, disabled controls and unadvertised actions are rejected.
+    pub fn accessibility_action(&mut self, action: &semantics::Action, now: Instant) -> Response {
+        self.accessibility_action_inner(None, action, now)
+    }
+
+    /// Executes a semantic action with active renderer metrics available to custom views.
+    pub fn accessibility_action_with_renderer(
+        &mut self,
+        renderer: &Renderer,
+        action: &semantics::Action,
+        now: Instant,
+    ) -> Response {
+        self.accessibility_action_inner(Some(renderer), action, now)
+    }
+
+    fn accessibility_action_inner(
+        &mut self,
+        renderer: Option<&Renderer>,
+        action: &semantics::Action,
+        now: Instant,
+    ) -> Response {
+        self.pending_paste = None;
+        self.reconcile_focus();
+        let previous_focus = self.focus.current.clone();
+        let mut requests = Requests::default();
+        let scope = self.modal_focus.last().map(|scope| scope.path.clone());
+        let handled = tree::accessibility_action(
+            &mut self.child,
+            Point::ORIGIN,
+            &mut Vec::new(),
+            action,
+            scope.as_deref(),
+            &mut tree::Router {
+                renderer,
+                now,
+                pointer: None,
+                requests: &mut requests,
+                focus: &mut self.focus,
+            },
+        )
+        .unwrap_or(Handled::No);
+        self.focus_identity = self
+            .focus
+            .current
+            .as_deref()
+            .and_then(|path| tree::focus_identity(&mut self.child, path));
+        if self.focus_identity.is_none() {
+            self.focus.current = None;
+        }
+        if previous_focus != self.focus.current {
+            self.preedit = None;
+            requests.paint = true;
+        }
+        Response {
+            captured: handled == Handled::Yes,
             paint: requests.paint || requests.layout || requests.animate,
             layout: requests.layout,
             animate: requests.animate,
@@ -238,11 +810,15 @@ impl Root {
     /// The window's semantic tree: one group of `size` holding every
     /// described view.
     pub fn describe(&mut self, size: Size) -> semantics::Node {
+        self.reconcile_focus();
         let mut nodes = Vec::new();
-        tree::describe(
+        tree::describe_scope(
             &mut self.child,
             Point::ORIGIN,
             &mut Vec::new(),
+            self.modal_focus
+                .last()
+                .map_or(&[], |scope| scope.path.as_slice()),
             self.focus.current.as_deref(),
             &mut nodes,
         );
@@ -273,6 +849,49 @@ mod tests {
     use crate::views::{button, column, row, text};
     use crate::{Child, Event, Handled, Point, Rectangle, Size, View, mouse, semantics};
 
+    #[test]
+    fn a_busy_mailbox_rearms_the_waker_after_its_drain_budget() {
+        use std::cell::{Cell, RefCell};
+        use std::rc::Rc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let slot = Rc::new(RefCell::new(None::<crate::Sender<u32>>));
+        let received = Rc::new(Cell::new(0));
+        let root = Root::new(|cx| {
+            let sender = cx.channel({
+                let slot = slot.clone();
+                let received = received.clone();
+                move |value| {
+                    received.set(received.get() + 1);
+                    if value < 256 {
+                        slot.borrow().as_ref().unwrap().send(value + 256).unwrap();
+                    }
+                }
+            });
+            *slot.borrow_mut() = Some(sender);
+            text("Mailbox")
+        });
+        let wakes = Arc::new(AtomicUsize::new(0));
+        root.on_change({
+            let wakes = wakes.clone();
+            move || {
+                let _ = wakes.fetch_add(1, Ordering::Relaxed);
+            }
+        });
+        for value in 0..256 {
+            slot.borrow().as_ref().unwrap().send(value).unwrap();
+        }
+        assert_eq!(wakes.load(Ordering::Relaxed), 1);
+        assert_eq!(root.take_changes(), (true, true));
+        assert_eq!(received.get(), 256);
+        assert_eq!(
+            wakes.load(Ordering::Relaxed),
+            2,
+            "queued work must get a new event-loop wake"
+        );
+        let _ = root.take_changes();
+        assert_eq!(received.get(), 512);
+    }
+
     fn frames(root: &mut Root) -> Vec<Rectangle> {
         let mut frames = Vec::new();
         tree::walk(
@@ -297,6 +916,40 @@ mod tests {
     }
 
     #[test]
+    fn cancellation_reaches_every_view_even_when_a_sibling_captures_it() {
+        use std::cell::Cell;
+        use std::rc::Rc;
+        struct Listener(Rc<Cell<usize>>);
+        impl crate::View for Listener {
+            fn measure(&mut self, _: &mut crate::MeasureCx<'_>, _: crate::Constraints) -> Size {
+                Size::new(10.0, 10.0)
+            }
+            fn paint(&self, _: &mut crate::PaintCx<'_>) {}
+            fn describe(&self, _: &crate::DescribeCx<'_>) -> Option<semantics::Node> {
+                None
+            }
+            fn event(&mut self, _: &mut crate::EventCx<'_>, event: &Event) -> Handled {
+                if tree::is_cancellation(event) {
+                    self.0.set(self.0.get() + 1);
+                    Handled::Yes
+                } else {
+                    Handled::No
+                }
+            }
+        }
+        let count = Rc::new(Cell::new(0));
+        let mut root =
+            Root::new(|_| column(views![Listener(count.clone()), Listener(count.clone())]));
+        let response = root.handle(
+            &Event::Window(taim_core::window::Event::Unfocused),
+            None,
+            Instant::now(),
+        );
+        assert!(response.captured);
+        assert_eq!(count.get(), 2);
+    }
+
+    #[test]
     fn roots_build_once_and_own_their_state() {
         let mut root = Root::new(|cx| {
             let count = cx.signal(0);
@@ -310,6 +963,19 @@ mod tests {
 
         // column, text, row, button, button label
         assert_eq!(frames(&mut root).len(), 5);
+    }
+
+    #[test]
+    fn invalid_zoom_does_not_keep_window_settings_permanently_dirty() {
+        for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, 0.0, -1.0] {
+            let mut root = Root::new(|cx| {
+                cx.scale(invalid);
+                text("Invalid zoom")
+            });
+            assert_eq!(root.scale(), 1.0);
+            assert!(root.settings_changed());
+            assert!(!root.settings_changed());
+        }
     }
 
     #[test]
@@ -344,6 +1010,7 @@ mod tests {
                 &mut Vec::new(),
                 event,
                 &mut tree::Router {
+                    renderer: None,
                     now: crate::Instant::now(),
                     pointer: Some(at),
                     requests: &mut requests,
@@ -389,5 +1056,77 @@ mod tests {
             .children(&mut |child| child.place(Point::new(0.0, 100.0)));
 
         assert_eq!(frames(&mut root)[1].y, 75.0);
+    }
+}
+
+#[cfg(test)]
+mod paste_privacy_tests {
+    use super::*;
+    use std::cell::Cell;
+    use std::rc::Rc;
+    struct PrivateEditor {
+        purpose: Rc<Cell<input_method::Purpose>>,
+        reads: Rc<Cell<u32>>,
+    }
+    impl crate::View for PrivateEditor {
+        fn measure(&mut self, _: &mut crate::MeasureCx<'_>, _: Constraints) -> Size {
+            Size::new(100.0, 40.0)
+        }
+        fn paint(&self, _: &mut crate::PaintCx<'_>) {}
+        fn describe(&self, _: &crate::DescribeCx<'_>) -> Option<semantics::Node> {
+            None
+        }
+        fn focusable(&self) -> bool {
+            true
+        }
+        fn input_method(&self, bounds: Rectangle) -> InputMethod {
+            InputMethod::Enabled {
+                cursor: bounds,
+                purpose: self.purpose.get(),
+                preedit: None,
+            }
+        }
+        fn editor_state(&self) -> Option<input_method::EditorState> {
+            self.reads.set(self.reads.get() + 1);
+            Some(input_method::EditorState {
+                content: "PRIVATE_MUST_NOT_BE_READ".into(),
+                selection: 0..0,
+                composing: None,
+                multiline: false,
+            })
+        }
+    }
+    #[test]
+    fn secure_paste_never_reads_even_a_custom_widgets_editor_state_and_purpose_changes_expire_lease()
+     {
+        let purpose = Rc::new(Cell::new(input_method::Purpose::Secure));
+        let reads = Rc::new(Cell::new(0));
+        let mut root = Root::new(|_| PrivateEditor {
+            purpose: purpose.clone(),
+            reads: reads.clone(),
+        });
+        let _ = root.handle(
+            &Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Named(keyboard::key::Named::Tab),
+                modified_key: keyboard::Key::Named(keyboard::key::Named::Tab),
+                physical_key: keyboard::key::Physical::Unidentified(
+                    keyboard::key::NativeCode::Unidentified,
+                ),
+                location: keyboard::Location::Standard,
+                modifiers: keyboard::Modifiers::NONE,
+                text: None,
+                repeat: false,
+            }),
+            None,
+            Instant::now(),
+        );
+        let token = root.begin_paste().unwrap();
+        assert_eq!(reads.get(), 0);
+        assert!(root.accept_paste(&token));
+        assert_eq!(reads.get(), 0);
+        let token = root.begin_paste().unwrap();
+        purpose.set(input_method::Purpose::Normal);
+        assert!(!root.accept_paste(&token));
+        assert_eq!(reads.get(), 0);
     }
 }

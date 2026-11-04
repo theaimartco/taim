@@ -36,7 +36,10 @@ impl Pipeline {
         static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
         let cache = gpu::Cache::new(device);
-        let atlas = gpu::TextAtlas::with_color_mode(device, queue, &cache, format, COLOR_MODE);
+        #[allow(unused_mut)]
+        let mut atlas = gpu::TextAtlas::with_color_mode(device, queue, &cache, format, COLOR_MODE);
+        #[cfg(target_os = "android")]
+        atlas.set_fallback_rasterizer(crate::graphics::text::android::rasterize_color_glyph);
 
         Self {
             id: Id(NEXT_ID.fetch_add(1, Ordering::Relaxed)),

@@ -260,6 +260,7 @@ mod tests {
             value: None,
             actions: Actions::empty(),
             live: None,
+            autofill: None,
         }
     }
 

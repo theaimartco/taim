@@ -19,6 +19,8 @@ all-features = true
 
 [features]
 default = ["wgpu/default"]
+vulkan = ["wgpu/vulkan"]
+gles = ["wgpu/gles", "dep:wgpu-hal"]
 geometry = ["taim_graphics/geometry", "lyon"]
 image = ["taim_graphics/image", "dep:image"]
 svg = ["taim_graphics/svg", "resvg"]
@@ -54,3 +56,7 @@ resvg.optional = true
 
 image.workspace = true
 image.optional = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+# Pin the reviewed Android EGL ABI/patch even in a fresh consumer lockfile.
+wgpu-hal = { version = "=29.0.4", default-features = false, features = ["gles"], optional = true }

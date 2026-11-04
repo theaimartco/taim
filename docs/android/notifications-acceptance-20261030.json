@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-30",
+  "milestone": "Local notifications and permission/settings integration",
+  "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+  "working_tree_dirty": true,
+  "device": {
+    "sdk": "35",
+    "model": "sdk_gphone16k_x86_64",
+    "abi": "x86_64",
+    "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+    "page_size": 16384
+  },
+  "runtime": {
+    "status": "passed",
+    "serial": "emulator-5594",
+    "apk_sha256": "bf90270a6b0aca7b54da4be13c6299edf7006417a0e68d9d3d26485346bf23ef",
+    "checks": 14,
+    "cold_intent_checks": 1
+  },
+  "unit_tests": 50,
+  "strict_clippy": {
+    "host_native_views": "passed",
+    "arm64_counter_and_platform_probe": "passed"
+  },
+  "runtime_report_directory": "target/android/runtime-smoke/notifications-02",
+  "artifact_sha256": {
+    "target/android/x86_64/debug/platform-probe/taim-platform-probe.apk": "bf90270a6b0aca7b54da4be13c6299edf7006417a0e68d9d3d26485346bf23ef",
+    "target/android/notifications-template-check-02/app/build/outputs/apk/debug/app-debug.apk": "09c854d91043cc2c39c969aac5569f082bb4aec0b01462edfca1ad5bcfdb5956"
+  },
+  "source_sha256": {
+    "winit/src/android/notifications.rs": "cf56847dfbadcff0f2731dffe51c5d1339a5d736abb0bfbb50e7cb9e047e9157",
+    "winit/src/android/services.rs": "41b557a7e983b68c8aa2b6c6493df08bed3eda2ea232e2cef7e3520908799ce9",
+    "winit/src/android/bridge.rs": "09b624e8e61b3690ff35c75266fe69be59a42f7eabc71176f1935383beb5fa86",
+    "winit/src/android/mod.rs": "b60cfbed8aa9236f21a15840e1a17b25a3ebc7f707ecd3e89a800c0cb6502aa1",
+    "src/lib.rs": "fbe9ba546ca62d4f634373e147d7a9a5ca77490a0d27d2286694b6c7cfb943a9",
+    "winit/android/com/theaimartco/taim/TaimNotifications.java": "eacb6e0aac6f49396149b7b7c2babf8e830460af1327f24687d915e8c406078a",
+    "winit/android/com/theaimartco/taim/TaimServices.java": "bf83715165765f2e4505e064ff2a20e8c2179d3461c8dc40d3f69bb11d09cc0e",
+    "scripts/android/project.py": "4870f5daac139066a6c06aba674679bbb0ded16cefa38f712eb8b2e52de387eb",
+    "scripts/android/platform-probe.py": "63dac84ba8c2ad9c2bba9e4238dc7ba098e178f6e88265bf23b7ce30f1dfd3ed",
+    "scripts/android/platform-test/PlatformDriver.java": "b8d620b11900343f8c1f1411a7ec72dc560290e62a30c28c1f41c975c81f49b8",
+    "scripts/android/templates/app/src/main/AndroidManifest.xml": "e6e3e85b669b5d43c9a03c5858c0c1b2811f42016f8cb1e3f9023645bccf3870",
+    "examples/android_platform_probe/src/lib.rs": "22f1cbe06eab4c1160435d21f487c3162beaec6485e694f815d2b7367bbd384a",
+    "examples/android_platform_probe/android/AndroidManifest.xml": "6da2c95ccb3ca348a8dba2af5b228a3f2957db36e306ae73de6e5920e1caf838"
+  },
+  "limitations": [
+    "Emulator API35 x86_64 16KiB only; physical/OEM/API26 runtime unaccepted",
+    "Cold replay test supplies explicit fixture launch extras; it is not a physical post-process-death shade tap",
+    "No push/FCM, alarm scheduling, remote input or foreground/background service implementation"
+  ],
+  "notes": [
+    "Failed notifications-01 retained: assertion raced asynchronous OS cancellation; driver now waits for actual disappearance.",
+    "Standalone project generation skips Python cache artifacts after a generator check exposed binary pyc traversal."
+  ],
+  "standalone_project": {
+    "status": "assembleDebug passed",
+    "abis": [
+      "arm64-v8a",
+      "x86_64"
+    ],
+    "notifications_manifest_opt_in": true,
+    "apk_signature": "verified development certificate",
+    "zipalign_16k": "passed"
+  }
+}

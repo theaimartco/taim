@@ -9,6 +9,7 @@ mod forms;
 mod icon;
 mod layers;
 mod look;
+#[cfg(any(feature = "image", feature = "svg", test))]
 mod media;
 mod mobile;
 mod overlays;

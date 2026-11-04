@@ -1,0 +1,222 @@
+{
+  "date": "2026-10-30",
+  "scope": "Experimental API35 x86_64 emulator platform acceptance; no physical-device or Flutter performance superiority acceptance",
+  "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+  "working_tree_dirty": true,
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "artifacts": {
+    "target/android/x86_64/debug/taim-counter.apk": {
+      "bytes": 19632609,
+      "sha256": "acca534bbc7206e36b70032d7caa10ff010a4e4e5bbace997d7527e958af7761"
+    },
+    "target/android/x86_64/debug/platform-probe/taim-platform-probe.apk": {
+      "bytes": 19341862,
+      "sha256": "2f74b2ca96992574b7c3dafda070d8c487f2906880a5308df9c6a589c0907e6b"
+    },
+    "target/android/external-platform-project/app/build/outputs/apk/release/app-release.apk": {
+      "bytes": 18542209,
+      "sha256": "456ec574da3a0b1ec232e3545a016aeaa36ed325d5bc5a4fd80a26f019ddf8bd"
+    },
+    "target/android/external-platform-project/app/build/outputs/bundle/release/app-release.aab": {
+      "bytes": 16531991,
+      "sha256": "37879fca48dcf11b71ceb52a31886760edbf6942562aa96b34f3d3a91863a40c"
+    },
+    "target/android/flutter-baseline-project/build/app/outputs/flutter-apk/app-release.apk": {
+      "bytes": 34025364,
+      "sha256": "87fcfff069bb16bd9f1a51925e5c0c1927df5b96608687837c10295df753f2e9"
+    }
+  },
+  "reports": {
+    "target/android/runtime-smoke/expanded-restoration-accepted/report.json": {
+      "status": "passed",
+      "started_utc": "2026-10-30T00:09:17.439529+00:00",
+      "serial": "emulator-5594",
+      "apk_sha256": "acca534bbc7206e36b70032d7caa10ff010a4e4e5bbace997d7527e958af7761",
+      "tap": [
+        220,
+        520
+      ],
+      "counter_region": [
+        75,
+        340,
+        300,
+        90
+      ],
+      "checks": [
+        "first successful presentation and stable nonblank counter screenshot",
+        "touch increment 1 and counter-region pixel change",
+        "background/resume cycle 1: same process, retained pixels, recreated target presented",
+        "touch increment 2 and counter-region pixel change",
+        "background/resume cycle 2: same process, retained pixels, recreated target presented",
+        "touch increment 3 and counter-region pixel change",
+        "background/resume cycle 3: same process, retained pixels, recreated target presented",
+        "touch increment 4 and counter-region pixel change",
+        "saved task restored count pixels into a new process and next increment retained the value"
+      ],
+      "device": {
+        "model": "sdk_gphone16k_x86_64",
+        "sdk": "35",
+        "abi": "x86_64",
+        "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+        "page_size": 16384
+      },
+      "source": {
+        "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+        "working_tree_dirty": true,
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+      },
+      "launch": "Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.theaimartco.taim.counter/com.theaimartco.taim.TaimActivity }\nStatus: ok\nLaunchState: COLD\nActivity: com.theaimartco.taim.counter/com.theaimartco.taim.TaimActivity\nTotalTime: 433\nWaitTime: 440\nComplete",
+      "pid": "11822",
+      "recreated_pid": "12208",
+      "final_counter": 5,
+      "limitations": [
+        "Emulator results do not certify physical GPU/device support",
+        "Presentation marker means successful compositor present, not scan-out latency",
+        "Pixel assertions depend on the supplied counter-only region",
+        "No IME, TalkBack, battery or Flutter comparison acceptance"
+      ],
+      "finished_utc": "2026-10-30T00:09:32.040148+00:00",
+      "artifacts_sha256": {
+        "app.log": "fd38fbf744e50a7acee9bb184f64fc8df0050c7c2002deb235c10d329536ecd3",
+        "before-process-kill.log": "042bf6b433f2a49a931eee116834d814f9da02e11d7e113367f53085b2ea8778",
+        "increment-1.png": "cd2892faab724970f163db267811a713d9a467fdd7b55ec58689d31f0d0ab35a",
+        "increment-2.png": "96e2c0c1872f518d0e71bfb38aa8cf7e21636e52859fe3cec6df330c0acaee71",
+        "increment-3.png": "bc53c1c57656061a20b42205401c56a71b231f8be697fcba7d684924085af38e",
+        "increment-4.png": "aae12413c7d04f3833fb30be9c6b9746ba2e883afdd9d946da7a44f9a3232d72",
+        "initial.png": "cb3ddacbe2719b47d66bfc74e012d311461bf2b60d7c7ec5d73ec73ea777b4f7",
+        "process-restored-increment.png": "02eedb6f944e00c11a897f3d9729f6a106774820a2ade16be373c9a298c6083b",
+        "process-restored.png": "cdda2543aaa0cd49c966d7ad7bb37468f76b942cb039f390805ca7b48a604361",
+        "resume-1.png": "cd2892faab724970f163db267811a713d9a467fdd7b55ec58689d31f0d0ab35a",
+        "resume-2.png": "96e2c0c1872f518d0e71bfb38aa8cf7e21636e52859fe3cec6df330c0acaee71",
+        "resume-3.png": "bc53c1c57656061a20b42205401c56a71b231f8be697fcba7d684924085af38e",
+        "vulkan.json": "cc8b5df067f192f36107ed88edfd1b90bf2f09075be7f68bbb615508f76b3f7b"
+      }
+    },
+    "target/android/runtime-smoke/expanded-ime-accepted/report.json": {
+      "status": "passed",
+      "serial": "emulator-5594",
+      "test_ime_sha256": "92b18eadb2cba2a0a0147f3c7cd46218b32e36592183c6c5e39ba6384359f80f",
+      "checks": [
+        "commit",
+        "assert",
+        "delete-codepoints",
+        "assert",
+        "select",
+        "batch",
+        "finish",
+        "assert-all",
+        "select-all",
+        "commit",
+        "compose",
+        "finish",
+        "assert",
+        "save",
+        "stale",
+        "commit",
+        "assert",
+        "compose",
+        "finish",
+        "delete-codepoints",
+        "assert",
+        "assert-all",
+        "select-all",
+        "commit",
+        "assert-all",
+        "delete-codepoints",
+        "compose",
+        "finish",
+        "assert-all"
+      ]
+    },
+    "target/android/runtime-smoke/platform-expanded-final/report.json": {
+      "status": "passed",
+      "serial": "emulator-5594",
+      "apk_sha256": "2f74b2ca96992574b7c3dafda070d8c487f2906880a5308df9c6a589c0907e6b",
+      "checks": 8
+    }
+  },
+  "checks": {
+    "native_views": 35,
+    "winit_lib": 47,
+    "native_instrumentation": 8,
+    "ime_protocol": 29,
+    "strict_host_clippy": "passed",
+    "strict_arm64_android_clippy": "passed",
+    "release_apk_signature": "passed",
+    "release_apk_zipalign_16k": "passed",
+    "release_aab_jarsigner": "verified with development self-signed certificate; JDK warns about absent timestamp and ZIP stream ordering"
+  },
+  "source_sha256": {
+    "examples/android_counter/Cargo.toml": "4152145d4ed0dccda84390ba010e34d240a7afa53be0071b70c88bcd3f0d0747",
+    "examples/android_counter/android/AndroidManifest.xml": "3da78b30c760c48dd6e31019c230ea862156adfeac9def711068a2f15205271b",
+    "examples/android_counter/src/lib.rs": "47975a9ade8f3197ed273ea4b2d00761371e9ad879b04078c2cbc1fdab79b297",
+    "examples/android_flutter_baseline/README.md": "e05600440ce21d5cbff1a3c2e44cdf98fac4b7ad1943209c9d48d3790dbfdcdb",
+    "examples/android_flutter_baseline/lib/main.dart": "173d875ba77aba667b122352cd2cb5419471ee244cdd8210ff91454a9f71ce7d",
+    "examples/android_flutter_baseline/pubspec.yaml": "8a9ac076324290726101e205481b1c960ebac8591d5db3a077f7cfc952861e0c",
+    "examples/android_platform_probe/Cargo.toml": "349c9944536230af572518ae2c5c9775d6831e3c8c6f5127a75a1351005c959f",
+    "examples/android_platform_probe/android/AndroidManifest.xml": "b4fa026c556fd7f0bc45823822ad8bbdeced4e4d570f0a40a7d6d464647d7ae5",
+    "examples/android_platform_probe/android/assets/probe.txt": "e23ac7c6c8993d0f35b43f793cd17c0c5f31c4e130528545426bc6d98f8f6648",
+    "examples/android_platform_probe/android/java/com/theaimartco/taim/TaimProbeActivity.java": "156cd24059580ef728d1916acfe03e2c680e2970a44027a45170dea0acca0f5b",
+    "examples/android_platform_probe/src/lib.rs": "8b46956a9b8bb390865071001a9ed35c0909ad4ee4d4671650e78bc35d372b85",
+    "scripts/android/buffer-probe.py": "4ae5bdef246b4c98503e1525208444506b48d6433f370cb302e2b881e09c4f6a",
+    "scripts/android/compare.py": "dac0fc7fbd5572c09e5e7963ebbef8cb755be477b0c4d1af45a2d5b39abbb705",
+    "scripts/android/counter.py": "114377b5ec4ed60cf3575b1b4b87de376d2b899b94b511b57e93e2b3f22f9ee3",
+    "scripts/android/ime-probe.py": "279d8edb0e493a595c9f1c5793b3f38056f3839238846afea0f22d8bffbc11d6",
+    "scripts/android/ime-test/AndroidManifest.xml": "4a4c06d506f1c226dfebcbf18920672985e1644925c9eb79c106fd920abb4b74",
+    "scripts/android/ime-test/TestIme.java": "8f8b5e1321bd4d310bdcded1c997594a690b3ace8c1537edda39a1faddf35a52",
+    "scripts/android/ime-test/res/xml/method.xml": "63a8fbf832bca89108f7cd2f2451d34179abde3773fb18fb58889cf881dde2a7",
+    "scripts/android/platform-probe.py": "112b5003994d8df737ec3f00277ef62cc844e4b010e0b28e00fc14234fb44e68",
+    "scripts/android/platform-test/AndroidManifest.xml": "476068bf92516e545ca7e0ff11b79a356c5930a6412a20ffbf3cb807d785628f",
+    "scripts/android/platform-test/PlatformDriver.java": "7d9d1498104d5c582a613e32bda7c79994a3c2d4ed7b7a0d0e555dbab5745335",
+    "scripts/android/project.py": "6097a09c498114da739276b734d32043533bcd833763703d0383f3c8705face6",
+    "scripts/android/runtime-smoke.py": "a6b66f9bef0ec67aff47f347f6d98578c4870ad9efb13303477f683a28e8d1af",
+    "scripts/android/templates/app/build.gradle.kts": "960435ee816b84208b524f85504c43883909a8840c7ce9ad6ff94116666a71e6",
+    "scripts/android/templates/app/src/main/AndroidManifest.xml": "70a277e7ea19da124c8a599563286173e44f94b0cdd52282d8d141e1a0838171",
+    "scripts/android/templates/build-rust.py": "d3b27cf8a2cacd131abc870422753ae72c7c48cdb4fb20a85ea3f2fd164c4d02",
+    "scripts/android/templates/build.gradle.kts": "cec20badce17e9d79e7b655fd1abf4b148741b1b94920ac6f1beee8e19550242",
+    "scripts/android/templates/gradle-bootstrap.py": "b4fa108b1c2bb0da863e8bfebaeb368d39856e08d5bccb96c5deb6147edc5e7f",
+    "scripts/android/templates/gradle.properties": "45470d929d980ce85c737cbd41e02f327b1cba514632cadc131c2b86363414bb",
+    "scripts/android/templates/settings.gradle.kts": "d532df5d805b7f4b656d6d1fa45c44191aa8df1aebe9dd8d90936f0ccad249ea",
+    "tests/native_views.rs": "849a37750752a793e4ad7b7ad0e7a0be69ed2570f2f5626bcdb07a84001ca087",
+    "view/src/restoration.rs": "0ac68c0af121743cc06f96aa2d64c2fc91c545995f80940c23930aa391f241d0",
+    "view/src/root.rs": "2c952b332bfa26b320d736b48450aaef6c0401eb3be16e41ffdeb5ff66b3eb3f",
+    "view/src/state.rs": "e69b202fc434244613ac891c4ce397238c41fd042eeb6a6d2de0fcbc1e9e6f63",
+    "winit/android/com/theaimartco/taim/TaimAccessibility.java": "c926affd9d288529abe91e5ef7106b4a4b407dface5ff10b67eee06039a59bb7",
+    "winit/android/com/theaimartco/taim/TaimActivity.java": "c868588244b0c725f7b6e3bb14e1a37569a5f92bd4b82739d55e34a099dcd8a2",
+    "winit/android/com/theaimartco/taim/TaimBack.java": "6fff783dbbb00a5ac8fbc5726e366d70c22fd233b19b6e2ae45af4bc81ce7bde",
+    "winit/android/com/theaimartco/taim/TaimPlugin.java": "264db2ea7f50de383e002a270d9e6572ad43d66697d0d6fc45c9bedf806c0727",
+    "winit/android/com/theaimartco/taim/TaimServices.java": "7b382eb80a80705152f30ae567e0e2037cf9ee135b781ee2c60125d9fac5091d",
+    "winit/src/android/bridge.rs": "f46ad2e77531548561cf6d7f94f0191e50df4f81c0458501396e1d855de7f0ca",
+    "winit/src/android/geometry.rs": "d49207dd946a4ba24ca5f1b747f487f70e4c8445eadc665d50f2d3f5e2a065eb",
+    "winit/src/android/mod.rs": "5c93496b642c7b639698234048dd419eec9e33a4344607c2cf54883c50541ca1",
+    "winit/src/android/semantics.rs": "a30a1378fe5b082e5e97fba1132d209db3e0617439dd2f95a44fe7bf080988d2",
+    "winit/src/android/services.rs": "f1739536b150a52e3c10f5ad19b0d1fb3121bf29a863740f04cc2a1cb44c202e",
+    "winit/src/shell.rs": "08bfcb984eebcc95acbbc2bdd3c5b62c0f39a94e1a68fc4e5eb8f9336e21ea3e",
+    "winit/src/surface.rs": "f42c0af5a47695dcddbe6da426ad3e3e1bda10cfc7d67ae975831eb6844baf4a"
+  },
+  "comparison_harness": {
+    "report": "target/android/comparison/emulator-release-harness-final/report.json",
+    "status": "passed",
+    "trials": 4,
+    "order": [
+      "taim",
+      "flutter",
+      "flutter",
+      "taim"
+    ],
+    "diagnostic_debug": false,
+    "limitations": "Emulator only; ADB/screenshot upper bounds, not native input latency or framework superiority",
+    "artifacts": {
+      "taim": {
+        "sha256": "456ec574da3a0b1ec232e3545a016aeaa36ed325d5bc5a4fd80a26f019ddf8bd",
+        "bytes": 18542209,
+        "badging": "package: name='com.theaimartco.externalprobe' versionCode='1' versionName='0.1.0' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'\nminSdkVersion:'26'\ntargetSdkVersion:'36'\napplication: label='Taim App' icon=''\nlaunchable-activity: name='com.theaimartco.taim.TaimActivity'  label='' icon=''\nfeature-group: label=''\n  uses-gl-es: '0x30000'\n  uses-feature-not-required: name='android.hardware.vulkan.level' version='1'\n  uses-feature: name='android.hardware.faketouch'\n  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'\nmain\nsupports-screens: 'small' 'normal' 'large' 'xlarge'\nsupports-any-density: 'true'\nlocales:\ndensities:\nnative-code: 'arm64-v8a' 'x86_64'\n"
+      },
+      "flutter": {
+        "sha256": "87fcfff069bb16bd9f1a51925e5c0c1927df5b96608687837c10295df753f2e9",
+        "bytes": 34025364,
+        "badging": "package: name='com.theaimartco.taim_android_baseline' versionCode='1' versionName='0.1.0' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'\nminSdkVersion:'24'\ntargetSdkVersion:'36'\nuses-permission: name='com.theaimartco.taim_android_baseline.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'\napplication-label:'taim_android_baseline'\napplication-icon-160:'res/9w.png'\napplication-icon-240:'res/yn.png'\napplication-icon-320:'res/FS.png'\napplication-icon-480:'res/RJ.png'\napplication-icon-640:'res/o-.png'\napplication: label='taim_android_baseline' icon='res/9w.png'\nlaunchable-activity: name='com.theaimartco.taim_android_baseline.MainActivity'  label='' icon=''\nuses-library-not-required:'androidx.window.extensions'\nuses-library-not-required:'androidx.window.sidecar'\nfeature-group: label=''\n  uses-feature: name='android.hardware.faketouch'\n  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'\nmain\nother-receivers\nsupports-screens: 'small' 'normal' 'large' 'xlarge'\nsupports-any-density: 'true'\nlocales: '--_--'\ndensities: '160' '240' '320' '480' '640'\nnative-code: 'arm64-v8a' 'x86_64'\n"
+      }
+    }
+  }
+}

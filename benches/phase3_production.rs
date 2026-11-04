@@ -1,23 +1,24 @@
 //! Phase 3 End-to-End Production Execution Benchmarks.
 //!
 //! Measures performance across the 4 critical production paths:
-//! 1. `AppRunner::new` construction (not full windowed cold start)
-//! 2. Keystroke-to-paint update & draw latency (retained versus cold)
+//! 1. View-root construction (not full windowed cold start)
+//! 2. Signal-to-paint preparation (retained versus cold)
 //! 3. Wake storm throughput under heavy concurrent task wakeups with generational validation
 //! 4. Idle CPU overhead in quiescent event loop with FrameGate
 
 #![allow(missing_docs)]
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
-use taim::widget::{button, column, text};
-use taim::window;
-use taim::{App, AppContext, AppRunner, Element, Size, Task, Theme, WindowContext};
+use taim::prelude::*;
+use taim::view::Root;
+use taim::{Color, Rectangle, Size};
+use taim_core::Renderer as _;
+use taim_core::time::Instant;
+use taim_core::window;
 use taim_futures::futures::executor;
 use taim_futures::scheduler::TaskScheduler;
 use taim_renderer::Renderer;
 use taim_renderer::core::renderer::{self, Headless as _};
-use taim_runtime::UserInterface;
-use taim_runtime::user_interface;
 use taim_winit::frame_gate::FrameGate;
 
 use std::sync::Arc;
@@ -26,58 +27,17 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 criterion_main!(benches);
 criterion_group!(benches, bench_phase3_production);
 
-#[derive(Debug, Clone)]
-struct BenchmarkApp {
-    count: u32,
-}
-
-#[derive(Debug, Clone)]
-enum BenchMessage {
-    Keystroke(char),
-}
-
-impl App for BenchmarkApp {
-    type State = u32;
-    type Message = BenchMessage;
-    type Theme = Theme;
-    type Renderer = Renderer;
-    type Executor = taim::executor::Default;
-
-    fn name() -> &'static str {
-        "bench_phase3"
-    }
-
-    fn boot(&self, _context: &mut AppContext) -> (Self::State, Task<Self::Message>) {
-        (self.count, Task::none())
-    }
-
-    fn update(
-        &self,
-        state: &mut Self::State,
-        message: Self::Message,
-        context: &mut AppContext,
-    ) -> Task<Self::Message> {
-        match message {
-            BenchMessage::Keystroke(c) => {
-                let _ = black_box(c);
-                *state = state.wrapping_add(1);
-                context.request_redraw();
-                Task::none()
-            }
-        }
-    }
-
-    fn view<'a>(
-        &self,
-        state: &'a Self::State,
-        _window: &WindowContext,
-    ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
-        column![
-            text(format!("Counter: {state}")),
-            button("Click").on_press(BenchMessage::Keystroke('c')),
-        ]
-        .into()
-    }
+fn view_root(count: u32) -> (Root, State<u32>) {
+    let mut state = None;
+    let root = Root::new(|cx| {
+        let value = cx.signal(count);
+        state = Some(value);
+        column(views![
+            text(move || format!("Counter: {}", value.get())),
+            button("Click").on_press(move || value.update(|n| *n = n.wrapping_add(1))),
+        ])
+    });
+    (root, state.expect("root initialized the state"))
 }
 
 struct CaptureFuture {
@@ -104,69 +64,38 @@ impl std::future::Future for CaptureFuture {
 pub fn bench_phase3_production(c: &mut Criterion) {
     let mut group = c.benchmark_group("phase3_production");
 
-    // 1. AppRunner construction only. No window, renderer, or first frame.
-    let _ = group.bench_function("app_runner_construct", |b| {
-        let app = BenchmarkApp { count: 0 };
+    // Root construction only: no window, renderer or first frame.
+    let _ = group.bench_function("view_root_construct", |b| {
         b.iter(|| {
-            let (runner, task) = AppRunner::new(black_box(app.clone()));
-            let _ = black_box(runner);
-            let _ = black_box(task);
+            let _ = black_box(view_root(black_box(0)));
         });
     });
 
-    // 2. Keystroke-to-paint: message update -> UI build -> paint preparation.
-    // These benchmarks do not submit a GPU frame or read pixels back.
+    // Signal update to paint preparation, with no submit or pixel readback.
     let mut renderer = executor::block_on(Renderer::new(
         renderer::Settings::default(),
-        Some("software"),
+        Some("tiny-skia"),
     ))
     .expect("software renderer must be available");
-
-    let _ = group.bench_function("keystroke_to_paint_retained", |b| {
-        let app = BenchmarkApp { count: 0 };
-        let (mut runner, _) = AppRunner::new(app);
-        let win_ctx = WindowContext::new(window::Id::unique(), 1.0);
-        let viewport = Size::new(800.0, 600.0);
-        let mut cache = user_interface::Cache::new();
-
+    let viewport = Size::new(800.0, 600.0);
+    let _ = group.bench_function("signal_to_paint_retained", |b| {
+        let (mut root, count) = view_root(0);
         b.iter(|| {
-            // Update
-            let _ = runner.update(BenchMessage::Keystroke('a'));
-
-            // Build UI
-            let view = runner.view(&win_ctx);
-            let mut ui =
-                UserInterface::build(view, viewport, std::mem::take(&mut cache), &mut renderer);
-
-            // Draw
-            ui.draw(
-                &mut renderer,
-                &Theme::Dark,
-                &renderer::Style::default(),
-                taim::mouse::Cursor::Unavailable,
-            );
-            cache = ui.into_cache();
+            count.update(|n| *n = n.wrapping_add(1));
+            let _ = root.take_changes();
+            root.layout(&renderer, viewport);
+            renderer.reset(Rectangle::with_size(viewport));
+            root.paint(&mut renderer, Color::BLACK, None, Instant::now());
         });
     });
-
-    let _ = group.bench_function("keystroke_to_paint_cold", |b| {
-        let app = BenchmarkApp { count: 0 };
-        let (mut runner, _) = AppRunner::new(app);
-        let win_ctx = WindowContext::new(window::Id::unique(), 1.0);
-        let viewport = Size::new(800.0, 600.0);
-
+    let _ = group.bench_function("signal_to_paint_cold", |b| {
         b.iter(|| {
-            let _ = runner.update(BenchMessage::Keystroke('a'));
-            let view = runner.view(&win_ctx);
-            let mut ui =
-                UserInterface::build(view, viewport, user_interface::Cache::new(), &mut renderer);
-            ui.draw(
-                &mut renderer,
-                &Theme::Dark,
-                &renderer::Style::default(),
-                taim::mouse::Cursor::Unavailable,
-            );
-            let _ = black_box(ui);
+            let (mut root, count) = view_root(0);
+            count.update(|n| *n = n.wrapping_add(1));
+            root.layout(&renderer, viewport);
+            renderer.reset(Rectangle::with_size(viewport));
+            root.paint(&mut renderer, Color::BLACK, None, Instant::now());
+            let _ = black_box(root);
         });
     });
 

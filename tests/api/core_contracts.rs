@@ -8,9 +8,11 @@
 //! as it did before those methods existed ("all existing widgets compile
 //! unchanged" and "no mandatory `Widget` method is introduced").
 
-use taim::advanced::widget::{self, Widget};
-use taim::advanced::{Layout, mouse, renderer};
-use taim::{Element, Length, Point, Rectangle, Size, Theme};
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
+use taim_core::widget::{self, Widget};
+use taim_core::{Layout, mouse, renderer};
+use taim_core::{Length, Point, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
 
 /// A widget that overrides nothing beyond the mandatory methods, to
@@ -27,9 +29,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Bare {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
-        taim::advanced::layout::Node::new(Size::new(40.0, 20.0))
+        _limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
+        taim_core::layout::Node::new(Size::new(40.0, 20.0))
     }
 
     fn draw(
@@ -45,8 +47,8 @@ impl<Message> Widget<Message, Theme, Renderer> for Bare {
     }
 }
 
-fn layout_at(bounds: Rectangle) -> taim::advanced::layout::Node {
-    taim::advanced::layout::Node::new(bounds.size()).move_to(bounds.position())
+fn layout_at(bounds: Rectangle) -> taim_core::layout::Node {
+    taim_core::layout::Node::new(bounds.size()).move_to(bounds.position())
 }
 
 #[test]
@@ -140,8 +142,8 @@ fn element_construction_from_a_bare_widget_still_works() {
 /// checking a basic invariant); a full behavioral test for each type
 /// lives alongside its definition in `core/src/`.
 mod public_surface {
-    use taim::advanced::widget::Id;
-    use taim::advanced::widget::tree::{DirtyFlags, Revision};
+    use taim_core::widget::Id;
+    use taim_core::widget::tree::{DirtyFlags, Revision};
     use taim_core::{cache, damage, frame, semantics};
 
     #[test]

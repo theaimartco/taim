@@ -14,12 +14,14 @@
 //!
 //! [`reconcile`]: taim_runtime::reconcile::reconcile
 
-use taim::advanced::widget::{self, Widget};
-use taim::advanced::{Layout, mouse, renderer};
-use taim::widget::keyed::Column;
-use taim::{Element, Length, Rectangle, Size, Theme};
+type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
+    taim_core::Element<'a, M, T, R>;
+use taim_core::widget::{self, Widget};
+use taim_core::{Layout, mouse, renderer};
+use taim_core::{Length, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::user_interface::{self, UserInterface};
+use taim_widget::keyed::Column;
 
 /// A widget whose only job is to hold an identifiable counter in its
 /// [`widget::Tree`] state, incremented once when the widget is first
@@ -40,9 +42,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Marker {
         &mut self,
         _tree: &mut widget::Tree,
         _renderer: &Renderer,
-        _limits: &taim::advanced::layout::Limits,
-    ) -> taim::advanced::layout::Node {
-        taim::advanced::layout::Node::new(Size::new(20.0, 20.0))
+        _limits: &taim_core::layout::Limits,
+    ) -> taim_core::layout::Node {
+        taim_core::layout::Node::new(Size::new(20.0, 20.0))
     }
 
     fn tag(&self) -> widget::tree::Tag {
@@ -78,12 +80,10 @@ fn marker_state(tree: &widget::Tree, index: usize) -> u32 {
 }
 
 fn headless_renderer() -> Renderer {
-    taim_futures::futures::executor::block_on(
-        <Renderer as taim::advanced::renderer::Headless>::new(
-            taim::advanced::renderer::Settings::default(),
-            Some("tiny-skia"),
-        ),
-    )
+    taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(
+        taim_core::renderer::Settings::default(),
+        Some("tiny-skia"),
+    ))
     .expect("tiny-skia renderer must be available")
 }
 

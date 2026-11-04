@@ -119,6 +119,8 @@ impl Default for Settings {
             level: Level::default(),
             icon: None,
             exit_on_close_request: true,
+            // Other platforms use a unit struct; desktop adapters have fields.
+            #[allow(clippy::default_constructed_unit_structs)]
             platform_specific: PlatformSpecific::default(),
         }
     }

@@ -40,6 +40,29 @@ impl FontSystem {
             cosmic_text::fontdb::Source::Binary(Arc::new(FIRA_SANS_REGULAR)),
         ]);
 
+        // fontdb deliberately excludes Android from system discovery. Load the
+        // platform directories before rebuilding cosmic-text's derived font
+        // and monospace indices, rather than adding faces to stale indices.
+        #[cfg(target_os = "android")]
+        #[allow(unused_mut)]
+        let mut raw = {
+            let (locale, mut db) = raw.into_locale_and_db();
+            for directory in ["/system/fonts", "/product/fonts", "/system_ext/fonts"] {
+                if std::path::Path::new(directory).is_dir() {
+                    db.load_fonts_dir(directory);
+                }
+            }
+            db.set_sans_serif_family("Roboto");
+            db.set_serif_family("Noto Serif");
+            db.set_monospace_family("Noto Sans Mono");
+            log::info!("Android font discovery: {} faces", db.len());
+            cosmic_text::FontSystem::new_with_locale_and_db_and_fallback(
+                locale,
+                db,
+                AndroidFallback,
+            )
+        };
+
         #[cfg(feature = "fira-sans")]
         raw.db_mut().set_sans_serif_family("Fira Sans");
 
@@ -121,4 +144,50 @@ pub struct Version(u64);
 
 pub(crate) fn font_version() -> Version {
     Version(GENERATION.load(Ordering::Acquire))
+}
+
+// cosmic-text intentionally supplies an empty fallback policy on Android.
+// Discovering the files alone does not put color emoji into its fallback list.
+#[cfg(target_os = "android")]
+struct AndroidFallback;
+
+#[cfg(target_os = "android")]
+impl cosmic_text::Fallback for AndroidFallback {
+    fn common_fallback(&self) -> &[&'static str] {
+        &[
+            "Noto Color Emoji",
+            "Noto Sans Symbols 2",
+            "Noto Sans Symbols",
+            "Roboto",
+            "Noto Sans",
+        ]
+    }
+    fn forbidden_fallback(&self) -> &[&'static str] {
+        &[]
+    }
+    fn script_fallback(&self, script: unicode_script::Script, locale: &str) -> &[&'static str] {
+        use unicode_script::Script;
+        match script {
+            Script::Devanagari => &["Noto Sans Devanagari"],
+            Script::Arabic => &["Noto Naskh Arabic", "Noto Sans Arabic"],
+            Script::Bengali => &["Noto Sans Bengali"],
+            Script::Gujarati => &["Noto Sans Gujarati"],
+            Script::Gurmukhi => &["Noto Sans Gurmukhi"],
+            Script::Tamil => &["Noto Sans Tamil"],
+            Script::Telugu => &["Noto Sans Telugu"],
+            Script::Kannada => &["Noto Sans Kannada"],
+            Script::Malayalam => &["Noto Sans Malayalam"],
+            Script::Thai => &["Noto Sans Thai"],
+            Script::Hebrew => &["Noto Sans Hebrew"],
+            Script::Hiragana | Script::Katakana => &["Noto Sans CJK JP"],
+            Script::Hangul => &["Noto Sans CJK KR"],
+            Script::Han if locale.starts_with("ja") => &["Noto Sans CJK JP"],
+            Script::Han if locale.starts_with("ko") => &["Noto Sans CJK KR"],
+            Script::Han if locale.starts_with("zh-TW") || locale.starts_with("zh-HK") => {
+                &["Noto Sans CJK TC"]
+            }
+            Script::Han => &["Noto Sans CJK SC", "Noto Sans CJK JP"],
+            _ => &[],
+        }
+    }
 }

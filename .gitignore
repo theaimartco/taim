@@ -3,3 +3,57 @@ pkg/
 **/*.rs.bk
 dist/
 traces/
+
+# Local Python verification caches
+__pycache__/
+*.py[cod]
+
+# Generated local QA evidence
+/artifacts/
+
+# Local build output (including Android and Flutter example projects)
+build/
+.gradle/
+.gradle-bootstrap/
+.cxx/
+.externalNativeBuild/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+local.properties
+*.apk
+*.aab
+*.apks
+
+# Machine-local credentials and release signing material
+/.aws/
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+key.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+
+# Local logs, coverage and editor/OS temporary files
+/logs/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+lcov.info
+*.profraw
+*.profdata
+hs_err_pid*.log
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo

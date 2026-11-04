@@ -110,10 +110,10 @@ impl Default for Layer {
     fn default() -> Self {
         Self {
             bounds: Rectangle::INFINITE,
-            quads: Default::default(),
-            triangles: Default::default(),
-            primitives: Default::default(),
-            text: Default::default(),
+            quads: crate::quad::Batch::default(),
+            triangles: Vec::new(),
+            primitives: Vec::new(),
+            text: Vec::new(),
             #[allow(clippy::default_constructed_unit_structs)]
             images: image::Batch::default(),
             effects: crate::effects::Graph::new(),

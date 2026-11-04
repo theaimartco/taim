@@ -39,6 +39,10 @@ pub struct Radio<T> {
 const DOT: f32 = 18.0;
 
 impl<T: Clone + PartialEq + Send + Sync + 'static> View for Radio<T> {
+    fn cancel_interaction(&mut self) {
+        self.pressed = false;
+    }
+
     fn measure(&mut self, cx: &mut MeasureCx<'_>, _constraints: Constraints) -> Size {
         let label = self.label.measure(cx);
         Size::new(DOT + 8.0 + label.width, label.height.max(DOT))
@@ -105,6 +109,26 @@ impl<T: Clone + PartialEq + Send + Sync + 'static> View for Radio<T> {
         }
     }
 
+    fn accessibility_action(
+        &mut self,
+        cx: &mut EventCx<'_>,
+        request: &semantics::Request,
+    ) -> Handled {
+        match request {
+            semantics::Request::Activate => {
+                cx.request_focus();
+                let _ = self.selected.set(self.value.clone());
+                cx.request_paint();
+                Handled::Yes
+            }
+            semantics::Request::Focus => {
+                cx.request_focus();
+                Handled::Yes
+            }
+            _ => Handled::No,
+        }
+    }
+
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
         let mut state = look::interactive_state(true, cx.has_focus());
         state.set(semantics::State::CHECKED, self.shown.get() == self.value);
@@ -112,7 +136,7 @@ impl<T: Clone + PartialEq + Send + Sync + 'static> View for Radio<T> {
             semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::RadioButton)
                 .with_name(self.label.text())
                 .with_state(state)
-                .with_actions(semantics::Actions::ACTIVATE),
+                .with_actions(semantics::Actions::ACTIVATE | semantics::Actions::FOCUS),
         )
     }
 
@@ -319,6 +343,26 @@ impl View for Dropdown {
         }
     }
 
+    fn accessibility_action(
+        &mut self,
+        cx: &mut EventCx<'_>,
+        request: &semantics::Request,
+    ) -> Handled {
+        match request {
+            semantics::Request::Activate | semantics::Request::ToggleExpanded => {
+                cx.request_focus();
+                self.open = !self.open;
+                cx.request_paint();
+                Handled::Yes
+            }
+            semantics::Request::Focus => {
+                cx.request_focus();
+                Handled::Yes
+            }
+            _ => Handled::No,
+        }
+    }
+
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
         let mut state = look::interactive_state(true, cx.has_focus());
         state.set(semantics::State::EXPANDED, self.open);
@@ -331,7 +375,11 @@ impl View for Dropdown {
             semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::Button)
                 .with_name(value)
                 .with_state(state)
-                .with_actions(semantics::Actions::ACTIVATE | semantics::Actions::TOGGLE_EXPANDED),
+                .with_actions(
+                    semantics::Actions::ACTIVATE
+                        | semantics::Actions::FOCUS
+                        | semantics::Actions::TOGGLE_EXPANDED,
+                ),
         )
     }
 
@@ -357,6 +405,7 @@ pub fn dialog(open: State<bool>, content: impl Into<AnyView>) -> Dialog {
         shown: open.into_prop(),
         content: Child::new(container(content).padding(24.0)),
         card: Cell::new(Rectangle::default()),
+        id: widget::Id::unique(),
     }
 }
 
@@ -366,6 +415,7 @@ pub struct Dialog {
     shown: Prop<bool>,
     content: Child,
     card: Cell<Rectangle>,
+    id: widget::Id,
 }
 
 impl View for Dialog {
@@ -410,6 +460,17 @@ impl View for Dialog {
         if !self.shown.get() {
             return Handled::No;
         }
+        if matches!(
+            event,
+            Event::Keyboard(crate::keyboard::Event::KeyPressed {
+                key: crate::keyboard::Key::Named(crate::keyboard::key::Named::Escape),
+                ..
+            })
+        ) {
+            let _ = self.open.set(false);
+            cx.request_layout();
+            return Handled::Yes;
+        }
         let bounds = cx.bounds();
         let local = self.card.get();
         let card = Rectangle::new(
@@ -426,11 +487,29 @@ impl View for Dialog {
         }
     }
 
+    fn accessibility_action(
+        &mut self,
+        cx: &mut EventCx<'_>,
+        request: &semantics::Request,
+    ) -> Handled {
+        if *request == semantics::Request::Dismiss && self.shown.get() {
+            let _ = self.open.set(false);
+            cx.request_layout();
+            Handled::Yes
+        } else {
+            Handled::No
+        }
+    }
+
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
         self.shown.get().then(|| {
-            semantics::Node::new(widget::Id::unique(), cx.bounds(), semantics::Role::Window)
+            semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::Window)
                 .with_actions(semantics::Actions::DISMISS)
         })
+    }
+
+    fn is_modal(&self) -> bool {
+        self.shown.get()
     }
 
     fn is_layer(&self) -> bool {
@@ -440,6 +519,8 @@ impl View for Dialog {
     fn children(&mut self, visit: &mut dyn FnMut(&mut Child)) {
         if self.shown.get() {
             visit(&mut self.content);
+        } else {
+            self.content.deactivate();
         }
     }
 }

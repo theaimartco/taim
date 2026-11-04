@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.theaimartco.taim.imetest">
+  <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
+  <application android:label="Taim test IME" android:allowBackup="false" android:debuggable="true">
+    <service android:name=".TestIme" android:exported="true" android:permission="android.permission.BIND_INPUT_METHOD">
+      <intent-filter><action android:name="android.view.InputMethod" /></intent-filter>
+      <meta-data android:name="android.view.im" android:resource="@xml/method" />
+    </service>
+  </application>
+</manifest>

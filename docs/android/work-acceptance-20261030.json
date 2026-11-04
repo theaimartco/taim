@@ -1,0 +1,104 @@
+{
+  "date": "2026-10-30",
+  "milestone": "Durable JobScheduler work, protected headless Rust entry, constraints, retry/cancel/reconcile and process restart",
+  "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+  "working_tree_dirty": true,
+  "runtime": {
+    "status": "passed",
+    "serial": "emulator-5594",
+    "started_utc": "2026-10-30T05:01:44.975838+00:00",
+    "apk_sha256": "8a5ecabfba55819755c925f7cc91e1c24625c642eb0ac05ff2cf12c6f7873675",
+    "driver_sha256": "e45096411feab493cb3b1081e050b090de9d962c98ca505403fd861c93df3e2b",
+    "device": {
+      "sdk": "35",
+      "model": "sdk_gphone16k_x86_64",
+      "abi": "x86_64",
+      "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+      "page_size": 16384
+    },
+    "suite_pid": 8165,
+    "generation": "a1ec60a8-8c80-460e-bc6f-25a0f9d43d54",
+    "suite_checks": 14,
+    "headless_checks": 3,
+    "worker_pid": 8450,
+    "finished_utc": "2026-10-30T05:01:55.602790+00:00"
+  },
+  "headless_output": {
+    "attempt": 1,
+    "headless": true,
+    "label": "headless",
+    "pid": 8450,
+    "socket_bound": null
+  },
+  "platform_notification_regression": {
+    "status": "passed",
+    "serial": "emulator-5594",
+    "notifications": true,
+    "started_utc": "2026-10-30T05:02:52.995647+00:00",
+    "apk_sha256": "b9c6e9a7bfd26429dd5585c2d27b609b3dd5aa3c5eb2ad83bba96341070b9213",
+    "driver_sha256": "a2b44ef5d238344f850d43ef3df52a3b119fe579a7d2cac0c04294f4ef557198",
+    "device": {
+      "sdk": "35",
+      "model": "sdk_gphone16k_x86_64",
+      "abi": "x86_64",
+      "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+      "page_size": 16384
+    },
+    "checks": 14,
+    "cold_intent_checks": 1,
+    "finished_utc": "2026-10-30T05:02:59.859777+00:00"
+  },
+  "checks": {
+    "host_unit_tests": 58,
+    "strict_host_native_views_clippy": "passed",
+    "strict_arm64_work_and_counter_clippy": "passed",
+    "standalone_arm64_x86_64_assemble_debug": "passed",
+    "worker_jni_export": "verified for fixture and generated project",
+    "generated_apk_signature": "verified development signature",
+    "generated_apk_zipalign_16k": "passed",
+    "worker_manifest": "BIND_JOB_SERVICE-protected service; RECEIVE_BOOT_COMPLETED and ACCESS_NETWORK_STATE; no foreground service/background location"
+  },
+  "artifact_sha256": {
+    "target/android/x86_64/debug/work-probe/taim-work-probe.apk": "8a5ecabfba55819755c925f7cc91e1c24625c642eb0ac05ff2cf12c6f7873675",
+    "target/android/work-template-check/app/build/outputs/apk/debug/app-debug.apk": "4a61a88d10180a0f7e4faccfb7a08d34fe269789e81cbaf193c52b2b2cc7c278",
+    "target/android/runtime-smoke/work-accepted/work-driver.apk": "e45096411feab493cb3b1081e050b090de9d962c98ca505403fd861c93df3e2b"
+  },
+  "source_sha256": {
+    "Cargo.lock": "0045d7720c1520ff8b9a94716cc1a29792a260c96659ecf0d8515850d810cb21",
+    "Cargo.toml": "f11fe1f9c09617a5f886672c72a3ac61dbfab0128358884327031bab0dbc47dd",
+    "examples/android_platform_probe/src/lib.rs": "18733363edcd8f02f05b6a5f63dd500d53379d8c0fbb4cd630a7828beea75f2e",
+    "examples/android_work_probe/Cargo.toml": "4db7d4fb08cdf5b82f27a87e10680a98430870e8ad8187bd9cfbf556605a7819",
+    "examples/android_work_probe/android/AndroidManifest.xml": "370323f51b4d756f1c89dbe1838cb83d810c71445c5dcd2ca548c4bb464ff2c4",
+    "examples/android_work_probe/src/lib.rs": "b05f4efd57d5dc738fd4b7e377a1f9b1728688cdff68f7451f9dfffe6fe17c9c",
+    "scripts/android/counter.py": "5cf382106426ec75715441a590da4a4ce38e1361fae91417a1bb493602268eb2",
+    "scripts/android/platform-test/PlatformDriver.java": "27c71e3dac1044014ece8ca7f67a9ffeca3810b4c476091e23c755298bc81277",
+    "scripts/android/project.py": "abf7aa076c2fab66e4409fb51d5ad073a2245a0e57ec27b9444fa4f469e6e2f0",
+    "scripts/android/templates/app/src/main/AndroidManifest.xml": "3ac755a13d6a799a8c725fdef28094ce68ea095a2e012513bbc8531bfc098061",
+    "scripts/android/templates/build-rust.py": "84512ce36f6699a4782eac882703a69fbaf716f2270e63858a9ff9ed34d3985d",
+    "scripts/android/work-probe.py": "cc6d28dbf2b8dc3dc12a665b0c476e9cb125fc9de570c29929b049f0c181e13c",
+    "scripts/android/work-test/AndroidManifest.xml": "6f55189a83efeaf96d901b6e4df1331a5eb044e84697513ef9035ec839acb262",
+    "scripts/android/work-test/WorkDriver.java": "2107a311be93a2a8cc8ee809eb94cfac58f3b7cb328ed49d6d6b161088c44618",
+    "src/lib.rs": "1951852df2445585a1df7f86704961dc1e6c147390725b1926240162ae50e1a7",
+    "winit/android/com/theaimartco/taim/TaimServices.java": "af66794759a58ca34da8553ba6560e825e288dd33b9ef665153ab8d1fb59d07b",
+    "winit/android/com/theaimartco/taim/TaimWork.java": "78149172f9a5bccaaf281c269526badbfd99e7d966ba10f7c7ed016738642c6e",
+    "winit/android/com/theaimartco/taim/TaimWorkService.java": "bfe756e54fb0c7342762d50dd4ba5323e43ef61987bb738052f43f66a0a12d52",
+    "winit/src/android/mod.rs": "cffce2a4bcc8e30bca356af05f4b7b0bf1fc96a57c6b518216dc1bab9398461c",
+    "winit/src/android/services.rs": "8c5543de3291dc95811f39083bab8fe12914c6d656ce8ae53d1b914a9539a9c3",
+    "winit/src/android/work.rs": "3720e6d2919ffad7d993b9b579d0a08c14a294f4654d64aadd25985e0dfe771e",
+    "winit/src/android/work_bridge.rs": "f6e9747c4a4f9c1eaa254cab1b92aacdbba067cd63a98c91eefc7207f7dff9d4"
+  },
+  "evidence_directory": "target/android/runtime-smoke/work-accepted",
+  "notes": [
+    "OS stop before ledger claim preserves retry without consuming an attempt; dedicated gated-manager test passed.",
+    "Terminal scheduler cancellation is serialized with replacement to prevent cancelling a newer generation.",
+    "Failed work-platform-regression retained: fixture assumed synchronous notification shade publication; driver now waits for effective permission and active entries. Final regression passed."
+  ],
+  "limitations": [
+    "API35 x86_64 16KiB emulator only; no physical/OEM/API26/reboot/unlock/Doze acceptance",
+    "Forced scheduler tests bypass eligibility; they do not prove natural periodic timing or quota behavior",
+    "Cooperative cancellation; native threads and application side effects cannot be forcibly rolled back",
+    "At-least-once delivery, not exactly-once external effects",
+    "No WorkManager DAG API, push/FCM, foreground service, exact alarm or background-location service",
+    "Generated and fixture APKs in this record are development-signed debug builds"
+  ]
+}

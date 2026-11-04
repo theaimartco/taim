@@ -22,16 +22,22 @@ pub mod conversion;
 pub mod frame_clock;
 pub mod frame_gate;
 
+#[cfg(any(target_os = "android", test))]
+pub mod android;
 mod error;
 #[cfg(all(feature = "measurement", not(target_arch = "wasm32")))]
 mod measurement;
 mod shell;
 mod surface;
+#[cfg(all(feature = "linux-theme-detection", target_os = "linux"))]
+mod system_theme;
 mod wake;
 
 pub use clipboard::Clipboard;
 pub use error::Error;
 pub use frame_gate::{DirtyFlags, FrameGate, PlatformEvent, TaimEvent, WindowStateTracker};
+#[cfg(target_os = "android")]
+pub use shell::run_android;
 pub use shell::{App, run};
 
 type Renderer = taim_renderer::Renderer;

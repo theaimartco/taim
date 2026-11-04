@@ -1,0 +1,345 @@
+{
+  "date": "2026-10-30",
+  "milestone": "Retained Android native hierarchy slots, InputQueue gesture handoff, hardware composition and TextureView producer",
+  "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+  "working_tree_dirty": true,
+  "reports": {
+    "native-view-accepted": {
+      "status": "passed",
+      "serial": "emulator-5594",
+      "started_utc": "2026-10-30T05:37:15.879943+00:00",
+      "apk_sha256": "8e337befb06da36387249184542f82d21a84ebd2dc27814468301ac06cfc222e",
+      "driver_sha256": "535b77340eb4832926b17836df9f2ae58e39931fbe5ba30aae7cc2638f354e60",
+      "device": {
+        "sdk": "35",
+        "model": "sdk_gphone16k_x86_64",
+        "abi": "x86_64",
+        "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+        "page_size": 16384
+      },
+      "checks": 22,
+      "finished_utc": "2026-10-30T05:37:23.493774+00:00"
+    },
+    "native-view-counter": {
+      "status": "passed",
+      "started_utc": "2026-10-30T05:37:48.993207+00:00",
+      "serial": "emulator-5594",
+      "apk_sha256": "4e8456407d927df56994bdbe6218748fc4bd3b1e198c9f19737bda63c886e8d2",
+      "tap": [
+        220,
+        520
+      ],
+      "counter_region": [
+        75,
+        340,
+        300,
+        90
+      ],
+      "checks": [
+        "first successful presentation and stable nonblank counter screenshot",
+        "touch increment 1 and counter-region pixel change",
+        "background/resume cycle 1: same process, retained pixels, recreated target presented",
+        "touch increment 2 and counter-region pixel change",
+        "background/resume cycle 2: same process, retained pixels, recreated target presented",
+        "touch increment 3 and counter-region pixel change",
+        "background/resume cycle 3: same process, retained pixels, recreated target presented",
+        "touch increment 4 and counter-region pixel change",
+        "saved task restored count pixels into a new process and next increment retained the value"
+      ],
+      "device": {
+        "model": "sdk_gphone16k_x86_64",
+        "sdk": "35",
+        "abi": "x86_64",
+        "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+        "page_size": 16384
+      },
+      "source": {
+        "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+        "working_tree_dirty": true,
+        "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+      },
+      "launch": "Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.theaimartco.taim.counter/com.theaimartco.taim.TaimActivity }\nStatus: ok\nLaunchState: COLD\nActivity: com.theaimartco.taim.counter/com.theaimartco.taim.TaimActivity\nTotalTime: 605\nWaitTime: 626\nComplete",
+      "pid": "7199",
+      "recreated_pid": "7576",
+      "final_counter": 5,
+      "limitations": [
+        "Emulator results do not certify physical GPU/device support",
+        "Presentation marker means successful compositor present, not scan-out latency",
+        "Pixel assertions depend on the supplied counter-only region",
+        "No IME, TalkBack, battery or Flutter comparison acceptance"
+      ],
+      "finished_utc": "2026-10-30T05:38:04.624963+00:00",
+      "artifacts_sha256": {
+        "app.log": "b0990705e2cd230147c264f38bf08374f99fdc14596599c378dbcb732749d82e",
+        "before-process-kill.log": "32d788db0cebaafb979a620499ad3b64cf456c0bec0e8b3b705e1de3401be290",
+        "increment-1.png": "d12397c2b3f4903c33cb55c3ad25115be4c992e72262ef836aa73100aec7f82f",
+        "increment-2.png": "a79432efe90ec9a0922ca6a6e4f1105bc86869d8cab0d6718534a7bcbe2cbba6",
+        "increment-3.png": "d81e9532a8ee20c8bca103a575601a7fb2d7038407610a0b50efed95aa23f196",
+        "increment-4.png": "6f13be3f5fe753a93f20d2e3ec3bbd53c389ad315c3a6649917f1f51a7559a5b",
+        "initial.png": "19d3c4ab780d0f26fe67cc152afb4f065383ce1705799cb9cc2cdfbfc318a289",
+        "process-restored-increment.png": "57691f694bccdc640e460d7a0220409ce5ddf746bbbe0b45b8c1442747ec08a5",
+        "process-restored.png": "2ecba4581e8ea3834ae6f745f5c95d7b083f31c21979425d3d35535401ef9418",
+        "resume-1.png": "d12397c2b3f4903c33cb55c3ad25115be4c992e72262ef836aa73100aec7f82f",
+        "resume-2.png": "a79432efe90ec9a0922ca6a6e4f1105bc86869d8cab0d6718534a7bcbe2cbba6",
+        "resume-3.png": "d81e9532a8ee20c8bca103a575601a7fb2d7038407610a0b50efed95aa23f196",
+        "vulkan.json": "cc8b5df067f192f36107ed88edfd1b90bf2f09075be7f68bbb615508f76b3f7b"
+      }
+    },
+    "native-view-ime": {
+      "status": "passed",
+      "serial": "emulator-5594",
+      "test_ime_sha256": "2a011efe9ffd28fa0b3368afaacf7d94db8c225a66130e4172623eb55f57d3b6",
+      "checks": [
+        "commit",
+        "assert",
+        "delete-codepoints",
+        "assert",
+        "select",
+        "batch",
+        "finish",
+        "assert-all",
+        "select-all",
+        "commit",
+        "compose",
+        "finish",
+        "assert",
+        "save",
+        "stale",
+        "commit",
+        "assert",
+        "compose",
+        "finish",
+        "delete-codepoints",
+        "assert",
+        "assert-all",
+        "select-all",
+        "commit",
+        "assert-all",
+        "delete-codepoints",
+        "compose",
+        "finish",
+        "assert-all"
+      ]
+    },
+    "native-view-platform": {
+      "status": "passed",
+      "serial": "emulator-5594",
+      "notifications": true,
+      "started_utc": "2026-10-30T05:39:27.218853+00:00",
+      "apk_sha256": "efdf1c37ef92a577a424bba64a84a24b7eb468f070776901344f8b151d0f84f0",
+      "driver_sha256": "283432f9dd8c469cd28120138963e46f951c037a1faea63025310dfd3d77ef1d",
+      "device": {
+        "sdk": "35",
+        "model": "sdk_gphone16k_x86_64",
+        "abi": "x86_64",
+        "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys",
+        "page_size": 16384
+      },
+      "checks": 14,
+      "cold_intent_checks": 1,
+      "finished_utc": "2026-10-30T05:39:36.905149+00:00"
+    }
+  },
+  "host_checks": {
+    "native_views": 39,
+    "winit_lib": 59,
+    "clippy_host": "passed -D warnings",
+    "clippy_arm64_counter_and_native_probe": "passed -D warnings",
+    "cargo_fmt_all_check": "passed",
+    "git_diff_check": "passed",
+    "python_compile": "passed"
+  },
+  "build_checks": {
+    "native_probe_abis": [
+      "arm64-v8a",
+      "x86_64"
+    ],
+    "standalone_compile_target_sdk": 36,
+    "standalone_native_libraries": [
+      "lib/arm64-v8a/libtaim_app.so",
+      "lib/x86_64/libtaim_app.so"
+    ],
+    "signatures_and_16k_alignment": "passed; development/debug signatures only"
+  },
+  "artifacts": {
+    "target/android/x86_64/debug/native-view-probe/taim-native-view-probe.apk": {
+      "bytes": 19649003,
+      "sha256": "8e337befb06da36387249184542f82d21a84ebd2dc27814468301ac06cfc222e"
+    },
+    "target/android/arm64-v8a/debug/native-view-probe/taim-native-view-probe.apk": {
+      "bytes": 20287982,
+      "sha256": "250dc143121131f427bb0efb8c394e0c03cbd1c2e47986d1e348ddccfcd8f0e7"
+    },
+    "target/android/native-view-project/app/build/outputs/apk/debug/app-debug.apk": {
+      "bytes": 54337303,
+      "sha256": "0074c72716865b64207f6ff9216d6b576f97d41545fc30d5a783d9c8e70ef200"
+    },
+    "target/android/x86_64/debug/taim-counter.apk": {
+      "bytes": 19980769,
+      "sha256": "4e8456407d927df56994bdbe6218748fc4bd3b1e198c9f19737bda63c886e8d2"
+    },
+    "target/android/x86_64/debug/platform-probe/taim-platform-probe.apk": {
+      "bytes": 19812902,
+      "sha256": "efdf1c37ef92a577a424bba64a84a24b7eb468f070776901344f8b151d0f84f0"
+    }
+  },
+  "sources": {
+    "Cargo.lock": {
+      "bytes": 137055,
+      "sha256": "b1a543eb3fedc537a234ec1f26014987f4410bc564da365547f8228aea39cc9b"
+    },
+    "Cargo.toml": {
+      "bytes": 13864,
+      "sha256": "a4aab7f23b48f5ef224ee600f2c03dbac87f3100e1a9d3adf1862fb3ffe41021"
+    },
+    "examples/android_native_view_probe/Cargo.toml": {
+      "bytes": 332,
+      "sha256": "588847dc01d55fd86058d28fb954e6a59132cdd21ae03497d4d9b91388636d8b"
+    },
+    "examples/android_native_view_probe/android/AndroidManifest.xml": {
+      "bytes": 1159,
+      "sha256": "97dbdc502bac14bd939229aaa9206adeb9cf460b04e7309479aef37b9de99bc7"
+    },
+    "examples/android_native_view_probe/android/java/com/theaimartco/taim/TaimNativeProbeActivity.java": {
+      "bytes": 1914,
+      "sha256": "63c14c0a4e2bb1c6d1aef5cdd73c613ac53ca9366767aae44ac453c41ffc75c5"
+    },
+    "examples/android_native_view_probe/src/lib.rs": {
+      "bytes": 2586,
+      "sha256": "fd9074e8802f7381ab91ca1c9034b6655c3e86f7918a4fb02f2ade0c849a0c29"
+    },
+    "scripts/android/counter.py": {
+      "bytes": 10545,
+      "sha256": "5cae326a16caeea8ee5f5718543ab8d695bd27da9e3e32f0b3b9c006b56645d1"
+    },
+    "scripts/android/native-view-probe.py": {
+      "bytes": 3725,
+      "sha256": "39eb59bfb3cca7d80a004e8a4787572a8b47b24395b2ebf3dce283a038a88d47"
+    },
+    "scripts/android/native-view-test/AndroidManifest.xml": {
+      "bytes": 439,
+      "sha256": "d8ae7caecbaa62f66501ad38a25d4bba6f879c50639fc043c4befdbd45181f55"
+    },
+    "scripts/android/native-view-test/NativeViewDriver.java": {
+      "bytes": 10904,
+      "sha256": "f61d13eab85e268afffe71e6a5a29be621f455be9f7fab5526df2e11b3aaedb5"
+    },
+    "scripts/android/project.py": {
+      "bytes": 9211,
+      "sha256": "5d4e475eee820d130cee5b6222447f448673801d5cf24d1ebbbb2bcb6bfa7ef7"
+    },
+    "tests/native_views.rs": {
+      "bytes": 50166,
+      "sha256": "21fc7b8ecb6000444619d77baba20a67746e0b873730855572d258c8864d77fb"
+    },
+    "view/src/lib.rs": {
+      "bytes": 2326,
+      "sha256": "8849c30199548dc86c1fe929a65d2ed480c7aeecad2c9df441cdbe712ade302c"
+    },
+    "view/src/native.rs": {
+      "bytes": 4988,
+      "sha256": "1fc5c32acf36e070018e117be348bd48ce89a8eba043b1bd03554b27cada7805"
+    },
+    "view/src/root.rs": {
+      "bytes": 33281,
+      "sha256": "580f3506977972a3b994de40569a10fd7ca7e89c4c1de6eb0558a9310ef768e0"
+    },
+    "view/src/tree.rs": {
+      "bytes": 22942,
+      "sha256": "881f9e784f94ae7d994ead8f9715f62b39e991f5faeb46b325432c1e1c34611e"
+    },
+    "view/src/view.rs": {
+      "bytes": 9876,
+      "sha256": "1848bbd0c851887858f308430d283fc066805a34ec945f6a944c5842f08e396e"
+    },
+    "winit/android/com/theaimartco/taim/TaimAccessibility.java": {
+      "bytes": 14935,
+      "sha256": "c926affd9d288529abe91e5ef7106b4a4b407dface5ff10b67eee06039a59bb7"
+    },
+    "winit/android/com/theaimartco/taim/TaimActivity.java": {
+      "bytes": 35529,
+      "sha256": "a2eccbcd577893ba988fdab0abeb57baa5a76a6665890096c3d22e2dddfbdde8"
+    },
+    "winit/android/com/theaimartco/taim/TaimBack.java": {
+      "bytes": 2075,
+      "sha256": "6fff783dbbb00a5ac8fbc5726e366d70c22fd233b19b6e2ae45af4bc81ce7bde"
+    },
+    "winit/android/com/theaimartco/taim/TaimLocation.java": {
+      "bytes": 10592,
+      "sha256": "b88626fbddb6fe19f26d75f5b45bbbb623887b5930f656c0be1116776064b04f"
+    },
+    "winit/android/com/theaimartco/taim/TaimMedia.java": {
+      "bytes": 9109,
+      "sha256": "65ecaf4d32ed15ebb565a70c3eac10f1ee9c20ca98c9081cacc98ee12cdf1018"
+    },
+    "winit/android/com/theaimartco/taim/TaimMediaProvider.java": {
+      "bytes": 4064,
+      "sha256": "fe789051ca9aad1cccea0d33c0cde93fe476af189591bc24b132a40e88bc9c43"
+    },
+    "winit/android/com/theaimartco/taim/TaimNativeViewFactory.java": {
+      "bytes": 1217,
+      "sha256": "27b134dabdfbf1fdaade541c40910c16b019ac8016b061a0645f6f638e6fb63c"
+    },
+    "winit/android/com/theaimartco/taim/TaimNativeViews.java": {
+      "bytes": 16503,
+      "sha256": "7e85a51e44494d70adc53f1d14f7a4af101bdd98f9e2408a2733a3c336941590"
+    },
+    "winit/android/com/theaimartco/taim/TaimNotifications.java": {
+      "bytes": 7836,
+      "sha256": "eacb6e0aac6f49396149b7b7c2babf8e830460af1327f24687d915e8c406078a"
+    },
+    "winit/android/com/theaimartco/taim/TaimPlugin.java": {
+      "bytes": 441,
+      "sha256": "264db2ea7f50de383e002a270d9e6572ad43d66697d0d6fc45c9bedf806c0727"
+    },
+    "winit/android/com/theaimartco/taim/TaimServices.java": {
+      "bytes": 23572,
+      "sha256": "af66794759a58ca34da8553ba6560e825e288dd33b9ef665153ab8d1fb59d07b"
+    },
+    "winit/android/com/theaimartco/taim/TaimTextureView.java": {
+      "bytes": 2011,
+      "sha256": "54d90a9675089d40d952511cdf9dd34f9f6115e48559363ba3372f05a2cabe93"
+    },
+    "winit/android/com/theaimartco/taim/TaimWork.java": {
+      "bytes": 15708,
+      "sha256": "78149172f9a5bccaaf281c269526badbfd99e7d966ba10f7c7ed016738642c6e"
+    },
+    "winit/android/com/theaimartco/taim/TaimWorkService.java": {
+      "bytes": 9396,
+      "sha256": "bfe756e54fb0c7342762d50dd4ba5323e43ef61987bb738052f43f66a0a12d52"
+    },
+    "winit/src/android/bridge.rs": {
+      "bytes": 41275,
+      "sha256": "6fc371a89e92ab27e30e75c82f9e738291c5777bab5062d78e353e33dee712a7"
+    },
+    "winit/src/android/mod.rs": {
+      "bytes": 1171,
+      "sha256": "4c6b0d3e9120ce79e15116012b41ca437acd84076ad05609d7ac72960fe5d65c"
+    },
+    "winit/src/android/native_views.rs": {
+      "bytes": 2891,
+      "sha256": "112ec0e9950723e8658da9e6a2ba8063775e739121e39232ea6385ecfac45dcc"
+    },
+    "winit/src/android/services.rs": {
+      "bytes": 29795,
+      "sha256": "de8b018c434b7e134a9d75a74b0ddbb3f82d5e86e0e7d1022455e286e900f289"
+    },
+    "winit/src/shell.rs": {
+      "bytes": 18344,
+      "sha256": "b4c8230c5ef6d4d500ddee6ebc705cb701e35406eec5c0cafd61e878f40606d6"
+    },
+    "winit/src/surface.rs": {
+      "bytes": 40251,
+      "sha256": "b5e22cf7ea5f0dea1823ffc7631ea23d42b3b4e6590d4c95bde0b1bbe09d2abc"
+    }
+  },
+  "limitations": [
+    "Experimental; physical API/GPU/OEM/TalkBack/IME matrix is pending.",
+    "System-composited native hierarchy and TextureView producer; external GPU texture import and arbitrary GPU/native interleaving are not implemented.",
+    "Rectangular clips; active Taim modals hide all native slots; keep slots clear of decorative GPU paint-over.",
+    "Finger-position gesture forwarding supports up to 16 pointer identities; hardware-key/IME KeyEvent forwarding, mouse/hover/stylus metadata remain gaps.",
+    "Native input acceptance covers Unicode accessibility edits and a real editable InputConnection commit; full physical IME acceptance is pending.",
+    "Camera2/player/maps/WebView SDK adapters are not implemented by the generic factory infrastructure.",
+    "Native state retention is limited to the living Activity; process restoration requires explicit application state."
+  ]
+}
