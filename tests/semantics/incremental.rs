@@ -13,17 +13,17 @@
 //! `UserInterface::semantics` uses -- rather than a hand-rolled one, so
 //! what is tested here is what an application actually runs.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
 use std::cell::RefCell;
 use std::rc::Rc;
+use taim::{Rectangle, Size, Theme};
 use taim_core::Layout;
+use taim_core::Length;
 use taim_core::widget::tree::DirtyFlags;
 use taim_core::widget::visit::{self, Visit};
 use taim_core::widget::{self, Widget};
-use taim_core::{Length, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::semantics;
+use taim_widget::Element;
 
 fn headless_renderer() -> Renderer {
     taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(

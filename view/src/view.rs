@@ -40,6 +40,18 @@ pub trait View: 'static {
         Handled::No
     }
 
+    /// Looks at `event` before any child does, and may take it.
+    ///
+    /// This is how a scrollable area claims a drag that began on a button:
+    /// it lets the press through, watches the finger move, and once the
+    /// movement is clearly a scroll returns [`Handled::Yes`]. The children
+    /// that saw the press then receive a cancellation (the pointer leaves
+    /// and the button is released with no pointer), so nothing activates.
+    /// Android calls this `onInterceptTouchEvent`.
+    fn intercept(&mut self, _cx: &mut EventCx<'_>, _event: &Event) -> Handled {
+        Handled::No
+    }
+
     /// Cancels temporary interactions when this view is deactivated.
     /// This must be idempotent and must not activate controls or discard model data.
     fn cancel_interaction(&mut self) {}
@@ -84,6 +96,12 @@ pub trait View: 'static {
 
     /// Whether the view can take keyboard focus (and be reached with Tab).
     fn focusable(&self) -> bool {
+        false
+    }
+
+    /// Whether the view edits text while it has focus. The shell shows the
+    /// on-screen keyboard (and enables the input method) while it does.
+    fn takes_text(&self) -> bool {
         false
     }
 
@@ -132,6 +150,28 @@ pub trait View: 'static {
 
     /// Hands each child to `visit`, in paint order.
     fn children(&mut self, _visit: &mut dyn FnMut(&mut Child)) {}
+
+    /// Hands each child to `visit` in reverse paint order: topmost first,
+    /// the order input is offered in.
+    ///
+    /// The default walks [`View::children`] once per child, which is fine
+    /// for a handful of children. Views that hold many (stacks, lists,
+    /// grids) override it so routing an event stays linear in the number
+    /// of children.
+    fn children_rev(&mut self, visit: &mut dyn FnMut(&mut Child)) {
+        let mut count = 0_usize;
+        self.children(&mut |_| count += 1);
+
+        for target in (0..count).rev() {
+            let mut index = 0_usize;
+            self.children(&mut |child| {
+                if index == target {
+                    visit(child);
+                }
+                index += 1;
+            });
+        }
+    }
 
     /// The view's type, for diagnostics and developer tools.
     fn debug_name(&self) -> &'static str {

@@ -10,7 +10,6 @@ mod pipeline;
 #[cfg(feature = "image")]
 mod raster;
 
-#[cfg(feature = "image")]
 #[cfg(feature = "svg")]
 mod vector;
 

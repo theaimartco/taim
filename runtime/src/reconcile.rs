@@ -22,7 +22,7 @@
 
 use crate::core::widget::Tree;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 use std::hash::Hash;
 
 /// Reconciles `current` (the previous frame's `(key, Tree)` pairs, in
@@ -87,7 +87,7 @@ pub fn reconcile_parallel<K, T>(
     debug_assert_eq!(next_keys.len(), next_items.len());
 
     let previous_len = keys.len().min(trees.len());
-    let mut previous = FxHashMap::with_capacity_and_hasher(previous_len, rustc_hash::FxBuildHasher);
+    let mut previous = FxHashMap::with_capacity_and_hasher(previous_len, FxBuildHasher);
 
     for (key, tree) in keys.drain(..).zip(trees.drain(..)) {
         let _replaced = previous.insert(key, tree);

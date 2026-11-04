@@ -31,13 +31,13 @@
 //! These tests exist because that failure is invisible at every layer
 //! until something divides by it.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
+use taim::{Point, Rectangle, Size, Theme};
+use taim_core::Length;
 use taim_core::damage;
 use taim_core::layout::Limits;
-use taim_core::{Length, Point, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::user_interface::{Cache, UserInterface};
+use taim_widget::Element;
 use taim_widget::{column, container, row, text};
 
 type Message = &'static str;

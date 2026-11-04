@@ -16,12 +16,12 @@
 //! out of this phase's scope (see `docs/architecture/widget-lifecycle.md`).
 //! It proves the mechanism itself is correct and safe to adopt.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
+use taim::{Point, Rectangle, Size, Theme};
+use taim_core::Length;
 use taim_core::widget::{self, Widget};
 use taim_core::{Layout, mouse, renderer};
-use taim_core::{Length, Point, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
+use taim_widget::Element;
 
 use std::cell::RefCell;
 use std::rc::Rc;

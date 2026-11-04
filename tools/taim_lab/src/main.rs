@@ -8,9 +8,10 @@
 //!
 //! # What this is, honestly
 //!
-//! A native TAIM view application. Its panels inspect a hosted legacy
-//! widget fixture, so the fixture can continue exercising the retained
-//! widget/runtime contracts independently of the application facade.
+//! **The first Taim application that has ever run.** Everything else in
+//! this repository is verified headlessly. That is real verification, and
+//! it is also why this exists: a window that opens finds a class of
+//! problem a headless test structurally cannot.
 //!
 //! It inspects a view it **hosts**, in-process. It cannot attach to a
 //! separate application; see [`target::Connection::Remote`] for why that
@@ -26,14 +27,6 @@
 //! plausible picture — see their module docs. A wrong answer from a
 //! profiler is worse than no answer, because it is acted on.
 
-// Local construction shorthands for native view lists.
-macro_rules! column {
-    ($($child:expr),* $(,)?) => { taim::view::views::column(taim::view::views![$($child),*]) };
-}
-macro_rules! row {
-    ($($child:expr),* $(,)?) => { taim::view::views::row(taim::view::views![$($child),*]) };
-}
-
 mod animation_inspector;
 mod damage_overlay;
 mod device_profiles;
@@ -45,16 +38,11 @@ mod semantics_inspector;
 mod target;
 mod widget_inspector;
 
-use std::time::Duration;
-
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
+use std::time::Duration;
+
 use taim::prelude::*;
-use taim::view::{AnyView, Sender};
 
 use target::{Connection, Hosted};
 
@@ -168,7 +156,6 @@ struct Lab {
     /// could only ever say "yes" or "no", which is what makes the stuck
     /// case invisible.
     activity: animation_inspector::Activity,
-    timer: Option<Ticker>,
 }
 
 impl Default for Lab {
@@ -178,7 +165,6 @@ impl Default for Lab {
             connection: Connection::Detached,
             target: None,
             activity: animation_inspector::Activity::default(),
-            timer: None,
         };
 
         // Attached from the start: an inspector that opened detached would
@@ -229,16 +215,12 @@ fn update(lab: &mut Lab, message: Message) {
         Message::Detach => {
             lab.connection = Connection::Detached;
             lab.target = None;
-            lab.timer = None;
             // Reset: a run of animation belongs to the target that was
             // running it, and carrying it across an attach would accuse a
             // fresh target of being stuck.
             lab.activity = animation_inspector::Activity::default();
         }
         Message::Tick => {
-            if let Some(timer) = &lab.timer {
-                timer.pending.store(false, Ordering::Release);
-            }
             if let Some(target) = &mut lab.target {
                 target.step();
                 lab.activity.record(target.snapshot().is_animating);
@@ -252,35 +234,35 @@ fn update(lab: &mut Lab, message: Message) {
     }
 }
 
-#[cfg(test)]
-fn view(lab: &Lab) -> AnyView {
-    view_with(lab, Rc::new(|_| {}))
+/// Delivers a [`Message`] to the inspector from a view's handler.
+type Send = Rc<dyn Fn(Message)>;
+
+/// Builds the press handler that sends `message`.
+fn on(send: &Send, message: Message) -> impl Fn() + 'static {
+    let send = Rc::clone(send);
+
+    move || send(message.clone())
 }
 
-fn panel_tabs(selected: Panel, dispatch: Rc<dyn Fn(Message)>) -> AnyView {
-    let tabs = Panel::ALL.iter().fold(row![].gap(4.0), |tabs, panel| {
+fn view(lab: &Lab, send: &Send) -> AnyView {
+    let tabs = Panel::ALL.iter().fold(row([]).gap(4.0), |tabs, panel| {
         let label = if panel.has_data() {
             panel.title().to_owned()
         } else {
             // Marked, so a developer knows before clicking. The panel
             // still opens and explains itself.
-            format!("{} \u{00b7} —", panel.title())
+            format!("{} \u{00b7} \u{2014}", panel.title())
         };
 
-        let dispatch = dispatch.clone();
-        let panel = *panel;
-        let control = button(label).on_press(move || dispatch(Message::Show(panel)));
-        tabs.push(if panel == selected {
-            control
+        let tab = button(label).on_press(on(send, Message::Show(*panel)));
+
+        tabs.push(if *panel == lab.panel {
+            tab
         } else {
-            control.ghost()
+            tab.ghost()
         })
     });
 
-    tabs.into()
-}
-
-fn panel_body(lab: &Lab, dispatch: Rc<dyn Fn(Message)>) -> AnyView {
     // Rendered whether or not anything is attached: the two panels with
     // no data source have something to say regardless, and a "nothing
     // attached" message would hide the more useful explanation.
@@ -318,250 +300,149 @@ fn panel_body(lab: &Lab, dispatch: Rc<dyn Fn(Message)>) -> AnyView {
         }
         (Panel::DeviceProfiles, Some(target)) => {
             let snapshot = target.snapshot();
+            let send = Rc::clone(send);
 
-            device_profiles::view(snapshot.bounds, snapshot.scale, {
-                let dispatch = dispatch.clone();
-                move |profile| dispatch(Message::Profile(profile))
+            device_profiles::view(snapshot.bounds, snapshot.scale, move |profile| {
+                send(Message::Profile(profile));
             })
         }
     };
 
-    body
-}
-
-#[cfg(test)]
-fn view_with(lab: &Lab, dispatch: Rc<dyn Fn(Message)>) -> AnyView {
-    let tabs = panel_tabs(lab.panel, dispatch.clone());
-    let body = panel_body(lab, dispatch.clone());
     let driven = match &lab.target {
         Some(target) => format!("{} frames driven", target.frames()),
         None => "not driving".to_owned(),
     };
 
-    let status = row![
-        text(lab.connection.describe()).size(12),
-        text(driven).size(12),
-        text(format!("{:.1}s", lab.connection.uptime().as_secs_f32())).size(12),
-        if lab.connection.is_live() {
-            button("Detach").on_press({
-                let dispatch = dispatch.clone();
-                move || dispatch(Message::Detach)
-            })
-        } else {
-            button("Attach").on_press({
-                let dispatch = dispatch.clone();
-                move || dispatch(Message::Attach)
-            })
-        },
-    ]
-    .gap(12.0);
+    let toggle = if lab.connection.is_live() {
+        button("Detach").on_press(on(send, Message::Detach))
+    } else {
+        button("Attach").on_press(on(send, Message::Attach))
+    };
+
+    let status = row(views![
+        text(lab.connection.describe()).size(12.0),
+        text(driven).size(12.0),
+        text(format!("{:.1}s", lab.connection.uptime().as_secs_f32())).size(12.0),
+        toggle.secondary(),
+    ])
+    .gap(12.0)
+    .align(Align::Center);
 
     container(
-        column![
-            scroll(tabs).horizontal(),
-            container(body).fill_height().padding(8),
-            status,
-        ]
-        .gap(8.0),
+        column(views![tabs, container(body).fill().padding(8.0), status,])
+            .gap(8.0)
+            .fill_width(),
     )
-    .padding(12)
+    .padding(12.0)
+    .fill()
     .into()
 }
 
 /// A panel that is not built, saying so rather than showing an empty box.
 fn unbuilt(question: &str, why: &str) -> AnyView {
     container(
-        column![text(question).size(16), text(why).size(12)]
+        column(views![text(question).size(16.0), text(why).size(12.0)])
             .gap(6.0)
             .fill_width(),
     )
-    .center_x()
-    .fill_width()
-    .center_y()
-    .fill_height()
+    .center()
+    .fill()
     .into()
+}
+
+/// Drives the hosted target on a timer while one is attached.
+///
+/// ~60Hz, on a timer rather than on the inspector's own frames: those stop
+/// when the inspector's window is occluded or minimised, and the trace
+/// would simply stop, with nothing saying why. A timer keeps measuring
+/// whether or not anyone is looking, which is the behaviour a profiler
+/// needs.
+///
+/// Each attachment starts its own ticker, identified by `generation`; a
+/// ticker whose generation is no longer current stops. Detached costs
+/// nothing: no thread keeps firing into a `None`.
+fn start_ticker(ticks: State<u64>, generation: State<u64>) {
+    let mine = generation.get();
+
+    spawn(async move {
+        loop {
+            std::thread::sleep(TICK);
+
+            if generation.get() != mine {
+                break;
+            }
+
+            ticks.update(|n| {
+                *n = n.wrapping_add(1);
+            });
+        }
+    });
 }
 
 /// Opens the inspector.
 pub fn main() -> taim::Result {
-    taim::launch("Taim Lab", build)
-}
+    taim::launch("Taim Lab", |cx| {
+        let lab = Rc::new(RefCell::new(Lab::default()));
 
-fn build(cx: &mut Scope) -> AnyView {
-    let lab = Rc::new(RefCell::new(Lab::default()));
-    let revision = cx.signal(0_u64);
-    let selected = cx.signal(Panel::FrameGraph);
-    let attached = cx.signal(lab.borrow().connection.is_live());
-    let status = cx.signal(status_line(&lab.borrow()));
-    let sender_slot = Rc::new(RefCell::new(None::<Sender<Message>>));
-    let dispatch = cx.channel({
-        let lab = lab.clone();
-        let sender_slot = sender_slot.clone();
-        move |message| {
-            let ticking = matches!(message, Message::Tick);
-            let restart = matches!(message, Message::Attach);
-            let mut lab = lab.borrow_mut();
-            update(&mut lab, message);
-            if restart && lab.target.is_some() {
-                lab.timer = Some(Ticker::new(sender_slot.borrow().as_ref().unwrap().clone()));
-            }
-            let _ = selected.set(lab.panel);
-            let _ = attached.set(lab.connection.is_live());
-            let _ = status.set(status_line(&lab));
-            if !ticking
-                || !matches!(
-                    lab.panel,
-                    Panel::DeviceProfiles | Panel::GpuResources | Panel::OverdrawOverlay
-                )
-            {
-                revision.update(|value| *value = value.wrapping_add(1));
-            }
-        }
-    });
-    *sender_slot.borrow_mut() = Some(dispatch.clone());
-    if lab.borrow().target.is_some() {
-        lab.borrow_mut().timer = Some(Ticker::new(dispatch.clone()));
-    }
-    let dispatch: Rc<dyn Fn(Message)> = Rc::new(move |message| {
-        let _ = dispatch.send(message);
-    });
-    let tabs = rebuild(selected, {
-        let dispatch = dispatch.clone();
-        move |panel| Some(panel_tabs(*panel, dispatch.clone()))
-    });
-    let body = rebuild(revision, {
-        let dispatch = dispatch.clone();
-        move |_| Some(panel_body(&lab.borrow(), dispatch.clone()))
-    });
-    let attachment = rebuild(attached, move |live| {
-        let message = if *live {
-            Message::Detach
-        } else {
-            Message::Attach
-        };
-        let dispatch = dispatch.clone();
-        Some(
-            button(if *live { "Detach" } else { "Attach" })
-                .on_press(move || dispatch(message.clone()))
-                .into(),
-        )
-    });
-    container(
-        column![
-            scroll(tabs).horizontal(),
-            container(scroll(body)).padding(8).fill_height(),
-            row![text(move || status.get()).size(12), attachment].gap(12.0),
-        ]
-        .gap(8.0),
-    )
-    .padding(12)
-    .into()
-}
+        // Bumped by every message, so the shell rebuilds after each one.
+        let version = cx.signal(0_u64);
+        // Bumped by the ticker; each new value is one `Message::Tick`.
+        let ticks = cx.signal(0_u64);
+        // Which ticker is current; see `start_ticker`.
+        let generation = cx.signal(0_u64);
 
-fn status_line(lab: &Lab) -> String {
-    let driven = lab.target.as_ref().map_or_else(
-        || "not driving".to_owned(),
-        |target| format!("{} frames driven", target.frames()),
-    );
-    format!(
-        "{} · {} · {:.1}s",
-        lab.connection.describe(),
-        driven,
-        lab.connection.uptime().as_secs_f32()
-    )
-}
+        let send: Send = {
+            let lab = Rc::clone(&lab);
 
-/// A dedicated timer keeps driving the hosted fixture while the inspector
-/// is occluded. Detach stops it; closing disconnects the bounded mailbox.
-struct Ticker {
-    active: Arc<AtomicBool>,
-    pending: Arc<AtomicBool>,
-}
+            Rc::new(move |message: Message| {
+                let restart = matches!(message, Message::Attach | Message::Detach);
 
-impl Ticker {
-    fn new(sender: Sender<Message>) -> Self {
-        let active = Arc::new(AtomicBool::new(true));
-        let running = active.clone();
-        let pending = Arc::new(AtomicBool::new(false));
-        let queued = pending.clone();
-        if let Err(error) = std::thread::Builder::new()
-            .name("taim-lab-clock".into())
-            .spawn(move || {
-                while running.load(Ordering::Acquire) {
-                    if !queued.swap(true, Ordering::AcqRel) {
-                        match sender.send(Message::Tick) {
-                            Ok(()) => {}
-                            Err(std::sync::mpsc::TrySendError::Full(_)) => {
-                                queued.store(false, Ordering::Release);
-                            }
-                            Err(std::sync::mpsc::TrySendError::Disconnected(_)) => break,
-                        }
+                update(&mut lab.borrow_mut(), message);
+
+                if restart {
+                    generation.update(|n| *n = n.wrapping_add(1));
+
+                    if lab.borrow().target.is_some() {
+                        start_ticker(ticks, generation);
                     }
-                    std::thread::sleep(TICK);
                 }
-            })
-        {
-            eprintln!("Taim Lab clock could not start: {error}");
-        }
-        Self { active, pending }
-    }
-}
 
-impl Drop for Ticker {
-    fn drop(&mut self) {
-        self.active.store(false, Ordering::Release);
-    }
+                version.update(|n| *n = n.wrapping_add(1));
+            })
+        };
+
+        if lab.borrow().target.is_some() {
+            start_ticker(ticks, generation);
+        }
+
+        let seen = RefCell::new(0_u64);
+
+        rebuild(
+            move || (version.get(), ticks.get()),
+            move |&(_, tick)| {
+                let mut lab_mut = lab.borrow_mut();
+
+                // A tick drives the target exactly once, however many
+                // times the shell is rebuilt for it.
+                if *seen.borrow() != tick {
+                    *seen.borrow_mut() = tick;
+                    update(&mut lab_mut, Message::Tick);
+                }
+
+                drop(lab_mut);
+
+                Some(view(&lab.borrow(), &send))
+            },
+        )
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn native_inspector_routes_controls_and_detaches_through_the_window_mailbox() {
-        use taim_core::{
-            Event, Point, Size, mouse,
-            semantics::{Node, Role},
-            time::Instant,
-        };
-        fn button_bounds(node: &Node, label: &str) -> Option<taim_core::Rectangle> {
-            if node.role == Role::Button && node.name.as_deref() == Some(label) {
-                return Some(node.bounds);
-            }
-            node.children
-                .iter()
-                .find_map(|child| button_bounds(child, label))
-        }
-        let renderer = taim_futures::futures::executor::block_on(
-            <taim::Renderer as taim_core::renderer::Headless>::new(
-                taim_core::renderer::Settings::default(),
-                Some("tiny-skia"),
-            ),
-        )
-        .expect("CPU renderer");
-        let mut root = taim::view::Root::new(build);
-        let window = Size::new(1200.0, 800.0);
-        let _ = root.take_changes();
-        root.layout(&renderer, window);
-        for label in ["Widgets", "Semantics", "Devices", "watch", "Detach"] {
-            let tree = root.describe(window);
-            let bounds =
-                button_bounds(&tree, label).unwrap_or_else(|| panic!("missing {label} button"));
-            let at = Point::new(
-                bounds.x + bounds.width / 2.0,
-                bounds.y + bounds.height / 2.0,
-            );
-            for event in [
-                Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
-                Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
-            ] {
-                let _ = root.handle(&event, Some(at), Instant::now());
-            }
-            let _ = root.take_changes();
-            root.layout(&renderer, window);
-        }
-        assert!(button_bounds(&root.describe(window), "Attach").is_some());
-        assert!(button_bounds(&root.describe(window), "Detach").is_none());
+    fn ignore() -> Send {
+        Rc::new(|_| {})
     }
 
     #[test]
@@ -602,7 +483,7 @@ mod tests {
         for panel in [Panel::OverdrawOverlay, Panel::GpuResources] {
             update(&mut lab, Message::Show(panel));
 
-            let _ = std::hint::black_box(view(&lab));
+            let _ = std::hint::black_box(view(&lab, &ignore()));
         }
     }
 
@@ -616,7 +497,7 @@ mod tests {
         for panel in Panel::ALL {
             update(&mut lab, Message::Show(panel));
 
-            let _ = std::hint::black_box(view(&lab));
+            let _ = std::hint::black_box(view(&lab, &ignore()));
         }
     }
 

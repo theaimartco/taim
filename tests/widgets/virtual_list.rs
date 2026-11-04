@@ -5,9 +5,10 @@
 //! extent," plus variable-height positioning, jump-to-position,
 //! insert/remove reactivity, and focus traversal through virtualized
 //! content.
+use taim::{Point, Rectangle, Size};
+use taim_core::Length;
 use taim_core::widget::{self, Widget, operation};
 use taim_core::{Layout, Shell, mouse};
-use taim_core::{Length, Point, Rectangle, Size};
 use taim_core::{shell::Waker, window};
 use taim_renderer::Renderer;
 use taim_widget::{text, text_input, virtual_list};

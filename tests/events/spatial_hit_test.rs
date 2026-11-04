@@ -16,14 +16,14 @@
 //! layouts (overlapping siblings, nested rows) rather than only the
 //! grid-of-leaves stress test `hit_test.rs` runs internally.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
+use taim::{Point, Rectangle, Size, Theme};
 use taim_core::Layout;
+use taim_core::Length;
 use taim_core::widget::visit;
 use taim_core::widget::{self, Widget};
-use taim_core::{Length, Point, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::hit_test::{self, Index};
+use taim_widget::Element;
 
 fn headless_renderer() -> Renderer {
     taim_futures::futures::executor::block_on(<Renderer as taim_core::renderer::Headless>::new(

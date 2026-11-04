@@ -4,14 +4,14 @@
 //! says a tile's height comes from its line count and that a
 //! non-interactive tile is presentation; this proves the widget does both.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
+use taim::{Point, Rectangle, Size, Theme};
+use taim_core::Event;
 use taim_core::semantics::{Actions, Role, State};
 use taim_core::widget::{self, Widget};
-use taim_core::{Event, Point, Rectangle, Size, Theme};
 use taim_core::{Layout, Shell, layout, mouse};
 use taim_core::{shell::Waker, window};
 use taim_renderer::Renderer;
+use taim_widget::Element;
 use taim_widget::list_tile as list_tile_mod;
 use taim_widget::{list_tile, space, text};
 

@@ -37,7 +37,6 @@
 
 use taim::Size;
 use taim::prelude::*;
-use taim::view::AnyView;
 use taim_core::damage::{Attribution, Causes, Fallback, Region};
 
 /// What this panel still cannot say.
@@ -143,16 +142,16 @@ pub fn view(damage: Option<&Attribution>, surface: Size, layout_changed: bool) -
     };
 
     container(
-        column![
-            text(headline).size(20),
-            text(why).size(13),
-            text(verdict).size(13),
-            row![
+        column(views![
+            text(headline).size(20.0),
+            text(why).size(13.0),
+            text(verdict).size(13.0),
+            row(views![
                 text(format!(
                     "surface {:.0}\u{00d7}{:.0}",
                     surface.width, surface.height
                 ))
-                .size(12),
+                .size(12.0),
                 text(if layout_changed {
                     // Worth pairing: a relayout is the usual reason a frame
                     // damages everything, and seeing them together is the
@@ -161,16 +160,15 @@ pub fn view(damage: Option<&Attribution>, surface: Size, layout_changed: bool) -
                 } else {
                     "layout reused"
                 })
-                .size(12),
-            ]
+                .size(12.0),
+            ])
             .gap(12.0),
-            text(MISSING).size(11),
-        ]
+            text(MISSING).size(11.0),
+        ])
         .gap(8.0),
     )
     .center_x()
-    .fill_width()
-    .padding(12)
+    .padding(12.0)
     .into()
 }
 

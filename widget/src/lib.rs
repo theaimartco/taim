@@ -323,3 +323,8 @@ pub mod markdown;
 pub use crate::core::theme::{self, Theme};
 pub use action::Action;
 pub use renderer::Renderer;
+
+/// An [`Element`](core::Element) drawn with the built-in [`Theme`] and
+/// [`Renderer`] unless told otherwise.
+pub type Element<'a, Message, Theme = crate::Theme, Renderer = crate::Renderer> =
+    core::Element<'a, Message, Theme, Renderer>;

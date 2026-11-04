@@ -6,18 +6,18 @@
 //! real widget reports what a real `taim_accessibility::Focus` needs to
 //! enforce that, and that the two compose.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
 use taim_accessibility::focus::{Focus, Scope};
 use taim_accessibility::tree::Tree as SemanticTree;
 
+use taim::{Point, Rectangle, Size, Theme};
+use taim_core::Event;
 use taim_core::keyboard;
 use taim_core::semantics::{Actions, Role};
 use taim_core::widget::{self, Widget};
-use taim_core::{Event, Point, Rectangle, Size, Theme};
 use taim_core::{Layout, Shell, layout, mouse};
 use taim_core::{shell::Waker, window};
 use taim_renderer::Renderer;
+use taim_widget::Element;
 use taim_widget::dialog as dialog_mod;
 use taim_widget::{button, dialog, text};
 

@@ -39,6 +39,11 @@ pub struct Root {
     system_motion_reduced: bool,
     paste_sequence: u64,
     pending_paste: Option<PendingPaste>,
+    /// The focus path [`Root::wants_text_input`] last answered for.
+    text_input: Option<(Option<Vec<u16>>, bool)>,
+    /// Edges the platform covers (status bar, navigation bar, notch,
+    /// on-screen keyboard); views are laid out inside them.
+    insets: crate::Padding,
 }
 
 /// Opaque single-use identity for one asynchronous clipboard read.
@@ -169,6 +174,8 @@ impl Root {
             focus_identity: None,
             modal_focus: Vec::new(),
             applied: None,
+            text_input: None,
+            insets: crate::Padding::ZERO,
             id: widget::Id::unique(),
             preedit: None,
             composition: crate::ime::Composition::default(),
@@ -379,14 +386,44 @@ impl Root {
         self.theme = theme;
     }
 
-    /// Lays the tree out to fill `size`.
+    /// Sets the edges of the window the platform covers: system bars, a
+    /// display cutout, the on-screen keyboard. The next [`Root::layout`]
+    /// keeps every view inside them, as a safe area. Returns whether they
+    /// changed.
+    pub fn set_insets(&mut self, insets: crate::Padding) -> bool {
+        let usable = |edge: f32| if edge.is_finite() { edge.max(0.0) } else { 0.0 };
+        let insets = crate::Padding {
+            top: usable(insets.top),
+            right: usable(insets.right),
+            bottom: usable(insets.bottom),
+            left: usable(insets.left),
+        };
+
+        let changed = insets != self.insets;
+        self.insets = insets;
+        changed
+    }
+
+    /// The edges views are kept inside of; see [`Root::set_insets`].
+    pub fn insets(&self) -> crate::Padding {
+        self.insets
+    }
+
+    /// Lays the tree out to fill `size`, inside the platform's insets.
     pub fn layout(&mut self, renderer: &Renderer, size: Size) {
+        // A rebuilt subtree can put a different view at the focused path.
+        self.text_input = None;
         let mut cx = MeasureCx {
             renderer,
             theme: &self.theme,
         };
-        let _ = self.child.measure(&mut cx, Constraints::loose(size));
-        self.child.place(Point::ORIGIN);
+        let insets = self.insets;
+        let inner = Size::new(
+            (size.width - insets.left - insets.right).max(0.0),
+            (size.height - insets.top - insets.bottom).max(0.0),
+        );
+        let _ = self.child.measure(&mut cx, Constraints::loose(inner));
+        self.child.place(Point::new(insets.left, insets.top));
         self.reconcile_focus();
     }
 
@@ -514,6 +551,42 @@ impl Root {
         tree::any_animating(&mut self.child, now)
     }
 
+    /// Whether the focused view edits text, so the platform should show its
+    /// on-screen keyboard.
+    ///
+    /// Cheap to ask after every event: the tree is only searched when focus
+    /// has moved since the last answer.
+    pub fn wants_text_input(&mut self) -> bool {
+        if let Some((path, wants)) = &self.text_input
+            && *path == self.focus.current
+        {
+            return *wants;
+        }
+
+        let wants = self.focused_takes_text();
+        self.text_input = Some((self.focus.current.clone(), wants));
+        wants
+    }
+
+    fn focused_takes_text(&mut self) -> bool {
+        let Some(focused) = self.focus.current.clone() else {
+            return false;
+        };
+
+        let mut wants = false;
+        tree::walk(
+            &mut self.child,
+            Point::ORIGIN,
+            &mut Vec::new(),
+            &mut |view, _, path| {
+                if path == focused.as_slice() {
+                    wants = view.takes_text();
+                }
+            },
+        );
+        wants
+    }
+
     /// The earliest one-shot deadline requested by any view.
     pub fn redraw_at(&mut self) -> Option<Instant> {
         let mut earliest = None;
@@ -534,7 +607,21 @@ impl Root {
     /// Routes one event: keyboard input to the focused view, everything
     /// else to every view, topmost first.
     pub fn handle(&mut self, event: &Event, pointer: Option<Point>, now: Instant) -> Response {
-        self.handle_inner(None, event, pointer, now)
+        self.handle_inner(None, event, pointer, now, false)
+    }
+
+    /// Like [`Root::handle`], saying whether the pointer is a finger, for
+    /// shells that turn the first finger into pointer events; views that
+    /// behave differently for a finger read
+    /// [`EventCx::is_touch`](crate::EventCx::is_touch).
+    pub fn handle_input(
+        &mut self,
+        event: &Event,
+        pointer: Option<Point>,
+        now: Instant,
+        touch: bool,
+    ) -> Response {
+        self.handle_inner(None, event, pointer, now, touch)
     }
 
     /// Routes an event with access to the active rendering backend for
@@ -546,7 +633,7 @@ impl Root {
         pointer: Option<Point>,
         now: Instant,
     ) -> Response {
-        self.handle_inner(Some(renderer), event, pointer, now)
+        self.handle_inner(Some(renderer), event, pointer, now, false)
     }
 
     fn handle_inner(
@@ -555,7 +642,10 @@ impl Root {
         event: &Event,
         pointer: Option<Point>,
         now: Instant,
+        touch: bool,
     ) -> Response {
+        // Native finger events are touch too, whichever way the shell reports them.
+        let touch = touch || matches!(event, Event::Touch(_));
         self.reconcile_focus();
         if matches!(
             event,
@@ -656,6 +746,7 @@ impl Root {
                 renderer,
                 now,
                 pointer,
+                touch,
                 requests: &mut requests,
                 focus: &mut self.focus,
             };
@@ -691,6 +782,28 @@ impl Root {
         };
 
         let mut captured = handled == Handled::Yes;
+
+        // Back that the focused view did not use goes to the topmost view
+        // that can close something: a dialog, a sheet, a drawer.
+        if !captured && is_back(event) {
+            let mut router = tree::Router {
+                renderer,
+                now,
+                pointer,
+                touch,
+                requests: &mut requests,
+                focus: &mut self.focus,
+            };
+
+            captured = tree::broadcast(
+                &mut self.child,
+                Point::ORIGIN,
+                everything,
+                &mut Vec::new(),
+                event,
+                &mut router,
+            ) == Handled::Yes;
+        }
 
         // Clicking anything that does not take focus clears it.
         if tree::is_press(event) && !self.focus.taken && self.focus.current.take().is_some() {
@@ -773,6 +886,7 @@ impl Root {
                 renderer,
                 now,
                 pointer: None,
+                touch: false,
                 requests: &mut requests,
                 focus: &mut self.focus,
             },
@@ -837,6 +951,23 @@ impl std::fmt::Debug for Root {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Root").finish_non_exhaustive()
     }
+}
+
+/// Whether `event` is a press asking to go back: the Android back button or
+/// gesture, a browser/mouse back key, or Escape.
+///
+/// A back press no view used is the platform's to handle; on Android that
+/// leaves the application, like the root route of a navigator.
+pub fn is_back(event: &Event) -> bool {
+    use crate::keyboard::{self, key::Named};
+
+    matches!(
+        event,
+        Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Named(Named::Escape | Named::BrowserBack | Named::GoBack),
+            ..
+        })
+    )
 }
 
 #[cfg(test)]
@@ -1013,6 +1144,7 @@ mod tests {
                     renderer: None,
                     now: crate::Instant::now(),
                     pointer: Some(at),
+                    touch: false,
                     requests: &mut requests,
                     focus: &mut focus,
                 },
@@ -1056,6 +1188,94 @@ mod tests {
             .children(&mut |child| child.place(Point::new(0.0, 100.0)));
 
         assert_eq!(frames(&mut root)[1].y, 75.0);
+    }
+
+    fn key(named: crate::keyboard::key::Named) -> Event {
+        use crate::keyboard;
+
+        Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Named(named),
+            modified_key: keyboard::Key::Named(named),
+            physical_key: keyboard::key::Physical::Unidentified(
+                keyboard::key::NativeCode::Unidentified,
+            ),
+            location: keyboard::Location::Standard,
+            modifiers: keyboard::Modifiers::empty(),
+            text: None,
+            repeat: false,
+        })
+    }
+
+    #[test]
+    fn back_closes_the_open_dialog_and_only_then_reaches_the_platform() {
+        use crate::keyboard::key::Named;
+        use crate::views::dialog;
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        let handle = Rc::new(Cell::new(None));
+        let mut root = Root::new({
+            let handle = handle.clone();
+            move |cx| {
+                let open = cx.signal(true);
+                handle.set(Some(open));
+                column(views![text("page"), dialog(open, text("Saved"))])
+            }
+        });
+        let open = handle.get().expect("built");
+        let now = crate::Instant::now();
+
+        let first = root.handle(&key(Named::BrowserBack), None, now);
+        assert!(first.captured, "an open dialog takes the back press");
+        assert!(!open.get(), "and closes");
+
+        let second = root.handle(&key(Named::BrowserBack), None, now);
+        assert!(
+            !second.captured,
+            "with nothing left to close, back belongs to the platform"
+        );
+    }
+
+    #[test]
+    fn only_back_keys_count_as_back() {
+        use crate::keyboard::key::Named;
+
+        assert!(is_back(&key(Named::BrowserBack)));
+        assert!(is_back(&key(Named::GoBack)));
+        assert!(is_back(&key(Named::Escape)));
+        assert!(!is_back(&key(Named::Enter)));
+    }
+
+    #[test]
+    fn reverse_child_order_is_the_reverse_of_paint_order() {
+        use crate::views::{grid, layers};
+
+        fn order(view: &mut dyn View, reverse: bool) -> Vec<*const Child> {
+            let mut seen = Vec::new();
+            let mut record = |child: &mut Child| seen.push(child as *const Child);
+            if reverse {
+                view.children_rev(&mut record);
+            } else {
+                view.children(&mut record);
+            }
+            seen
+        }
+
+        let mut views: Vec<Box<dyn View>> = vec![
+            Box::new(column(views![text("a"), text("b"), text("c")])),
+            Box::new(layers(views![text("a"), text("b"), text("c")])),
+            Box::new(grid(2, views![text("a"), text("b"), text("c")])),
+            // A view with a single child uses the default.
+            Box::new(crate::views::container(text("a"))),
+        ];
+
+        for view in &mut views {
+            let forward = order(view.as_mut(), false);
+            let mut backward = order(view.as_mut(), true);
+            backward.reverse();
+
+            assert_eq!(forward, backward, "{}", view.debug_name());
+        }
     }
 }
 

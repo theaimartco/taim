@@ -447,6 +447,10 @@ impl Surface {
         }
 
         self.apply_response(&response);
+        // iOS: show the on-screen keyboard while a text view has focus. Android
+        // drives its own editor proxy through the host bridge instead.
+        #[cfg(target_os = "ios")]
+        self.raw.set_ime_allowed(self.root.wants_text_input());
         #[cfg(target_os = "android")]
         if response.captured
             && matches!(

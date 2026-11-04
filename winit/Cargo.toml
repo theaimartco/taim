@@ -27,6 +27,11 @@ image = ["taim_core/image", "arboard/image-data"]
 # to carry. See taim-accessibility/src/atspi/bridge.rs.
 accessibility = ["taim-accessibility/atspi"]
 x11 = ["winit/x11"]
+# Android, through NativeActivity: no Java code is needed in the
+# application package. GameActivity (AndroidX) handles more of the
+# platform's input, including text input from the on-screen keyboard.
+android-native-activity = ["winit/android-native-activity"]
+android-game-activity = ["winit/android-game-activity"]
 wayland = ["winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita", "arboard/wayland-data-control"]
 
 [dependencies]
@@ -50,12 +55,21 @@ tracing.workspace = true
 winit.workspace = true
 
 
-[target.'cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))'.dependencies]
+# arboard covers Linux, Windows and macOS; mobile platforms have their own.
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))'.dependencies]
 arboard.workspace = true
+
+# iOS services: links, the pasteboard. The same versions winit uses.
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2 = "0.5.2"
+objc2-foundation = { version = "0.2.2", features = ["NSDictionary", "NSString", "NSURL"] }
+objc2-ui-kit = { version = "0.2.2", features = ["UIApplication", "UIPasteboard", "UIResponder", "block2"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys.workspace = true
-web-sys.features = ["Document", "Window", "HtmlCanvasElement"]
+web-sys.features = ["Clipboard", "console", "Document", "Element", "HtmlCanvasElement", "HtmlElement", "Navigator", "Node", "ShareData", "Storage", "Window"]
+js-sys = "0.3"
+wasm-bindgen = "0.2"
 wasm-bindgen-futures.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -69,3 +83,6 @@ objc2 = { version = "0.5", features = ["relax-sign-encoding"] }
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.22.4"
 winit = { workspace = true, features = ["android-native-activity"] }
+# platform.rs (open_url/share/vibrate/data_dir) is written against the jni 0.21 API.
+jni21 = { package = "jni", version = "0.21" }
+ndk-context = "0.1"

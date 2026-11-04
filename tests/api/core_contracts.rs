@@ -8,12 +8,12 @@
 //! as it did before those methods existed ("all existing widgets compile
 //! unchanged" and "no mandatory `Widget` method is introduced").
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
+use taim::{Point, Rectangle, Size, Theme};
+use taim_core::Length;
 use taim_core::widget::{self, Widget};
 use taim_core::{Layout, mouse, renderer};
-use taim_core::{Length, Point, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
+use taim_widget::Element;
 
 /// A widget that overrides nothing beyond the mandatory methods, to
 /// prove the four new defaulted methods are reachable and behave as

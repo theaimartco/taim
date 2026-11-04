@@ -154,6 +154,8 @@ impl State {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Sampling {
     Nearest,
+    // Only raster images ask for linear filtering.
+    #[cfg_attr(not(feature = "image"), allow(dead_code))]
     Linear,
 }
 

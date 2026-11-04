@@ -30,7 +30,6 @@
 //! [`Visit`]: taim_core::widget::visit::Visit
 
 use taim::prelude::*;
-use taim::view::AnyView;
 
 use crate::target::Node;
 
@@ -46,21 +45,22 @@ pub const MISSING: &str = "Type, state and revisions are not shown: `Visit` carr
 /// Renders the widget tree.
 pub fn view(tree: &[Node]) -> AnyView {
     if tree.is_empty() {
-        return container(text("No tree. Nothing is attached.").size(16))
-            .center_x()
-            .fill_width()
-            .center_y()
-            .fill_height()
+        return container(text("No tree. Nothing is attached.").size(16.0))
+            .center()
             .into();
     }
 
     let rows = tree
         .iter()
-        .fold(column![].gap(1.0), |rows, node| rows.push(node_row(node)));
+        .fold(column([]).gap(1.0), |rows, node| rows.push(node_row(node)));
 
-    column![text(summarise(tree)).size(13), text(MISSING).size(11), rows,]
-        .gap(8.0)
-        .into()
+    column(views![
+        text(summarise(tree)).size(13.0),
+        text(MISSING).size(11.0),
+        scroll(rows),
+    ])
+    .gap(8.0)
+    .into()
 }
 
 fn node_row(node: &Node) -> AnyView {
@@ -80,15 +80,15 @@ fn node_row(node: &Node) -> AnyView {
         None => "\u{2014}".to_owned(),
     };
 
-    row![
-        text(format!("{indent}{role}")).size(12),
+    row(views![
+        text(format!("{indent}{role}")).size(12.0),
         text(format!(
             "{:.0},{:.0} {:.0}\u{00d7}{:.0}",
             node.bounds.x, node.bounds.y, node.bounds.width, node.bounds.height
         ))
-        .size(11),
-        text(identity).size(10),
-    ]
+        .size(11.0),
+        text(identity).size(10.0),
+    ])
     .gap(10.0)
     .into()
 }

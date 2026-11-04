@@ -18,12 +18,38 @@ publish = false
 # font it can get from the host/OS. An app that needs the bundled font for
 # pixel-identical rendering across machines opts back in explicitly.
 taim.workspace = true
-taim.features = [
-    "wgpu",
-    "tiny-skia",
-    "crisp",
-    "hinting",
-    "linux-theme-detection",
-    "x11",
-    "wayland",
-]
+taim.features = ["wgpu", "tiny-skia", "crisp", "hinting"]
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+taim = { workspace = true, features = ["linux-theme-detection", "x11", "wayland"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+taim = { workspace = true, features = ["android"] }
+log.workspace = true
+
+[lib]
+# `cdylib` is the shared library an Android package loads; `rlib` lets the
+# desktop binary below use the same application.
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "mobile_shell"
+path = "src/main.rs"
+
+# For `cargo apk build -p mobile_shell` (cargo-apk) builds; Gradle builds
+# use the manifest in `android/` instead. See docs/platform/android.md.
+[package.metadata.android]
+package = "com.theaimartco.taim.mobileshell"
+apk_name = "mobile_shell"
+build_targets = ["aarch64-linux-android", "x86_64-linux-android"]
+
+[package.metadata.android.sdk]
+min_sdk_version = 26
+target_sdk_version = 35
+
+[package.metadata.android.application]
+label = "Taim Mobile Shell"
+
+[package.metadata.android.application.activity]
+config_changes = "orientation|screenSize|screenLayout|keyboardHidden|uiMode|density"
+orientation = "unspecified"

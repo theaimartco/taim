@@ -19,8 +19,6 @@
 use std::collections::BTreeMap;
 
 use taim::prelude::*;
-use taim::view::AnyView;
-
 use taim_profiler::Phase;
 
 use crate::target::Frame;
@@ -36,20 +34,17 @@ pub const BUDGET: u64 = 16_666_667;
 pub fn view(frames: &[Frame]) -> AnyView {
     if frames.is_empty() {
         return container(
-            column![
-                text("No frames recorded.").size(16),
+            column(views![
+                text("No frames recorded.").size(16.0),
                 text(
                     "A trace records phases as they run. If this stays empty while something \
                      is drawing, the pipeline is not instrumented \u{2014} not that it is fast."
                 )
-                .size(12),
-            ]
+                .size(12.0),
+            ])
             .gap(6.0),
         )
-        .center_x()
-        .fill_width()
-        .center_y()
-        .fill_height()
+        .center()
         .into();
     }
 
@@ -59,15 +54,15 @@ pub fn view(frames: &[Frame]) -> AnyView {
         .iter()
         .rev()
         .take(60)
-        .fold(column![].gap(2.0), |rows, frame| {
+        .fold(column([]).gap(2.0), |rows, frame| {
             rows.push(frame_row(frame))
         });
 
-    column![
-        text(summary).size(13),
-        text(dominant(frames)).size(12),
-        rows,
-    ]
+    column(views![
+        text(summary).size(13.0),
+        text(dominant(frames)).size(12.0),
+        scroll(rows),
+    ])
     .gap(8.0)
     .into()
 }
@@ -104,12 +99,12 @@ fn frame_row(frame: &Frame) -> AnyView {
         Some(unattributed) => format!("  ?:{:.1}", nanos_to_millis(unattributed)),
     };
 
-    row![
-        text(format!("#{:<5}", frame.number)).size(12),
-        text(duration).size(12),
-        text(format!("{breakdown}{residue}")).size(12),
-        text(late).size(12),
-    ]
+    row(views![
+        text(format!("#{:<5}", frame.number)).size(12.0),
+        text(duration).size(12.0),
+        text(format!("{breakdown}{residue}")).size(12.0),
+        text(late).size(12.0),
+    ])
     .gap(10.0)
     .into()
 }

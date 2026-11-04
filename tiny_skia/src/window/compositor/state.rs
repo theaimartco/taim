@@ -1,5 +1,5 @@
 use crate::Layer;
-use crate::core::Color;
+use crate::core::{Color, backend};
 use crate::graphics::compositor;
 
 use std::collections::VecDeque;
@@ -27,11 +27,23 @@ pub(super) struct Frame {
     pub layers: Arc<[Layer]>,
 }
 
-pub(super) fn create_compositor(display: impl compositor::Display) -> Compositor {
+/// Connects the software compositor to `display`.
+///
+/// This fails when the platform refuses a software presentation context
+/// (an unsupported display server, for instance). The software renderer is
+/// the last fallback when no GPU adapter works, so the failure is returned
+/// for the caller to report rather than aborting the process here.
+pub(super) fn create_compositor(
+    display: impl compositor::Display,
+) -> Result<Compositor, backend::Error> {
     #[allow(unsafe_code)]
-    let context = softbuffer::Context::new(Box::new(display) as _)
-        .expect("TAIM software display context creation failed");
-    Compositor { context }
+    let context = softbuffer::Context::new(Box::new(display) as _).map_err(|error| {
+        backend::Error::GraphicsAdapterNotFound {
+            backend: "tiny-skia",
+            reason: backend::Reason::RequestFailed(error.to_string()),
+        }
+    })?;
+    Ok(Compositor { context })
 }
 
 pub(super) fn create_surface(

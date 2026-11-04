@@ -35,8 +35,14 @@ async fn run(backends: wgpu::Backends, tag: &str) {
             return;
         };
         let page = unsafe { libc_page_size() };
-        let size: usize = property("debug.taim.gpu_probe_size").and_then(|v| v.parse().ok()).filter(|n: &usize| *n >= 256 && n % 256 == 0 && *n <= 1 << 24).unwrap_or(256);
-        eprintln!("GPU_PROBE{tag}_ADAPTER page={page} size={size} {:?}", adapter.get_info());
+        let size: usize = property("debug.taim.gpu_probe_size")
+            .and_then(|v| v.parse().ok())
+            .filter(|n: &usize| *n >= 256 && n % 256 == 0 && *n <= 1 << 24)
+            .unwrap_or(256);
+        eprintln!(
+            "GPU_PROBE{tag}_ADAPTER page={page} size={size} {:?}",
+            adapter.get_info()
+        );
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 memory_hints: wgpu::MemoryHints::MemoryUsage,
@@ -144,7 +150,11 @@ fn property(name: &str) -> Option<String> {
     let mut value = [0 as std::ffi::c_char; 92]; // PROP_VALUE_MAX
     // SAFETY: both pointers are valid; the buffer is PROP_VALUE_MAX bytes as the API requires.
     let len = unsafe { __system_property_get(name.as_ptr(), value.as_mut_ptr()) };
-    (len > 0).then(|| unsafe { std::ffi::CStr::from_ptr(value.as_ptr()) }.to_string_lossy().into_owned())
+    (len > 0).then(|| {
+        unsafe { std::ffi::CStr::from_ptr(value.as_ptr()) }
+            .to_string_lossy()
+            .into_owned()
+    })
 }
 #[cfg(target_os = "android")]
 unsafe fn libc_page_size() -> i32 {

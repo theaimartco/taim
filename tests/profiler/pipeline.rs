@@ -8,14 +8,13 @@
 //! These drive a real `UserInterface` through a real frame and read the
 //! trace that falls out.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
-use taim_core::{Size, Theme};
+use taim::{Size, Theme};
 use taim_profiler::export;
 use taim_profiler::{Collector, Phase as Traced};
 use taim_renderer::Renderer;
 use taim_runtime::diagnostics::Trace;
 use taim_runtime::user_interface::{Cache, UserInterface};
+use taim_widget::Element;
 use taim_widget::{button, column, text};
 
 type Message = &'static str;

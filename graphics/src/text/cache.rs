@@ -195,7 +195,7 @@ impl Cache {
             // that inventing one would not be. Bookkeeping below (byte
             // estimation, eviction) is deliberately excluded -- that is
             // this cache's own overhead, not the cost of shaping text.
-            let shaping_began = std::time::Instant::now();
+            let shaping_began = taim_core::time::Instant::now();
 
             let metrics =
                 cosmic_text::Metrics::new(key.size, key.line_height.max(f32::MIN_POSITIVE));

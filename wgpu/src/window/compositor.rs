@@ -83,6 +83,9 @@ pub struct Compositor {
     adapter: wgpu::Adapter,
     format: wgpu::TextureFormat,
     alpha_mode: wgpu::CompositeAlphaMode,
+    /// What presented frames can be used for: always rendered to, and
+    /// copied from where the surface allows it (not WebGL).
+    usage: wgpu::TextureUsages,
     engine: Engine,
     settings: Settings,
     device_lost: Arc<AtomicBool>,
@@ -222,11 +225,23 @@ impl Compositor {
         if adapter.get_info().backend == wgpu::Backend::Gl {
             verify_egl_precision(&instance, &adapter)?;
         }
+        let mut usage = wgpu::TextureUsages::RENDER_ATTACHMENT;
 
         let (format, alpha_mode) = compatible_surface
             .as_ref()
             .and_then(|surface| {
                 let capabilities = surface.get_capabilities(&adapter);
+
+                // Glass and effects copy regions of the presented frame;
+                // some surfaces (WebGL's) can only be rendered to, and then
+                // those fall back rather than failing validation.
+                if capabilities.usages.contains(wgpu::TextureUsages::COPY_SRC) {
+                    usage |= wgpu::TextureUsages::COPY_SRC;
+                } else {
+                    log::info!(
+                        "the surface cannot be copied from: glass and effects are drawn flat"
+                    );
+                }
 
                 log::info!("Available formats: {:#?}", capabilities.formats);
 
@@ -334,6 +349,7 @@ impl Compositor {
                         adapter,
                         format,
                         alpha_mode,
+                        usage,
                         engine,
                         settings,
                         device_lost,
@@ -638,13 +654,11 @@ impl graphics::Compositor for Compositor {
         surface.configure(
             &self.engine.device,
             &wgpu::SurfaceConfiguration {
-                // COPY_SRC as well as RENDER_ATTACHMENT: the effect pipeline
-                // copies a region of the presented frame into an offscreen
-                // target to post-process it. Without it, every effect is a
-                // validation error the moment a blur appears on screen.
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                    | (surface.get_capabilities(&self.adapter).usages
-                        & wgpu::TextureUsages::COPY_SRC),
+                // COPY_SRC as well as RENDER_ATTACHMENT where the surface
+                // allows it: the effect pipeline and glass copy regions of
+                // the presented frame. Where it does not, the renderer
+                // checks the frame's usage and draws them flat.
+                usage: self.usage,
                 format: self.format,
                 present_mode: self.settings.present_mode,
                 width,

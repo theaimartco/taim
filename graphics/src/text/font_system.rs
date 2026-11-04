@@ -74,6 +74,21 @@ impl FontSystem {
             raw.db_mut().set_monospace_family("Menlo");
         }
 
+        // fontdb does not look for system fonts on Android, which would
+        // leave every view without text. The platform's fonts (Roboto and
+        // the Noto families that cover other scripts, Devanagari included)
+        // live in these directories.
+        #[cfg(target_os = "android")]
+        {
+            for directory in ["/system/fonts", "/product/fonts", "/system_ext/fonts"] {
+                raw.db_mut().load_fonts_dir(directory);
+            }
+            #[cfg(not(feature = "fira-sans"))]
+            raw.db_mut().set_sans_serif_family("Roboto");
+            raw.db_mut().set_serif_family("Noto Serif");
+            raw.db_mut().set_monospace_family("Droid Sans Mono");
+        }
+
         #[cfg(target_os = "windows")]
         {
             #[cfg(not(feature = "fira-sans"))]

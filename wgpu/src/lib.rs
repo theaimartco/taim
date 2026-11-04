@@ -19,6 +19,10 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(missing_docs)]
+// On the web wgpu's handles are neither `Send` nor `Sync`. A page runs on
+// one thread, so the `Arc`s that share them between parts of the renderer
+// are sound there; on every other target they are `Send` and `Sync`.
+#![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
 pub mod display;
 pub mod layer;
 pub mod primitive;
@@ -32,6 +36,7 @@ pub mod effects;
 pub mod gbuffer;
 pub mod rasterizer;
 
+mod backdrop_mips;
 mod buffer;
 mod color;
 mod engine;
@@ -147,6 +152,8 @@ struct RecordingRetainedFrame {
 /// effect visible.
 struct QuadBackdrop {
     texture: wgpu::Texture,
+    /// Fills the blurred levels frosted glass reads.
+    mips: backdrop_mips::Mips,
     bind_group: wgpu::BindGroup,
     size: wgpu::Extent3d,
     format: wgpu::TextureFormat,
@@ -928,16 +935,20 @@ impl Renderer {
         let size = frame_texture.size();
         let format = frame_texture.format();
 
+        let levels = backdrop_mips::levels(size);
         let texture = self.engine.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("taim_wgpu::quad backdrop"),
             size,
-            mip_level_count: 1,
+            mip_level_count: levels,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         });
+        let mips = backdrop_mips::Mips::new(&self.engine.device, &texture, format, levels);
 
         let bind_group = self.pipelines.quad.backdrop_bind_group(
             &self.engine.device,
@@ -946,6 +957,7 @@ impl Renderer {
 
         self.quad_backdrop = Some(QuadBackdrop {
             texture,
+            mips,
             bind_group,
             size,
             format,
@@ -962,8 +974,14 @@ impl Renderer {
     ) {
         use std::mem::ManuallyDrop;
 
+        // Glass and effects copy from the frame; a frame that cannot be
+        // copied from (WebGL) draws them flat instead of failing validation.
+        let can_copy = frame_texture
+            .usage()
+            .contains(wgpu::TextureUsages::COPY_SRC);
+
         // Before the draw loop, which borrows `self.layers`.
-        if self.layers.iter().any(|layer| layer.quads.needs_backdrop()) {
+        if can_copy && self.layers.iter().any(|layer| layer.quads.needs_backdrop()) {
             self.prepare_quad_backdrop(frame_texture);
         }
 
@@ -1036,7 +1054,7 @@ impl Renderer {
             // before it draws over them. A backdrop blur frosts the page
             // behind a sheet; running it after the sheet has drawn would
             // blur the sheet instead.
-            if self.pipelines.effect.has_backdrop(index) {
+            if can_copy && self.pipelines.effect.has_backdrop(index) {
                 let physical = viewport.physical_size();
 
                 let _ = ManuallyDrop::into_inner(render_pass);
@@ -1074,7 +1092,7 @@ impl Renderer {
             // backdrop *effect*, which replaces its region in its own pass,
             // this is a plain copy: the bending happens per-fragment inside
             // the quad's own draw.
-            let backdrop = (!layer.quads.is_empty() && layer.quads.needs_backdrop())
+            let backdrop = (can_copy && !layer.quads.is_empty() && layer.quads.needs_backdrop())
                 .then_some(self.quad_backdrop.as_ref())
                 .flatten();
 
@@ -1086,6 +1104,7 @@ impl Renderer {
                     backdrop.texture.as_image_copy(),
                     backdrop.size,
                 );
+                backdrop.mips.generate(encoder);
 
                 render_pass =
                     ManuallyDrop::new(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -1274,7 +1293,7 @@ impl Renderer {
                 render_span.finish();
             }
 
-            if !layer.effects.is_empty() {
+            if can_copy && !layer.effects.is_empty() {
                 let _ = ManuallyDrop::into_inner(render_pass);
                 let physical = viewport.physical_size();
 

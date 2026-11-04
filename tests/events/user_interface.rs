@@ -15,11 +15,10 @@
 //!
 //! These tests call the public methods an application calls.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
-use taim_core::{Point, Size, Theme};
+use taim::{Point, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::user_interface::{Cache, UserInterface};
+use taim_widget::Element;
 use taim_widget::{column, container, row, space, stack};
 
 type Message = &'static str;

@@ -7,15 +7,15 @@
 //! stops agreeing to) produce frames, submit work, or lay
 //! out/paint anything.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
 use std::time::{Duration, Instant};
+use taim::{Rectangle, Size, Theme};
+use taim_core::Length;
 use taim_core::widget::{self, Widget};
 use taim_core::{Layout, mouse, renderer};
-use taim_core::{Length, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::frame_scheduler::{MotionId, Scheduler};
 use taim_runtime::user_interface::{self, UserInterface};
+use taim_widget::Element;
 
 use taim_core::animation::MotionClock;
 use taim_motion::{Easing, Transition};

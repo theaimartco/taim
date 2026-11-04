@@ -26,8 +26,6 @@
 use std::time::{Duration, Instant};
 
 use taim::{Color, Rectangle, Size, Theme};
-use taim_widget::{button, checkbox, container, scrollable, slider, text};
-type Element<'a, M> = taim_core::Element<'a, M, Theme, Renderer>;
 use taim_core::semantics;
 use taim_core::widget::visit::Visit;
 use taim_profiler::events::{Event, Phase, Resource};
@@ -35,6 +33,8 @@ use taim_profiler::{Collector, export};
 use taim_renderer::graphics::text::CacheStatistics;
 use taim_runtime::diagnostics::Trace;
 use taim_runtime::user_interface::{Cache, UserInterface};
+use taim_widget::Element;
+use taim_widget::{button, checkbox, column, container, row, scrollable, slider, text};
 
 /// The renderer the hosted view draws with.
 ///
@@ -518,9 +518,9 @@ impl Hosted {
     /// enough text to shape. A synthetic tree of one widget would profile
     /// the profiler.
     fn view(&self) -> Element<'static, ()> {
-        let rows = (0..40).fold(taim_widget::column![].spacing(4), |rows, index| {
+        let rows = (0..40).fold(column![].spacing(4), |rows, index| {
             rows.push(
-                taim_widget::row![
+                row![
                     text(format!("row {index}")),
                     text("shaped text \u{2014} with some length to it"),
                 ]
@@ -529,9 +529,9 @@ impl Hosted {
         });
 
         container(
-            taim_widget::column![
+            column![
                 text("Hosted target").size(20),
-                taim_widget::row![
+                row![
                     button("press"),
                     checkbox(self.toggled).label("toggle"),
                     slider(0.0..=100.0, self.amount, |_| ()),

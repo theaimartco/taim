@@ -33,7 +33,6 @@
 //! So: nothing, and the reason.
 
 use taim::prelude::*;
-use taim::view::AnyView;
 
 /// Why this is empty, and what it would take.
 pub const MISSING: &str = "Nothing counts per-pixel writes, and nothing can without a new render \
@@ -46,23 +45,20 @@ pub const MISSING: &str = "Nothing counts per-pixel writes, and nothing can with
 /// Renders the overdraw panel.
 pub fn view() -> AnyView {
     container(
-        column![
-            text("Overdraw is not measured.").size(16),
-            text(MISSING).size(12),
+        column(views![
+            text("Overdraw is not measured.").size(16.0),
+            text(MISSING).size(12.0),
             text(
                 "A heat map built from layer bounds would be persuasive and wrong. Nobody \
                  double-checks a picture."
             )
-            .size(12),
-        ]
+            .size(12.0),
+        ])
         .gap(8.0)
         .fill_width(),
     )
-    .center_x()
-    .fill_width()
-    .center_y()
-    .fill_height()
-    .padding(12)
+    .center()
+    .padding(12.0)
     .into()
 }
 

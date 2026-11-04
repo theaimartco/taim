@@ -25,7 +25,6 @@
 //! that, and [`Activity`] is built to make it obvious.
 
 use taim::prelude::*;
-use taim::view::AnyView;
 
 /// What this panel cannot show, and why.
 pub const MISSING: &str = "Timelines, velocity and spring state are not shown. `UserInterface` \
@@ -101,16 +100,15 @@ pub fn view(activity: Activity, is_animating: bool) -> AnyView {
     };
 
     container(
-        column![
-            text(headline).size(20),
-            text(verdict).size(13),
-            text(MISSING).size(11),
-        ]
+        column(views![
+            text(headline).size(20.0),
+            text(verdict).size(13.0),
+            text(MISSING).size(11.0),
+        ])
         .gap(8.0),
     )
     .center_x()
-    .fill_width()
-    .padding(12)
+    .padding(12.0)
     .into()
 }
 

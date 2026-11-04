@@ -6,14 +6,18 @@ mod disclosure;
 mod dynamic;
 mod editor;
 mod forms;
+mod glass;
 mod icon;
 mod layers;
-mod look;
+mod list;
+pub(crate) mod look;
 #[cfg(any(feature = "image", feature = "svg", test))]
 mod media;
 mod mobile;
+mod navigator;
 mod overlays;
 mod pickers;
+mod pinch;
 mod range;
 mod scroll;
 mod space;
@@ -33,8 +37,10 @@ pub use editor::{Buffer, TextEditor, text_editor};
 pub use forms::{
     Dialog, Dropdown, Grid, Radio, app_bar, dialog, dropdown, grid, icon_button, list_tile, radio,
 };
+pub use glass::{Glass, glass};
 pub use icon::{Icon, icon};
 pub use layers::{Layers, layers};
+pub use list::{List, list};
 #[cfg(feature = "image")]
 pub use media::{Image, image};
 #[cfg(feature = "svg")]
@@ -43,10 +49,12 @@ pub use mobile::{
     Avatar, Badge, Chip, Segments, Skeleton, avatar, badge, chip, nav_bar, scaffold, search,
     segmented, skeleton, tabs,
 };
+pub use navigator::{Navigator, NavigatorView, navigator};
 pub use overlays::{
     Drawer, PullToRefresh, Sheet, Snackbar, drawer, pull_to_refresh, sheet, snackbar,
 };
 pub use pickers::{Date, DatePicker, Time, date_picker, days_in_month, is_leap_year, time_picker};
+pub use pinch::{Pinch, pinch};
 pub use range::{Progress, Rule, Slider, progress, rule, slider};
 pub use scroll::{Scroll, scroll};
 pub use space::{Space, space};

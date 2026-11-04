@@ -166,6 +166,10 @@ impl<T: Clone + PartialEq + Send + Sync + 'static> View for Each<T> {
     fn children(&mut self, visit: &mut dyn FnMut(&mut Child)) {
         self.stack.children(visit);
     }
+
+    fn children_rev(&mut self, visit: &mut dyn FnMut(&mut Child)) {
+        self.stack.children_rev(visit);
+    }
 }
 
 #[cfg(test)]

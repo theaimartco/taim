@@ -27,7 +27,7 @@ impl crate::graphics::Compositor for Compositor {
                 },
             });
         }
-        Ok(new(display))
+        try_new(display)
     }
 
     fn create_renderer(&self, settings: renderer::Settings) -> Self::Renderer {
@@ -81,7 +81,19 @@ impl crate::graphics::Compositor for Compositor {
     }
 }
 
+/// Creates a software compositor for `display`.
+///
+/// # Panics
+///
+/// When the platform refuses a software presentation context. Use
+/// [`try_new`] to handle that instead.
 pub fn new(display: impl compositor::Display) -> Compositor {
+    try_new(display).expect("TAIM software display context creation failed")
+}
+
+/// Creates a software compositor for `display`, or reports why the platform
+/// refused one.
+pub fn try_new(display: impl compositor::Display) -> Result<Compositor, backend::Error> {
     state::create_compositor(display)
 }
 

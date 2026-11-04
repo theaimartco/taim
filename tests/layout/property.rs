@@ -10,12 +10,12 @@
 //! avoid pulling in an external crate for this -- a fixed seed makes a
 //! failure reproducible without needing to capture whatever case a real
 //! property-testing library happened to shrink to.
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
+use taim::Size;
+use taim_core::Length;
 use taim_core::layout;
 use taim_core::widget;
-use taim_core::{Length, Size};
 use taim_renderer::Renderer;
+use taim_widget::Element;
 use taim_widget::{column, grid, row, text};
 
 fn headless_renderer() -> Renderer {

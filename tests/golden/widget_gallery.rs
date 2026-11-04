@@ -27,12 +27,11 @@
 //!
 //! Deliberately awkward. Read `harness`'s module docs before doing it.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
 use super::harness::{Harness, Image, Tolerance};
-use taim_core::alignment::Alignment::Center;
 
-use taim_core::{Size, Theme};
+use taim::{Size, Theme};
+use taim_core::Alignment::Center;
+use taim_widget::Element;
 use taim_widget::icon::{self, Icon};
 use taim_widget::segmented_control::Segment;
 use taim_widget::tabs::Tab;
@@ -58,7 +57,6 @@ const THEMES: [(&str, Theme); 2] = [("light", Theme::Light), ("dark", Theme::Dar
 fn check(name: &str, size: (u32, u32), tolerance: Tolerance, build: impl Fn() -> Case<'static>) {
     let harness = Harness::default_directory()
         .with_updates(std::env::var(super::harness::UPDATE_ENV).is_ok());
-    let mut failures = Vec::new();
 
     for (suffix, theme) in THEMES {
         let case = format!("{name}_{suffix}");
@@ -78,10 +76,10 @@ fn check(name: &str, size: (u32, u32), tolerance: Tolerance, build: impl Fn() ->
             // Write the artifact before failing, so CI has something to
             // upload and a reviewer has something to look at.
             harness.write_diff(&case, &image);
-            failures.push(outcome.report(&case));
         }
+
+        assert!(!outcome.is_failure(), "{}", outcome.report(&case));
     }
-    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 /// Pixels differing from the background, i.e. ink actually drawn.

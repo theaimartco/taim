@@ -36,19 +36,35 @@
 
 #[cfg(all(
     target_family = "unix",
-    not(any(target_os = "macos", target_os = "android")),
+    not(target_os = "macos"),
+    not(target_os = "ios"),
+    not(target_os = "android"),
     not(feature = "wayland"),
     not(feature = "x11"),
 ))]
 compile_error!("No Unix display backend is enabled. Enable x11 or wayland.");
+
+// Taim's Android host (`TaimActivity`, winit/android) is a NativeActivity, which
+// taim_winit always enables on Android; GameActivity cannot drive it.
+#[cfg(all(target_os = "android", feature = "android-game-activity"))]
+compile_error!(
+    "Taim's Android host is a NativeActivity; `android-game-activity` is not supported."
+);
 
 use taim_core as core;
 
 mod error;
 mod launch;
 
+pub mod storage;
 pub mod touch;
 pub mod window;
+
+/// What an application asks of the operating system: open a link, share
+/// text, vibrate, and where to keep its files.
+pub mod platform {
+    pub use taim_winit::platform::*;
+}
 
 pub use error::Error;
 pub use launch::{App, app, launch, prelude};

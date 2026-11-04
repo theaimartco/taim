@@ -224,4 +224,10 @@ impl View for Stack {
             visit(child);
         }
     }
+
+    fn children_rev(&mut self, visit: &mut dyn FnMut(&mut Child)) {
+        for child in self.children.iter_mut().rev() {
+            visit(child);
+        }
+    }
 }

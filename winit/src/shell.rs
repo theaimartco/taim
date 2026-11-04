@@ -39,6 +39,9 @@ impl std::fmt::Debug for App {
 /// Runs `app` until its window closes.
 #[cfg(not(target_os = "android"))]
 pub fn run(app: App) -> Result<(), Error> {
+    #[cfg(target_arch = "wasm32")]
+    web::report_panics();
+
     let event_loop = EventLoop::<Wake>::with_user_event()
         .build()
         .map_err(Error::EventLoop)?;
@@ -89,10 +92,26 @@ fn run_event_loop(
         recovery: (Instant::now(), 0),
         #[cfg(all(feature = "linux-theme-detection", target_os = "linux"))]
         theme_watcher: None,
+        #[cfg(target_arch = "wasm32")]
+        opening: None,
+        #[cfg(target_arch = "wasm32")]
+        compositor_slot: Default::default(),
     };
 
-    event_loop.run_app(&mut shell).map_err(Error::EventLoop)?;
-    shell.failure.map_or(Ok(()), Err)
+    // A browser owns its event loop: the application is handed over and
+    // this returns at once.
+    #[cfg(target_arch = "wasm32")]
+    {
+        use winit::platform::web::EventLoopExtWebSys as _;
+        event_loop.spawn_app(shell);
+        Ok(())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        event_loop.run_app(&mut shell).map_err(Error::EventLoop)?;
+        shell.failure.map_or(Ok(()), Err)
+    }
 }
 
 struct Shell {
@@ -113,6 +132,22 @@ struct Shell {
     recovery: (Instant, u8),
     #[cfg(all(feature = "linux-theme-detection", target_os = "linux"))]
     theme_watcher: Option<crate::system_theme::Watcher>,
+    /// A window waiting for its compositor, which the browser creates
+    /// asynchronously.
+    #[cfg(target_arch = "wasm32")]
+    opening: Option<Opening>,
+    /// Where that compositor arrives.
+    #[cfg(target_arch = "wasm32")]
+    compositor_slot: std::rc::Rc<std::cell::RefCell<Option<Result<Compositor, Error>>>>,
+}
+
+/// A window created but not yet given its surface.
+struct Opening {
+    raw: Arc<winit::window::Window>,
+    root: Root,
+    settings: core::Settings,
+    exit_on_close: bool,
+    visible: bool,
 }
 
 impl Shell {
@@ -242,10 +277,61 @@ impl Shell {
                 .map_err(Error::WindowCreationFailed)?,
         );
 
-        if self.compositor.is_none() {
-            self.compositor = Some(self.create_compositor(&raw)?);
+        #[cfg(target_arch = "wasm32")]
+        web::mount(&raw);
+
+        let opening = Opening {
+            raw,
+            root,
+            settings,
+            exit_on_close,
+            visible,
+        };
+
+        if self.compositor.is_some() {
+            self.attach(opening);
+            return Ok(());
         }
-        let compositor = self.compositor.as_mut().expect("created above");
+
+        // Native targets wait for the GPU; a browser cannot block, so the
+        // web finishes opening when the compositor arrives
+        // (`Wake::CompositorReady`).
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.compositor = Some(futures::executor::block_on(
+                self.compositor_future(&opening.raw),
+            )?);
+            self.attach(opening);
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            let future = self.compositor_future(&opening.raw);
+            let slot = self.compositor_slot.clone();
+            let proxy = self.proxy.clone();
+            self.opening = Some(opening);
+            wasm_bindgen_futures::spawn_local(async move {
+                let result = future.await;
+                *slot.borrow_mut() = Some(result);
+                let _ = proxy.send_event(Wake::CompositorReady);
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Gives an opened window its GPU surface and view tree.
+    fn attach(&mut self, opening: Opening) {
+        let Opening {
+            raw,
+            root,
+            settings,
+            exit_on_close,
+            visible,
+        } = opening;
+        let Some(compositor) = self.compositor.as_mut() else {
+            return;
+        };
 
         let id = window::Id::unique();
         let mut surface = Surface::new(
@@ -268,25 +354,37 @@ impl Shell {
         self.windows.push(surface);
         #[cfg(target_os = "android")]
         self.android.refresh_insets();
-
-        Ok(())
     }
 
-    fn create_compositor(&self, window: &Arc<winit::window::Window>) -> Result<Compositor, Error> {
-        let mut compositor = futures::executor::block_on(Compositor::new(
-            backend::Settings::from(&self.settings),
-            self.display.clone(),
-            window.clone(),
-            graphics::Shell::new(RendererSignal(self.proxy.clone())),
-        ))?;
+    /// Creates the compositor for `window`, with the application's fonts
+    /// loaded. Owns everything it needs, so the web can run it detached.
+    fn compositor_future(
+        &self,
+        window: &Arc<winit::window::Window>,
+    ) -> impl std::future::Future<Output = Result<Compositor, Error>> + 'static {
+        let settings = backend::Settings::from(&self.settings);
+        let display = self.display.clone();
+        let window = window.clone();
+        let shell = graphics::Shell::new(RendererSignal(self.proxy.clone()));
+        let fonts = self.settings.fonts.clone();
 
-        for font in self.settings.fonts.iter().cloned() {
-            if let Err(error) = compositor.load_font(font) {
-                log::warn!("a font failed to load: {error:?}");
+        async move {
+            let mut compositor = Compositor::new(settings, display, window, shell).await?;
+
+            for font in fonts {
+                if let Err(error) = compositor.load_font(font) {
+                    log::warn!("a font failed to load: {error:?}");
+                }
             }
-        }
 
-        Ok(compositor)
+            Ok(compositor)
+        }
+    }
+
+    /// Recreates the compositor after GPU device loss (Android recovery).
+    #[cfg(target_os = "android")]
+    fn create_compositor(&self, window: &Arc<winit::window::Window>) -> Result<Compositor, Error> {
+        futures::executor::block_on(self.compositor_future(window))
     }
 
     #[cfg(target_os = "android")]
@@ -493,7 +591,8 @@ impl winit::application::ApplicationHandler<Wake> for Shell {
         }
     }
 
-    fn user_event(&mut self, _event_loop: &ActiveEventLoop, wake: Wake) {
+    #[cfg_attr(not(target_arch = "wasm32"), allow(unused_variables))]
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, wake: Wake) {
         let system = self.system;
 
         match wake {
@@ -522,6 +621,24 @@ impl winit::application::ApplicationHandler<Wake> for Shell {
                 }
             }
             Wake::SystemTheme(mode) => self.set_system_theme(mode),
+            #[cfg(target_arch = "wasm32")]
+            Wake::CompositorReady => {
+                let created = self.compositor_slot.borrow_mut().take();
+                match created {
+                    Some(Ok(compositor)) => {
+                        self.compositor = Some(compositor);
+                        if let Some(opening) = self.opening.take() {
+                            self.attach(opening);
+                        }
+                    }
+                    Some(Err(error)) => {
+                        log::error!("no renderer could start: {error}");
+                        self.failure = Some(error);
+                        event_loop.exit();
+                    }
+                    None => {}
+                }
+            }
             Wake::Refresh => {
                 for surface in &mut self.windows {
                     surface.request_frame();
@@ -543,5 +660,91 @@ impl winit::application::ApplicationHandler<Wake> for Shell {
             .min()
             .map_or(ControlFlow::Wait, ControlFlow::WaitUntil);
         event_loop.set_control_flow(flow);
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+mod web {
+    /// Sends panics to the browser console. A page has no terminal, and a
+    /// release build aborts on panic, so without this a failure shows only
+    /// as an "unreachable" trap.
+    pub(super) fn report_panics() {
+        static ONCE: std::sync::Once = std::sync::Once::new();
+        ONCE.call_once(|| {
+            // Warnings and errors reach the console too, unless the
+            // application installed a logger of its own.
+            if log::set_logger(&Console).is_ok() {
+                log::set_max_level(log::LevelFilter::Info);
+            }
+
+            let previous = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |info| {
+                web_sys::console::error_1(&wasm_bindgen::JsValue::from_str(&format!(
+                    "taim: {info}"
+                )));
+                previous(info);
+            }));
+        });
+    }
+
+    /// `log` records, printed to the browser console.
+    struct Console;
+
+    impl log::Log for Console {
+        fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+            metadata.level() <= log::Level::Info
+        }
+
+        fn log(&self, record: &log::Record<'_>) {
+            if !self.enabled(record.metadata()) {
+                return;
+            }
+            let line = wasm_bindgen::JsValue::from_str(&format!(
+                "{} {}: {}",
+                record.level(),
+                record.target(),
+                record.args()
+            ));
+            match record.level() {
+                log::Level::Error => web_sys::console::error_1(&line),
+                log::Level::Warn => web_sys::console::warn_1(&line),
+                _ => web_sys::console::log_1(&line),
+            }
+        }
+
+        fn flush(&self) {}
+    }
+
+    /// Puts the window's canvas into the page: in place of the element with
+    /// id `taim` if there is one, or at the end of `<body>`, filling it.
+    pub(super) fn mount(window: &winit::window::Window) {
+        use winit::platform::web::WindowExtWebSys as _;
+
+        let Some(canvas) = window.canvas() else {
+            log::error!("the window has no canvas");
+            return;
+        };
+        // Fill the placeholder; no focus ring; touches drive the app instead
+        // of scrolling or zooming the page.
+        let _ = canvas.set_attribute(
+            "style",
+            "display: block; width: 100%; height: 100%; outline: none; touch-action: none",
+        );
+
+        let Some(document) = web_sys::window().and_then(|window| window.document()) else {
+            log::error!("not running in a browser document");
+            return;
+        };
+
+        match document.get_element_by_id("taim") {
+            Some(placeholder) => {
+                let _ = placeholder.replace_with_with_node_1(&canvas);
+            }
+            None => {
+                if let Some(body) = document.body() {
+                    let _ = body.append_child(&canvas);
+                }
+            }
+        }
     }
 }

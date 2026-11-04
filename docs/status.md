@@ -4,101 +4,92 @@
 **Production release verdict:** NO-GO until every evidence gate in
 docs/release/production-gates.md is approved on a reviewed release commit.
 
-## Repository hardening checkpoint — 2026-11-01
+## Liquid glass and visual checkpoint (2026-11-03)
 
-The current working tree passes workspace all-target/all-feature compilation,
-strict Clippy and the all-feature test suite: **2,418 passed, zero failed,
-12 ignored**. Five normally ignored AT-SPI transport tests were subsequently
-run explicitly on a private D-Bus session and passed, including native callback
-execution and focus acknowledgement after real CPU layout. Other ignored cases
-are not counted as executed acceptance. Workspace license checks also pass.
-Missing autofill metadata in accessibility test fixtures and Android host-test
-lint failures are repaired. Glass tests now verify the deliberate opaque
-fallback in legacy `web-colors` mode as well as physical rendering separately.
+Glass now frosts through a mip chain of the backdrop (smooth, nine samples
+per pixel) with vibrance, lenses at its rim scaled to screen density, and
+has a lit rim, sheen and shadow. A `glass` view, `Material::LIQUID` and
+`LIQUID_CLEAR`, and glass navigation capsules, dialogs and sheets are new;
+segmented controls use a raised thumb. Secondary text meets WCAG AA in
+every theme; it measured 1.4–2:1 before. GPU tests had been skipping in
+the build environment for lack of an adapter; with Mesa's software Vulkan
+driver they run, and all pass. See `docs/design/liquid-glass.md`.
 
-Generated Android/Flutter output, SDK-local configuration, signing material and
-caches are ignored; 33 previously tracked OS/Python cache files are untracked
-without deleting local copies. Source bundling independently rejects these
-paths, including explicitly inventoried signing keys. Source, golden fixtures,
-attribution and documentation remain included. Fourteen example manifests now
-inherit the workspace license instead of leaving the license unspecified.
+## Application-building checkpoint (2026-11-02)
 
-The broader offline workspace/all-feature dependency audit flags unmaintained
-`bincode` 2.0.1 via `cargo-hot-protocol` and `rustybuzz` 0.20.1 via SVG text.
-These findings are not suppressed or resolved by the existing `paste`
-maintenance exception. This checkpoint does not certify a clean immutable
-release, physical devices, independent review or distribution signing.
+Added for writing applications: `navigator` (a route stack with page-local
+state, slide transitions and back), a lazy `list` that builds only items
+near the screen (100,000 items tested), `taim::storage` (persistent
+settings, atomic writes), `taim::platform` (open URL, share, vibrate, data
+directory; Android over JNI, desktop through system tools) and `taim-new`,
+a project generator. A generated project was built on the desktop, checked
+for `aarch64-linux-android`, and driven under Xvfb: notes added, saved,
+restored after a restart, opened on their own page and closed with back.
+The Android side of `taim::platform` has not run on a device.
 
-## Android checkpoint — 2026-10-29
+## View-tree performance checkpoint (2026-11-02)
 
-The native Android host now includes system bars/cutout/IME insets, caret panning,
-dark/reduced-motion preferences, system-font/script fallback and API 31+ native
-color-glyph rasterization. Normal and secure input connections support native
-composition, selection and deletion; password context remains redacted.
+`cargo bench --bench views` measures a list of buttons inside `scroll`
+with the CPU renderer (criterion medians, one Linux x86-64 container,
+debug assertions off; indicative only):
 
-ARM64/x86_64 development APKs build. The tested API 35/16 KiB emulator passes
-four touch increments and three surface suspend/resume cycles through GLES
-compatibility. Vulkan's upstream buffer corruption remains unresolved; startup
-roundtrips detect it and retry GLES. Android InputConnection protocol evidence
-covers mixed scripts, codepoint deletion, stale connections, password redaction
-and multiline editing. This does not certify every IME or physical GPU.
+| Benchmark | Before | After |
+|---|---:|---:|
+| pointer move, 100 rows | 40.3 µs | 7.3 µs |
+| pointer move, 1000 rows | 3.36 ms | 86 µs |
+| paint, 100 rows | 27.4 µs | 8.2 µs |
+| paint, 1000 rows | 338 µs | 27 µs |
 
-See [native-host evidence](android/native-host-20261029.md), the
-[earlier Vulkan investigation](android/runtime-acceptance-20261028.md) and
-[Android ledger](android/plan.md). TalkBack, physical-device/ARM64 runtime,
-process restoration, distribution and Flutter comparison remain outstanding.
-Android remains unsupported for production.
+Two causes. Routing an event visited a parent's children in reverse by
+walking all of them once per child, which is quadratic for a long list;
+`View::children_rev` makes it linear. Painting drew every row of a
+scrolled list; views entirely outside a clipping ancestor (with a 32px
+margin for shadows and focus rings) are now skipped. Layout and
+`is_animating` are unchanged.
 
-## Current local verification — 2026-10-26
+## Android checkpoint (2026-11-02)
 
-Priority is the core native UI framework and production reliability on
-Linux, Windows and macOS. GitHub Actions remains disabled at owner request.
-These results describe an uncommitted working tree, not a certified release.
+TAIM builds and passes `clippy -D warnings` for `aarch64-linux-android`
+and `x86_64-linux-android` (`android` feature, NativeActivity). Added: an
+`android_main` entry (`App::run_android`), GPU surface drop/recreate across
+the activity lifecycle, touch delivered as pointer events, an intercept
+phase so touch drags scroll (with flings) and cancel the press underneath,
+back navigation that closes overlays then finishes the activity, safe-area
+insets, on-screen keyboard for text views, dark mode, Android system fonts
+and a JNI clipboard. View-level touch behaviour is covered by
+`tests/touch`. Since then: TalkBack through AccessKit (tree conversion
+unit tested), input-method text through GameActivity's buffer (diffing
+unit tested, including Devanagari composition), every finger delivered as
+raw touch, and a `pinch` view (integration tested). **None of it has run
+on a device or emulator**: there is no Android NDK in the build
+environment, so not even linking is verified, and the GameActivity
+backend's C++ glue has never been compiled here. See
+`docs/platform/android.md` for the gaps compared with Flutter.
 
-- Whole-workspace all-target/all-feature compilation, strict Clippy and
-  formatting: **PASS**.
-- Complete default-feature tests: **2,431 passed**, zero failures, six ignored.
-  Complete all-feature tests: **2,342 passed**, zero failures, six ignored.
-- Native view unit tests: **38 passed**. CPU-rendered native UI/IME integration:
-  **7 passed**, including cancellation and stale button release regressions.
-- Windows MSVC and Apple Silicon macOS facade type checks: **PASS** from Linux.
-  They do not verify OS runtime behavior, final linking or native accessibility.
-- Fresh external minimal and reactive-counter consumers: **PASS**, including
-  checks from an extracted source candidate with the network disabled.
-- Optimized Linux counter build and native window presentation on a private
-  X11 display: **PASS**. This is virtual-display smoke, not physical QA.
-- Public facade API docs: **PASS**. Reproducible source bundling, per-file
-  SHA-256 inventory and unapproved-candidate provenance are implemented.
-- Private D-Bus: **4 accessibility transport tests passed**; the normally ignored
-  live theme read/change race test was explicitly run and **passed**.
-- D-Bus moved to zbus 6.1; the Linux theme watcher is Taim-owned, runs off the
-  UI thread and cancels on shell shutdown. The unmaintained standalone
-  zvariant/zbus_names crates and mundy are removed from the lockfile.
-- Yanked Windows clipboard 5.4.1 replaced by 5.4.3. Dependency licenses: **PASS**.
-  Advisory policy: **PASS with a bounded maintenance exception** for the
-  build-time `paste` macro in released EXR/AVIF codecs. Its checksum, exact
-  consumers, advisory category and 2027-01-26 expiry are enforced by a required
-  guard. `paste` remains unmaintained; zero-exception policy still fails. See
-  [risk disposition](audit/dependency-maintenance-20261026.md).
-- No declared/resolved Iced Cargo dependency or exact inherited source blob.
-  Strict semantic-similarity audit: **NO_GO**, including eight token-identical
-  and 52 high-similarity files. These are heuristic review flags, not legal
-  authorship conclusions or original-source percentages.
+## Build and test checkpoint (2026-11-02)
 
-Core UI hardening includes bounded window-thread messaging, scoped tasks,
-IME composition, validated constraints, scroll chaining, presentation errors,
-calendar/time overflow protection and finite slider/progress geometry.
-Focus-loss/touch cancellation now reaches all views even when a sibling captures
-it, resets press/drag state and cannot commit a pull-to-refresh callback.
-IDE/Lab build migrations are complete; additional tooling polish is secondary.
+After the move to the view API (the `program` crate, the Elm-style
+`application` builder and the widget facade were removed), the workspace
+builds again and its automated checks are green on Linux x86-64:
 
-Remaining release gates include independent review of the maintenance risk,
-independent source review, native Windows/macOS and physical Wayland
-input/accessibility/GPU recovery checks, and packaging/signing of a reviewed
-immutable candidate. Release policy requires recorded local verification,
-not hosted CI. See [current evidence](audit/core-production-hardening-20261026.md).
-Historical checkpoints below retain the evidence available at their date;
-current results above supersede their build-blocker statements.
+- `cargo check --workspace --all-targets`, `cargo clippy --workspace
+  --all-targets -- -D warnings` and `cargo fmt --all --check` pass.
+- Integration tests and benches exercise the engine crates
+  (`taim_core`, `taim_widget`, `taim_runtime`, `taim_futures`) directly;
+  the `taim` facade exposes only the view API.
+- Tests of removed code (`AppRunner`/`Program`/`FrameGate`) were deleted
+  with it: `tests/runtime/phase3_inversion.rs`, `benches/phase3_production.rs`.
+- Widget-gallery goldens were re-adopted for the TAIM palette introduced in
+  37a7097. Before that, 25 of them had also drifted by sub-perceptual
+  border antialiasing (max channel delta 12); the source of that drift was
+  not identified.
+- `taim_wgpu` built with `svg` but without `image` failed to compile; fixed.
+- `tools/taim_lab` and `examples/trivial` are ported to the view API.
+- **`examples/ide` is not ported** and is excluded from the workspace.
+
+None of this changes the release verdict: automated checks passing on a
+headless machine is not hardware, accessibility, performance or security
+acceptance. Hosted CI remains disabled at the owner's request.
 
 ## Implemented foundations
 
@@ -333,8 +324,10 @@ Verified in this checkpoint: `cargo check --workspace --all-targets
 window-layer rewrite). Typing into `mobile_shell`'s search field also
 works once the test harness gives the window X keyboard focus (Xvfb runs
 without a window manager, so `xdotool windowfocus` is required).
-Physical-device, Wayland, Windows, macOS
-and web runs remain unverified.
+Physical-device, Wayland, Windows and macOS runs remain unverified. Web
+runs in headless Chromium through WebGL2 (`scripts/web/build.sh`, see
+`docs/platform/web.md`); Windows, macOS and iOS are lint-clean in the
+release check but have not been run.
 
 ## Verification lanes
 
@@ -352,14 +345,3 @@ The five historical commented workflow files are not active CI. Hardware
 results, stable API compatibility, package publication and tag signatures
 are not yet certified. Do not advertise microsecond internal work as
 input-to-photon or physical display latency.
-
-## Core native UI boundary checks — 2026-10-25
-
-Date/month arithmetic saturates at supported year boundaries, public malformed
-calendar fields are normalized, and time offsets use wide arithmetic. Sliders
-and progress bars normalize reversed/non-finite ranges, preserve finite drawing
-fractions over the full f32 range and reject non-finite pointer coordinates.
-Infinite steps are rejected. Four boundary regression tests were added.
-`cargo test -p taim-view --locked`: **37 passed**, zero failures.
-Whole-workspace strict all-feature Clippy passed after these changes.
-These checks do not certify physical platform acceptance or source independence.

@@ -1,0 +1,10 @@
+[package]
+name = "liquid"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+taim.workspace = true
+taim.features = ["wgpu", "tiny-skia", "crisp", "hinting", "linux-theme-detection", "x11", "wayland"]
+taim_core.workspace = true

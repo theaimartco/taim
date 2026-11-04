@@ -6,13 +6,12 @@
 //! the widget is a container: no actions, no focus, affordances delegated
 //! to real controls in its slots.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
+use taim::{Rectangle, Size, Theme};
 use taim_core::semantics::Role;
 use taim_core::widget::{self, Widget};
 use taim_core::{Layout, layout};
-use taim_core::{Rectangle, Size, Theme};
 use taim_renderer::Renderer;
+use taim_widget::Element;
 use taim_widget::app_bar as app_bar_mod;
 use taim_widget::{app_bar, icon_button, space, text};
 

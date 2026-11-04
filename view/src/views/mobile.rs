@@ -1,6 +1,6 @@
 //! Views for phone-style layouts.
 use super::look::{self, Label, Tween};
-use super::{button, column, container, layers, row, text, text_field, when};
+use super::{button, column, container, layers, row, text_field, when};
 use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::{Axis, Constraints, Sizing};
 use crate::state::{IntoProp, Prop, State};
@@ -103,7 +103,23 @@ impl Segments {
         }
     }
 
+    /// Where the segments sit: the whole bounds, except for the floating
+    /// navigation capsule, which keeps clear of the screen's edges.
+    fn track(&self, bounds: Rectangle) -> Rectangle {
+        match self.look {
+            Look::Pill => Rectangle::new(
+                Point::new(bounds.x + CAPSULE_MARGIN.0, bounds.y + CAPSULE_MARGIN.1),
+                Size::new(
+                    (bounds.width - 2.0 * CAPSULE_MARGIN.0).max(0.0),
+                    (bounds.height - CAPSULE_MARGIN.1 - CAPSULE_MARGIN.2).max(0.0),
+                ),
+            ),
+            _ => bounds,
+        }
+    }
+
     fn slot(&self, bounds: Rectangle, index: f32) -> Rectangle {
+        let bounds = self.track(bounds);
         let width = bounds.width / self.segments.len().max(1) as f32;
         Rectangle::new(
             Point::new(bounds.x + width * index, bounds.y),
@@ -112,6 +128,7 @@ impl Segments {
     }
 
     fn index_at(&self, bounds: Rectangle, at: Point) -> Option<usize> {
+        let bounds = self.track(bounds);
         if !bounds.contains(at) || self.segments.is_empty() {
             return None;
         }
@@ -119,6 +136,9 @@ impl Segments {
         Some((((at.x - bounds.x) / width) as usize).min(self.segments.len() - 1))
     }
 }
+
+/// The floating navigation capsule's margin: sides, top, bottom.
+const CAPSULE_MARGIN: (f32, f32, f32) = (16.0, 6.0, 10.0);
 
 impl View for Segments {
     fn cancel_interaction(&mut self) {
@@ -144,7 +164,7 @@ impl View for Segments {
 
         let padding = match self.look {
             Look::Underline => 28.0,
-            Look::Pill => 16.0,
+            Look::Pill => 20.0 + CAPSULE_MARGIN.1 + CAPSULE_MARGIN.2,
             Look::Boxed => 14.0,
         };
         let sized = constraints.with_sizing(self.sizing());
@@ -175,31 +195,79 @@ impl View for Segments {
                 );
             }
             Look::Boxed => {
-                let radius = 8.0;
+                // A sunken track with a raised thumb, as iOS draws it: the
+                // chosen segment is lifted, not flooded with colour.
+                let radius = 9.0;
                 cx.fill(
                     bounds,
                     palette.background.weak.color,
-                    Border::default()
-                        .width(1.0)
-                        .color(palette.background.strong.color)
-                        .rounded(radius),
+                    Border::default().rounded(radius),
                 );
-                cx.fill(
+                let thumb = if palette.is_dark {
+                    palette.background.strong.color
+                } else {
+                    palette.background.base.color
+                };
+                cx.fill_shadowed(
                     indicator.shrink(2.0),
-                    palette.primary.base.color,
+                    thumb,
                     Border::default().rounded(radius - 2.0),
+                    crate::Shadow {
+                        color: crate::Color::from_rgba(0.0, 0.0, 0.0, 0.16),
+                        offset: crate::Vector::new(0.0, 1.5),
+                        blur_radius: 5.0,
+                    },
                 );
             }
             Look::Pill => {
-                cx.fill(bounds, palette.background.weak.color, Border::default());
-                let pill = Rectangle::new(
-                    Point::new(indicator.x + indicator.width / 2.0 - 32.0, bounds.y + 8.0),
-                    Size::new(64.0, bounds.height - 16.0),
+                // A floating capsule of liquid glass, clear of the edges.
+                let capsule = self.track(bounds);
+                let radius = capsule.height / 2.0;
+                let dark = palette.is_dark;
+                let mut material = taim_core::material::Material::LIQUID;
+                if dark {
+                    material.transmission *= 0.8;
+                }
+                cx.fill_material(
+                    capsule,
+                    if dark {
+                        crate::Color::from_rgb(0.08, 0.10, 0.16)
+                    } else {
+                        crate::Color::WHITE
+                    },
+                    Border::default().rounded(radius).width(1.0).color(if dark {
+                        crate::Color::from_rgba(1.0, 1.0, 1.0, 0.14)
+                    } else {
+                        crate::Color::from_rgba(1.0, 1.0, 1.0, 0.6)
+                    }),
+                    crate::Shadow {
+                        color: crate::Color::from_rgba(
+                            0.0,
+                            0.0,
+                            0.0,
+                            if dark { 0.5 } else { 0.16 },
+                        ),
+                        offset: crate::Vector::new(0.0, 6.0),
+                        blur_radius: 20.0,
+                    },
+                    material,
                 );
+
+                // The chosen item sits in a soft, tinted lozenge.
+                let pill = indicator.shrink(4.0);
+                // Neutral, as Apple draws it: the accent is left to the
+                // chosen item's glyph and label, where it reads. Blending
+                // is in linear light, where a little white goes a long way
+                // on a dark surface: 3% white lifts smoked glass about as
+                // visibly as 5% black darkens bright glass.
                 cx.fill(
                     pill,
-                    palette.primary.base.color,
-                    Border::default().rounded(16.0),
+                    if dark {
+                        crate::Color::from_rgba(1.0, 1.0, 1.0, 0.03)
+                    } else {
+                        crate::Color::from_rgba(0.0, 0.0, 0.0, 0.05)
+                    },
+                    Border::default().rounded(pill.height / 2.0),
                 );
             }
         }
@@ -208,9 +276,15 @@ impl View for Segments {
             let slot = self.slot(bounds, index as f32);
             let chosen = index == selected;
             let color = match (self.look, chosen) {
-                (Look::Pill | Look::Boxed, true) => palette.primary.base.text,
+                (Look::Boxed, true) => cx.text_color(),
+                // The accent: the deeper shade on bright glass, the lighter
+                // one on smoked glass, so it reads on either.
+                (Look::Pill, true) if palette.is_dark => palette.primary.base.color,
+                (Look::Pill, true) => palette.primary.strong.color,
                 (Look::Underline, true) => palette.primary.base.color,
-                (_, false) => palette.background.strongest.color,
+                // Readable on the track it sits on.
+                (Look::Underline, false) => cx.muted(),
+                (_, false) => cx.muted_on(palette.background.weak.color),
             };
 
             match &segment.glyph {
@@ -250,6 +324,12 @@ impl View for Segments {
             }
             _ => Handled::No,
         }
+    }
+
+    /// The navigation capsule is glass, which looks through what was
+    /// painted before it.
+    fn is_layer(&self) -> bool {
+        self.look == Look::Pill
     }
 
     fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
@@ -572,14 +652,17 @@ impl View for Badge {
 pub fn search(placeholder: impl IntoProp<String>, query: State<String>) -> AnyView {
     container(
         row(crate::views![
-            text("⌕").size(18),
-            text_field(placeholder, query),
+            super::icon(super::Icon::SEARCH).size(18),
+            text_field(placeholder, query).plain(),
             when(
                 move || !query.get().is_empty(),
                 move || {
-                    button("✕").on_press(move || {
-                        let _ = query.set(String::new());
-                    })
+                    button("Clear search")
+                        .label_view(super::icon(super::Icon::CLOSE).size(16))
+                        .ghost()
+                        .on_press(move || {
+                            let _ = query.set(String::new());
+                        })
                 }
             ),
         ])
@@ -587,8 +670,11 @@ pub fn search(placeholder: impl IntoProp<String>, query: State<String>) -> AnyVi
         .align(super::Align::Center)
         .fill_width(),
     )
-    .padding([4.0, 12.0])
-    .background(Color::from_rgb8(0xE6, 0xE6, 0xEA))
+    .padding([2.0, 12.0])
+    .background_themed(
+        Color::from_rgb8(0xE6, 0xE6, 0xEA),
+        Color::from_rgb8(0x2C, 0x2C, 0x34),
+    )
     .border(Border::default().rounded(22.0))
     .fill_width()
     .into()

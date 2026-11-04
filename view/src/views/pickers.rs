@@ -114,7 +114,10 @@ pub fn date_picker(visible: State<Date>, chosen: State<Date>) -> DatePicker {
         days: (1..=31)
             .map(|day| Label::new(day.to_string(), Some(13.0)))
             .collect(),
-        arrows: [Label::new("‹", Some(20.0)), Label::new("›", Some(20.0))],
+        arrows: [
+            Label::glyph(super::Icon::CHEVRON_LEFT, 20.0),
+            Label::glyph(super::Icon::CHEVRON_RIGHT, 20.0),
+        ],
         pressed: None,
         id: widget::Id::unique(),
     }
@@ -218,7 +221,7 @@ impl View for DatePicker {
         let month = self.shown_month.get().first_of_month();
         let chosen = self.shown_choice.get();
         let ink = cx.text_color();
-        let quiet = palette.background.strongest.color;
+        let quiet = cx.muted();
 
         let header = Rectangle::new(bounds.position(), Size::new(bounds.width, TITLE));
         self.title.paint_centered(cx, header, ink);
@@ -347,9 +350,15 @@ pub fn time_picker(time: State<Time>, step: u8) -> AnyView {
 
     let column_of = |label: &'static str, up: i32, down: i32, show: fn(Time) -> u8| {
         column(crate::views![
-            button("▲").on_press(shift(up)),
+            button(format!("{label} up"))
+                .label_view(super::icon(super::Icon::CHEVRON_UP).size(18))
+                .secondary()
+                .on_press(shift(up)),
             text(move || format!("{:02}", show(time.get()))).size(24),
-            button("▼").on_press(shift(down)),
+            button(format!("{label} down"))
+                .label_view(super::icon(super::Icon::CHEVRON_DOWN).size(18))
+                .secondary()
+                .on_press(shift(down)),
             text(label).size(11),
         ])
         .gap(6.0)

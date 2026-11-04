@@ -195,7 +195,10 @@ fn fs_mask(input: VertexOutput) -> @location(0) vec4<f32> {
         return vec4<f32>(0.0);
     }
 
-    let coverage = textureSample(u_mask, u_sampler, vec2<f32>(local.x, local.y)).r;
+    // An explicit level: WGSL forbids implicit-derivative sampling after
+    // the early return above (non-uniform control flow). The mask has one
+    // level, so this samples exactly the same texel.
+    let coverage = textureSampleLevel(u_mask, u_sampler, vec2<f32>(local.x, local.y), 0.0).r;
 
     return source * coverage;
 }

@@ -80,15 +80,13 @@ mod static_assertions {
         assert_impl::<Theme>();
     };
 
-    // These three are behind features, so their assertions have to be too --
-    // otherwise a default-feature build fails to compile a test about
-    // coverage rather than reporting one.
+    // These three are behind `taim_widget` features, which the test
+    // dev-dependency enables so their coverage is always asserted.
     const _: fn() = || {
         fn assert_impl<T: taim_widget::markdown::Catalog>() {}
         assert_impl::<Theme>();
     };
 
-    #[cfg(feature = "svg")]
     const _: fn() = || {
         fn assert_impl<T: taim_widget::svg::Catalog>() {}
         assert_impl::<Theme>();

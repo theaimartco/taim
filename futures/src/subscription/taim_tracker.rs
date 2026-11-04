@@ -280,6 +280,7 @@ mod tests {
         assert_eq!(tasks.len(), 1);
         let _ = tracker.update(batch(&[]), sink);
         futures::executor::block_on(tasks.pop().expect("one task"));
+        // Closed or empty: either way, nothing was emitted.
         assert!(receiver.try_recv().is_err());
     }
 

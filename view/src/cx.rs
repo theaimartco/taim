@@ -94,11 +94,53 @@ impl PaintCx<'_> {
         );
     }
 
+    /// Fills `area` with a surface of `material`: glass that refracts and
+    /// frosts what was painted before it when the renderer can, and an
+    /// opaque `background` when it cannot. Glass must be painted in a layer
+    /// of its own ([`View::is_layer`](crate::View::is_layer)) so there is a
+    /// finished backdrop to look through.
+    pub fn fill_material(
+        &mut self,
+        area: Rectangle,
+        background: impl Into<Background>,
+        border: Border,
+        shadow: crate::Shadow,
+        material: taim_core::material::Material,
+    ) {
+        self.renderer.fill_quad(
+            Quad {
+                bounds: area,
+                border,
+                shadow,
+                material,
+                ..Quad::default()
+            },
+            background,
+        );
+    }
+
     /// Text color for secondary information: the text color faded toward
-    /// the window's background.
+    /// the window's background as far as it can go while still reading at
+    /// WCAG AA contrast (4.5:1) on it.
     pub fn muted(&self) -> Color {
         let background = self.theme.palette().background.base.color;
-        self.text_color.mix(background, 0.42)
+        crate::views::look::quiet(
+            self.text_color,
+            background,
+            crate::views::look::TEXT_CONTRAST,
+        )
+    }
+
+    /// Secondary text on `surface` (a field, a segment track), as quiet as
+    /// WCAG AA allows on that surface.
+    pub fn muted_on(&self, surface: Color) -> Color {
+        crate::views::look::quiet(self.text_color, surface, crate::views::look::TEXT_CONTRAST)
+    }
+
+    /// An icon or other graphic that is not the focus on `surface`: as
+    /// quiet as WCAG's 3:1 for non-text content allows.
+    pub fn quiet_icon_on(&self, surface: Color) -> Color {
+        crate::views::look::quiet(self.text_color, surface, crate::views::look::ICON_CONTRAST)
     }
 
     /// The renderer, for drawing primitives the context does not wrap.
@@ -116,6 +158,7 @@ pub struct EventCx<'a> {
     pub(crate) requests: &'a mut Requests,
     pub(crate) focus: &'a mut Focus,
     pub(crate) path: &'a [u16],
+    pub(crate) touch: bool,
 }
 
 /// What views asked for while handling events.
@@ -155,6 +198,15 @@ impl EventCx<'_> {
     /// The pointer position in window coordinates, if known.
     pub fn pointer(&self) -> Option<Point> {
         self.pointer
+    }
+
+    /// Whether the pointer is a finger rather than a mouse or pen.
+    ///
+    /// The shell turns the first finger on the screen into pointer events,
+    /// so every view works with touch; this tells the views that behave
+    /// differently for touch (dragging to scroll, say) which one it is.
+    pub fn is_touch(&self) -> bool {
+        self.touch
     }
 
     /// Whether the pointer is over this view.

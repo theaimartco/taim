@@ -31,6 +31,8 @@ pub struct Buffer {
 
 impl Buffer {
     /// A buffer holding `text`, caret at the start.
+    // With no renderer compiled in, the paragraph and editor types are `()`.
+    #[allow(clippy::unit_arg)]
     pub fn new(cx: &mut Scope, text: &str) -> Self {
         Self {
             engine: cx.signal(Arc::new(Mutex::new(Engine::with_text(text)))),
@@ -451,6 +453,7 @@ impl View for TextEditor {
             && let Some(placeholder) = &self.placeholder
         {
             use text::Renderer as _;
+            let hint_color = cx.muted_on(palette.background.weak.color);
             cx.renderer().fill_text(
                 text::Text {
                     content: placeholder.clone(),
@@ -466,7 +469,7 @@ impl View for TextEditor {
                     hint_factor: hint,
                 },
                 area.position(),
-                palette.background.strongest.color,
+                hint_color,
                 area,
             );
         }
@@ -664,6 +667,10 @@ impl View for TextEditor {
     }
 
     fn focusable(&self) -> bool {
+        true
+    }
+
+    fn takes_text(&self) -> bool {
         true
     }
 

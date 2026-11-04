@@ -11,11 +11,11 @@
 //! exists, forwards correctly, and is actually implemented where it
 //! mattered.
 
+use taim::{Point, Rectangle, Size, Theme, Vector};
 use taim_core::semantics::{Node, Role, State};
 use taim_core::widget::Id;
 use taim_core::widget::{self, Widget};
 use taim_core::{Layout, layout, mouse, overlay};
-use taim_core::{Point, Rectangle, Size, Theme, Vector};
 use taim_renderer::Renderer;
 use taim_widget::pick_list;
 

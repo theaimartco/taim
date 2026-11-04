@@ -11,17 +11,16 @@
 //! `taim_accessibility::Tree`, and assert the tree an assistive
 //! technology would actually receive.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
 use taim_accessibility::focus::Focus;
 use taim_accessibility::tree::Tree as SemanticTree;
 use taim_accessibility::{Dispatch, Router};
 
+use taim::{Size, Theme};
 use taim_core::semantics::{Actions, Role, State, Value};
 use taim_core::widget;
 use taim_core::{Layout, layout};
-use taim_core::{Size, Theme};
 use taim_renderer::Renderer;
+use taim_widget::Element;
 use taim_widget::{button, checkbox, radio, slider, text, text_input, toggler};
 
 type Message = ();

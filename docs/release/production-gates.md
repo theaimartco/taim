@@ -1,17 +1,29 @@
 # TAIM production release policy and signoff
 
-**Verdict on 2026-10-19: NO GO.**
-Branch hardening work is a proposal, not a 1.0 release. No tags or package
-publications should be created solely because CI passes.
+**Verdict on 2026-11-02: NO GO.** The automated checks pass locally; no
+device, screen-reader or release-signing gate has been run.
+
+**Decision (owner, 2026-11-02): no hosted CI.** Gate 1 is met by the local
+release check, `bash scripts/release/check.sh EVIDENCE_DIR`, run on the
+candidate commit from a clean checkout, with its report kept as evidence.
+No tag or publication follows from that check alone.
 
 ## Required gates
 
-1. Recorded local verification on the proposed immutable commit:
-   pinned toolchain, format, lint, workspace tests, visual goldens,
-   AT-SPI bus and harness contract tests. Run the manual verifier and retain
-   hashed logs. GitHub Actions is disabled at owner request and is not a
-   release prerequisite; the same executable checks remain required.
-2. Evidence under docs/testing/wayland-vyom-device-acceptance.md
+1. A passing local release check (`scripts/release/check.sh`) on the
+   candidate commit, with no skipped step: pinned toolchain, format,
+   desktop and Android lints, workspace tests (visual goldens included),
+   the new-project smoke and an Android link with the NDK.
+2. **Android:** a passing `scripts/qa/android-device-check.sh` report,
+   with its by-hand section completed, on at least three physical
+   devices with different GPU vendors (for example Adreno, Mali,
+   PowerVR or Xclipse) and Android versions spanning the supported
+   range (API 26 and the newest), plus one emulator. A passing
+   `scripts/qa/firebase-test-lab.sh` run on three physical models from
+   different manufacturers may stand in for the automated half of the
+   device check; the by-hand half still needs a person. Supported devices
+   in published material may not exceed the tested ones.
+   **Desktop and VYOM:** evidence under docs/testing/wayland-vyom-device-acceptance.md
    collected on the claimed target hardware. Native VYOM support cannot be
    claimed from generic Wayland/winit tests.
 3. Same-hardware four-framework comparisons under
@@ -42,16 +54,17 @@ security disclosure and deprecation policies without inventing an SLA.
 |---|---|
 | Linux x86-64 via winit/Wayland and X11 | Implemented; physical QA not signed |
 | Native VYOM/Smithay Wayland | Experimental; physical presentation not accepted |
-| Windows/macOS | Platform code present; physical QA not accepted |
-| Android | Experimental ARM64/x86_64 builds; API 35/4 KiB emulator smoke passes; tested 16 KiB GLES smoke passes; Vulkan corruption remains guarded; physical QA pending ([evidence](../android/native-host-20261029.md)) |
-| iOS | Unsupported until native device verification |
-| Web/WASM | Compile support only; functional device/browser QA pending |
+| Windows x64/ARM64, macOS x64/ARM64 | Lint clean in the release check; not run, physical QA not accepted |
+| Android arm64/x86_64 | Lint clean; device verification pending |
+| iOS arm64 and simulator | Lint clean (tests included); clipboard, links, vibration, storage implemented; no app-bundle (Xcode) tooling; not run |
+| Web/WASM | Runs in headless Chromium (WebGL2): render, text, gradients, clicks, typing, clipboard, storage; smoke-tested by the release check; glass is drawn flat on WebGL; WebGPU, Firefox, Safari and real devices not verified |
 
 ## Latest gate ledger
 
 | Gate | Status |
 |---|---|
-| Local verification on immutable release candidate | COMPLETE EVIDENCE REQUIRED |
+| Local release check (replaces hosted CI) | PASSES WITHOUT THE ANDROID LINK STEP (no NDK where it was run) |
+| Android device check on physical devices | NOT RUN |
 | Real Wayland frame presentation | NOT RUN |
 | Real VYOM-native display path | NOT RUN |
 | Input, multilingual IME, screen-reader acceptance | NOT RUN |

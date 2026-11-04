@@ -164,13 +164,17 @@ impl Cache {
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
         });
 
-        Self(Arc::new(Shared {
+        // On the web wgpu's handles are neither `Send` nor `Sync`; a page
+        // runs on one thread, so sharing them through an `Arc` is sound.
+        #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
+        let shared = Arc::new(Shared {
             atlas_layout,
             viewport_layout,
             pipeline_layout,
             shader,
             pipelines: Mutex::new(Vec::new()),
-        }))
+        });
+        Self(shared)
     }
 
     fn create_viewport_bind_group(

@@ -5,12 +5,12 @@ use criterion::{
 
 use taim::alignment;
 use taim::mouse;
-use taim_widget::{canvas, scrollable, stack, text};
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
-use taim_core::{Color, Font, Length, Pixels, Point, Rectangle, Size, Theme};
+use taim::{Color, Font, Pixels, Point, Rectangle, Size, Theme};
+use taim_core::Length;
 use taim_wgpu::Renderer;
 use taim_wgpu::wgpu;
+use taim_widget::Element;
+use taim_widget::{canvas, scrollable, stack, text};
 
 criterion_main!(taim_gpu_benches);
 criterion_group!(taim_gpu_benches, measure_gpu_frames);

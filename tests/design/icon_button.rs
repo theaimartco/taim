@@ -4,9 +4,10 @@
 //! ("an icon-only control's accessible name is mandatory"). This proves
 //! the real widget honors it, and behaves the way a button must.
 
+use taim::{Point, Rectangle, Size, Theme};
+use taim_core::Event;
 use taim_core::semantics::{Actions, Role, State};
 use taim_core::widget::{self, Widget};
-use taim_core::{Event, Point, Rectangle, Size, Theme};
 use taim_core::{Layout, Shell, layout, mouse};
 use taim_core::{shell::Waker, window};
 use taim_renderer::Renderer;

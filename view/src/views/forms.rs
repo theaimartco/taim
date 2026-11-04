@@ -240,7 +240,7 @@ impl View for Dropdown {
             Some(option) => option.paint(cx, at, cx.text_color()),
             None => self
                 .placeholder
-                .paint(cx, at, palette.background.strongest.color),
+                .paint(cx, at, cx.muted_on(palette.background.weak.color)),
         }
 
         let arrow = Rectangle::new(
@@ -252,7 +252,7 @@ impl View for Dropdown {
         } else {
             &self.chevrons[0]
         };
-        chevron.paint_centered(cx, arrow, palette.background.strongest.color);
+        chevron.paint_centered(cx, arrow, cx.quiet_icon_on(palette.background.weak.color));
     }
 
     fn paint_over(&self, cx: &mut PaintCx<'_>) {
@@ -449,10 +449,15 @@ impl View for Dialog {
             Point::new(bounds.x + local.x, bounds.y + local.y),
             local.size(),
         );
-        cx.fill(
+        // The card is liquid glass over the dimmed page.
+        let _ = palette;
+        super::glass::pane(
+            cx,
             card,
-            palette.background.base.color,
-            Border::default().rounded(12.0),
+            22.0,
+            taim_core::material::Material::LIQUID,
+            None,
+            2.0,
         );
     }
 
@@ -477,6 +482,11 @@ impl View for Dialog {
             Point::new(bounds.x + local.x, bounds.y + local.y),
             local.size(),
         );
+
+        if look::is_back(event) {
+            let _ = self.open.set(false);
+            return Handled::Yes;
+        }
 
         match look::gesture(event, cx.pointer()) {
             Some(Gesture::Down(at)) if !card.contains(at) => {
@@ -525,9 +535,11 @@ impl View for Dialog {
     }
 }
 
-/// A square button showing just an icon.
+/// A square button showing just an icon. Screen readers announce the
+/// icon's [name](Icon::name); give a more specific one with
+/// `button("Play episode").label_view(icon(Icon::PLAY))`.
 pub fn icon_button(glyph: Icon) -> super::Button {
-    button(String::new()).label_view(icon(glyph).size(18))
+    button(glyph.name()).label_view(icon(glyph).size(18))
 }
 
 /// A list row: optional leading icon, a title and an optional subtitle.
@@ -630,6 +642,12 @@ impl View for Grid {
 
     fn children(&mut self, visit: &mut dyn FnMut(&mut Child)) {
         for child in &mut self.children {
+            visit(child);
+        }
+    }
+
+    fn children_rev(&mut self, visit: &mut dyn FnMut(&mut Child)) {
+        for child in self.children.iter_mut().rev() {
             visit(child);
         }
     }

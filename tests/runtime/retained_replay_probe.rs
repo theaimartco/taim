@@ -1,12 +1,12 @@
 //! Live-path retained replay regressions.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
+use taim::{Rectangle, Size, Theme};
+use taim_core::Length;
 use taim_core::widget::{self, Widget};
 use taim_core::{Layout, mouse, renderer};
-use taim_core::{Length, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::user_interface::{self, UserInterface};
+use taim_widget::Element;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};

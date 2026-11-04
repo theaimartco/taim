@@ -53,8 +53,6 @@
 //! [`Resource::Pipeline`]: taim_profiler::Resource::Pipeline
 
 use taim::prelude::*;
-use taim::view::AnyView;
-
 use taim_profiler::Resource;
 use taim_profiler::events::Event;
 
@@ -148,50 +146,53 @@ pub fn view(events: &[Event]) -> AnyView {
 
     if !counts.any() {
         return container(
-            column![
-                text("Nothing recorded yet.").size(16),
+            column(views![
+                text("Nothing recorded yet.").size(16.0),
                 text(
                     "The text cache is wired and will show real counts once a frame draws \
                      something through it. If this stays empty while frames are running, that \
                      is itself worth noticing."
                 )
-                .size(12),
-                text(MISSING).size(12),
-            ]
+                .size(12.0),
+                text(MISSING).size(12.0),
+            ])
             .gap(8.0)
             .fill_width(),
         )
-        .center_x()
-        .fill_width()
-        .center_y()
-        .fill_height()
-        .padding(12)
+        .center()
+        .padding(12.0)
         .into();
     }
 
-    let rows = RESOURCES.iter().fold(column![].gap(2.0), |rows, resource| {
-        let index = index(*resource);
+    let rows = RESOURCES
+        .iter()
+        .fold(column([]).gap(2.0), |rows, resource| {
+            let index = index(*resource);
 
-        let rate = match counts.hit_rate(*resource) {
-            Some(rate) => format!("{:.0}% hit", rate * 100.0),
-            None => "unused".to_owned(),
-        };
+            let rate = match counts.hit_rate(*resource) {
+                Some(rate) => format!("{:.0}% hit", rate * 100.0),
+                None => "unused".to_owned(),
+            };
 
-        rows.push(
-            row![
-                text(format!("{:<9}", resource.as_str())).size(12),
-                text(format!("{:>6} hit", counts.hits[index])).size(11),
-                text(format!("{:>6} miss", counts.misses[index])).size(11),
-                text(rate).size(11),
-                text(format!("{} bytes evicted", counts.evicted[index])).size(11),
-            ]
-            .gap(10.0),
-        )
-    });
+            rows.push(
+                row(views![
+                    text(format!("{:<9}", resource.as_str())).size(12.0),
+                    text(format!("{:>6} hit", counts.hits[index])).size(11.0),
+                    text(format!("{:>6} miss", counts.misses[index])).size(11.0),
+                    text(rate).size(11.0),
+                    text(format!("{} bytes evicted", counts.evicted[index])).size(11.0),
+                ])
+                .gap(10.0),
+            )
+        });
 
-    column![text("Resources").size(14), rows, text(MISSING).size(11),]
-        .gap(8.0)
-        .into()
+    column(views![
+        text("Resources").size(14.0),
+        rows,
+        text(MISSING).size(11.0),
+    ])
+    .gap(8.0)
+    .into()
 }
 
 #[cfg(test)]

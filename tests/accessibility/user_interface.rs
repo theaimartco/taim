@@ -12,13 +12,12 @@
 //! These tests call the same public method an application calls, on a
 //! real `UserInterface` built from real widgets.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
+use taim::{Point, Size, Theme};
 use taim_core::mouse;
 use taim_core::semantics::{Node, Role, State};
-use taim_core::{Point, Size, Theme};
 use taim_renderer::Renderer;
 use taim_runtime::user_interface::{Cache, UserInterface};
+use taim_widget::Element;
 use taim_widget::{button, checkbox, column, container, float, pick_list, pin, row, space, text};
 
 type Message = &'static str;

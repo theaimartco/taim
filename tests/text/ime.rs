@@ -15,9 +15,10 @@
 //! testing easier would open a fresh disclosure channel for exactly the
 //! content Phase 10's security requirements protect.
 
+use taim::{Point, Rectangle, Size};
+use taim_core::Event;
 use taim_core::input_method::{self, CandidateRect, InputMethod, Preedit, Purpose};
 use taim_core::widget::{self, Widget};
-use taim_core::{Event, Point, Rectangle, Size};
 use taim_core::{Layout, Shell, layout, mouse};
 use taim_core::{shell::Waker, window};
 use taim_renderer::Renderer;

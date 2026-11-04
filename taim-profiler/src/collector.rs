@@ -188,7 +188,7 @@ struct Inner {
     ring: Mutex<Ring>,
     enabled: AtomicBool,
     counter: AtomicU64,
-    started: std::time::Instant,
+    started: taim_core::time::Instant,
 }
 
 /// Collects [`Event`]s.
@@ -237,7 +237,7 @@ impl Collector {
                 ring: Mutex::new(Ring::new(capacity)),
                 enabled: AtomicBool::new(enabled),
                 counter: AtomicU64::new(0),
-                started: std::time::Instant::now(),
+                started: taim_core::time::Instant::now(),
             }),
             sampling: Sampling::ALL,
         }

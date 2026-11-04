@@ -9,12 +9,12 @@
 //! level deeper than the keyed slot itself, since a real application's
 //! keyed list rows are essentially never a single leaf widget.
 
-type Element<'a, M, T = taim_core::Theme, R = taim_renderer::Renderer> =
-    taim_core::Element<'a, M, T, R>;
+use taim::{Point, Rectangle, Size, Theme};
+use taim_core::Length;
 use taim_core::widget::{self, Widget};
 use taim_core::{Layout, mouse, renderer};
-use taim_core::{Length, Point, Rectangle, Size, Theme};
 use taim_renderer::Renderer;
+use taim_widget::Element;
 use taim_widget::keyed::Column;
 
 /// A single-child wrapper, so each keyed row has a nested `Tree` level

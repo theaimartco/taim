@@ -4,7 +4,8 @@ use crate::text;
 use crate::triangle;
 
 use std::collections::HashMap;
-use std::time::Instant;
+// `web_time` on the web, where `std::time::Instant` panics.
+use crate::core::time::Instant;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PipelineKind {
