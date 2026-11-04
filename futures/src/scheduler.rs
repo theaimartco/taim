@@ -7,7 +7,7 @@
 use crate::BoxFuture;
 
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::task::{Context, Poll};
 
 /// Unique generational identifier for a task.
@@ -126,10 +126,18 @@ impl ArcWake for TaskWaker {
                                 == arc_self.generation
                             {
                                 {
-                                    let mut queue = arc_self.header.ready_queue.lock().unwrap();
+                                    let mut queue = arc_self
+                                        .header
+                                        .ready_queue
+                                        .lock()
+                                        .unwrap_or_else(PoisonError::into_inner);
                                     queue.push(arc_self.header.slot);
                                 }
-                                let notifier_guard = arc_self.header.notifier.lock().unwrap();
+                                let notifier_guard = arc_self
+                                    .header
+                                    .notifier
+                                    .lock()
+                                    .unwrap_or_else(PoisonError::into_inner);
                                 if let Some(notifier) = notifier_guard.as_ref() {
                                     notifier();
                                 }
@@ -188,10 +196,18 @@ impl CancelToken {
             .swap(WakeState::Cancelled as u8, Ordering::AcqRel);
         if prev != WakeState::Queued as u8 && prev != WakeState::Cancelled as u8 {
             {
-                let mut queue = self.header.ready_queue.lock().unwrap();
+                let mut queue = self
+                    .header
+                    .ready_queue
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner);
                 queue.push(self.header.slot);
             }
-            let notifier_guard = self.header.notifier.lock().unwrap();
+            let notifier_guard = self
+                .header
+                .notifier
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             if let Some(notifier) = notifier_guard.as_ref() {
                 notifier();
             }
@@ -261,12 +277,16 @@ impl TaskScheduler {
 
     /// Sets an external notification callback invoked whenever a task transitions to ready.
     pub fn set_notifier(&mut self, notifier: impl Fn() + Send + Sync + 'static) {
-        *self.notifier.lock().unwrap() = Some(Arc::new(notifier));
+        *self.notifier.lock().unwrap_or_else(PoisonError::into_inner) = Some(Arc::new(notifier));
     }
 
     /// Returns `true` if there are any tasks in the ready queue waiting to be polled.
     pub fn has_ready_tasks(&self) -> bool {
-        !self.ready_queue.lock().unwrap().is_empty()
+        !self
+            .ready_queue
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .is_empty()
     }
 
     /// Returns the number of currently active (non-finished) tasks.
@@ -324,7 +344,10 @@ impl TaskScheduler {
             slot.waker = Some(futures::task::waker(task_waker));
 
             // Queue slot initially for first poll
-            self.ready_queue.lock().unwrap().push(slot_idx);
+            self.ready_queue
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(slot_idx);
 
             let id = TaskId {
                 slot: slot_idx,
@@ -346,7 +369,10 @@ impl TaskScheduler {
                 notifier: Arc::clone(&self.notifier),
             });
 
-            self.ready_queue.lock().unwrap().push(slot_idx);
+            self.ready_queue
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(slot_idx);
 
             let id = TaskId {
                 slot: slot_idx,
@@ -379,7 +405,10 @@ impl TaskScheduler {
     pub fn poll_ready(&mut self) -> usize {
         // Fast-path: check if ready queue is empty without acquiring lock if possible
         {
-            let mut queue = self.ready_queue.lock().unwrap();
+            let mut queue = self
+                .ready_queue
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             if queue.is_empty() {
                 return 0;
             }
@@ -435,7 +464,10 @@ impl TaskScheduler {
                         slot.header
                             .wake_state
                             .store(WakeState::Queued as u8, Ordering::Release);
-                        self.ready_queue.lock().unwrap().push(slot_idx);
+                        self.ready_queue
+                            .lock()
+                            .unwrap_or_else(PoisonError::into_inner)
+                            .push(slot_idx);
                     }
                 }
             }
@@ -456,6 +488,43 @@ impl Default for TaskScheduler {
 mod tests {
     use super::*;
     use std::sync::atomic::AtomicUsize;
+
+    #[test]
+    fn panicking_notifier_does_not_break_later_wakes() {
+        let mut scheduler = TaskScheduler::new();
+        let notified = Arc::new(AtomicUsize::new(0));
+        let counter = Arc::clone(&notified);
+        scheduler.set_notifier(move || {
+            assert!(
+                counter.fetch_add(1, Ordering::SeqCst) != 0,
+                "first notification fails"
+            );
+        });
+
+        let captured_waker = Arc::new(Mutex::new(None));
+        let capture = Arc::clone(&captured_waker);
+        let polls = Arc::new(AtomicUsize::new(0));
+        let poll_counter = Arc::clone(&polls);
+        let _task = scheduler.spawn(Box::pin(std::future::poll_fn(move |cx| {
+            let _ = poll_counter.fetch_add(1, Ordering::SeqCst);
+            *capture.lock().unwrap() = Some(cx.waker().clone());
+            Poll::<()>::Pending
+        })));
+        let _ = scheduler.poll_ready();
+        let waker: std::task::Waker = captured_waker.lock().unwrap().clone().unwrap();
+
+        // The notifier panics while its lock is held, poisoning it.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| waker.wake_by_ref()));
+        assert!(result.is_err());
+        let _ = scheduler.poll_ready();
+
+        // Later wakes must still enqueue the task and notify.
+        waker.wake_by_ref();
+        assert!(scheduler.has_ready_tasks());
+        assert!(notified.load(Ordering::SeqCst) >= 2);
+        let _ = scheduler.poll_ready();
+        assert!(polls.load(Ordering::SeqCst) >= 3);
+    }
 
     #[test]
     fn test_duplicate_wake_coalescing() {

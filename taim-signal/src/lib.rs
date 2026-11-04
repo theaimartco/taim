@@ -8,7 +8,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, RwLock, Weak};
+use std::sync::{Arc, Mutex, PoisonError, RwLock, Weak};
 
 /// A monotonically increasing version of a reactive value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -109,7 +109,7 @@ impl Drop for BatchGuard {
                 subscribers
                     .callbacks
                     .lock()
-                    .expect("reactive subscriber lock poisoned")
+                    .unwrap_or_else(PoisonError::into_inner)
                     .get(&notification.id)
                     .map(|listener| listener.callback.clone())
             });
@@ -244,7 +244,7 @@ impl Subscribers {
         let _ = self
             .callbacks
             .lock()
-            .expect("reactive subscriber lock poisoned")
+            .unwrap_or_else(PoisonError::into_inner)
             .insert(
                 id,
                 Listener {
@@ -263,7 +263,7 @@ impl Subscribers {
         let listeners = self
             .callbacks
             .lock()
-            .expect("reactive subscriber lock poisoned")
+            .unwrap_or_else(PoisonError::into_inner)
             .iter()
             .map(|(id, listener)| (*id, listener.clone()))
             .collect::<Vec<_>>();
@@ -316,7 +316,7 @@ impl Drop for Subscription {
             let _ = subscribers
                 .callbacks
                 .lock()
-                .expect("reactive subscriber lock poisoned")
+                .unwrap_or_else(PoisonError::into_inner)
                 .remove(&self.id);
         }
     }
@@ -459,7 +459,13 @@ impl<T: Send + Sync + 'static> Signal<T> {
     pub fn with<R>(&self, read: impl FnOnce(&T) -> R) -> R {
         let source: Arc<dyn Source> = self.inner.clone();
         track(source);
-        read(&self.inner.value.read().expect("signal value lock poisoned"))
+        read(
+            &self
+                .inner
+                .value
+                .read()
+                .unwrap_or_else(PoisonError::into_inner),
+        )
     }
 
     /// Replaces the value and publishes one change notification.
@@ -469,7 +475,7 @@ impl<T: Send + Sync + 'static> Signal<T> {
                 .inner
                 .value
                 .write()
-                .expect("signal value lock poisoned");
+                .unwrap_or_else(PoisonError::into_inner);
             std::mem::replace(&mut *current, value)
         };
         self.inner.changed();
@@ -484,7 +490,7 @@ impl<T: Send + Sync + 'static> Signal<T> {
                 .inner
                 .value
                 .write()
-                .expect("signal value lock poisoned");
+                .unwrap_or_else(PoisonError::into_inner);
             update(&mut value)
         };
         self.inner.changed();
@@ -534,7 +540,7 @@ impl<T: PartialEq + Send + Sync + 'static> Signal<T> {
                 .inner
                 .value
                 .write()
-                .expect("signal value lock poisoned");
+                .unwrap_or_else(PoisonError::into_inner);
             if *current == value {
                 false
             } else {
@@ -574,13 +580,16 @@ impl<T: Send + Sync + 'static> MemoInner<T> {
             return;
         }
 
-        let _refreshing = self.refreshing.lock().expect("memo refresh lock poisoned");
+        let _refreshing = self
+            .refreshing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         if !self.dirty.load(Ordering::Acquire) {
             return;
         }
 
         let (value, dependencies) = capture(|| {
-            let compute = self.compute.lock().expect("memo computation lock poisoned");
+            let compute = self.compute.lock().unwrap_or_else(PoisonError::into_inner);
             compute()
         });
 
@@ -597,11 +606,11 @@ impl<T: Send + Sync + 'static> MemoInner<T> {
             })
             .collect::<Vec<_>>();
 
-        *self.value.write().expect("memo value lock poisoned") = Some(value);
+        *self.value.write().unwrap_or_else(PoisonError::into_inner) = Some(value);
         *self
             .dependencies
             .lock()
-            .expect("memo dependency lock poisoned") = subscriptions;
+            .unwrap_or_else(PoisonError::into_inner) = subscriptions;
         self.dirty.store(false, Ordering::Release);
 
         // A source can change between being read and being subscribed. Never
@@ -673,7 +682,11 @@ impl<T: Send + Sync + 'static> Memo<T> {
         track(source);
         self.inner.refresh();
 
-        let value = self.inner.value.read().expect("memo value lock poisoned");
+        let value = self
+            .inner
+            .value
+            .read()
+            .unwrap_or_else(PoisonError::into_inner);
         read(value.as_ref().expect("a refreshed memo must have a value"))
     }
 
@@ -917,6 +930,39 @@ mod tests {
         assert_eq!(seen.load(Ordering::Relaxed), 1);
         assert!(source.set(3));
         assert_eq!(seen.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn panic_inside_update_leaves_the_signal_usable() {
+        let source = Signal::new(1);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            source.update(|value| {
+                *value = 2;
+                panic!("abort update");
+            })
+        }));
+        assert!(result.is_err());
+        // The write made before the panic stands, and the signal still works.
+        assert_eq!(source.get(), 2);
+        assert!(source.set(3));
+        assert_eq!(source.get(), 3);
+    }
+
+    #[test]
+    fn panic_inside_memo_computation_is_retried_on_next_read() {
+        let source = Signal::new(0);
+        let input = source.clone();
+        let memo = Memo::new(move || {
+            let value = input.get();
+            assert!(value != 1, "cannot derive from 1");
+            value * 10
+        });
+        assert_eq!(memo.get(), 0);
+        assert!(source.set(1));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| memo.get()));
+        assert!(result.is_err());
+        assert!(source.set(2));
+        assert_eq!(memo.get(), 20);
     }
 
     #[test]

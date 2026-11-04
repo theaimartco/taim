@@ -40,6 +40,16 @@ break the public API.
 
 ### Fixed
 
+- A panic inside `Signal::update` or a `Memo` computation poisoned the
+  signal's lock, and every later read or write of it panicked; the signal
+  now stays usable and a memo recomputes on its next read.
+- A panic in the task scheduler's notifier poisoned its lock, after which
+  every wake of every task panicked; later wakes now enqueue and notify.
+- The software renderer aborted the process when the platform refused a
+  presentation context, even though it is the last fallback when no GPU
+  works; `Compositor::new` now returns that as an error, and
+  `taim_tiny_skia::window::compositor::try_new` is the fallible
+  constructor.
 - Windows: `open_url` went through `cmd /C start`, which cut a URL at `&`
   and ran the rest as a command; it now uses the URL protocol handler,
   with no shell.
