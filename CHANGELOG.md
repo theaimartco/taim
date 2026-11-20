@@ -86,6 +86,13 @@ break the public API.
   everything was built for size, which made software rendering 5x slower;
   it is now about 25% slower than `release`, for 41% smaller executables
   (counter on macOS 3.58 MiB, iOS 4.00 MiB). New `taim-new` projects get it.
+- Store packaging (`docs/release/store-submission.md`):
+  `scripts/windows/package.py` writes Microsoft Store MSIX packages
+  (full-trust, static C runtime, logos from one PNG) and
+  `scripts/linux/package.py` writes strictly confined core24 Snapcraft
+  projects for the Snap Store. Neither has been run on Windows or Ubuntu.
+- Release builds of `taim-new` projects and the examples no longer open a
+  console window on Windows.
 - **Breaking:** `graphics::Compositor::create_surface` returns
   `Result<Surface, backend::Error>`. A window the platform will not give a
   surface now fails with `Error::GraphicsCreationFailed` instead of

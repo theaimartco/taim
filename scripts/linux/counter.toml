@@ -1,0 +1,14 @@
+# Register the name first: snapcraft register taim-counter
+[app]
+name = "taim-counter"
+title = "Taim Counter"
+summary = "A counter written with Taim"
+description = """
+A counter written against the Taim view API: state is a signal, the buttons
+change it, and only the label that reads it is laid out again.
+"""
+version = "0.1.0"
+license = "MIT"
+icon = "../macos/AppIcon.png"
+categories = ["Development"]
+grade = "devel"

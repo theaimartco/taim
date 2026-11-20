@@ -1,0 +1,12 @@
+# Copy identity, publisher and publisher_display_name from Partner Center:
+# your app, then Product management > Product identity.
+[app]
+name = "Taim Counter"
+identity = "TheAimArtCo.TaimCounter"
+publisher = "CN=TheAimArtCo"
+publisher_display_name = "The AIM Art Co"
+version = "0.1.0.0"
+description = "A counter written with Taim."
+icon = "../macos/AppIcon.png"
+# Uncomment for an app that talks to the network.
+# capabilities = ["internetClient"]

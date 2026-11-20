@@ -48,6 +48,9 @@ No tag or publication follows from that check alone.
 7. Obtain written release-owner signoff; only then sign an annotated tag
    and publish release artifacts and a real changelog.
 
+Packaging for each store, and what the owner supplies, is in
+[store-submission.md](store-submission.md).
+
 ## Public compatibility contract
 
 Version 0.15.0-rc.1 is a release candidate, with no stable API guarantee.
