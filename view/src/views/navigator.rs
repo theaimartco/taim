@@ -500,14 +500,19 @@ impl<R: Clone + PartialEq + Send + Sync + 'static> NavigatorView<R> {
             self.resume = Some((amount, timed(1.0 - amount, speed)));
             let _ = self.navigator.pop();
         } else {
-            self.transition.set(Some(Transition {
-                kind: Kind::Stay,
-                from: amount,
-                to: 0.0,
-                duration: timed(amount, -speed),
-                started: None,
-            }));
+            self.spring_back(amount, timed(amount, -speed));
         }
+    }
+
+    /// Returns a dragged page to rest over `duration` seconds.
+    fn spring_back(&self, amount: f32, duration: f32) {
+        self.transition.set(Some(Transition {
+            kind: Kind::Stay,
+            from: amount,
+            to: 0.0,
+            duration,
+            started: None,
+        }));
     }
 }
 
@@ -585,13 +590,15 @@ impl<R: Clone + PartialEq + Send + Sync + 'static> View for NavigatorView<R> {
 
     fn intercept(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
         if crate::tree::is_cancellation(event) {
+            // The system took the touch: the user did not let go, so the
+            // page returns however far it was dragged.
             if let Some(swipe) = self.swipe.take()
                 && swipe.dragging
             {
-                self.let_go(&Swipe {
-                    samples: Vec::new(),
-                    ..swipe
-                });
+                self.spring_back(
+                    swipe.amount,
+                    (TRANSITION * swipe.amount.max(0.4)).max(SHORTEST),
+                );
                 cx.request_animation();
             }
             return Handled::No;

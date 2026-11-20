@@ -2,6 +2,7 @@
 use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::{Constraints, Sizing};
 use crate::state::{self, IntoProp, Invalidation, Prop};
+use crate::views::hero::{self, Stage};
 use crate::views::scroll::Scroller;
 use crate::{AnyView, Child, Event, Handled, Instant, Point, Size, Vector, View, semantics};
 
@@ -47,6 +48,7 @@ pub fn list(count: impl IntoProp<usize>, item: impl Fn(usize) -> AnyView + 'stat
         covered: Cell::new((0.0, 0.0)),
         id: widget::Id::unique(),
         window: state::building(),
+        stage: hero::current(),
     }
 }
 
@@ -68,6 +70,7 @@ pub struct List {
     covered: Cell<(f32, f32)>,
     id: widget::Id,
     window: Option<Arc<Invalidation>>,
+    stage: Option<Stage>,
 }
 
 impl List {
@@ -198,7 +201,7 @@ impl View for List {
                         previous.next().map(|(_, child)| child).expect("peeked")
                     }
                     _ => Child::new(state::rebuilding(self.window.as_ref(), || {
-                        (self.item)(index)
+                        hero::restaged(self.stage.as_ref(), || (self.item)(index))
                     })),
                 };
 

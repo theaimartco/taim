@@ -469,6 +469,13 @@ impl PaneState {
         let bounds = cx.bounds();
         let local = |at: Point| Vector::new(at.x - bounds.x, at.y - bounds.y);
 
+        // The pointer left the window: no move comes to say it left the pane.
+        if matches!(event, Event::Mouse(taim_core::mouse::Event::CursorLeft)) && self.hovered {
+            self.hovered = false;
+            self.hover.go(0.0, now);
+            return true;
+        }
+
         match super::look::gesture(event, cx.pointer()) {
             Some(Gesture::Down(at)) if bounds.contains(at) && self.origin.is_none() => {
                 self.origin = Some(local(at));
@@ -670,7 +677,7 @@ mod tests {
         );
 
         let later = start + Duration::from_secs(2);
-        assert!((spring.value(later) - 1.0).abs() < 1.0e-3);
+        assert_eq!(spring.value(later), 1.0, "at rest exactly on target");
         assert!(!spring.is_moving(later));
     }
 

@@ -159,7 +159,10 @@ impl View for Appear {
 
     fn is_animating(&self, now: Instant) -> bool {
         match self.started.get() {
-            None => true,
+            // Not drawn yet: it starts when it is, and the window checks for
+            // animation after drawing. Rows culled offscreen must not keep
+            // the window redrawing.
+            None => false,
             Some(start) if crate::state::motion_reduced() => now < start + REDUCED_FADE,
             Some(_) => self.progress.get().is_moving(now),
         }

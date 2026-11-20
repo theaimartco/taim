@@ -275,7 +275,7 @@ impl Spring {
         let Tuning { omega, zeta } = self.tuning;
         let offset = self.from - self.target;
 
-        if zeta < 1.0 {
+        let (value, velocity) = if zeta < 1.0 {
             let damped = omega * (1.0 - zeta * zeta).sqrt();
             let a = offset;
             let b = (self.velocity + zeta * omega * a) / damped;
@@ -293,7 +293,18 @@ impl Spring {
             let value = self.target + (a + b * t) * decay;
             let velocity = (b - omega * (a + b * t)) * decay;
             (value, velocity)
+        };
+        // Settled: exactly on target, so views that follow it come back to
+        // an identity visual and stop paying for a layer.
+        if Self::settled(value - self.target, velocity) {
+            (self.target, 0.0)
+        } else {
+            (value, velocity)
         }
+    }
+
+    fn settled(offset: f32, velocity: f32) -> bool {
+        offset.abs() <= 1.0e-3 && velocity.abs() <= 1.0e-2
     }
 
     pub(crate) fn value(&self, now: crate::Instant) -> f32 {
@@ -314,7 +325,7 @@ impl Spring {
 
     pub(crate) fn is_moving(&self, now: crate::Instant) -> bool {
         let (value, velocity) = self.sample(now);
-        self.start.is_some() && ((value - self.target).abs() > 1.0e-3 || velocity.abs() > 1.0e-2)
+        self.start.is_some() && !Self::settled(value - self.target, velocity)
     }
 }
 

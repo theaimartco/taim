@@ -350,6 +350,14 @@ fn appearing_content_is_drawn_faded_and_lowered_then_in_place() {
     assert!(brightness(&settled, x, top + 3, 2) > 250.0, "and in place");
 }
 
+#[test]
+fn content_that_has_not_been_drawn_does_not_keep_the_window_animating() {
+    // Rows culled below the fold are never drawn; until they are, nothing
+    // should ask for frames.
+    let mut root = Root::new(|_| appear(Block).delay(Duration::from_millis(500)));
+    assert!(!root.is_animating(Instant::now()));
+}
+
 /// A red square of a given side.
 struct Red(f32);
 
@@ -454,4 +462,102 @@ fn a_hero_flies_from_its_place_to_its_partners_over_a_fading_page() {
     );
     let last = centres[24];
     assert!((last.x - landed.x).abs() < 3.0 && (last.y - landed.y).abs() < 3.0);
+}
+
+#[test]
+fn a_hero_built_by_each_flies_too() {
+    let Some(mut renderer) = gpu() else {
+        eprintln!("skipped: no GPU adapter available");
+        return;
+    };
+    let mut handle = None;
+    let mut root = Root::new(|cx| {
+        let nav = Navigator::new(cx, 0_u8);
+        handle = Some(nav);
+        navigator(nav, |_, page| {
+            if *page == 0 {
+                // `each` builds its rows later, outside the page's build.
+                column(views![
+                    space().height(200.0),
+                    each(
+                        || vec![7_u8],
+                        |id: &u8| row(views![space().width(40.0), hero(("photo", *id), Red(40.0))])
+                    ),
+                ])
+                .into()
+            } else {
+                row(views![
+                    space().width(240.0),
+                    hero(("photo", 7_u8), Red(120.0))
+                ])
+                .into()
+            }
+        })
+        .transition(PageTransition::Zoom)
+    });
+    let nav = handle.expect("navigator");
+    let start = Instant::now();
+    let (thumb, _) = red(&render_at(&mut renderer, &mut root, Color::BLACK, start));
+
+    nav.push(1);
+    let _ = root.take_changes();
+    let mut middle = Point::ORIGIN;
+    for frame in 0..=6 {
+        let pixels = render_at(
+            &mut renderer,
+            &mut root,
+            Color::BLACK,
+            start + Duration::from_millis(16 * frame),
+        );
+        middle = red(&pixels).0;
+    }
+    let (landed, _) = red(&render_at(
+        &mut renderer,
+        &mut root,
+        Color::BLACK,
+        start + Duration::from_secs(1),
+    ));
+    assert!(
+        middle.x > thumb.x + 20.0 && middle.x < landed.x - 20.0,
+        "midway it flies between {thumb:?} and {landed:?}: {middle:?}"
+    );
+}
+
+#[test]
+fn the_hover_light_goes_out_when_the_pointer_leaves_the_window() {
+    let Some(mut renderer) = gpu() else {
+        eprintln!("skipped: no GPU adapter available");
+        return;
+    };
+    let mut root = panel();
+    let start = Instant::now();
+    let rest = render_at(&mut renderer, &mut root, Color::BLACK, start);
+
+    // Over the pane with no button down, then straight out of the window.
+    let pointer = Point::new(185.0, 180.0);
+    let _ = root.handle(
+        &taim_core::Event::Mouse(mouse::Event::CursorMoved { position: pointer }),
+        Some(pointer),
+        start,
+    );
+    let _ = render_at(
+        &mut renderer,
+        &mut root,
+        Color::BLACK,
+        start + Duration::from_millis(300),
+    );
+    let _ = root.handle(
+        &taim_core::Event::Mouse(mouse::Event::CursorLeft),
+        None,
+        start + Duration::from_millis(300),
+    );
+
+    let later = start + Duration::from_secs(3);
+    let settled = render_at(&mut renderer, &mut root, Color::BLACK, later);
+    let changed = rest
+        .chunks_exact(4)
+        .zip(settled.chunks_exact(4))
+        .filter(|(a, b)| a != b)
+        .count();
+    assert_eq!(changed, 0, "the pane is back as it was");
 }

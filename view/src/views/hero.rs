@@ -115,6 +115,21 @@ pub(crate) fn on_stage<T>(stage: Stage, build: impl FnOnce() -> T) -> T {
     build()
 }
 
+/// The stage heroes built now belong to.
+pub(crate) fn current() -> Option<Stage> {
+    BUILDING.with(|building| building.borrow().clone())
+}
+
+/// Runs `build` on `stage`, captured by [`current`] when a view that builds
+/// its children later (`each`, `list`, `rebuild`) was made, so heroes
+/// inside those children still fly.
+pub(crate) fn restaged<T>(stage: Option<&Stage>, build: impl FnOnce() -> T) -> T {
+    match stage {
+        Some(stage) => on_stage(stage.clone(), build),
+        None => build(),
+    }
+}
+
 /// Marks `content` as the same thing across pages: when a
 /// [`navigator`](super::navigator) moves to a page with a hero of the same
 /// `tag`, the content flies from where it was to where it is on the new
@@ -139,7 +154,7 @@ pub fn hero(tag: impl Hash, content: impl Into<AnyView>) -> Hero {
     Hero {
         content: Child::new(content),
         tag: hasher.finish(),
-        stage: BUILDING.with(|building| building.borrow().clone()),
+        stage: current(),
         flying: Cell::new(false),
     }
 }

@@ -185,6 +185,21 @@ fn a_short_swipe_lets_the_page_return() {
 }
 
 #[test]
+fn a_swipe_the_system_cancels_returns_the_page_however_far_it_went() {
+    let mut app = App::new(mail());
+    app.tap("Open 7");
+    app.wait(Duration::from_millis(400));
+    app.tap("Like");
+
+    // Past the point a release would go back, then a call takes the touch.
+    app.swipe_cancelled(Point::new(4.0, 300.0), 220.0);
+    app.wait(Duration::from_millis(500));
+    assert!(app.shows("Likes 1"), "the page stayed, with its state");
+    assert!(!app.shows("Inbox"));
+    assert!(!app.root.is_animating(app.now));
+}
+
+#[test]
 fn a_quick_flick_from_the_edge_goes_back_even_if_short() {
     let mut app = App::new(mail());
     app.tap("Open 7");

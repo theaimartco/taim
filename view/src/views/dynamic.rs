@@ -1,6 +1,7 @@
 use crate::cx::{DescribeCx, MeasureCx, PaintCx};
 use crate::layout::{Constraints, Sizing};
 use crate::state::{self, IntoProp, Invalidation, Prop};
+use crate::views::hero::{self, Stage};
 use crate::views::stack::{Stack, column};
 use crate::{AnyView, Child, Point, Size, View, semantics};
 
@@ -35,6 +36,7 @@ where
         shown: Vec::new(),
         stack: column([]),
         window: state::building(),
+        stage: hero::current(),
     }
 }
 
@@ -52,6 +54,7 @@ where
         built_for: None,
         child: None,
         window: state::building(),
+        stage: hero::current(),
     }
 }
 
@@ -62,6 +65,7 @@ pub struct Rebuild<K> {
     built_for: Option<K>,
     child: Option<Child>,
     window: Option<Arc<Invalidation>>,
+    stage: Option<Stage>,
 }
 
 impl<K: Clone + PartialEq + Send + Sync + 'static> Rebuild<K> {
@@ -71,7 +75,10 @@ impl<K: Clone + PartialEq + Send + Sync + 'static> Rebuild<K> {
             return;
         }
 
-        self.child = state::rebuilding(self.window.as_ref(), || (self.build)(&key)).map(Child::new);
+        self.child = state::rebuilding(self.window.as_ref(), || {
+            hero::restaged(self.stage.as_ref(), || (self.build)(&key))
+        })
+        .map(Child::new);
         self.built_for = Some(key);
     }
 }
@@ -114,6 +121,7 @@ pub struct Each<T> {
     shown: Vec<T>,
     stack: Stack,
     window: Option<Arc<Invalidation>>,
+    stage: Option<Stage>,
 }
 
 impl<T: Clone + PartialEq + Send + Sync + 'static> Each<T> {
@@ -137,7 +145,7 @@ impl<T: Clone + PartialEq + Send + Sync + 'static> Each<T> {
             let reused = kept.next().filter(|_| previous.get(index) == Some(item));
             children.push(reused.unwrap_or_else(|| {
                 Child::new(state::rebuilding(self.window.as_ref(), || {
-                    (self.view)(item)
+                    hero::restaged(self.stage.as_ref(), || (self.view)(item))
                 }))
             }));
         }

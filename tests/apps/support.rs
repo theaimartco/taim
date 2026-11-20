@@ -160,6 +160,36 @@ impl App {
         self.frame();
     }
 
+    /// A finger dragged sideways from `from` by `distance` pixels, then
+    /// taken by the system (the window loses focus) instead of lifted.
+    pub fn swipe_cancelled(&mut self, from: Point, distance: f32) {
+        let mut at = from;
+        for event in [
+            Event::Mouse(mouse::Event::CursorMoved { position: at }),
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+        ] {
+            let _ = self.root.handle_input(&event, Some(at), self.now, true);
+        }
+        for _ in 0..25 {
+            at.x += distance / 25.0;
+            self.now += Duration::from_millis(16);
+            let _ = self.root.handle_input(
+                &Event::Mouse(mouse::Event::CursorMoved { position: at }),
+                Some(at),
+                self.now,
+                true,
+            );
+            self.frame();
+        }
+        let _ = self.root.handle_input(
+            &Event::Window(taim_core::window::Event::Unfocused),
+            None,
+            self.now,
+            true,
+        );
+        self.frame();
+    }
+
     /// A quick finger flick from `from` up by `distance` pixels, released
     /// while moving.
     pub fn flick(&mut self, from: Point, distance: f32) {
