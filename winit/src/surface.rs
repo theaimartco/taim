@@ -582,13 +582,11 @@ impl Surface {
         (responses, completed)
     }
 
-    /// Re-resolves the theme after the application or the desktop changed
-    /// it.
-    #[cfg(any(target_os = "android", target_os = "ios", target_os = "macos"))]
     /// Leans the scene light by `lean` (each axis `-1.0..=1.0`): from the
     /// pointer on a desktop, from the device's tilt on a phone. Redraws only
     /// when glass is on screen and the change is visible, and not at all
     /// while motion is reduced.
+    #[cfg(not(target_os = "android"))]
     pub fn lean_light(&mut self, lean: [f32; 2]) {
         let lean = if self.root.motion_reduced() {
             [0.0, 0.0]
@@ -616,12 +614,16 @@ impl Surface {
         self.focused && self.root.painted_glass() && !self.root.motion_reduced()
     }
 
+    /// Follows the system's reduce-motion setting.
+    #[cfg(any(target_os = "android", target_os = "ios", target_os = "macos"))]
     pub fn set_system_motion_reduced(&mut self, reduced: bool) {
         if self.root.set_system_motion_reduced(reduced) {
             self.request_frame();
         }
     }
 
+    /// Re-resolves the theme after the application or the desktop changed
+    /// it.
     pub fn restyle(&mut self, system: theme::Mode) {
         let theme = self.root.theme().unwrap_or_else(|| Theme::default(system));
         let wanted = match theme.mode() {
