@@ -1,5 +1,7 @@
 //! Every phase-2 view of the TAIM view API in one window, all driven by
 //! state handles.
+// No console window behind the app in Windows release builds.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 use taim::prelude::*;
 
 fn main() -> taim::Result {

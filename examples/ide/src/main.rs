@@ -1,4 +1,6 @@
 //! Binary entry point for Virgo.
+// No console window behind the app in Windows release builds.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 use std::path::PathBuf;
 

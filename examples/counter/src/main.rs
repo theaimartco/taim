@@ -1,5 +1,7 @@
 //! A counter written against the TAIM view API: state is a signal, the
 //! buttons change it, and only the label that reads it is laid out again.
+// No console window behind the app in Windows release builds.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 use taim::prelude::*;
 
 fn main() -> taim::Result {

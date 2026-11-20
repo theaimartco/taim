@@ -10,6 +10,8 @@
 //! cascade in when the window opens, and the feed stretches past its ends.
 //! Tap a card: its artwork flies into the collection's page as that page
 //! slides in; swipe from the left edge to drag it back.
+// No console window behind the app in Windows release builds.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 use taim::prelude::*;
 use taim::view::{Constraints, DescribeCx, MeasureCx, PaintCx};
 use taim_core::gradient::Linear;

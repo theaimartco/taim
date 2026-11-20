@@ -1,6 +1,8 @@
 //! A to-do list on the TAIM view API: a list that follows state
 //! (`each`), a section that appears and disappears (`when`), and
 //! background work (`spawn`).
+// No console window behind the app in Windows release builds.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 use std::time::Duration;
 use taim::prelude::*;
 
