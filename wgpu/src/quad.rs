@@ -196,7 +196,11 @@ impl State {
 }
 
 impl Pipeline {
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Pipeline {
+    pub fn new(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        backend: Option<wgpu::Backend>,
+    ) -> Pipeline {
         let constant_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("taim_wgpu::quad uniforms layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -295,7 +299,13 @@ impl Pipeline {
         Self {
             solid: solid::Pipeline::new(device, format, &constant_layout, &backdrop_layout),
             gradient: gradient::Pipeline::new(device, format, &constant_layout, &backdrop_layout),
-            liquid: liquid::Pipeline::new(device, format, &constant_layout, &backdrop_layout),
+            liquid: liquid::Pipeline::new(
+                device,
+                format,
+                &constant_layout,
+                &backdrop_layout,
+                backend,
+            ),
             constant_layout,
             backdrop_layout,
             backdrop_sampler,

@@ -49,6 +49,26 @@ impl Pipeline {
         constants_layout: &wgpu::BindGroupLayout,
         backdrop_layout: &wgpu::BindGroupLayout,
     ) -> Self {
+        Self {
+            pipeline: Self::raw(
+                device,
+                format,
+                constants_layout,
+                backdrop_layout,
+                std::mem::size_of::<Solid>() as u64,
+            ),
+        }
+    }
+
+    /// The solid pipeline over instances `stride` bytes apart, each of which
+    /// starts with a [`Solid`].
+    pub fn raw(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        constants_layout: &wgpu::BindGroupLayout,
+        backdrop_layout: &wgpu::BindGroupLayout,
+        stride: u64,
+    ) -> wgpu::RenderPipeline {
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("taim_wgpu.quad.solid.pipeline"),
             bind_group_layouts: &[Some(constants_layout), Some(backdrop_layout)],
@@ -74,14 +94,14 @@ impl Pipeline {
             ))),
         });
 
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("taim_wgpu.quad.solid.pipeline"),
             layout: Some(&layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("solid_vs_main"),
                 buffers: &[wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Solid>() as u64,
+                    array_stride: stride,
                     step_mode: wgpu::VertexStepMode::Instance,
                     attributes: &wgpu::vertex_attr_array!(
                         // Color
@@ -131,9 +151,7 @@ impl Pipeline {
             },
             multiview_mask: None,
             cache: None,
-        });
-
-        Self { pipeline }
+        })
     }
 
     pub fn render<'a>(

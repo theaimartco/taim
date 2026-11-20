@@ -64,7 +64,9 @@ impl PipelineCache {
         }
 
         let pipeline = match key.kind {
-            PipelineKind::Quad => CachedPipeline::Quad(quad::Pipeline::new(device, key.format)),
+            PipelineKind::Quad => {
+                CachedPipeline::Quad(quad::Pipeline::new(device, key.format, key.backend))
+            }
             PipelineKind::Text => {
                 CachedPipeline::Text(text::Pipeline::new(device, queue, key.format))
             }
@@ -88,29 +90,6 @@ impl PipelineCache {
         let _ = self.access_times.insert(key.clone(), Instant::now());
 
         pipeline
-    }
-
-    pub fn prewarm(
-        &mut self,
-        format: wgpu::TextureFormat,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-    ) {
-        let quad_key = PipelineKey {
-            kind: PipelineKind::Quad,
-            format,
-            antialiasing: None,
-            backend: None,
-        };
-        let _ = self.get_or_create(quad_key, device, queue);
-
-        let text_key = PipelineKey {
-            kind: PipelineKind::Text,
-            format,
-            antialiasing: None,
-            backend: None,
-        };
-        let _ = self.get_or_create(text_key, device, queue);
     }
 
     fn evict_if_needed(&mut self) {

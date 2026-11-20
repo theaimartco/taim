@@ -42,13 +42,34 @@ pub struct Pipeline {
     pipeline: wgpu::RenderPipeline,
 }
 
+/// Instance attributes of the liquid pass.
+const ATTRIBUTES: u32 = 16;
+
 impl Pipeline {
+    /// The liquid pass, or -- where the device cannot take its attributes --
+    /// the solid pass over the same instances, which draws the quads as
+    /// plain glass.
     pub fn new(
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
         constants_layout: &wgpu::BindGroupLayout,
         backdrop_layout: &wgpu::BindGroupLayout,
+        backend: Option<wgpu::Backend>,
     ) -> Self {
+        // GLSL spends an attribute on `gl_VertexID`.
+        let needed = ATTRIBUTES + u32::from(backend == Some(wgpu::Backend::Gl));
+        if needed > device.limits().max_vertex_attributes {
+            return Self {
+                pipeline: quad::solid::Pipeline::raw(
+                    device,
+                    format,
+                    constants_layout,
+                    backdrop_layout,
+                    std::mem::size_of::<Liquid>() as u64,
+                ),
+            };
+        }
+
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("taim_wgpu.quad.liquid.pipeline"),
             bind_group_layouts: &[Some(constants_layout), Some(backdrop_layout)],

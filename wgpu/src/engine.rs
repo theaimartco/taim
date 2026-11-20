@@ -91,12 +91,7 @@ impl Engine {
         antialiasing: Option<Antialiasing>,
         shell: Shell,
     ) -> Self {
-        let mut cache = pipeline_cache::PipelineCache::new(32);
-
-        // Build the preferred format's pipelines up front so the first frame
-        // does not pay for them. Any other format is built on first use.
-        cache.prewarm(format, &device, &queue);
-
+        let cache = pipeline_cache::PipelineCache::new(32);
         let backend = Some(adapter.get_info().backend);
 
         let engine = Self {
@@ -111,8 +106,10 @@ impl Engine {
             _shell: shell,
         };
 
-        // Resolve once, so a misconfigured preferred format fails here rather
-        // than inside the first render pass.
+        // Build the preferred format's pipelines up front, so the first frame
+        // does not pay for them and a misconfigured format fails here rather
+        // than inside the first render pass. Any other format is built on
+        // first use.
         let _ = engine.pipelines(format);
 
         engine
