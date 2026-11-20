@@ -1,5 +1,11 @@
 # Custom Drawing with Canvas
 
+> **This guide describes the pre-0.15 API** (`Element`, `Message`,
+> `Task`, `taim::widget`), which the `taim` crate no longer exports. Its
+> code does not compile against this release. For applications, use the
+> view API in [Getting started](getting-started.md). This page is kept for
+> its concepts while it is rewritten.
+
 The `Canvas` widget gives you full control over 2D rendering. It's perfect for charts, diagrams, custom visualizations, drawing apps, and any UI that can't be expressed with standard widgets.
 
 > **Feature gate**: Requires `features = ["canvas"]` in your `Cargo.toml`.

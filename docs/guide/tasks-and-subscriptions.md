@@ -1,5 +1,11 @@
 # Tasks and Subscriptions
 
+> **This guide describes the pre-0.15 API** (`Element`, `Message`,
+> `Task`, `taim::widget`), which the `taim` crate no longer exports. Its
+> code does not compile against this release. For applications, use the
+> view API in [Getting started](getting-started.md). This page is kept for
+> its concepts while it is rewritten.
+
 When building applications with Vyom-Taim, you often need to perform side effects: fetching data from the network, reading files, interacting with the system clipboard, or listening to continuous events like time and keyboard input. The framework manages all of these through two powerful concepts: **Tasks** and **Subscriptions**.
 
 In the Elm architecture, side effects are not performed directly inside your `update` function. Instead, your `update` function remains pure: it takes the current state and a message, and returns the new state along with a description of the side effects to be executed by the runtime.

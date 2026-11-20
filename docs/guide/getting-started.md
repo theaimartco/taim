@@ -1,643 +1,303 @@
-# Getting Started with Taim
+# Getting started
 
-Welcome to **Taim**, a fast, declarative, and highly customizable GUI framework for Rust. Taim is built on top of the Elm architecture, providing a robust and predictable way to build cross-platform desktop applications.
+This guide takes you from nothing to a running Taim application on the
+desktop, then shows where to go for Android, iOS, the web and the stores.
+Every Rust block here is compiled as a doctest of the `taim` crate
+(`cargo test --doc -p taim`), so it matches the API of this release.
 
-This guide will walk you through everything you need to know to build your first Taim application, from installing dependencies to structuring a real-world project. By the end of this guide, you will have a solid understanding of how Taim works and how to leverage its powerful builder API.
+## 1. Install Rust and the system libraries
 
----
+Taim needs Rust 1.95 or newer (edition 2024). Install it with
+[rustup](https://rustup.rs), then add your platform's libraries:
 
-## 1. Prerequisites
+**macOS**: Xcode Command Line Tools (`xcode-select --install`).
 
-Before you can start building with Taim, you need to ensure your development environment is properly configured.
+**Windows**: Visual Studio Build Tools with the "Desktop development with
+C++" workload.
 
-### Rust
-
-Taim requires **Rust 1.80** or later. If you don't have Rust installed, the easiest way to install it is via `rustup`.
-
-Open your terminal and run:
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-After installation, verify your Rust version:
+**Ubuntu / Debian**
 
 ```bash
-rustc --version
-```
-
-If you already have Rust installed, ensure it is up to date:
-
-```bash
-rustup update
-```
-
-### GPU Requirements
-
-Taim leverages hardware acceleration for fast, smooth rendering. You need a modern GPU that supports Vulkan, Metal (macOS), or DX12 (Windows).
-
-### Linux Headers & Dependencies
-
-If you are developing on Linux, you will need to install a few development libraries. Taim uses Wayland or X11 for windowing.
-
-**Ubuntu / Debian:**
-
-```bash
-sudo apt update
 sudo apt install -y pkg-config libx11-dev libxkbcommon-dev libwayland-dev
 ```
 
-**Fedora:**
+**Fedora**
 
 ```bash
 sudo dnf install -y pkgconf-pkg-config libX11-devel libxkbcommon-devel wayland-devel
 ```
 
-**Arch Linux:**
+**Arch**
 
 ```bash
 sudo pacman -S --needed pkgconf libx11 libxkbcommon wayland
 ```
 
----
+## 2. Create a project
 
-## 2. Installation
-
-With your environment set up, you can now add Taim to your project.
-
-### Creating a New Project
-
-Create a new Rust binary project:
+Taim is not yet published on crates.io. Clone the repository and let
+`taim-new` write a project next to it:
 
 ```bash
-cargo new my_taim_app
-cd my_taim_app
+git clone https://github.com/theaimartco/taim.git
+cd taim
+cargo run -p taim-new -- ../hello --name "Hello" --package com.example.hello
+cd ../hello
+cargo run
 ```
 
-### Adding Taim
+`taim-new` writes:
 
-You can add Taim using `cargo add`:
+| Path | What it is |
+|---|---|
+| `src/main.rs` | The desktop entry point |
+| `src/lib.rs` | Your application, shared by every platform |
+| `android/` | A Gradle project that builds an APK or a Play Store bundle |
+| `macos/` | A packaging config for sandboxed `.app` bundles and Mac App Store installers |
 
-```bash
-cargo add taim
-```
-
-Alternatively, you can manually edit your `Cargo.toml`:
-
-```toml
-[package]
-name = "my_taim_app"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-taim = "0.1" # Replace with the latest version
-```
-
-### Feature Flags
-
-Taim is highly modular. Depending on your needs, you might want to enable or disable certain features. Here is an overview:
-
-| Feature Flag | Default | Description | When to use |
-| :--- | :---: | :--- | :--- |
-| `wayland` | Yes | Wayland support for Linux. | If targeting modern Linux desktops. |
-| `x11` | Yes | X11 support for Linux. | For compatibility with older Linux setups. |
-| `tokio` | Yes | Asynchronous runtime support. | Required if you use `Task` for async I/O. |
-| `smol` | No | Alternative async runtime. | If you prefer `smol` over `tokio`. |
-| `svg` | Yes | SVG rendering support. | If you need to render vector graphics. |
-| `canvas` | Yes | 2D canvas drawing API. | If you need custom drawing primitives. |
-| `debug` | No | Enables debug overlays. | Use during development to inspect layout. |
-
-To enable specific features in `Cargo.toml`:
+To add Taim to an existing project instead, depend on the repository:
 
 ```toml
 [dependencies]
-taim = { version = "0.1", default-features = false, features = ["tokio", "svg", "wayland"] }
+taim = { git = "https://github.com/theaimartco/taim" }
 ```
 
----
+## 3. Your first view
 
-## 3. Your First App
+```rust,no_run
+use taim::prelude::*;
 
-Let's build the classic counter application. This is the simplest way to understand how Taim ties State, Messages, and Views together.
+fn main() -> taim::Result {
+    taim::launch("Counter", |cx| {
+        let count = cx.signal(0_i64);
 
-Replace the contents of `src/main.rs` with the following:
+        column(views![
+            text(move || format!("Count: {}", count.get())).size(32),
+            row(views![
+                button("−1").on_press(move || count.update(|n| *n -= 1)),
+                button("+1").on_press(move || count.update(|n| *n += 1)),
+            ])
+            .gap(8.0),
+        ])
+        .gap(16.0)
+        .padding(24.0)
+    })
+}
+```
+
+Three ideas carry the whole framework:
+
+1. **The build closure runs once.** `launch` calls it to build the view
+   tree. It is not called again when state changes.
+2. **State is a handle.** `cx.signal(0)` returns a `State<i64>`: a small
+   `Copy` handle you can move into as many closures as you like. `get`,
+   `set`, `update` and `with` read and change it from any thread.
+3. **Closures are live.** `text("Hello")` is fixed; `text(move ||
+   ...)` is re-evaluated when a state it read changes. Only views that read
+   a changed state are measured and painted again. Nothing else is touched.
+
+There is no message enum, no `update` function and no diffing of a
+virtual tree.
+
+## 4. Lay things out
 
 ```rust
-use taim::{Element, Task};
-use taim::widget::{button, column, text, container};
+use taim::prelude::*;
 
-// 1. The State
-#[derive(Default)]
-struct Counter {
-    value: i32,
-}
-
-// 2. The Messages
-#[derive(Debug, Clone, Copy)]
-enum Message {
-    Increment,
-    Decrement,
-}
-
-// 3. The Update Logic
-fn update(state: &mut Counter, message: Message) {
-    match message {
-        Message::Increment => {
-            state.value += 1;
-        }
-        Message::Decrement => {
-            state.value -= 1;
-        }
-    }
-}
-
-// 4. The View Logic
-fn view(state: &Counter) -> Element<Message> {
+fn profile() -> impl Into<AnyView> {
     container(
-        column![
-            button("Increment").on_press(Message::Increment),
-            text(format!("Value: {}", state.value)).size(50),
-            button("Decrement").on_press(Message::Decrement),
-        ]
-        .spacing(20)
-        .align_items(taim::Alignment::Center)
+        column(views![
+            row(views![
+                avatar("Ada Lovelace").size(48.0),
+                column(views![text("Ada Lovelace").size(18), text("Analyst").size(13)]).gap(2.0),
+                space(),
+                button("Follow"),
+            ])
+            .gap(12.0)
+            .align(Align::Center)
+            .fill_width(),
+            rule(),
+            text("Notes on the Analytical Engine."),
+        ])
+        .gap(12.0)
+        .padding(16.0),
     )
-    .center_x()
-    .center_y()
-    .into()
-}
-
-// 5. The Entry Point
-fn main() -> taim::Result {
-    taim::run(update, view)
+    .fill()
 }
 ```
 
-### Line-by-Line Explanation
+- `column` and `row` stack children with `.gap`, `.padding` and `.align`.
+- `space()` takes the leftover room, pushing what follows to the end.
+- `container` positions one child: `.center()`, `.fill()`, `.align_bottom()`.
+- `layers` draws children on top of each other; `grid` places them in columns.
+- `scroll(view)` scrolls with the wheel, a finger drag and a fling.
 
-1. **Imports:** We import `Element` and `Task` from `taim`, along with common widgets from `taim::widget`.
-2. **State:** We define a struct `Counter`. It derives `Default`, which `taim::run` requires to initialize the application state automatically (in this case, `value` defaults to `0`).
-3. **Messages:** The `Message` enum defines every possible event that can occur in our application. `Increment` and `Decrement` are our two actions. It must implement `Debug`, `Clone`, and often `Copy`.
-4. **Update Logic:** The `update` function takes a mutable reference to our state (`&mut Counter`) and a `Message`. We match on the message to mutate the state accordingly. Since we are not performing any asynchronous work, we don't need to return a `Task` here.
-5. **View Logic:** The `view` function takes an immutable reference to our state (`&Counter`) and returns an `Element<Message>`. We use a `column!` macro to stack our widgets vertically. `button("...").on_press(...)` creates a button that emits a specific message when clicked. `container` is used to center everything on the screen.
-6. **Entry Point:** The `main` function uses `taim::run(update, view)`. This is the simplest way to start an Taim application. It automatically sets up the window and event loop.
+## 5. Lists that follow state
 
----
-
-## 4. How The Elm Architecture Works
-
-Taim is built heavily on the principles of **The Elm Architecture (TEA)**. TEA provides a strictly unidirectional data flow, which makes debugging and understanding your app's state incredibly straightforward.
-
-### Data Flow Diagram
-
-```text
-       +-----------------+
-       |                 |
-       |     STATE       |
-       |                 |
-       +-------+---------+
-               |
-               v (Immutable reference passed)
-       +-------+---------+
-       |                 |
-       |      VIEW       |  <-- Generates UI based on State
-       |                 |
-       +-------+---------+
-               |
-               v (User interaction triggers...)
-       +-------+---------+
-       |                 |
-       |    MESSAGES     |  <-- e.g., Click, Input
-       |                 |
-       +-------+---------+
-               |
-               v (Message and Mutable State passed)
-       +-------+---------+
-       |                 |
-       |     UPDATE      |  <-- Mutates State, optionally spawns Tasks
-       |                 |
-       +-------+---------+
-               |
-               v (New State)
-       +-----------------+
-       |                 |
-       |     STATE       |  <-- Cycle repeats
-       |                 |
-       +-----------------+
-```
-
-### Why it matters vs MVC/MVVM
-
-In MVC (Model-View-Controller) or MVVM (Model-View-ViewModel), data bindings can often be bi-directional. A view can modify a model directly, or a model can trigger arbitrary view updates. This can lead to "spaghetti state", where it's hard to track *why* a particular value changed.
-
-In Taim (and TEA):
-1. **State is the single source of truth.**
-2. **State can ONLY be modified in the `update` function.**
-3. **The `update` function is ONLY triggered by explicit `Messages`.**
-4. **The `view` is a pure function of the `State`.**
-
-This makes rendering predictable. If you know your state, you know exactly what your UI looks like. If your UI looks wrong, you know either your state is wrong (check `update`) or your rendering logic is wrong (check `view`).
-
----
-
-## 5. Custom State
-
-While the `Counter` example used a single `i32`, real applications have complex states. You define your state as a standard Rust `struct`.
+`each` keeps one row per item and rebuilds only the rows whose item
+changed. `when` shows a view while a condition holds.
 
 ```rust
-use taim::{Element, Task};
-use taim::widget::text;
+use taim::prelude::*;
 
-#[derive(Default)]
-struct AppState {
-    user_name: String,
-    is_logged_in: bool,
-    active_tab: usize,
-    items: Vec<String>,
-}
-
-#[derive(Debug, Clone)]
-enum Message {
-    None,
-}
-
-fn update(state: &mut AppState, message: Message) {
-    // Handle messages
-}
-
-fn view(state: &AppState) -> Element<Message> {
-    text(format!("Welcome, {}!", state.user_name)).into()
-}
-
-fn main() -> taim::Result {
-    taim::run(update, view)
-}
-```
-
-By deriving `Default`, you instruct Rust on how to create the initial version of your state. If you need complex initialization (e.g., loading from disk), you will use the Application Builder's `boot_fn` (covered in Section 7).
-
----
-
-## 6. Messages With Data
-
-Messages aren't just simple flags; they can carry data payloads. This is essential for handling text input, selections, or incoming network data.
-
-```rust
-use taim::{Element, Task, Color};
-use taim::widget::{text_input, column, text, pick_list};
-
-#[derive(Default)]
-struct ProfileEditor {
-    name: String,
-    favorite_color: Option<Color>,
-}
-
-#[derive(Debug, Clone)]
-enum Message {
-    NameChanged(String),
-    ColorSelected(Color),
-}
-
-fn update(state: &mut ProfileEditor, message: Message) {
-    match message {
-        // We receive the new string from the text input
-        Message::NameChanged(new_name) => {
-            state.name = new_name;
+fn tasks(cx: &mut Scope) -> impl Into<AnyView> {
+    let tasks = cx.signal(vec!["Write the guide".to_owned()]);
+    let draft = cx.signal(String::new());
+    let add = move || {
+        let title = draft.get();
+        if !title.trim().is_empty() {
+            tasks.update(|all| all.push(title));
+            draft.set(String::new());
         }
-        // We receive the selected color from a pick list
-        Message::ColorSelected(color) => {
-            state.favorite_color = Some(color);
-        }
-    }
-}
-
-fn view(state: &ProfileEditor) -> Element<Message> {
-    column![
-        text("Edit your profile:"),
-        // The text input takes the current value and a closure mapping 
-        // the new string to a Message
-        text_input("Enter your name", &state.name)
-            .on_input(Message::NameChanged),
-            
-        text(format!("Hello, {}", state.name)),
-    ].into()
-}
-
-fn main() -> taim::Result {
-    taim::run(update, view)
+    };
+    column(views![
+        row(views![
+            text_field("New task", draft).on_submit(add),
+            button("Add").on_press(add),
+        ])
+        .gap(8.0),
+        each(tasks, |task: &String| text(task.clone())),
+        when(move || tasks.with(Vec::is_empty), || text("Nothing to do.")),
+    ])
+    .gap(8.0)
 }
 ```
 
-Notice how `Message::NameChanged` expects a `String`. The `on_input` method of `text_input` automatically provides that string whenever the user types.
-
----
-
-## 7. The Application Builder
-
-For anything beyond a simple prototype, `taim::run` is not enough. You need control over the window size, title, themes, fonts, and initialization logic.
-
-This is where `taim::application()` comes in. It returns an Application Builder that lets you configure every aspect of your app.
-
-Here is a comprehensive example using all builder methods:
+For thousands of rows, use `list`: it builds only the rows on screen.
 
 ```rust
-use taim::{application, Element, Task, Theme, Size, window};
-use taim::widget::text;
+use taim::prelude::*;
 
-struct MyComplexApp {
-    data: String,
-}
-
-#[derive(Debug, Clone)]
-enum Message {
-    Loaded(String),
-}
-
-// boot_fn initializes the state and can return an initial Task
-fn boot() -> (MyComplexApp, Task<Message>) {
-    (
-        MyComplexApp { data: String::from("Loading...") },
-        // Simulate a startup task
-        Task::perform(async { "Data loaded!".to_string() }, Message::Loaded)
-    )
-}
-
-fn update(state: &mut MyComplexApp, message: Message) -> Task<Message> {
-    match message {
-        Message::Loaded(data) => {
-            state.data = data;
-            Task::none()
-        }
-    }
-}
-
-fn view(state: &MyComplexApp) -> Element<Message> {
-    text(&state.data).into()
-}
-
-fn main() -> taim::Result {
-    application(boot, update, view)
-        // Set a static string for the window title
-        .title("My Awesome App")
-        
-        // OR set a dynamic title based on the state! (Overrides the static title)
-        .title_with(|state: &MyComplexApp| {
-            format!("App - {}", state.data)
-        })
-        
-        // Set the active theme
-        .theme(Theme::CatppuccinMocha)
-        
-        // OR set a dynamic theme based on state
-        // .theme_with(|state| Theme::Light)
-        
-        // Configure the initial window size
-        .window_size(Size::new(800.0, 600.0))
-        
-        // Configure deeper window settings (resizable, decorations, etc.)
-        .window(window::Settings {
-            resizable: true,
-            decorations: true,
-            ..Default::default()
-        })
-        
-        // Center the window on the primary monitor on startup
-        .centered()
-        
-        // Enable or disable MSAA (Multisample Anti-Aliasing)
-        .antialiasing(true)
-        
-        // Set the default font family for the entire app
-        // .default_font(Font::with_name("Open Sans"))
-        
-        // Load custom font bytes (e.g., from `include_bytes!`)
-        // .font(include_bytes!("../assets/fonts/Inter-Regular.ttf").as_slice())
-        
-        // Subscribe to global events (keyboard, mouse, time)
-        // .subscription(|state| taim::time::every(...))
-        
-        // Force a specific scale factor (usually handled by the OS)
-        // .scale_factor(|_window_id| 1.5)
-        
-        // Set a custom background style for the root application
-        // .style(|theme| container::Appearance { ... })
-        
-        // Finally, run the application
-        .run()
+fn inbox(cx: &mut Scope) -> impl Into<AnyView> {
+    let subjects = cx.signal((1..=100_000).map(|n| format!("Message {n}")).collect::<Vec<_>>());
+    list(move || subjects.with(Vec::len), move |index| {
+        text(move || subjects.with(|all| all[index].clone())).into()
+    })
 }
 ```
 
-### Builder Methods Breakdown
-
-- **`.title("string")`**: Sets a static window title.
-- **`.title_with(|state| ...)`**: A closure that returns a `String`. Useful for updating the title dynamically (e.g., "Document - Unsaved").
-- **`.theme(Theme)`**: Sets the color palette for the app.
-- **`.theme_with(|state| ...)`**: Allows you to switch themes at runtime based on your state.
-- **`.window_size(Size)`**: The initial logical size of the window.
-- **`.window(Settings)`**: Detailed window configuration.
-- **`.centered()`**: A convenience method to place the window in the center of the screen.
-- **`.antialiasing(bool)`**: Smooths out vector graphics.
-- **`.default_font(Font)` / `.font(&[u8])`**: Essential for branding your application with custom typography.
-- **`.subscription(fn)`**: Ties your app to external asynchronous event streams (like global keyboard listeners or timers). See the [Subscriptions Guide](./subscriptions.md) for details.
-- **`.scale_factor(fn)`**: Advanced: overrides the OS UI scaling.
-- **`.style(fn)`**: Customizes the base window background.
-- **`.run()`**: Consumes the builder and starts the event loop.
-
----
-
-## 8. Running Your App
-
-During development, you will typically run your application in debug mode:
-
-```bash
-cargo run
-```
-
-**Debug mode** compiles quickly and includes safety checks, but the resulting executable is large and may run slowly. This is especially noticeable in GUI applications if you have complex layouts.
-
-When you are ready to test performance or distribute your app, build in **release mode**:
-
-```bash
-cargo run --release
-```
-
-**Release mode** takes longer to compile because Rust applies heavy optimizations. The resulting binary will be significantly smaller, and rendering will be buttery smooth. Always measure UI performance in release mode!
-
----
-
-## 9. Feature Flags (Detailed)
-
-Here is the complete table of feature flags for `taim`:
-
-| Feature | Default | Description | When to Use |
-| :--- | :---: | :--- | :--- |
-| `wayland` | Yes | Native Wayland windowing support on Linux. | Essential for modern Linux distributions. |
-| `x11` | Yes | X11 windowing fallback for Linux. | Essential for compatibility on Linux. |
-| `tokio` | Yes | Integration with the `tokio` async runtime. | If you use `reqwest`, `sqlx`, or standard Tokio primitives. |
-| `smol` | No | Integration with the `smol` async runtime. | If you prefer a lighter-weight async runtime. |
-| `system-fonts` | Yes | Allows querying and loading fonts from the OS. | If you want to use fonts like Arial or Segoe UI without bundling them. |
-| `svg` | Yes | Enables the `svg` widget for rendering `.svg` files. | Highly recommended for modern, scalable iconography. |
-| `image` | Yes | Enables the `image` widget for `.png`, `.jpg`, etc. | If your app displays raster graphics. |
-| `canvas` | Yes | Enables the highly performant `Canvas` widget. | If you need to draw custom charts, games, or complex visualizations. |
-| `debug` | No | Shows bounding boxes and layout overlays. | Enable temporarily in `Cargo.toml` when debugging layout issues. |
-| `accessibility`| Yes | Enables screen reader integration (AccessKit). | Keep enabled to ensure your app is accessible to all users. |
-
----
-
-## 10. All Built-in Themes
-
-Taim ships with a massive collection of high-quality, pre-defined themes out of the box. 
-
-You can set the theme programmatically via `.theme(Theme::...)` or use the environment variable `TAIM_THEME`.
-
-### Standard Themes
-- **`Light`**: A clean, high-contrast light theme (default).
-- **`Dark`**: A standard, easy-on-the-eyes dark theme.
-
-### Popular Community Themes
-- **`Dracula`**: A dark theme with vibrant pinks and purples.
-- **`Nord`**: An arctic, north-bluish cold color palette.
-- **`SolarizedLight` / `SolarizedDark`**: Precision colors for machines and people.
-- **`GruvboxLight` / `GruvboxDark`**: Retro groove color scheme.
-- **`CatppuccinLatte` (Light)**: Soothing pastel light theme.
-- **`CatppuccinFrappe` / `Macchiato` / `Mocha`**: Various shades of dark pastel themes.
-- **`TokyoNight` / `TokyoNightStorm` / `TokyoNightLight`**: A clean, dark Tokyo-inspired theme.
-- **`KanagawaWave` / `KanagawaDragon` / `KanagawaLotus`**: Colors inspired by traditional Japanese woodblock prints.
-- **`Moonfly` / `Nightfly`**: Dark themes inspired by the night sky.
-- **`Oxocarbon`**: A dark theme inspired by IBM Carbon.
-- **`Ferra`**: A warm, earthy dark theme.
-
-### Environment Variable Override
-
-Users can override your app's hardcoded theme (if you allow it) by setting:
-
-```bash
-export TAIM_THEME=CatppuccinMocha
-cargo run
-```
-
-### Custom Themes
-
-If none of the built-in themes fit your brand, you can create your own.
+## 6. Screens and back navigation
 
 ```rust
-use taim::Theme;
+use taim::prelude::*;
 
-// Option 1: Load from a palette structure
-let my_theme = Theme::custom(taim::theme::Palette {
-    background: taim::Color::from_rgb(0.1, 0.1, 0.1),
-    text: taim::Color::WHITE,
-    primary: taim::Color::from_rgb(0.9, 0.4, 0.4),
-    // ... define other colors
-    ..Default::default()
-});
+#[derive(Clone, PartialEq)]
+enum Route {
+    Inbox,
+    Message(u32),
+}
 
-// Option 2: Provide a function for total control over widget styling
-let advanced_theme = Theme::custom_with_fn(|_widget_type| {
-    // Return specific styling based on widget request
-    // See the Advanced Theming guide for details.
-    todo!()
-});
+fn screens(cx: &mut Scope) -> impl Into<AnyView> {
+    let nav = Navigator::new(cx, Route::Inbox);
+    navigator(nav, move |_cx, route| match route {
+        Route::Inbox => button("Open message 7")
+            .on_press(move || nav.push(Route::Message(7)))
+            .into(),
+        Route::Message(id) => column(views![
+            text(format!("Message {id}")),
+            button("Back").on_press(move || {
+                nav.pop();
+            }),
+        ])
+        .into(),
+    })
+}
 ```
 
----
+Pushes slide in, pops slide out, and an edge swipe (on touch screens) or the
+Android back button pops. `nav.replace`, `nav.pop_to_root` and `nav.depth`
+cover the rest.
 
-## 11. Project Structure
+## 7. Work in the background
 
-For a "Hello World", putting everything in `main.rs` is fine. For a real application, you should organize your code into modules. 
+`cx.tasks()` gives a handle that runs futures in the background for this
+window. State handles are `Send`, so the future sets state directly and the
+views that read it update. Closing the window cancels the work.
 
-Here is the recommended folder structure for an Taim project:
-
-```text
-my_taim_app/
-├── Cargo.toml
-└── src/
-    ├── main.rs       // Entry point, builder config, module declarations
-    ├── app.rs        // The main State struct, global Messages, Update logic
-    ├── screens/      // High-level views (e.g., individual pages)
-    │   ├── mod.rs
-    │   ├── home.rs   // State/Update/View specific to the Home screen
-    │   └── settings.rs
-    └── widgets/      // Reusable, custom UI components
-        ├── mod.rs
-        ├── card.rs
-        └── user_avatar.rs
-```
-
-### Example: Separating `app.rs`
-
-**`src/app.rs`**:
 ```rust
-use taim::{Element, Task};
-use crate::screens::{home, settings};
+use taim::prelude::*;
 
-pub struct App {
-    current_screen: Screen,
-}
-
-enum Screen {
-    Home(home::State),
-    Settings(settings::State),
-}
-
-#[derive(Debug, Clone)]
-pub enum Message {
-    HomeMsg(home::Message),
-    SettingsMsg(settings::Message),
-    NavigateToSettings,
-}
-
-impl App {
-    pub fn new() -> (Self, Task<Message>) {
-        (
-            Self { current_screen: Screen::Home(home::State::new()) },
-            Task::none()
-        )
-    }
-
-    pub fn update(&mut self, message: Message) -> Task<Message> {
-        // Delegate messages to the appropriate screen state
-        Task::none()
-    }
-
-    pub fn view(&self) -> Element<Message> {
-        // Render the current screen
-        use taim::widget::text;
-        text("Routing example").into()
-    }
+fn loader(cx: &mut Scope) -> impl Into<AnyView> {
+    let status = cx.signal("Idle".to_owned());
+    let tasks = cx.tasks();
+    column(views![
+        text(move || status.get()),
+        button("Load").on_press(move || {
+            status.set("Loading…".to_owned());
+            tasks.spawn(async move {
+                let body = "42 records".to_owned(); // your HTTP call here
+                status.set(body);
+            });
+        }),
+    ])
+    .gap(8.0)
 }
 ```
 
-**`src/main.rs`**:
+The free function `spawn` starts detached work that outlives the window;
+prefer `cx.tasks()` for anything that touches its state. For non-`Send`
+results, `cx.channel` delivers messages to a handler on the window thread.
+
+## 8. Settings and the platform
+
 ```rust
-mod app;
-mod screens;
-mod widgets;
+use std::time::Duration;
 
-use taim::application;
-use app::App;
+fn remember_launch() -> Result<u32, taim::storage::Error> {
+    let mut settings = taim::storage::Store::open("settings")?;
+    let launches = settings.get_as::<u32>("launches").unwrap_or(0) + 1;
+    settings.set("launches", launches)?;
+    Ok(launches)
+}
 
-fn main() -> taim::Result {
-    application(App::new, App::update, App::view)
-        .title("Structured App")
-        .run()
+fn say_hello() {
+    let _ = taim::platform::open_url("https://example.com");
+    let _ = taim::platform::share_text("Made with Taim");
+    let _ = taim::platform::vibrate(Duration::from_millis(20));
 }
 ```
 
-This structure keeps your code clean, modular, and easy to test.
+`Store` writes through a temporary file, fsyncs and renames it into place,
+so a crash or power loss never leaves a half-written file. On the web it is
+`localStorage`. `taim::platform::data_dir()` is the application's private
+folder on every platform.
 
----
+## 9. Liquid glass
 
-## 12. Next Steps
+```rust
+use taim::prelude::*;
 
-Congratulations! You now have a solid understanding of the Taim framework. From here, you can dive deeper into specific topics:
+fn player(artwork: AnyView) -> impl Into<AnyView> {
+    layers(views![
+        artwork,
+        container(glass(text("Now playing")).radius(28.0))
+            .align_bottom()
+            .padding(16.0),
+    ])
+}
+```
 
-- **[Layout and Widgets](./layout.md)** — Master `row!`, `column!`, `container`, and flexbox styling.
-- **[Handling State and Tasks](./tasks.md)** — Learn how to make HTTP requests, read files, and handle asynchronous data.
-- **[Subscriptions](./subscriptions.md)** — Listen to global events like keyboard shortcuts, window resizing, or timers.
-- **[Custom Widgets](./custom-widgets.md)** — Build your own complex UI elements from scratch using the `Widget` trait.
-- **[Canvas API](./canvas.md)** — Draw custom 2D graphics, charts, and shapes.
-- **[Advanced Theming](./theming.md)** — Create deeply customized, brand-specific UI styles.
+The pane frosts and lenses what is behind it. Without a GPU, or with
+"reduce transparency" on, it draws as a solid tinted surface. See
+[liquid glass](../design/liquid-glass.md).
 
-Happy coding!
+## 10. Run it everywhere
+
+| Platform | Command | Guide |
+|---|---|---|
+| macOS, Windows, Linux | `cargo run --release` | — |
+| Android | `cd android && ./gradlew installDebug` | [android.md](../platform/android.md) |
+| iOS | `python3 scripts/ios/package.py ...` | [ios.md](../platform/ios.md) |
+| Web | `cargo build --target wasm32-unknown-unknown` | [web.md](../platform/web.md) |
+
+Release builds on Windows open without a console window, and the store
+packagers for Google Play, the App Store, the Mac App Store, the Microsoft
+Store and the Snap Store are described in
+[store submission](../release/store-submission.md).
+
+## Next
+
+- Browse every view: `cargo run -p gallery`.
+- A phone-style app with tabs, a drawer, a sheet and pull-to-refresh:
+  `cargo run -p mobile_shell`.
+- [Architecture](../architecture/) and [performance](../performance/numbers.md).

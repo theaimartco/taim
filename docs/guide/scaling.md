@@ -1,5 +1,11 @@
 # Scaling Applications
 
+> **This guide describes the pre-0.15 API** (`Element`, `Message`,
+> `Task`, `taim::widget`), which the `taim` crate no longer exports. Its
+> code does not compile against this release. For applications, use the
+> view API in [Getting started](getting-started.md). This page is kept for
+> its concepts while it is rewritten.
+
 When you first start building an application with Vyom-Taim, a single `update` function, one `Message` enum, and one `view` function might be all you need. However, as your application grows in complexity, features, and lines of code, managing everything in a single file becomes unwieldy.
 
 This guide explains how to scale your application architecture by breaking it down into manageable, reusable components.

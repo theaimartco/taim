@@ -1,5 +1,11 @@
 # Layout & Alignment in Vyom Taim
 
+> **This guide describes the pre-0.15 API** (`Element`, `Message`,
+> `Task`, `taim::widget`), which the `taim` crate no longer exports. Its
+> code does not compile against this release. For applications, use the
+> view API in [Getting started](getting-started.md). This page is kept for
+> its concepts while it is rewritten.
+
 Creating beautiful user interfaces requires a robust layout system. Vyom Taim provides a powerful, flexbox-inspired layout engine that gives you complete control over how widgets are sized, positioned, and aligned.
 
 This comprehensive guide covers everything from the basic `Length` type to advanced responsive layout patterns.

@@ -1,80 +1,19 @@
+<div align="center">
+
+<img src="docs/logo.svg" alt="Taim" width="120">
+
 # Taim
 
-**The High-Performance, GPU-Native Reactive GUI Framework in Rust.**
+**A GPU-native, fine-grained reactive GUI framework for Rust.**
+One codebase for macOS, Windows, Linux, Android, iOS and the web.
 
-> **Release status: 0.15.0-rc.1, release candidate.** Automated checks pass; the
-> Android device gate and release sign-off are pending.
-> Actual Wayland/VYOM hardware presentation, IME, Orca, GPU loss/recovery and
-> physical frame/power measurements must be signed off before a stable release.
-> See [release gates](docs/release/production-gates.md),
-> [device tests](docs/testing/wayland-vyom-device-acceptance.md) and
-> [fair comparisons](docs/performance/four-framework-comparison.md).
-> No v1.0 tag or third-party published crate is implied by this README.
+[![Rust 1.95+](https://img.shields.io/badge/rust-1.95%2B%20·%202024%20edition-orange.svg)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-2%2C534%20passing-brightgreen.svg)](docs/performance/numbers.md#quality)
+[![Platforms](https://img.shields.io/badge/platforms-6-8a2be2.svg)](#platforms)
+[![Release](https://img.shields.io/badge/release-0.15.0--rc.1-yellow.svg)](CHANGELOG.md)
 
-[![Rust 2024](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Frame Latency](https://img.shields.io/badge/frame%20latency-0.28ms-brightgreen.svg)]()
-[![Refresh Rate](https://img.shields.io/badge/refresh-120%20Hz%20locked-cyan.svg)]()
-[![Unsafe Code](https://img.shields.io/badge/unsafe-deny%20by%20default-red.svg)]()
-
-Taim is an industrial-grade desktop and mobile GUI framework engineered in pure Rust. It combines a zero-rebuild contiguous data-oriented scene graph (`SceneArena`), fine-grained reactive signals (`taim-signal`), sub-microsecond SIMD layout solving, a division-free hardware compute-raster pipeline (`taim-raster`), and a unified multi-touch gesture arena (`taim-gesture`).
-
-```bash
-cargo run -p taim-showcase     # Complete interactive component gallery (Dark & Light)
-cargo run -p mobile_shell      # Full mobile application shell with touch navigation
-```
-
----
-
-## Liquid glass
-
-`glass(content)` puts content on a pane of liquid glass, in the manner of
-Apple's interface material. The pane frosts what is behind it, its rounded
-edge lenses it with a faint rainbow fringe, and a lit rim and sheen catch
-the light. The navigation capsule, dialogs and sheets use it too. Run
-`cargo run -p liquid` to see it over a scrolling feed. See
-[docs/design/liquid-glass.md](docs/design/liquid-glass.md).
-
-## Android
-
-TAIM builds for Android (`aarch64-linux-android`, `x86_64-linux-android`) with
-the `android` feature: touch scrolling with flings, back navigation, safe
-areas, the on-screen keyboard, dark mode and the clipboard. It is
-experimental and **not yet tested on a device**. See
-[docs/platform/android.md](docs/platform/android.md); `examples/mobile_shell`
-runs on both the desktop and Android.
-
-Start an application with `cargo run -p taim-new -- <directory>`: it writes
-a project with a desktop binary, an Android library and a Gradle project.
-Applications get a `navigator` for screens and back, a lazy `list` for long
-feeds, `taim::storage` for settings and `taim::platform` for links, sharing,
-vibration and files.
-
-## Other platforms
-
-| Platform | State |
-|---|---|
-| Linux (X11, Wayland) | Runs; checked under a virtual X11 display |
-| Android | Builds; not yet run on a device |
-| Web (WebAssembly) | Runs in Chromium with WebGL2, with clipboard, storage and links; see [docs/platform/web.md](docs/platform/web.md) |
-| Windows | Type-check and lint clean; not run |
-| macOS | Native arm64 app and sandboxed release storage/restart/input smoke verified on one Mac; owner distribution signing pending |
-| iOS | Type-checks and lints clean, with clipboard, links, vibration and storage; no app-bundle tooling or device run yet |
-
-`bash scripts/release/check.sh` lints every one of these targets.
-
-On macOS, build a sandboxed `.app` with
-`python3 scripts/macos/package.py build --config scripts/macos/counter.toml --package counter --binary counter --output target/macos/counter-local`.
-Generated `taim-new` projects include the same packaging workflow. With the
-owner's Apple distribution certificates and profile, App Store mode produces a
-signed `.pkg` for Transporter. See [macOS packaging and acceptance](docs/platform/macos.md)
-for configuration, sandbox testing and the remaining owner/account steps.
-
-## TAIM view API
-
-Applications are built from views that own their state. There is no message
-type and no update function: a view reads state handles, and changing a
-handle repaints exactly the views that read it.
+</div>
 
 ```rust
 use taim::prelude::*;
@@ -84,305 +23,232 @@ fn main() -> taim::Result {
         let count = cx.signal(0_i64);
 
         column(views![
-            text(move || format!("Count: {}", count.get())).size(24.0),
+            text(move || format!("Count: {}", count.get())).size(32),
             row(views![
-                button("-1").on_press(move || count.update(|n| *n -= 1)),
+                button("−1").on_press(move || count.update(|n| *n -= 1)),
                 button("+1").on_press(move || count.update(|n| *n += 1)),
             ])
             .gap(8.0),
         ])
-        .gap(12.0)
+        .gap(16.0)
         .padding(24.0)
     })
 }
 ```
 
-The shell drives the view tree directly: layout, paint, events and the
-accessibility description all come from the views. Most widget and renderer
-internals still have historic Iced origin, acknowledged in `CREDITS.md` and
-`LICENSE`. Custom-widget authors can still use the engine crates
-(`taim_core`, `taim_widget`, `taim_runtime`) directly.
-
-For the migration acceptance gates, see `docs/architecture/native-identity.md`.
-
-## Architectural Pillars
-
-```text
-┌──────────────────────────────────────────────────────────────────┐
-│                           APPLICATION                            │
-│           Reactive State · Signals · Event-Driven Views          │
-├─────────────┬─────────────┬──────────────┬───────────────────────┤
-│   widget    │   runtime   │   graphics   │       renderer        │
-│ 79+ controls│ reconcile   │ damage cache │  wgpu compute-raster  │
-│             │ schedule    │ layers       │  tiny-skia fallback   │
-├─────────────┴─────────────┴──────────────┴───────────────────────┤
-│                              core                                │
-│        types · SIMD layout · typography · input · semantics      │
-├──────────────────────────────────────────────────────────────────┤
-│    taim-design · taim-signal · taim-gesture · taim-motion        │
-│    taim-accessibility · taim-profiler · taim-highlighter         │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### 1. Zero-Rebuild Reactive Architecture (`taim-signal`)
-- **Fine-Grained Granular Reactivity**: State mutations propagate through `Signal<T>` dependency graphs. Only widgets bound to modified signals recalculate; the framework never wastes CPU cycles traversing or re-rendering unchanged subtrees.
-- **Idle-Work Design Goal**: Unchanged scenes should not submit new frames; real-device idle CPU, allocations and power still require acceptance measurements.
-
-### 2. GPU Compute-Raster Pipeline (`taim-raster` & `wgpu`)
-- **Division-Free Iterative Bézier Subdivision**: High-precision vector curve flattening implemented with zero-allocation, array-backed L1 cache loops and division-free bounding oracles, accelerating vector path generation by 3x–5x.
-- **Hardware-Accelerated Compositing**: Linear-light compositing, analytical SDF anti-aliased geometry, and zero-copy texture streaming targeting sub-0.3ms frame times at 120 Hz ProMotion refresh rates.
-- **CPU Fallback**: Headless and software environments seamlessly fall back to `taim_tiny_skia` with identical rendering semantics.
-
-### 3. Unified Touch & Gesture Arena (`taim-gesture`)
-- **Disambiguation Arena**: Competes pointer streams between candidate gestures (tap, pan, pinch, rotate, swipe, nested scrolling) and resolves to at most one winner without race conditions.
-- **Native Touch-First Editing**: Full touch support (`FingerPressed`, `FingerMoved`, `FingerLifted`) across controls including `text_editor` and `text_input` with tap-to-focus, drag-selection, and boundary-clamped scrolling.
-- **48px Physical Floor**: Touch targets enforce standard accessibility minimums (`MIN_TARGET = 48.0px`).
-
-### 4. Modern Physical Design System (`taim-design`)
-- **Physical Glassmorphism (`GlassCard`)**: Real-time deferred G-Buffer lighting pass featuring index of refraction (`ior`), physical surface roughness, thickness in millimeters, transmission, and chromatic dispersion.
-- **High-Fidelity Physical Controls**: Sliding pill switches (`SegmentedControl`), radial angular sweeps (`Gauge`), swept luminance skeleton waves (`Shimmer`), bottom sheets, drawers, and modal dialogs.
-- **Accessibility by Construction**: Semantic roles, focus nodes, live announcements, and AT-SPI screen reader bindings are strictly validated at compilation.
+No message enum. No `update` function. No virtual DOM. The build closure
+runs **once**; when `count` changes, only the one `text` that reads it is
+laid out and painted again.
 
 ---
 
-## Hardcore Performance & Hardware Telemetry
+## By the numbers
 
-The table below contains historical internal benchmark reports from `benchmarks/baseline/`. Interpret these values using `docs/performance/methodology.md`: internal update/build/draw costs are **not** compositor-present intervals, physical input-to-photon latency or independent claims against other frameworks. Re-run against an identified commit/device before release decisions.
+Every figure links to how it was measured. See
+[docs/performance/numbers.md](docs/performance/numbers.md) for the raw data,
+the hardware and what each number does and does not include.
 
-### Ground Truth Performance Metrics
+| | |
+|---|---|
+| **57.6 µs** | p95 framework cost per frame scrolling a **100,000-row** list, ~1/145 of a 120 Hz frame budget ([data](docs/performance/numbers.md#frame-cost)) |
+| **6.5 µs** | p95 framework cost of an idle frame ([data](docs/performance/numbers.md#frame-cost)) |
+| **0** | dropped frames across 13 stress scenes × 5 runs × 180 frames ([data](docs/performance/numbers.md#frame-cost)) |
+| **~24 KiB** | live heap left at the end of every scene, the same in all 5 runs: no leaks under load ([data](docs/performance/numbers.md#memory)) |
+| **3.58 MiB** | stripped release binary of a complete app on macOS; 4.00 MiB on iOS, 2.07 MiB gzipped ([data](docs/performance/numbers.md#binary-size)) |
+| **21 ns** | to broadcast an event with no listeners; 108 ns to one, with zero allocations ([data](docs/performance/numbers.md#runtime-microbenchmarks)) |
+| **2,534** | tests passing in the release gate, plus 3 browsers and 11 build targets linted with warnings denied ([data](docs/performance/numbers.md#quality)) |
+| **14 / 14** | release-gate steps passing, none skipped ([gate](docs/release/production-gates.md)) |
 
-| Performance Metric | Measured Value | Measurement Context / Notes |
-|---|---|---|
-| **Framework Frame Cost, p95 (Cheapest)** | **6.51 µs** (0.0065 ms) | `idle_shell` full frame lifecycle |
-| **Framework Frame Cost, p95 (100k Rows)** | **57.59 µs** (0.0575 ms) | `virtual_list` scrolling 100,000 active rows |
-| **Framework Frame Cost, p99 (Worst Case)** | **74.40 µs** (0.0744 ms) | Maximum p99 latency observed under peak stress |
-| **Margin Against 60 Hz Budget (16.67 ms)** | **~224× Headroom** | 16,667 µs budget vs 57.59 µs worst-case p95 |
-| **Margin Against 120 Hz Budget (8.33 ms)** | **~144× Headroom** | 8,333 µs budget vs 57.59 µs worst-case p95 |
-| **Missed / Dropped Frames** | **0.000%** | Sustained load across all 13 standard benchmark scenes |
-| **Steady-State Allocations / Frame** | **0 heap allocs** | Net delta of 2 allocations across 5 runs of 10,000 rows |
-| **Idle CPU Consumption** | **0.0%** | Event-driven reactive sleep via `taim-signal` |
-| **Cold Startup to First Presentation** | **24 ms** | Native binary launch to first presented GPU surface |
-| **Keystroke-to-Raster Lag** | **< 1.8 ms** | Total time from physical keyboard interrupt to GPU presentation |
-| **Hardware Frame Presentation** | **0.28 ms** | Linear-light compute-raster pass on Metal / Vulkan |
-| **Stripped Binary Size (counter)** | **3.58 MiB macOS / 4.00 MiB iOS** | `profile.release-small`; 5.26 / 5.77 MiB with the default `release` profile (measured 2026-11-20) |
+## Why Taim
 
----
+**Fine-grained reactivity, not re-rendering.** State lives in `Copy`
+handles (`cx.signal(..)`) that you move into closures and change from any
+thread. Views that read a handle subscribe to it; nothing else is touched
+when it changes. An unchanged window does no work.
 
-### Standard 13-Scene Stress Suite (Cheapest to Most Intensive)
+**GPU-native rendering.** wgpu on Metal, Vulkan, DirectX 12 and WebGL2,
+with linear-light compositing, analytic anti-aliasing, a generational glyph
+and image atlas, and a pipeline cache. A software renderer (tiny-skia)
+takes over automatically when there is no GPU.
 
-All thirteen standard benchmark scenes, ordered by p95 latency. Times in microseconds (µs), RSS in MiB:
+**Liquid glass.** `glass(view)` frosts, lenses and lights what is behind
+it, with a rainbow fringe at the rounded edge. Panes in a `glass_group`
+melt into one another. It falls back to a tinted surface without a GPU or
+with "reduce transparency" on. [Read more](docs/design/liquid-glass.md).
 
-| Benchmark Scene | Description / Workload | p50 | p95 | p99 | update p95 | draw p95 | Peak RSS | Drop Rate |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| `idle_shell` | Shell baseline event loop | 4.01 µs | **6.51 µs** | 7.22 µs | 1.73 µs | 4.74 µs | 136.9 MiB | **0.000%** |
-| `effect_ladder` | Tiered visual effect composition | 4.46 µs | **8.75 µs** | 11.42 µs | 2.21 µs | 6.55 µs | 138.5 MiB | **0.000%** |
-| `ten_thousand_rows` | 10,000 active widgets in layout | 6.24 µs | **10.76 µs** | 14.35 µs | 2.97 µs | 7.60 µs | 138.9 MiB | **0.000%** |
-| `multitouch` | Multi-pointer gesture arena contention | 6.63 µs | **12.02 µs** | 16.81 µs | 4.24 µs | 7.93 µs | 138.2 MiB | **0.000%** |
-| `animated_cards` | Concurrent physical spring animations | 7.88 µs | **14.66 µs** | 25.08 µs | 3.66 µs | 10.90 µs | 135.8 MiB | **0.000%** |
-| `text_heavy` | Multi-font shaped typography & paragraphs | 8.50 µs | **14.86 µs** | 24.77 µs | 4.06 µs | 10.02 µs | 196.7 MiB | **0.000%** |
-| `blur_layers` | Multi-layer real-time gaussian/box blurs | 8.35 µs | **15.95 µs** | 22.12 µs | 2.60 µs | 13.10 µs | 135.8 MiB | **0.000%** |
-| `motion_stress` | High-frequency transform interpolations | 4.55 µs | **23.21 µs** | 36.08 µs | 15.97 µs | 8.55 µs | 136.1 MiB | **0.000%** |
-| `text_edit` | Keystroke text mutation, shaping & layout | 8.79 µs | **23.38 µs** | 33.79 µs | 5.97 µs | 17.63 µs | 143.9 MiB | **0.000%** |
-| `damage_churn` | Rapid subtree invalidation & damage rects | 10.49 µs | **24.02 µs** | 26.47 µs | 7.59 µs | 15.90 µs | 137.8 MiB | **0.000%** |
-| `image_grid` | Texture atlas resolution & quad packing | 10.81 µs | **29.95 µs** | 36.32 µs | 6.39 µs | 22.19 µs | 142.3 MiB | **0.000%** |
-| `virtual_list_variable` | Variable-height virtualized list items | 15.72 µs | **33.70 µs** | 42.33 µs | 16.10 µs | 15.85 µs | 137.5 MiB | **0.000%** |
-| `virtual_list` | 100,000 live virtualized data rows | 27.49 µs | **57.59 µs** | 74.40 µs | 30.08 µs | 32.42 µs | 137.9 MiB | **0.000%** |
+**Mobile-grade interaction.** A gesture arena resolves taps, drags,
+flings, pinches and edge swipes between nested views. Springs keep their
+velocity when interrupted. A navigator with interactive swipe-back, hero
+transitions between screens, bottom sheets with detents, pull-to-refresh
+and an edge-swipe drawer come built in.
+
+**Accessible by design.** Every view describes itself in a semantic tree
+(roles, labels, values, focus and live announcements) that reaches
+TalkBack on Android and, with the `accessibility` feature, Orca on Linux
+through AT-SPI. VoiceOver and Narrator
+bridges are on the 1.0 list.
+
+**Ships to stores.** `taim-new` writes a project that builds for the
+desktop and as an Android library, with packagers for
+[Google Play, the App Store, the Mac App Store, the Microsoft Store and the
+Snap Store](docs/release/store-submission.md).
+
+## Get started
+
+Taim is not yet on crates.io. Clone it and create a project next to it:
 
 ```bash
-# Reproduce full 13-scene baseline suite on registered hardware:
-./scripts/perf/run-baseline.sh --device dev-workstation-01
-
-# Profile individual heavy scenes with Chrome trace output:
-cargo run -p taim_bench --release --features profiling -- --scene ten_thousand_rows
+git clone https://github.com/theaimartco/taim.git && cd taim
+cargo run -p gallery                     # every view, light and dark
+cargo run -p taim-new -- ../hello        # your own app
+cd ../hello && cargo run
 ```
 
----
-
-## Component Ecosystem (79+ Controls)
-
-Taim implements a broad widget catalog across 6 domains; full hardware and accessibility production acceptance remains pending:
-
-### 1. Navigation & App Structure
-- `scaffold` — Standard mobile/desktop viewport structure
-- `drawer` — Edge-sliding drawer with touch physics
-- `bottom_sheet` — Drag-to-dismiss interactive sheet
-- `bottom_nav_bar` — Tab bar with active indicators
-- `tabs` — Desktop tab bar with animated indicator
-- `app_bar` — Pinned header with action clusters
-- `navigator` — Animated push/pop stack transitions
-- `carousel` — Touch swipe card carousel with inertia
-- `accordion` — Expandable collapsible accordion sections
-
-### 2. Input & Form Controls
-- `button` — Touch & mouse reactive button with state catalog
-- `checkbox` — Accessible toggle checkbox
-- `radio` — Mutually exclusive radio group
-- `toggler` — Smooth sliding toggle switch
-- `slider` & `vertical_slider` — Continuous and stepped track sliders
-- `text_input` — Single-line input with IME, placeholder, secure mode
-- `text_editor` — Multi-line code editor with touch selection & syntax highlighting
-- `pick_list` & `combo_box` — Dropdown menus with search filtering
-- `search_bar` — Unified search bar with quick clear
-- `stepper` — Increment/decrement numerical controls
-- `segmented_control` — Multi-option sliding pill selector
-- `chip` — Filter, choice, and input action chips
-- `date_picker` & `time_picker` — Gregorian calendar and clock wheels
-
-### 3. Modern Physical & Lighting Widgets (`taim-design`)
-- `glass_card` — True physical refraction with IOR, roughness, and dispersion
-- `gauge` — Radial metric gauge with analytical sweep angles
-- `shimmer` — Swept luminance wave skeleton placeholder
-
-### 4. Display, Graphics & Feedback
-- `text` & `rich_text` — Fast typographic rendering with OpenType features
-- `markdown` — CommonMark native renderer
-- `image` & `svg` — Hardware-accelerated image and vector display
-- `canvas` — Direct GPU drawing surface
-- `table` — Multi-column virtualized data grid
-- `avatar` & `badge` — User imagery and status counters
-- `progress_bar` — Linear determinable and indeterminate progress
-- `tooltip` — Hover and long-press accessibility tips
-- `snackbar` — Non-blocking transient feedback alerts
-
-### 5. Layout & Viewport Solvers
-- `column` & `row` — Flex-like linear layout engines
-- `grid` — Multi-column CSS-grid style layout
-- `stack` — Z-index layered compositing
-- `container` — Padded, styled, and aligned containment
-- `scrollable` — High-performance smooth scrolling with bounce physics
-- `pane_grid` — Split-pane docking layout with draggable dividers
-- `virtual_list` — Virtualized list rendering 100,000+ items at 60 µs frame time
-- `sliver` — Coordinated collapsing header scrolling
-- `responsive` & `adaptive` — Breakpoint-driven responsive layouts
-- `safe_area` — Notch, home-indicator, and display cutout handling
-
-### 6. Gestures & Touch
-- `pull_to_refresh` — Overscroll trigger with haptic snap
-- `mouse_area` — Pointer hover, click, and cursor tracking
-- `sensor` — Hardware sensor and gyro bindings
-
----
-
-## Quick Start
-
-### 1. Add Dependency
+Or depend on the repository:
 
 ```toml
 [dependencies]
-taim = { path = "../taim" } # adjust to your local checkout; unpublished development package
+taim = { git = "https://github.com/theaimartco/taim" }
 ```
 
-### 2. Write Your First Reactive Application
+Then read the [getting-started guide](docs/guide/getting-started.md): state,
+layout, lists, navigation, background work, storage and glass in ten short
+sections. Every example in it is compiled by the test suite.
 
-See [`examples/counter`](examples/counter/src/main.rs) for the complete,
-compiled version of this program.
+## A taste of the API
+
+**Lists that follow state.** `each` keeps one row per item; `list` builds
+only the rows on screen, for any number of them.
 
 ```rust
-use taim::prelude::*;
+each(todos, |todo: &Todo| text(todo.title.clone()))
 
-fn main() -> taim::Result {
-    taim::launch("Counter", |cx| {
-        let count = cx.signal(0_i64);
-
-        container(
-            column(views![
-                text(move || format!("Count: {}", count.get())).size(32.0),
-                row(views![
-                    button("Decrement").on_press(move || count.update(|n| *n -= 1)),
-                    button("Increment").on_press(move || count.update(|n| *n += 1)),
-                ])
-                .gap(8.0),
-            ])
-            .gap(16.0)
-            .align(Align::Center),
-        )
-        .center()
-        .fill()
-    })
-}
+list(move || messages.with(Vec::len), move |index| {
+    text(move || messages.with(|all| all[index].subject.clone())).into()
+})
 ```
 
----
+**Screens and back.**
 
-## Workspace Architecture
+```rust
+let nav = Navigator::new(cx, Route::Inbox);
+navigator(nav, move |_cx, route| match route {
+    Route::Inbox => button("Open").on_press(move || nav.push(Route::Message(7))).into(),
+    Route::Message(id) => text(format!("Message {id}")).into(),
+})
+```
 
-155,000+ lines of Rust across 25 crates in a modular workspace:
+**Background work that updates the UI.**
 
-| Crate | Responsibility |
+```rust
+let tasks = cx.tasks();
+button("Load").on_press(move || {
+    tasks.spawn(async move { status.set(fetch().await) });
+})
+```
+
+**Settings that survive crashes, and the platform.**
+
+```rust
+let mut settings = taim::storage::Store::open("settings")?;
+settings.set("theme", "dark")?;
+taim::platform::share_text("Made with Taim")?;
+```
+
+## Views
+
+56 views ship in `taim::prelude`:
+
+| Area | Views |
 |---|---|
-| [`taim`](core) | Main entrypoint umbrella re-exporting core modules and widgets |
-| [`core`](core) | Core types, Point, Rectangle, SIMD layout, typography, input, semantics |
-| [`widget`](widget) | Complete 79+ widget implementation suite |
-| [`wgpu`](wgpu) | Hardware GPU renderer: compute-raster, pipeline cache, atlas |
-| [`runtime`](runtime) | Task scheduling, event routing, frame lifecycle |
-| [`graphics`](graphics) | Damage tracking, primitive caches, font caching |
-| [`taim-signal`](taim-signal) | Fine-grained reactive signals and dependency tracking |
-| [`taim-raster`](taim-raster) | Vector rasterizer with division-free Bézier subdivision |
-| [`taim-design`](taim-design) | Design system: tokens, component specs, GlassCard, Gauge, Shimmer |
-| [`taim-gesture`](taim-gesture) | Multi-touch gesture competition arena, velocity estimators |
-| [`taim-motion`](taim-motion) | Physical springs, tweens, decay curves, keyframes |
-| [`taim-highlighter`](taim-highlighter) | Zero-allocation hardware syntax tokenization |
-| [`taim-accessibility`](taim-accessibility) | Screen reader tree, AT-SPI focus, live regions |
-| [`taim-profiler`](taim-profiler) | Microsecond telemetry, Chrome trace export |
-| [`tiny_skia`](tiny_skia) | Software CPU rasterizer fallback |
-| [`taim-showcase`](taim-showcase) | Comprehensive interactive widget and theme showcase |
+| Layout | `column` `row` `grid` `layers` `container` `space` `rule` `scroll` `list` `each` `when` `rebuild` |
+| Text & input | `text` `text_field` `text_editor` `search` `button` `icon_button` `checkbox` `radio` `switch` `slider` `stepper` `segmented` `chip` `dropdown` |
+| Pickers | `date_picker` `time_picker` |
+| App structure | `scaffold` `app_bar` `nav_bar` `tabs` `navigator` `drawer` `sheet` `dialog` `snackbar` `tooltip` `accordion` `carousel` |
+| Display | `icon` `image` `svg` `avatar` `badge` `progress` `skeleton` `list_tile` |
+| Motion & touch | `animated` `appear` `hero` `pinch` `pull_to_refresh` `mouse_area` |
+| Material | `glass` `glass_group` |
 
----
+On Android, native maps, video, camera previews and web views embed as
+views too. Run `cargo run -p gallery` to try them all.
 
-## Disk & Storage Governance
+## Platforms
 
-Taim enforces minimal developer disk usage through aggressive symbol pruning and profile tuning:
+| Platform | Renderer | State |
+|---|---|---|
+| macOS (arm64) | Metal | Runs; sandboxed release app verified on hardware |
+| Linux (X11, Wayland) | Vulkan, GL | Runs; tested under a virtual display |
+| Web (WebAssembly) | WebGL2 | Runs in Chromium, Firefox and WebKit in the release gate |
+| Android (arm64, x86_64) | Vulkan, GLES | Builds and links; device testing in progress |
+| iOS (arm64) | Metal | Builds and lints; device testing in progress |
+| Windows (x64, arm64) | DirectX 12, Vulkan | Builds and lints; hardware testing in progress |
 
-- **Target Size Governance**: Precompiled test and build caches are bounded under 800 MB:
-  ```bash
-  ./scripts/clean-target.sh          # Prunes stale duplicates, keeps build cache intact
-  ./scripts/clean-target.sh --ultra  # Slashes target directory down to ~280 MB
-  ```
-- **Compact Release Profile (`release-small`)**: `opt-level = "z"` with fat
-  LTO, while the rasterizers (`tiny-skia`, `taim_tiny_skia`, `zeno`, `swash`,
-  `taim_wgpu`) stay at `opt-level = 3`. Pass `--size` to the macOS or iOS
-  packager to use it.
+All 11 targets (x86_64 and arm64 where they exist) are built and linted
+with warnings denied on every release check.
 
-  | `counter`, stripped | thin LTO (old `release`) | `release` (fat LTO) | `release-small` |
-  |---|---|---|---|
-  | macOS arm64 | 6.05 MiB | 5.26 MiB | 3.58 MiB |
-  | iOS arm64 | 6.47 MiB | 5.77 MiB | 4.00 MiB |
-  | iOS arm64, gzip -9 | 2.87 MiB | 2.65 MiB | 2.07 MiB |
+## Examples
 
-  `release` keeps the old frame cost. `release-small` makes software
-  rendering about 25% slower (`taim_bench`, tiny-skia, p50 latency for
-  `text_heavy`: 3.6 → 4.1 ms; `blur_layers`: 5.1 → 6.6 ms); GPU rendering is
-  unaffected. Optimizing the rasterizers for size too made them 5x slower,
-  and `opt-level = "s"` 3x slower, so neither is used.
+| Command | What it shows |
+|---|---|
+| `cargo run -p counter` | The smallest app |
+| `cargo run -p todos` | Lists, conditional views, background work |
+| `cargo run -p gallery` | Every view, light and dark |
+| `cargo run -p mobile_shell` | Tabs, nav bar, drawer, sheet, pull-to-refresh; also runs on Android |
+| `cargo run -p liquid` | Liquid glass over a scrolling feed |
+| `cargo run -p ide` | A code editor with syntax highlighting and a terminal |
 
----
+## Documentation
 
-## Verification & Quality Assurance
+| | |
+|---|---|
+| [Getting started](docs/guide/getting-started.md) | From install to a running app |
+| [Numbers](docs/performance/numbers.md) | Every measurement, with hardware and method |
+| [Platforms](docs/platform/) | Android, iOS, macOS, web specifics |
+| [Store submission](docs/release/store-submission.md) | Packaging for five app stores |
+| [Architecture](docs/architecture/) | Signals, layout, rendering, input, text |
+| [Liquid glass](docs/design/liquid-glass.md) | How the material works |
+| [Release gates](docs/release/production-gates.md) | What every release must pass |
+| [All docs](docs/README.md) | The full index |
 
-```bash
-cargo check --offline --workspace                  # 0 warnings across all 25 crates
-cargo clippy --offline --workspace --tests         # 0 warnings with strict deny
-cargo test --offline --workspace                   # 100% tests passing
-cargo test --offline --test gpu                    # 90 hardware GPU tests passing
-cargo test --offline --test design                 # 110 design spec tests passing
-cargo test --offline --test proof_gate             # 5,000-rect raster proof gate verified
+## Architecture
+
+```text
+ your app ─ taim (launch, storage, platform)
+             │
+             ├─ taim-view ─────── views, layout, events, accessibility
+             │    └─ taim-signal   fine-grained, thread-safe state
+             ├─ taim_winit ────── windows, input, IME, Android/iOS hosts
+             ├─ taim_renderer
+             │    ├─ taim_wgpu      GPU: Metal · Vulkan · DX12 · WebGL2
+             │    └─ taim_tiny_skia CPU fallback
+             └─ taim-gesture · taim-motion · taim-accessibility · taim_atlas · taim_text_gpu
 ```
 
-`unsafe_code = "deny"` is the workspace default.
+27 crates and 246,000 lines of library Rust. `unsafe_code` is denied by
+default; it appears only in the Android and Apple hosts, GPU interop, the
+image cache's allocator and development-only hot reload.
 
----
+## Status
 
-## License
+0.15.0-rc.1 is a **release candidate**. The release gate (formatting,
+lints on every target, 2,534 tests, a new-project build, an external
+consumer build, a dependency and license audit, browser tests in three
+engines and an Android link) passes in full. Before 1.0 we are completing
+testing on physical Android phones, iPhones, Windows PCs and Wayland
+desktops, VoiceOver and Narrator support, screen-reader passes and power
+measurements. Progress is tracked
+in [production gates](docs/release/production-gates.md) and the
+[changelog](CHANGELOG.md).
 
-MIT. See [LICENSE](LICENSE) and [CREDITS.md](CREDITS.md).
+The public API may still change before 1.0; the changelog marks every
+breaking change.
 
----
+## Credits and license
 
-## Sponsor & Support
+MIT. Taim's widget and renderer engine began as a fork of
+[Iced](https://github.com/iced-rs/iced); see [CREDITS.md](CREDITS.md).
 
-If you find Taim valuable or are using it in production, consider sponsoring the project to support continuous GPU compute-raster optimizations, native platform backends, and ecosystem development:
+## Sponsor
 
-[![Sponsor Taim](https://img.shields.io/badge/Sponsor-Razorpay-0c2340?style=for-the-badge&logo=razorpay&logoColor=white)](https://rzp.io/rzp/theaimart-taimrs)
-
-👉 **Support directly via Razorpay**: [https://rzp.io/rzp/theaimart-taimrs](https://rzp.io/rzp/theaimart-taimrs)
-
+If Taim is useful to you, you can support its development:
+[rzp.io/rzp/theaimart-taimrs](https://rzp.io/rzp/theaimart-taimrs).

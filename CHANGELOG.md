@@ -100,6 +100,15 @@ break the public API.
 
 ### Fixed
 
+- The getting-started guide taught the removed `Message`/`update` API and
+  `cargo add taim`, which fails; it is rewritten for the view API and its
+  examples are now compiled as doctests. The README's performance table
+  claimed zero allocations per frame, and listed latency, startup and idle
+  figures that were never measured; it now shows only measured numbers,
+  each linked to `docs/performance/numbers.md`. The accessibility guide no
+  longer claims VoiceOver and Narrator support, which does not exist yet.
+- Settings saves now fsync the directory after the rename, so power loss
+  right after a save cannot bring back the previous file.
 - Keychain: replacing an item deleted the old secret before adding the
   new one, so a failure (no passcode, missing entitlement, unsigned Mac)
   lost the stored credential. The new item is now tried first.

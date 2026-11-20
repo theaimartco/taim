@@ -1,5 +1,11 @@
 # Vyom-Taim Widget Reference Guide
 
+> **This guide describes the pre-0.15 API** (`Element`, `Message`,
+> `Task`, `taim::widget`), which the `taim` crate no longer exports. Its
+> code does not compile against this release. For applications, use the
+> view API in [Getting started](getting-started.md). This page is kept for
+> its concepts while it is rewritten.
+
 This comprehensive reference guide covers the vast array of widgets available in Vyom-Taim, categorized by function. It provides detailed documentation, methods, types, styling, and robust, realistic code examples for each widget.
 
 ---

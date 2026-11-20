@@ -1,24 +1,36 @@
 # Taim Documentation
 
-Welcome to the official documentation for the **Taim UI Framework** — the GPU-first, zero-compromise GUI framework built in Rust.
+Documentation for **Taim**, the GPU-native, fine-grained reactive GUI framework for Rust.
 
 ## 📚 User Guide
 
-Step-by-step guides to learn Taim from scratch:
+Start here. [Getting Started](guide/getting-started.md) covers installation,
+state, layout, lists, navigation, background work, storage, liquid glass and
+running on every platform; its examples are compiled by the test suite.
 
 | Guide | Description |
 |---|---|
-| [Getting Started](guide/getting-started.md) | Installation, first app, the Elm architecture, feature flags, themes |
-| [Layout](guide/layout.md) | Length, columns, rows, containers, scrolling, responsive & adaptive layout |
-| [Widgets](guide/widgets.md) | Complete widget catalog — 50+ widgets with examples |
-| [Styling & Theming](guide/styling.md) | Built-in themes, custom themes, widget styling, the palette system |
-| [Tasks & Subscriptions](guide/tasks-and-subscriptions.md) | Async tasks, time ticks, keyboard events, window management |
+| [Getting Started](guide/getting-started.md) | From install to a running app, on the view API |
 | [Animations & Motion](guide/animations.md) | Springs, tweens, decay, page transitions, shared elements |
 | [Gestures](guide/gestures.md) | Gesture arena, tap, pan, swipe, pinch, rotate, nested scroll |
-| [Canvas Drawing](guide/canvas-drawing.md) | Custom 2D drawing, paths, fills, strokes, geometry caching |
 | [Design System](guide/design-system.md) | Color tokens, typography, spacing, radius, elevation, motion tokens |
-| [Accessibility](guide/accessibility.md) | Semantic tree, focus management, screen readers, live regions |
-| [Scaling Applications](guide/scaling.md) | Component pattern, screen composition, message mapping, multi-window |
+| [Accessibility](guide/accessibility.md) | Semantic tree, focus, screen readers per platform, live regions |
+
+Being rewritten for the view API (their code targets the pre-0.15 API):
+[Widgets](guide/widgets.md), [Layout](guide/layout.md),
+[Styling](guide/styling.md), [Tasks & Subscriptions](guide/tasks-and-subscriptions.md),
+[Canvas Drawing](guide/canvas-drawing.md), [Scaling](guide/scaling.md).
+
+## 📦 Platforms and release
+
+| Document | Description |
+|---|---|
+| [Android](platform/android.md) | Building, running and the Play Store bundle |
+| [iOS](platform/ios.md) | Simulator and device bundles, App Store packaging |
+| [macOS](platform/macos.md) | Sandboxed apps and Mac App Store packaging |
+| [Web](platform/web.md) | WebAssembly with WebGL2 |
+| [Store Submission](release/store-submission.md) | Google Play, App Store, Mac App Store, Microsoft Store, Snap Store |
+| [Production Gates](release/production-gates.md) | What every release must pass |
 
 ## 🏗️ Architecture
 
@@ -54,7 +66,8 @@ Engineering Taim for speed:
 | [GPU Pipeline](performance/gpu-pipeline.md) | Batching, pipeline cache, atlas management |
 | [Effect Budgets](performance/effect-budgets.md) | Blur, shadow, and mask cost accounting |
 | [Methodology](performance/methodology.md) | How we measure and compare performance |
-| [1.0 Report](performance/taim-1.0-report.md) | Benchmark results and analysis |
+| [Numbers](performance/numbers.md) | Every published measurement, with hardware and method |
+| [1.0 Report](performance/taim-1.0-report.md) | What is and is not yet measured for 1.0 |
 
 ## 🧪 Testing
 

@@ -146,3 +146,9 @@ pub mod android {
     pub use taim_winit::android_background_worker as background_worker;
     pub use taim_winit::winit::platform::android::activity::AndroidApp;
 }
+
+/// Compiles every Rust example in the getting-started guide, so the guide
+/// cannot drift from the API.
+#[cfg(doctest)]
+#[doc = include_str!("../docs/guide/getting-started.md")]
+pub struct GettingStarted;

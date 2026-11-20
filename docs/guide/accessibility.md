@@ -81,19 +81,23 @@ Dialog::new()
 
 ## 5. Screen Readers and Platform Adapters
 
-Vyom-Taim integrates seamlessly with underlying operating systems via **AccessKit**, a cross-platform accessibility infrastructure.
+Taim publishes the semantic tree to the platform through its own adapters
+in `taim-accessibility` and `taim_winit`.
 
 ### Adapter and Capabilities
-The `Adapter` acts as a bridge between the internal Semantic Tree and AccessKit. It queries platform `Capabilities` to determine what accessibility features are supported and active.
+The `Adapter` acts as a bridge between the internal Semantic Tree and the platform. It queries platform `Capabilities` to determine what accessibility features are supported and active.
 
 ### Session Management
 A `Session` is established when an AT is detected. This prevents the framework from spending CPU cycles on accessibility translation when no AT is running.
 
 ### Supported ATs
-Through AccessKit, Vyom-Taim natively supports:
-- **AT-SPI (Linux)**: Orca screen reader.
-- **VoiceOver (macOS/iOS)**: Native integration with Apple's accessibility APIs.
-- **UI Automation (Windows)**: Narrator, NVDA, and JAWS.
+- **TalkBack (Android)**: always on; the tree is sent to `TaimActivity`,
+  which exposes it as virtual accessibility nodes.
+- **Orca (Linux)**: through AT-SPI, with the `accessibility` feature:
+  `taim = { git = "...", features = ["accessibility"] }`.
+- **VoiceOver (macOS, iOS) and Narrator, NVDA, JAWS (Windows)**: not yet.
+  The tree is built on these platforms, but no bridge publishes it to
+  their accessibility APIs. This is required for 1.0.
 
 ## 6. Live Regions
 
