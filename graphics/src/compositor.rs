@@ -66,7 +66,8 @@ pub trait Compositor: Sized {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .load_font(font);
 
-        // TODO: Error handling
+        // `font::Error` has no variants yet; data without a usable face is
+        // logged and skipped by the font system.
         Ok(())
     }
 

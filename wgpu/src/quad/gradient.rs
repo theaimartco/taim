@@ -8,7 +8,7 @@ mod backend;
 pub use backend::{Layer, Pipeline};
 
 /// A quad filled with interpolated colors.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Pod, Zeroable)]
 #[repr(C)]
 pub struct Gradient {
     /// The background gradient data of the quad.
@@ -17,9 +17,3 @@ pub struct Gradient {
     /// The [`Quad`] data of the [`Gradient`].
     pub quad: Quad,
 }
-
-#[allow(unsafe_code)]
-unsafe impl Pod for Gradient {}
-
-#[allow(unsafe_code)]
-unsafe impl Zeroable for Gradient {}

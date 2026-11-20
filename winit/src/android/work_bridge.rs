@@ -18,6 +18,8 @@ struct Host<'env, 'local, 'class> {
 }
 impl WorkHost for Host<'_, '_, '_> {
     fn bind_socket(&mut self, fd: i32) -> bool {
+        // SAFETY: `network` is a handle the platform gave this worker and
+        // `fd` a socket the caller owns; the call only binds it.
         self.network
             .is_some_and(|network| unsafe { android_setsocknetwork(network, fd) == 0 })
     }

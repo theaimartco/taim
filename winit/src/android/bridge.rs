@@ -435,6 +435,8 @@ impl Bridge {
     }
 
     pub fn restored_state(&self) -> Option<String> {
+        // SAFETY: AndroidApp keeps these JVM and global activity references
+        // alive. Create a local JNI reference for this attached-thread frame.
         let vm = unsafe { JavaVM::from_raw(self.app.vm_as_ptr().cast()) };
         let raw = self.app.activity_as_ptr() as jni::sys::jobject;
         let result = vm.attach_current_thread(|env| -> jni::errors::Result<Option<String>> {
@@ -1214,6 +1216,8 @@ unsafe extern "C" {
 #[cfg(feature = "measurement")]
 impl FrameTrace {
     pub fn begin() -> Self {
+        // SAFETY: the label is a static NUL-terminated string; the section
+        // is closed by `drop` on the same thread.
         unsafe {
             ATrace_beginSection(c"TaimFrame".as_ptr());
         }
@@ -1223,6 +1227,7 @@ impl FrameTrace {
 #[cfg(feature = "measurement")]
 impl Drop for FrameTrace {
     fn drop(&mut self) {
+        // SAFETY: closes the section `begin` opened on this thread.
         unsafe {
             ATrace_endSection();
         }

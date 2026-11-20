@@ -128,6 +128,7 @@ impl FontSystem {
             .load_font_source(cosmic_text::fontdb::Source::Binary(Arc::new(bytes)));
 
         if loaded.is_empty() {
+            log::warn!("font data holds no usable face; ignored");
             if let Some(key) = borrowed_key {
                 let _ = self.borrowed_fonts.remove(&key);
             }
