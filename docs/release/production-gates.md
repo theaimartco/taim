@@ -104,6 +104,28 @@ the checkout:
 bash scripts/release/check.sh target/release-check-candidate
 ```
 
+On a Mac with the tools in their usual places, the full run is:
+
+```sh
+python3 -m venv ~/.taim-qa && ~/.taim-qa/bin/pip install Pillow
+cargo install --locked cargo-deny cargo-ndk
+cargo install --locked wasm-bindgen-cli --version 0.2.108  # as in Cargo.lock
+npm install -g playwright@1.56.1 && npx playwright install chromium firefox webkit
+ANDROID_NDK_HOME=~/Library/Android/sdk/ndk/<version> \
+NODE_PATH="$(npm root -g)" TAIM_QA_PYTHON=~/.taim-qa/bin/python \
+CARGO_TARGET_DIR="$PWD/target/release-$(git rev-parse --short HEAD)" \
+  bash scripts/release/check.sh target/release-check-$(git rev-parse --short HEAD)
+```
+
+Use a fresh `CARGO_TARGET_DIR` for evidence: cross-target caches in a
+long-lived `target/` have produced errors from stale `taim_core` metadata.
+With Node 26, Playwright 1.56's browser install can hang while unpacking;
+download each archive from
+`https://playwright.download.prss.microsoft.com/dbazure/download/playwright/`
+(the paths are in `playwright-core/lib/server/registry/index.js`), unpack it
+with `ditto -x -k` into `~/Library/Caches/ms-playwright/<name>-<revision>`
+and create an empty `INSTALLATION_COMPLETE` file there.
+
 For development diagnostics on the host:
 
 ```sh
