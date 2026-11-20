@@ -48,6 +48,22 @@ full analysis. Do not treat `text_heavy` reports from this device as a
 locked baseline until re-measured with a pinned governor.
 """
 
+[[device]]
+name = "apple-m1-dev"
+description = "Developer MacBook used for the 2026-11-20 full-frame run in benchmarks/runs/2026-11-20-apple-m1"
+cpu = "Apple M1 (4 performance + 4 efficiency cores)"
+gpu = "Apple M1 integrated, Metal"
+memory_gib = 8
+display = "unspecified (headless run; the harness renders offscreen)"
+os = "macOS 26.6.2"
+compositor = "none (headless)"
+refresh_rate_hz = 60
+power_mode = "on battery; Low Power Mode off when checked right after the 2026-11-20 run"
+notes = """
+A development machine, not a locked-down reference device. Other work was
+kept off the machine during the run, but nothing pinned clocks or cores.
+"""
+
 # Template for adding a real target device. Copy this block, fill in every
 # field, and remove this comment once populated.
 #

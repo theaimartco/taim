@@ -25,41 +25,60 @@ Reproduce: `bash scripts/release/check.sh target/release-check` (see
 
 ## Frame cost
 
-The framework's own CPU time per frame: event handling, state propagation,
-layout and recording draw commands. It does **not** include GPU execution,
-compositor presentation or display latency, so it is not "frame time" in
-the sense of how long until pixels change. It is the part a UI framework is
-responsible for, and what the rest of the 8.33 ms (120 Hz) or 16.67 ms
-(60 Hz) budget is left for.
+The framework's own CPU time per frame: building the view, reconciling and
+laying it out, handling events and recording draw commands
+(`build + update + draw`). It does **not** include GPU execution,
+compositor presentation or display latency, so it is not "time until pixels
+change". It is the part a UI framework is responsible for, and what the
+rest of the 8.33 ms (120 Hz) or 16.67 ms (60 Hz) budget is left for.
 
-Measured by `tools/taim_bench` on `dev-workstation-01` (Intel Core
-i7-12700H, Iris Xe via Mesa Vulkan, 16 GiB, Ubuntu 26.04, headless, 60 Hz
-pacing, powersave governor), commit `5e2d789` (2026-08-23), release build,
-5 runs × 180 frames per scene, median run. Raw data:
-[`benchmarks/baseline/*.json`](../../benchmarks/baseline/).
+Measured by `tools/taim_bench` on an Apple M1 (8 GB, macOS 26.6, Metal, on
+battery; device `apple-m1-dev` in `benchmarks/devices.toml`),
+commit `7c3b207` (2026-11-20), release build with allocation counting,
+30 s warm-up, 5 runs × 180 frames per scene, median run. Raw data:
+[`benchmarks/runs/2026-11-20-apple-m1/`](../../benchmarks/runs/2026-11-20-apple-m1/).
 
-| Scene | Workload | p50 | p95 | p99 | Dropped |
-|---|---|---:|---:|---:|---:|
-| `idle_shell` | An app shell with nothing changing | 4.01 µs | 6.51 µs | 7.22 µs | 0 |
-| `effect_ladder` | Layered visual effects | 4.46 µs | 8.75 µs | 11.42 µs | 0 |
-| `ten_thousand_rows` | 10,000 widgets in layout | 6.24 µs | 10.76 µs | 14.35 µs | 0 |
-| `multitouch` | Several pointers contending in the gesture arena | 6.63 µs | 12.02 µs | 16.81 µs | 0 |
-| `animated_cards` | Concurrent spring animations | 7.88 µs | 14.66 µs | 25.08 µs | 0 |
-| `text_heavy` | Shaped multi-font paragraphs | 8.50 µs | 14.86 µs | 24.77 µs | 0 |
-| `blur_layers` | Stacked blurs | 8.35 µs | 15.95 µs | 22.12 µs | 0 |
-| `motion_stress` | High-frequency transform animation | 4.55 µs | 23.21 µs | 36.08 µs | 0 |
-| `text_edit` | Typing: mutation, shaping, layout | 8.79 µs | 23.38 µs | 33.79 µs | 0 |
-| `damage_churn` | Rapid invalidation of subtrees | 10.49 µs | 24.02 µs | 26.47 µs | 0 |
-| `image_grid` | Image atlas packing | 10.81 µs | 29.95 µs | 36.32 µs | 0 |
-| `virtual_list_variable` | Virtualized list, variable row heights | 15.72 µs | 33.70 µs | 42.33 µs | 0 |
-| `virtual_list` | Scrolling 100,000 rows | 27.49 µs | 57.59 µs | 74.40 µs | 0 |
+| Scene | Workload | p50 | p95 | p99 | Allocs/frame | Peak RSS | Dropped |
+|---|---|---:|---:|---:|---:|---:|---:|
+| `idle_shell` | An app shell with nothing changing | 6.5 µs | **17.5 µs** | 19.7 µs | 69 | 40 MiB | 0 |
+| `text_edit` | Typing: mutation, shaping, layout | 19.6 µs | **33.8 µs** | 62.7 µs | 49 | 62 MiB | 0 |
+| `animated_cards` | Concurrent spring animations | 28.4 µs | **54.3 µs** | 58.1 µs | 123 | 39 MiB | 0 |
+| `text_heavy` | Shaped multi-font paragraphs | 16.0 µs | **55.9 µs** | 69.2 µs | 44 | 103 MiB | 0 |
+| `multitouch` | Several pointers contending in the gesture arena | 21.8 µs | **57.8 µs** | 65.2 µs | 72 | 46 MiB | 0 |
+| `effect_ladder` | Layered visual effects | 64.5 µs | **75.6 µs** | 86.8 µs | 37 | 42 MiB | 0 |
+| `ten_thousand_rows` | 10,000 widgets in layout | 35.5 µs | **88.2 µs** | 96.8 µs | 82 | 68 MiB | 0 |
+| `blur_layers` | Stacked blurs | 78.0 µs | **90.0 µs** | 92.4 µs | 96 | 39 MiB | 0 |
+| `image_grid` | Image atlas packing | 64.1 µs | **106.3 µs** | 126.1 µs | 290 | 48 MiB | 0 |
+| `signal_list_100k` | 100,000-row list, one row changing each frame through a signal | 102.8 µs | **117.1 µs** | 125.5 µs | 164 | 36 MiB | 0 |
+| `signal_list_1m` | 1,000,000-row list, one row changing each frame through a signal | 108.9 µs | **121.7 µs** | 157.1 µs | 164 | 42 MiB | 0 |
+| `virtual_list` | Scrolling 100,000 rows | 95.9 µs | **123.3 µs** | 137.3 µs | 394 | 45 MiB | 0 |
+| `damage_churn` | Rapid invalidation of subtrees | 163.6 µs | **225.7 µs** | 232.5 µs | 436 | 53 MiB | 0 |
+| `motion_stress` | High-frequency transform animation | 46.5 µs | **409.5 µs** | 422.0 µs | 298 | 42 MiB | 0 |
+| `virtual_list_variable` | 100,000 rows of variable height | 502.7 µs | **681.6 µs** | 709.5 µs | 276 | 43 MiB | 0 |
 
-The heaviest scene's p95, 57.59 µs, is 1/145 of a 120 Hz frame and 1/289
-of a 60 Hz frame.
+What this shows:
+
+- **Cost follows what changes, not how much data there is.** Growing the
+  signal list tenfold, from 100,000 to 1,000,000 rows, raises p95 by 4%
+  (117.1 → 121.7 µs).
+- **Every scene's p95 fits 12 times into a 120 Hz frame**; all but two fit
+  36 times. No frame was dropped in 13,500 measured frames.
+- **The slowest scene is a known cost.** A variable-height list rebuilds
+  its table of row offsets on every layout, which is O(rows); fixed-height
+  lists and the view API's `list` do not. Caching that table is planned.
 
 Reproduce: `scripts/perf/run-baseline.sh --device <name>` with a device
-entry in `benchmarks/devices.toml`; compare runs with
-`scripts/perf/compare-baseline.sh`.
+entry in `benchmarks/devices.toml`, or one scene:
+`cargo run --release -p taim_bench --features profiling -- --scene virtual_list --device <name>`.
+
+### Earlier baseline
+
+[`benchmarks/baseline/`](../../benchmarks/baseline/) holds a run from
+2026-08-23 (commit `5e2d789`, Intel Core i7-12700H, Ubuntu). Its frame
+cost was `update + draw` only, before the harness began timing `build`
+(view construction and layout) in commit `5aa9da3`, so its numbers are
+lower than the full-frame figures above and are not comparable with
+them. Use the table above.
 
 ## Memory
 
@@ -67,13 +86,9 @@ From the same runs:
 
 | | |
 |---|---|
-| Live heap at the end of a run | ~24 KiB in every scene, identical in all 5 runs |
-| Peak resident memory | 136–197 MiB (`text_heavy` is the 197) |
-| Allocations per frame | 200 (`blur_layers`) to 9,800 (`text_edit`); not zero, and a target for 1.0 |
-
-The live heap staying constant across runs means no growth under load.
-Allocations per frame are reported because they are measured; reducing
-them in the text and list paths is planned work.
+| Peak resident memory | 36–103 MiB per scene (`text_heavy` is the 103) |
+| Live heap at the end of a run | 6–114 KiB, within 1 KiB across runs 2 to 5 of every scene: no growth under sustained load |
+| Allocations per frame | 37 (`effect_ladder`) to 436 (`damage_churn`) |
 
 ## Binary size
 

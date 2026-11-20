@@ -1,0 +1,449 @@
+{
+  "schema_version": 2,
+  "scene": "damage_churn",
+  "refresh_rate": "hz60",
+  "cache_state": "warm",
+  "seed": 42,
+  "viewport": [
+    1280.0,
+    800.0
+  ],
+  "scale_factor": 1.0,
+  "environment": {
+    "git_commit": "7c3b207ccad32785cc14372eb5fe2136cfc02a4e",
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "renderer_backend": "wgpu",
+    "build_profile": "release",
+    "device": "apple-m1-dev",
+    "os": "macos",
+    "allocation_counting_active": true
+  },
+  "runs": [
+    {
+      "frame_time": {
+        "sample_count": 180,
+        "p50": {
+          "secs": 0,
+          "nanos": 224459
+        },
+        "p95": {
+          "secs": 0,
+          "nanos": 383041
+        },
+        "p99": {
+          "secs": 0,
+          "nanos": 426418
+        },
+        "missed_frame_rate": 0.0,
+        "build_p95": {
+          "secs": 0,
+          "nanos": 312541
+        },
+        "update_p95": {
+          "secs": 0,
+          "nanos": 5625
+        },
+        "draw_p95": {
+          "secs": 0,
+          "nanos": 71375
+        },
+        "present_p95": {
+          "secs": 0,
+          "nanos": 8894917
+        }
+      },
+      "latency": {
+        "sample_count": 180,
+        "p50": {
+          "secs": 0,
+          "nanos": 5919292
+        },
+        "p95": {
+          "secs": 0,
+          "nanos": 9210917
+        }
+      },
+      "pacing": {
+        "sample_count": 180,
+        "dropped_count": 0,
+        "missed_count": 0,
+        "missed_rate": 0.0,
+        "mean_target_error": {
+          "secs": 0,
+          "nanos": 0
+        },
+        "jitter": {
+          "secs": 0,
+          "nanos": 0
+        },
+        "jitter_ratio": 0.0,
+        "max_queue_depth": 0,
+        "mean_queue_depth": 0.0
+      },
+      "allocations": {
+        "allocations": 80955,
+        "deallocations": 80367,
+        "bytes_allocated": 396507729,
+        "live_bytes": 8906
+      },
+      "memory": {
+        "rss_bytes": 54837248
+      }
+    },
+    {
+      "frame_time": {
+        "sample_count": 180,
+        "p50": {
+          "secs": 0,
+          "nanos": 122874
+        },
+        "p95": {
+          "secs": 0,
+          "nanos": 217334
+        },
+        "p99": {
+          "secs": 0,
+          "nanos": 227624
+        },
+        "missed_frame_rate": 0.0,
+        "build_p95": {
+          "secs": 0,
+          "nanos": 142875
+        },
+        "update_p95": {
+          "secs": 0,
+          "nanos": 4708
+        },
+        "draw_p95": {
+          "secs": 0,
+          "nanos": 68209
+        },
+        "present_p95": {
+          "secs": 0,
+          "nanos": 7629458
+        }
+      },
+      "latency": {
+        "sample_count": 180,
+        "p50": {
+          "secs": 0,
+          "nanos": 3721291
+        },
+        "p95": {
+          "secs": 0,
+          "nanos": 7727375
+        }
+      },
+      "pacing": {
+        "sample_count": 180,
+        "dropped_count": 0,
+        "missed_count": 0,
+        "missed_rate": 0.0,
+        "mean_target_error": {
+          "secs": 0,
+          "nanos": 0
+        },
+        "jitter": {
+          "secs": 0,
+          "nanos": 0
+        },
+        "jitter_ratio": 0.0,
+        "max_queue_depth": 0,
+        "mean_queue_depth": 0.0
+      },
+      "allocations": {
+        "allocations": 78542,
+        "deallocations": 77954,
+        "bytes_allocated": 396133968,
+        "live_bytes": 50308
+      },
+      "memory": {
+        "rss_bytes": 54853632
+      }
+    },
+    {
+      "frame_time": {
+        "sample_count": 180,
+        "p50": {
+          "secs": 0,
+          "nanos": 163585
+        },
+        "p95": {
+          "secs": 0,
+          "nanos": 225667
+        },
+        "p99": {
+          "secs": 0,
+          "nanos": 232501
+        },
+        "missed_frame_rate": 0.0,
+        "build_p95": {
+          "secs": 0,
+          "nanos": 156166
+        },
+        "update_p95": {
+          "secs": 0,
+          "nanos": 4792
+        },
+        "draw_p95": {
+          "secs": 0,
+          "nanos": 69084
+        },
+        "present_p95": {
+          "secs": 0,
+          "nanos": 8269834
+        }
+      },
+      "latency": {
+        "sample_count": 180,
+        "p50": {
+          "secs": 0,
+          "nanos": 5326250
+        },
+        "p95": {
+          "secs": 0,
+          "nanos": 8445458
+        }
+      },
+      "pacing": {
+        "sample_count": 180,
+        "dropped_count": 0,
+        "missed_count": 0,
+        "missed_rate": 0.0,
+        "mean_target_error": {
+          "secs": 0,
+          "nanos": 0
+        },
+        "jitter": {
+          "secs": 0,
+          "nanos": 0
+        },
+        "jitter_ratio": 0.0,
+        "max_queue_depth": 0,
+        "mean_queue_depth": 0.0
+      },
+      "allocations": {
+        "allocations": 78543,
+        "deallocations": 77955,
+        "bytes_allocated": 396136032,
+        "live_bytes": 51336
+      },
+      "memory": {
+        "rss_bytes": 55869440
+      }
+    },
+    {
+      "frame_time": {
+        "sample_count": 180,
+        "p50": {
+          "secs": 0,
+          "nanos": 176458
+        },
+        "p95": {
+          "secs": 0,
+          "nanos": 220625
+        },
+        "p99": {
+          "secs": 0,
+          "nanos": 260334
+        },
+        "missed_frame_rate": 0.0,
+        "build_p95": {
+          "secs": 0,
+          "nanos": 148375
+        },
+        "update_p95": {
+          "secs": 0,
+          "nanos": 7000
+        },
+        "draw_p95": {
+          "secs": 0,
+          "nanos": 68458
+        },
+        "present_p95": {
+          "secs": 0,
+          "nanos": 8437292
+        }
+      },
+      "latency": {
+        "sample_count": 180,
+        "p50": {
+          "secs": 0,
+          "nanos": 5561042
+        },
+        "p95": {
+          "secs": 0,
+          "nanos": 8643833
+        }
+      },
+      "pacing": {
+        "sample_count": 180,
+        "dropped_count": 0,
+        "missed_count": 0,
+        "missed_rate": 0.0,
+        "mean_target_error": {
+          "secs": 0,
+          "nanos": 0
+        },
+        "jitter": {
+          "secs": 0,
+          "nanos": 0
+        },
+        "jitter_ratio": 0.0,
+        "max_queue_depth": 0,
+        "mean_queue_depth": 0.0
+      },
+      "allocations": {
+        "allocations": 78542,
+        "deallocations": 77954,
+        "bytes_allocated": 396133968,
+        "live_bytes": 50308
+      },
+      "memory": {
+        "rss_bytes": 55885824
+      }
+    },
+    {
+      "frame_time": {
+        "sample_count": 180,
+        "p50": {
+          "secs": 0,
+          "nanos": 205334
+        },
+        "p95": {
+          "secs": 0,
+          "nanos": 234374
+        },
+        "p99": {
+          "secs": 0,
+          "nanos": 254498
+        },
+        "missed_frame_rate": 0.0,
+        "build_p95": {
+          "secs": 0,
+          "nanos": 151417
+        },
+        "update_p95": {
+          "secs": 0,
+          "nanos": 8458
+        },
+        "draw_p95": {
+          "secs": 0,
+          "nanos": 77000
+        },
+        "present_p95": {
+          "secs": 0,
+          "nanos": 8825000
+        }
+      },
+      "latency": {
+        "sample_count": 180,
+        "p50": {
+          "secs": 0,
+          "nanos": 5954833
+        },
+        "p95": {
+          "secs": 0,
+          "nanos": 9037208
+        }
+      },
+      "pacing": {
+        "sample_count": 180,
+        "dropped_count": 0,
+        "missed_count": 0,
+        "missed_rate": 0.0,
+        "mean_target_error": {
+          "secs": 0,
+          "nanos": 0
+        },
+        "jitter": {
+          "secs": 0,
+          "nanos": 0
+        },
+        "jitter_ratio": 0.0,
+        "max_queue_depth": 0,
+        "mean_queue_depth": 0.0
+      },
+      "allocations": {
+        "allocations": 78542,
+        "deallocations": 77954,
+        "bytes_allocated": 396133968,
+        "live_bytes": 50308
+      },
+      "memory": {
+        "rss_bytes": 55918592
+      }
+    }
+  ],
+  "median": {
+    "frame_time": {
+      "sample_count": 180,
+      "p50": {
+        "secs": 0,
+        "nanos": 163585
+      },
+      "p95": {
+        "secs": 0,
+        "nanos": 225667
+      },
+      "p99": {
+        "secs": 0,
+        "nanos": 232501
+      },
+      "missed_frame_rate": 0.0,
+      "build_p95": {
+        "secs": 0,
+        "nanos": 156166
+      },
+      "update_p95": {
+        "secs": 0,
+        "nanos": 4792
+      },
+      "draw_p95": {
+        "secs": 0,
+        "nanos": 69084
+      },
+      "present_p95": {
+        "secs": 0,
+        "nanos": 8269834
+      }
+    },
+    "latency": {
+      "sample_count": 180,
+      "p50": {
+        "secs": 0,
+        "nanos": 5326250
+      },
+      "p95": {
+        "secs": 0,
+        "nanos": 8445458
+      }
+    },
+    "pacing": {
+      "sample_count": 180,
+      "dropped_count": 0,
+      "missed_count": 0,
+      "missed_rate": 0.0,
+      "mean_target_error": {
+        "secs": 0,
+        "nanos": 0
+      },
+      "jitter": {
+        "secs": 0,
+        "nanos": 0
+      },
+      "jitter_ratio": 0.0,
+      "max_queue_depth": 0,
+      "mean_queue_depth": 0.0
+    },
+    "allocations": {
+      "allocations": 78543,
+      "deallocations": 77955,
+      "bytes_allocated": 396136032,
+      "live_bytes": 51336
+    },
+    "memory": {
+      "rss_bytes": 55869440
+    }
+  }
+}

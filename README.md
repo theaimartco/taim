@@ -44,16 +44,18 @@ laid out and painted again.
 
 ## By the numbers
 
-Every figure links to how it was measured. See
+Every figure links to how it was measured; frame costs are from an Apple M1
+on current code. See
 [docs/performance/numbers.md](docs/performance/numbers.md) for the raw data,
 the hardware and what each number does and does not include.
 
 | | |
 |---|---|
-| **57.6 µs** | p95 framework cost per frame scrolling a **100,000-row** list, ~1/145 of a 120 Hz frame budget ([data](docs/performance/numbers.md#frame-cost)) |
-| **6.5 µs** | p95 framework cost of an idle frame ([data](docs/performance/numbers.md#frame-cost)) |
-| **0** | dropped frames across 13 stress scenes × 5 runs × 180 frames ([data](docs/performance/numbers.md#frame-cost)) |
-| **~24 KiB** | live heap left at the end of every scene, the same in all 5 runs: no leaks under load ([data](docs/performance/numbers.md#memory)) |
+| **4%** | more frame cost for **10× the data**: a list of 1,000,000 rows costs 121.7 µs p95, against 117.1 µs for 100,000 ([data](docs/performance/numbers.md#frame-cost)) |
+| **17.5 µs** | p95 framework cost of an idle frame, view construction and layout included ([data](docs/performance/numbers.md#frame-cost)) |
+| **12×** | headroom: every one of 15 stress scenes fits its p95 frame 12 times into a 120 Hz frame, 13 of them 36 times ([data](docs/performance/numbers.md#frame-cost)) |
+| **0** | dropped frames in 13,500 measured frames ([data](docs/performance/numbers.md#frame-cost)) |
+| **36–103 MiB** | peak memory per stress scene, with no heap growth across runs ([data](docs/performance/numbers.md#memory)) |
 | **3.58 MiB** | stripped release binary of a complete app on macOS; 4.00 MiB on iOS, 2.07 MiB gzipped ([data](docs/performance/numbers.md#binary-size)) |
 | **21 ns** | to broadcast an event with no listeners; 108 ns to one, with zero allocations ([data](docs/performance/numbers.md#runtime-microbenchmarks)) |
 | **2,534** | tests passing in the release gate, plus 3 browsers and 11 build targets linted with warnings denied ([data](docs/performance/numbers.md#quality)) |
