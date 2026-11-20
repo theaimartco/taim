@@ -12,6 +12,10 @@ One codebase for macOS, Windows, Linux, Android, iOS and the web.
 [![Tests](https://img.shields.io/badge/tests-2%2C534%20passing-brightgreen.svg)](docs/performance/numbers.md#quality)
 [![Platforms](https://img.shields.io/badge/platforms-6-8a2be2.svg)](#platforms)
 [![Release](https://img.shields.io/badge/release-0.15.0--rc.1-yellow.svg)](CHANGELOG.md)
+[![Sponsor](https://img.shields.io/badge/%E2%9D%A4_sponsor-Taim-ea4aaa.svg)](https://rzp.io/rzp/theaimart-taimrs)
+
+<sub>Taim is independent and funded by its users.
+**[Sponsor its development →](#sponsor-taim)**</sub>
 
 </div>
 
@@ -245,12 +249,31 @@ in [production gates](docs/release/production-gates.md) and the
 The public API may still change before 1.0; the changelog marks every
 breaking change.
 
+## Sponsor Taim
+
+Taim is independent, and sponsorship decides how fast it reaches 1.0. Support pays for the work listed under [Status](#status):
+
+- **Real devices** for the test lab: Android phones across manufacturers,
+  iPhones and iPads, Windows PCs and Wayland laptops, so every release is
+  run on hardware, not only emulators.
+- **Accessibility**: VoiceOver and Narrator bridges, and screen-reader
+  passes on every platform.
+- **Performance work** measured on named hardware and published with raw
+  data, like everything in [the numbers](docs/performance/numbers.md).
+- **Maintenance**: reviews, releases and answers to issues.
+
+<p align="center">
+  <a href="https://rzp.io/rzp/theaimart-taimrs">
+    <img src="https://img.shields.io/badge/%E2%9D%A4_Sponsor_Taim-Razorpay-0c2340?style=for-the-badge&logo=razorpay&logoColor=white" alt="Sponsor Taim on Razorpay">
+  </a>
+</p>
+
+Companies using Taim in a product can sponsor to have their name or logo
+listed here: sponsor, then
+[open an issue](https://github.com/theaimartco/taim/issues/new?title=Sponsor%20listing)
+with the name, logo and link you want shown.
+
 ## Credits and license
 
 MIT. Taim's widget and renderer engine began as a fork of
 [Iced](https://github.com/iced-rs/iced); see [CREDITS.md](CREDITS.md).
-
-## Sponsor
-
-If Taim is useful to you, you can support its development:
-[rzp.io/rzp/theaimart-taimrs](https://rzp.io/rzp/theaimart-taimrs).

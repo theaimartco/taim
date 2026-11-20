@@ -108,3 +108,8 @@ the verified rendering path and the remaining device/accessibility limitations.
 | Document | Description |
 |---|---|
 | [Contract](accessibility/contract.md) | Accessibility requirements and compliance |
+
+---
+
+Taim is independent and funded by its users.
+[Sponsor its development](https://rzp.io/rzp/theaimart-taimrs).
