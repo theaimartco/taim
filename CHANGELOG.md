@@ -93,6 +93,24 @@ break the public API.
 
 ### Fixed
 
+- Keychain: replacing an item deleted the old secret before adding the
+  new one, so a failure (no passcode, missing entitlement, unsigned Mac)
+  lost the stored credential. The new item is now tried first.
+- macOS: bundled apps moved their data directory from the executable's
+  name to the bundle ID without moving the data, so an update looked like
+  a reset. The old directory is moved across once.
+- Android: a keyboard snapshot that Rust rejected (too long, or a secure
+  field) left Java one revision ahead, after which every programmatic
+  change to that field was ignored.
+- `appear()` content not yet drawn (rows below the fold) kept the window
+  redrawing every frame while idle.
+- An edge swipe that the system cancelled (a call, the notification
+  shade) popped the page if it was past 40%; it now springs back.
+- Heroes built by `each`, `list`, `when` or `rebuild` never flew between
+  pages.
+- Glass kept its hover light after the pointer left the window.
+- Settled springs stopped a hair short of their target, so animated views
+  kept an extra layer every frame.
 - Web: the counter crashed in every browser. The liquid glass pass needs
   more vertex attributes than WebGL2 has, its shader failed, and the
   software fallback panicked on the canvas. Where the pass does not fit,
