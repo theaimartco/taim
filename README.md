@@ -9,7 +9,7 @@ One codebase for macOS, Windows, Linux, Android, iOS and the web.
 
 [![Rust 1.95+](https://img.shields.io/badge/rust-1.95%2B%20·%202024%20edition-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-2%2C534%20passing-brightgreen.svg)](docs/performance/numbers.md#quality)
+[![Tests](https://img.shields.io/badge/tests-2%2C542%20passing-brightgreen.svg)](docs/performance/numbers.md#quality)
 [![Platforms](https://img.shields.io/badge/platforms-6-8a2be2.svg)](#platforms)
 [![Release](https://img.shields.io/badge/release-0.15.0--rc.1-yellow.svg)](CHANGELOG.md)
 [![Sponsor](https://img.shields.io/badge/%E2%9D%A4_sponsor-Taim-ea4aaa.svg)](https://rzp.io/rzp/theaimart-taimrs)
@@ -62,7 +62,7 @@ the hardware and what each number does and does not include.
 | **36–103 MiB** | peak memory per stress scene, with no heap growth across runs ([data](docs/performance/numbers.md#memory)) |
 | **3.58 MiB** | stripped release binary of a complete app on macOS; 4.00 MiB on iOS, 2.07 MiB gzipped ([data](docs/performance/numbers.md#binary-size)) |
 | **21 ns** | to broadcast an event with no listeners; 108 ns to one, with zero allocations ([data](docs/performance/numbers.md#runtime-microbenchmarks)) |
-| **2,534** | tests passing in the release gate, plus 3 browsers and 11 build targets linted with warnings denied ([data](docs/performance/numbers.md#quality)) |
+| **2,542** | tests passing in the release gate, plus 3 browsers and 11 build targets linted with warnings denied ([data](docs/performance/numbers.md#quality)) |
 | **14 / 14** | release-gate steps passing, none skipped ([gate](docs/release/production-gates.md)) |
 
 ## Why Taim
@@ -237,7 +237,7 @@ image cache's allocator and development-only hot reload.
 ## Status
 
 0.15.0-rc.1 is a **release candidate**. The release gate (formatting,
-lints on every target, 2,534 tests, a new-project build, an external
+lints on every target, 2,542 tests, a new-project build, an external
 consumer build, a dependency and license audit, browser tests in three
 engines and an Android link) passes in full. Before 1.0 we are completing
 testing on physical Android phones, iPhones, Windows PCs and Wayland

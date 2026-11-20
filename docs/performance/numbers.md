@@ -6,14 +6,14 @@ number has not been measured, this page says so instead of estimating it.
 
 ## Quality
 
-From the release check of commit `936de6c` (2026-11-20, Apple M1, macOS,
+From the release check of commit `bd292bb` (2026-11-20, Apple M1, macOS,
 Rust 1.95.0), `scripts/release/check.sh`, report in
 `target/release-check-<commit>/report.md`:
 
 | | |
 |---|---|
 | Release-gate steps | 14 of 14 passed, none skipped |
-| Tests | 2,534 passed, 0 failed, 11 ignored, in 101 test suites |
+| Tests | 2,542 passed, 0 failed, 11 ignored, in 101 test suites |
 | Targets built and linted, warnings denied | 11: macOS (arm64, x86_64), Linux (x86_64, arm64), Windows (x64, arm64), Android (arm64, x86_64), iOS (device, simulator), WebAssembly |
 | Browsers | Chromium, Firefox and WebKit draw the app, respond to clicks and log no errors |
 | New project | `taim-new` output builds and passes its own tests |
