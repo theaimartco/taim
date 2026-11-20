@@ -284,7 +284,7 @@ opt-level = 3
 [workspace]
 # `examples/ide` still targets the removed Elm-style `application` API and
 # has not been ported to the view API; it is kept out of the workspace
-# build until it is. See `docs/status.md`.
+# build until it is. See `docs/release/production-gates.md`.
 exclude = ["vendor/wgpu-hal", "examples/ide"]
 members = [
     "taim-accessibility",

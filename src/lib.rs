@@ -29,7 +29,7 @@
 //! [`prelude`] imports what an application needs. The runtime owns frame
 //! scheduling, accessibility and renderer recovery.
 //!
-//! TAIM is under active development. Consult `docs/status.md` before
+//! TAIM is under active development. Consult `docs/release/production-gates.md` before
 //! depending on a platform or performance property.
 #![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo-256.png")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
