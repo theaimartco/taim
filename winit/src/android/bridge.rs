@@ -785,6 +785,17 @@ extern "system" fn Java_com_theaimartco_taim_TaimActivity_nativeEdit(
             .i()? as usize
             > MAX_TEXT_UTF16
         {
+            // Rejected, but consumed: Java counts every snapshot, and an
+            // unacknowledged revision would make it refuse every later
+            // update for this editor. Acknowledging also resends the view's
+            // text, replacing what was rejected.
+            bridge
+                .control
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .composing = false;
+            bridge.acknowledge_edit(owner as u64, revision as u64);
+            bridge.wake();
             return Ok(());
         }
         let content = text.try_to_string(env)?;
@@ -798,7 +809,14 @@ extern "system" fn Java_com_theaimartco_taim_TaimActivity_nativeEdit(
             .control
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if bridge.owner() != owner as u64 || control.secure {
+        if bridge.owner() != owner as u64 {
+            return Ok(());
+        }
+        if control.secure {
+            control.composing = false;
+            drop(control);
+            bridge.acknowledge_edit(owner as u64, revision as u64);
+            bridge.wake();
             return Ok(());
         }
         control.composing = composing.is_some();
