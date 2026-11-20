@@ -276,4 +276,4 @@ These are not done yet, roughly in order of how much they matter:
    network image view; use a Rust HTTP crate in `spawn` and show the result
    with `image`.
 7. **Tooling.** There is no hot reload and no device-preview tooling.
-8. **iOS.** Not started.
+8. **iOS.** Core services exist (see `docs/platform/ios.md`); not yet run on physical devices.

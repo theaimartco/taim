@@ -1,0 +1,10 @@
+[package]
+name = "macos_store_probe"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+taim = { workspace = true, features = ["wgpu", "tiny-skia", "measurement", "x11", "wayland"] }
+serde_json = "1.0"

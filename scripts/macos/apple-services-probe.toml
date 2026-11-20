@@ -1,0 +1,21 @@
+[app]
+name = "Taim Apple Services Probe"
+bundle_id = "com.theaimartco.taim.probe"
+version = "0.1.0"
+build = "1"
+minimum_system_version = "13.0"
+category = "public.app-category.developer-tools"
+copyright = "Copyright © 2026 VYOM Taim contributors"
+icon = "AppIcon.png"
+privacy_manifest = "PrivacyInfo.xcprivacy"
+
+# Local smoke of taim::apple: location, camera permission and the open panel.
+[entitlements]
+"com.apple.security.personal-information.location" = true
+"com.apple.security.device.camera" = true
+"com.apple.security.files.user-selected.read-only" = true
+
+[usage_descriptions]
+NSLocationUsageDescription = "The probe reads your location once to check the TAIM location service."
+NSLocationWhenInUseUsageDescription = "The probe reads your location once to check the TAIM location service."
+NSCameraUsageDescription = "The probe asks for camera access to check the TAIM permission service."

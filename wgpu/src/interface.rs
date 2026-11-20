@@ -21,6 +21,10 @@ impl core::Renderer for Renderer {
         self.layers.push_opacity(opacity);
     }
 
+    fn start_opacity_reset(&mut self, opacity: f32) {
+        self.layers.push_opacity_reset(opacity);
+    }
+
     fn end_opacity(&mut self) {
         self.layers.pop_opacity();
     }

@@ -76,7 +76,7 @@ fn run_event_loop(
     event_loop: EventLoop<Wake>,
     #[cfg(target_os = "android")] activity: winit::platform::android::activity::AndroidApp,
 ) -> Result<(), Error> {
-    let mut shell = Shell {
+    let shell = Shell {
         #[cfg(target_os = "android")]
         android: crate::android::Bridge::new(activity, event_loop.create_proxy()),
         settings: app.settings.clone(),
@@ -95,7 +95,7 @@ fn run_event_loop(
         #[cfg(target_arch = "wasm32")]
         opening: None,
         #[cfg(target_arch = "wasm32")]
-        compositor_slot: Default::default(),
+        compositor_slot: std::rc::Rc::default(),
     };
 
     // A browser owns its event loop: the application is handed over and
@@ -109,6 +109,14 @@ fn run_event_loop(
 
     #[cfg(not(target_arch = "wasm32"))]
     {
+        // Before UIApplicationMain starts, so the notification that launched
+        // the app reaches the delegate (Apple requires it before launching
+        // finishes; winit's `resumed` can come later).
+        #[cfg(any(target_os = "ios", target_os = "macos"))]
+        if let Some(mtm) = objc2_foundation::MainThreadMarker::new() {
+            crate::apple::notifications::install(mtm);
+        }
+        let mut shell = shell;
         event_loop.run_app(&mut shell).map_err(Error::EventLoop)?;
         shell.failure.map_or(Ok(()), Err)
     }
@@ -178,13 +186,14 @@ impl Shell {
                 surface.set_system_motion_reduced(reduced);
             }
         }
-        for (owner, edit) in pending.edits {
+        for (owner, revision, edit) in pending.edits {
             if owner == self.android.owner() {
                 for surface in &mut self.windows {
                     let _ = surface.handle(&core::Event::InputMethod(
                         core::input_method::Event::Edit(edit.clone()),
                     ));
                 }
+                self.android.acknowledge_edit(owner, revision);
             }
         }
         for (owner, event) in pending.operations {
@@ -436,6 +445,57 @@ impl Shell {
         }
     }
 
+    /// winit reports neither appearance nor Reduce Motion changes on iOS, so
+    /// the shell reads them when the window opens, resizes or comes forward
+    /// (toggling Dark Mode in Control Center or Settings does both).
+    /// winit follows the Mac's appearance itself; Reduce Motion it does not.
+    #[cfg(target_os = "macos")]
+    fn sync_mac_motion(&mut self) {
+        let reduced = crate::apple::window::reduce_motion();
+        for surface in &mut self.windows {
+            surface.set_system_motion_reduced(reduced);
+        }
+    }
+
+    #[cfg(target_os = "ios")]
+    fn sync_ios_appearance(&mut self) {
+        let Some(raw) = self.windows.first().map(|surface| surface.raw.clone()) else {
+            return;
+        };
+        if let Some(mode) = crate::apple::window::appearance(&raw) {
+            self.set_system_theme(mode);
+        }
+        let reduced = crate::apple::window::reduce_motion();
+        for surface in &mut self.windows {
+            surface.set_system_motion_reduced(reduced);
+        }
+    }
+
+    /// Leans the light on glass with the device's tilt while glass is on
+    /// screen; stops the sensors otherwise. Returns whether to keep polling.
+    #[cfg(target_os = "ios")]
+    fn follow_tilt(&mut self) -> bool {
+        use crate::apple::motion;
+
+        if !self.windows.iter().any(Surface::wants_tilt) {
+            if motion::is_running() {
+                motion::stop();
+                for surface in &mut self.windows {
+                    surface.lean_light([0.0, 0.0]);
+                }
+            }
+            return false;
+        }
+
+        motion::start();
+        if let Some(lean) = motion::lean() {
+            for surface in &mut self.windows {
+                surface.lean_light(lean);
+            }
+        }
+        motion::is_running()
+    }
+
     fn set_system_theme(&mut self, mode: theme::Mode) {
         if mode == self.system {
             return;
@@ -483,6 +543,11 @@ impl winit::application::ApplicationHandler<Wake> for Shell {
             self.failure = Some(error);
             event_loop.exit();
         }
+
+        #[cfg(target_os = "ios")]
+        self.sync_ios_appearance();
+        #[cfg(target_os = "macos")]
+        self.sync_mac_motion();
     }
 
     #[cfg(target_os = "android")]
@@ -511,6 +576,15 @@ impl winit::application::ApplicationHandler<Wake> for Shell {
 
         if let WindowEvent::ThemeChanged(theme) = &event {
             self.set_system_theme(conversion::theme_mode(*theme));
+        }
+
+        #[cfg(target_os = "ios")]
+        if matches!(event, WindowEvent::Focused(true) | WindowEvent::Resized(_)) {
+            self.sync_ios_appearance();
+        }
+        #[cfg(target_os = "macos")]
+        if matches!(event, WindowEvent::Focused(true)) {
+            self.sync_mac_motion();
         }
 
         #[cfg(target_os = "android")]
@@ -653,10 +727,18 @@ impl winit::application::ApplicationHandler<Wake> for Shell {
             surface.tick(now);
         }
 
+        #[cfg(target_os = "ios")]
+        let tilt = self
+            .follow_tilt()
+            .then(|| now + std::time::Duration::from_millis(33));
+        #[cfg(not(target_os = "ios"))]
+        let tilt: Option<Instant> = None;
+
         let flow = self
             .windows
             .iter()
             .filter_map(Surface::deadline)
+            .chain(tilt)
             .min()
             .map_or(ControlFlow::Wait, ControlFlow::WaitUntil);
         event_loop.set_control_flow(flow);

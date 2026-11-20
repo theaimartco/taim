@@ -242,7 +242,7 @@ There are three documents in this repository that overlap with this one:
 
 | File | What it is | Status |
 |---|---|---|
-| `audit.md` | Competitive audit written at `b753d3e0` | Partly stale — P0-6, P0-10 have since been closed |
+| `audit.md` (removed; in git history) | Competitive audit written at `b753d3e0` | Superseded — P0-6, P0-10 have since been closed |
 | `phase.md` | 18-phase execution roadmap | Still the authoritative build order |
 | `docs/audit/ui-component-speed-audit.md` | UI/component/speed audit at `bf065be7` | Current, narrower scope |
 

@@ -10,6 +10,8 @@
 //! The project it writes builds with `cargo run`, and its `android/`
 //! folder is a Gradle project that builds the Rust library with
 //! `cargo-ndk` and packages it as an APK or Play Store bundle.
+//! The `macos/` folder builds sandboxed .app bundles and, with the owner's
+//! Apple distribution credentials, signed Mac App Store installer packages.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -25,6 +27,7 @@ const TEMPLATE: &[(&str, &str)] = &[
     ),
     ("src/lib.rs", include_str!("../template/src/lib.rs")),
     ("src/main.rs", include_str!("../template/src/main.rs")),
+    ("macos/app.toml", include_str!("../template/macos/app.toml")),
     (
         "android/settings.gradle.kts",
         include_str!("../template/android/settings.gradle.kts"),
@@ -47,9 +50,24 @@ const TEMPLATE: &[(&str, &str)] = &[
     ),
 ];
 
-/// Template files copied byte for byte: the Gradle wrapper, so a project
-/// builds without Gradle installed. `true` marks an executable.
+/// Template files copied byte for byte: native hosts, packaging tools, assets
+/// and the Gradle wrapper. `true` marks an executable.
 const BINARY: &[(&str, &[u8], bool)] = &[
+    (
+        "macos/package.py",
+        include_bytes!("../../../scripts/macos/package.py"),
+        true,
+    ),
+    (
+        "macos/AppIcon.png",
+        include_bytes!("../../../scripts/macos/AppIcon.png"),
+        false,
+    ),
+    (
+        "macos/PrivacyInfo.xcprivacy",
+        include_bytes!("../../../scripts/macos/PrivacyInfo.xcprivacy"),
+        false,
+    ),
     // TAIM's Android host (`TaimActivity`): native text input, insets,
     // TalkBack, back navigation and platform services. Copied verbatim.
     (
@@ -282,9 +300,9 @@ impl Project {
         }
         if name
             .chars()
-            .any(|c| c.is_control() || matches!(c, '"' | '<' | '>' | '&' | '\\'))
+            .any(|c| c.is_control() || matches!(c, '"' | '<' | '>' | '&' | '\\' | '/' | ':'))
         {
-            return Err("the display name cannot contain quotes, <, >, & or \\".to_owned());
+            return Err("the display name cannot contain quotes, <, >, &, \\, / or :".to_owned());
         }
 
         Ok(Self {
@@ -313,6 +331,7 @@ impl Project {
             .replace("{{lib}}", &self.krate)
             .replace("{{name}}", &self.name)
             .replace("{{package}}", &self.package)
+            .replace("{{macos_bundle_id}}", &self.package.replace('_', "-"))
             .replace("{{taim_source}}", &self.taim_source)
             .replace(
                 "{{gradle_name}}",
@@ -441,7 +460,7 @@ fn main() -> ExitCode {
     }
 
     println!(
-        "Created {} ({}, Android package {}).\n\n  cd {}\n  cargo run                       # on the desktop\n  cd android && gradle installDebug   # on a phone; see README.md",
+        "Created {} ({}, app ID {}).\n\n  cd {}\n  cargo run                       # on the desktop\n  python3 macos/package.py --help  # native macOS packaging; see README.md\n  cd android && ./gradlew installDebug  # optional Android build; see README.md",
         project.name,
         project.krate,
         project.package,
@@ -508,6 +527,16 @@ mod tests {
         assert!(manifest.contains(r#"android:value="notes""#));
         let gradle = file("android/app/build.gradle.kts");
         assert!(gradle.contains(r#"applicationId = "dev.taim.notes""#));
+        let macos = file("macos/app.toml");
+        assert!(macos.contains(r#"bundle_id = "dev.taim.notes""#));
+        let underscored = Project::from_args(&args(&["notes", "--package", "dev.taim.my_notes"]))
+            .expect("valid Android package");
+        assert_eq!(underscored.fill("{{macos_bundle_id}}"), "dev.taim.my-notes");
+        let toolchain = file("rust-toolchain.toml");
+        assert!(
+            !toolchain.contains("targets ="),
+            "platform targets are opt-in"
+        );
     }
 
     #[test]
@@ -519,6 +548,9 @@ mod tests {
 
         project.create().expect("creates");
         assert!(directory.join("src/lib.rs").is_file());
+        assert!(directory.join("macos/package.py").is_file());
+        assert!(directory.join("macos/AppIcon.png").is_file());
+        assert!(directory.join("macos/PrivacyInfo.xcprivacy").is_file());
         assert!(
             directory
                 .join("android/app/src/main/AndroidManifest.xml")

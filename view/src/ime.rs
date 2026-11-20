@@ -19,6 +19,8 @@ impl Composition {
         self.paragraph = None;
     }
 
+    // Debug builds without a renderer use `()` as their paragraph type.
+    #[allow(clippy::unit_arg)]
     pub(crate) fn paint(
         &mut self,
         renderer: &mut Renderer,

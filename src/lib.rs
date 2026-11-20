@@ -109,6 +109,14 @@ pub use taim_renderer::wgpu::wgpu;
 /// What running an application returns.
 pub type Result = std::result::Result<(), Error>;
 
+/// Apple platform services (iOS and macOS): haptics, Face ID and Touch ID,
+/// the keychain, local notifications, location, the photo picker and the
+/// camera.
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+pub mod apple {
+    pub use taim_winit::apple::*;
+}
+
 /// Android application host types, shared with Taim's window shell.
 #[cfg(target_os = "android")]
 pub mod android {

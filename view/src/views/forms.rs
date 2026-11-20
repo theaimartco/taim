@@ -1,5 +1,5 @@
 //! Choice, list and window-chrome views.
-use super::look::{self, Gesture, Label};
+use super::look::{self, Gesture, Label, POP, Spring};
 use super::{Align, Icon, button, column, container, icon, row, space, text};
 use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::{Axis, Constraints, Sizing};
@@ -22,6 +22,8 @@ where
         selected,
         shown: selected.into_prop(),
         pressed: false,
+        dot: Cell::new(Spring::new(0.0, POP)),
+        dot_ready: Cell::new(false),
         id: widget::Id::unique(),
     }
 }
@@ -33,6 +35,11 @@ pub struct Radio<T> {
     selected: State<T>,
     shown: Prop<T>,
     pressed: bool,
+    /// The chosen dot's size, `0` to `1`; it pops in and shrinks away.
+    dot: Cell<Spring>,
+    /// Whether the dot has been placed once: the first frame shows the
+    /// choice as it is, without animating into it.
+    dot_ready: Cell<bool>,
     id: widget::Id,
 }
 
@@ -56,22 +63,39 @@ impl<T: Clone + PartialEq + Send + Sync + 'static> View for Radio<T> {
             Point::new(bounds.x, bounds.y + (bounds.height - DOT) / 2.0),
             Size::new(DOT, DOT),
         );
-        let edge = if on {
-            palette.primary.base.color
-        } else {
-            palette.background.strong.color
-        };
+        let now = cx.now();
+        let mut dot = self.dot.get();
+        let target = f32::from(u8::from(on));
+        if !self.dot_ready.replace(true) {
+            dot.set(target);
+        } else if (dot.target() - target).abs() > f32::EPSILON {
+            dot.go(target, now);
+        }
+        self.dot.set(dot);
+        let size = dot.value(now);
+
+        let edge = palette
+            .background
+            .strong
+            .color
+            .mix(palette.primary.base.color, size.clamp(0.0, 1.0));
 
         cx.fill(
             ring,
             palette.background.base.color,
             Border::default().width(1.5).color(edge).rounded(DOT / 2.0),
         );
-        if on {
+        if size > 0.02 {
+            let full = DOT - 10.0;
+            let side = full * size.max(0.0);
+            let centre = ring.center();
             cx.fill(
-                ring.shrink(5.0),
+                Rectangle::new(
+                    Point::new(centre.x - side / 2.0, centre.y - side / 2.0),
+                    Size::new(side, side),
+                ),
                 palette.primary.base.color,
-                Border::default().rounded(DOT / 2.0),
+                Border::default().rounded(side / 2.0),
             );
         }
         self.label.paint(
@@ -146,6 +170,10 @@ impl<T: Clone + PartialEq + Send + Sync + 'static> View for Radio<T> {
 
     fn focusable(&self) -> bool {
         true
+    }
+
+    fn is_animating(&self, now: crate::Instant) -> bool {
+        self.dot.get().is_moving(now)
     }
 }
 

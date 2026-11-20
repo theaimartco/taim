@@ -1,7 +1,16 @@
 # TAIM production release policy and signoff
 
-**Verdict on 2026-11-02: NO GO.** The automated checks pass locally; no
-device, screen-reader or release-signing gate has been run.
+**Current verdict (2026-11-15): automated code gate PASS; broad production
+release remains NO GO.** A clean all-platform release check now runs every
+step, including Android linking and all three browser engines. Native macOS,
+iOS Simulator and Android emulator evidence is available. Physical target,
+screen-reader, independent review and distribution-signing gates remain open.
+See [the full-access follow-up](../testing/production-full-access-20261115.md).
+
+**macOS follow-up, 2026-11-15:** a real arm64 Mac now passes the local sandboxed
+release fixture and generated-consumer packaging checks. This is limited local
+evidence; owner signing and Apple distribution validation remain pending. See
+[the scoped acceptance record](../testing/macos-store-acceptance-20261115.md).
 
 **Decision (owner, 2026-11-02): no hosted CI.** Gate 1 is met by the local
 release check, `bash scripts/release/check.sh EVIDENCE_DIR`, run on the
@@ -41,7 +50,7 @@ No tag or publication follows from that check alone.
 
 ## Public compatibility contract
 
-Version 0.15.0-dev is experimental, with no stability guarantee.
+Version 0.15.0-rc.1 is a release candidate, with no stable API guarantee.
 Before 1.0, publish the stable public API and target matrix, freeze
 the API for an independent consumer test, and include a migration guide.
 After 1.0, use major versions for breaking changes, minor versions for
@@ -54,29 +63,60 @@ security disclosure and deprecation policies without inventing an SLA.
 |---|---|
 | Linux x86-64 via winit/Wayland and X11 | Implemented; physical QA not signed |
 | Native VYOM/Smithay Wayland | Experimental; physical presentation not accepted |
-| Windows x64/ARM64, macOS x64/ARM64 | Lint clean in the release check; not run, physical QA not accepted |
-| Android arm64/x86_64 | Lint clean; device verification pending |
-| iOS arm64 and simulator | Lint clean (tests included); clipboard, links, vibration, storage implemented; no app-bundle (Xcode) tooling; not run |
-| Web/WASM | Runs in headless Chromium (WebGL2): render, text, gradients, clicks, typing, clipboard, storage; smoke-tested by the release check; glass is drawn flat on WebGL; WebGPU, Firefox, Safari and real devices not verified |
+| Windows x64/ARM64 | Lint clean in the release check; not run, physical QA not accepted |
+| macOS | Native arm64 sandbox/storage/restart/input smoke accepted on one Mac; Intel/universal, broad physical QA and owner distribution signing pending |
+| Android arm64/x86_64 | Both optimized libraries link; arm64 development APK passes emulator lifecycle/process-death and multilingual/secure/multiline IME probes; physical GPU/API-range acceptance pending |
+| iOS arm64 and simulator | Strict cross checks pass; service layer (share, haptics, biometrics, keychain, notifications, location, photo picker, camera), safe area and appearance verified on an iOS 26.2 Simulator, interactive prompts and notification taps included (keychain biometric prompt and camera capture excepted); device/App Store packaging implemented but not run with owner credentials; physical devices, VoiceOver, complex input and owner distribution pending; see platform/ios.md |
+| Web/WASM | Counter rendering/repeated clicks pass in headless Chromium, Firefox and WebKit (WebGL2); glass is drawn flat on WebGL; WebGPU, actual Safari and physical devices are not accepted |
 
 ## Latest gate ledger
 
 | Gate | Status |
 |---|---|
-| Local release check (replaces hosted CI) | PASSES WITHOUT THE ANDROID LINK STEP (no NDK where it was run) |
+| Local release check (replaces hosted CI) | PASS on clean candidate; no skipped step, including Android link |
 | Android device check on physical devices | NOT RUN |
 | Real Wayland frame presentation | NOT RUN |
 | Real VYOM-native display path | NOT RUN |
-| Input, multilingual IME, screen-reader acceptance | NOT RUN |
+| Input, multilingual IME, screen-reader acceptance | Android emulator protocol checks pass; physical IME and human screen-reader acceptance pending |
 | GPU recovery and thermal/idle memory/energy | NOT RUN |
 | Iced/Slint/egui benchmark proof | NOT RUN |
-| Clean third-party package consumer and API freeze | NOT RUN |
-| Security assessment and signed reproducible release | NOT RUN |
+| Clean third-party package consumer and API freeze | Fresh external consumer builds from extracted immutable source bundle; independent API review/freeze pending |
+| Security assessment and signed reproducible release | Dependency audits pass; source bundles reproduce byte-for-byte; SBOM generated; independent security/rebuild and owner distribution signing pending |
 
 For each PASS supply device, exact source SHA, test command, raw trace hash,
 independent reviewer and date. Do not substitute self-reported completeness
 percentages for evidence. Supported device promises must never exceed tested
 coverage.
+
+## Running the local code gate
+
+Use the pinned Rust toolchain and Python 3.11+ with Pillow for the Android
+pixel-evidence tests. `TAIM_QA_PYTHON` selects the interpreter/virtual environment
+for the Python checks (default: `python3`). The complete run also requires
+the cross-target Rust standard libraries, Android NDK/cargo-ndk, cargo-deny,
+wasm-bindgen at the locked version, Node and Playwright with Chromium, Firefox
+and WebKit installed.
+
+Run from a clean candidate, writing evidence under ignored `target/` or outside
+the checkout:
+
+```sh
+bash scripts/release/check.sh target/release-check-candidate
+```
+
+For development diagnostics on the host:
+
+```sh
+TAIM_QA_PYTHON=/path/to/venv/bin/python \
+  bash scripts/release/check.sh --allow-dirty --host-only target/host-check-candidate
+```
+
+Exit 0 means the complete automated code gate passed; it does not grant device
+acceptance or release approval. Exit 1 is a failed check, 2 a preflight/usage
+error, and 3 incomplete coverage. Dirty or host-only runs cannot return a
+release PASS. Untracked source is included in cleanliness checks; changing the
+source while checks run invalidates the result. Reports include log checksums.
+Use a new evidence directory for each run.
 
 ## Hardware smoke entrypoint
 

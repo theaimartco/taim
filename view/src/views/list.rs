@@ -273,11 +273,11 @@ impl View for List {
     }
 
     fn scroll_offset(&self) -> Vector {
-        Vector::new(0.0, self.scroller.offset())
+        Vector::new(0.0, self.scroller.shown_offset())
     }
 
-    fn is_animating(&self, _now: Instant) -> bool {
-        self.scroller.is_flinging()
+    fn is_animating(&self, now: Instant) -> bool {
+        self.scroller.is_moving(now)
     }
 
     fn children(&mut self, visit: &mut dyn FnMut(&mut Child)) {

@@ -34,10 +34,10 @@ impl Modifiers {
     /// Returns whether the platform's word-jump modifier is active.
     #[inline]
     pub const fn jump(self) -> bool {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
         return self.contains(Self::ALT);
 
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", target_os = "ios")))]
         return self.contains(Self::CTRL);
     }
 

@@ -60,6 +60,15 @@ class ReleaseContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "mismatched evidence"):
                 module.verify(p, COMMIT)
 
+    def test_operator_cannot_self_review_using_case_or_whitespace(self):
+        with tempfile.TemporaryDirectory() as d:
+            p, m, _ = self.fixture(d)
+            m["operator"] = " synthetic-operator "
+            m["gates"]["real_screen_reader"]["reviewer"] = "SYNTHETIC-OPERATOR"
+            p.write_text(json.dumps(m))
+            with self.assertRaisesRegex(ValueError, "independent"):
+                module.verify(p, COMMIT)
+
     def test_commit_mismatch_is_no_go(self):
         with tempfile.TemporaryDirectory() as d:
             p, _, _ = self.fixture(d)

@@ -8,7 +8,8 @@
 //! report file sees, which is exactly this stdout stream. `taim_bench`
 //! is a bin-only crate (see `tools/taim_bench/Cargo.toml`), so its types
 //! are not otherwise reachable from an integration test in this
-//! directory.
+//! directory. Cargo provides the built binary directly, so these tests never
+//! invoke a nested Cargo build or compete for the parent build's locks.
 
 use std::process::Command;
 
@@ -53,8 +54,7 @@ const REQUIRED_FRAME_TIME_FIELDS: &[&str] = &[
 ];
 
 fn run_taim_bench(args: &[&str]) -> serde_json::Value {
-    let output = Command::new(env!("CARGO"))
-        .args(["run", "--quiet", "--package", "taim_bench", "--"])
+    let output = Command::new(env!("CARGO_BIN_EXE_taim_bench"))
         .args(args)
         .output()
         .expect("failed to run taim_bench");
@@ -168,8 +168,7 @@ fn report_has_the_configured_number_of_runs_each_with_every_required_field() {
 
 #[test]
 fn refusing_fewer_than_five_runs_is_enforced_by_the_binary() {
-    let output = Command::new(env!("CARGO"))
-        .args(["run", "--quiet", "--package", "taim_bench", "--"])
+    let output = Command::new(env!("CARGO_BIN_EXE_taim_bench"))
         .args(["--scene", "idle_shell", "--runs", "1"])
         .output()
         .expect("failed to run taim_bench");
@@ -182,8 +181,7 @@ fn refusing_fewer_than_five_runs_is_enforced_by_the_binary() {
 
 #[test]
 fn unknown_scene_name_fails_cleanly_rather_than_panicking() {
-    let output = Command::new(env!("CARGO"))
-        .args(["run", "--quiet", "--package", "taim_bench", "--"])
+    let output = Command::new(env!("CARGO_BIN_EXE_taim_bench"))
         .args(["--scene", "does_not_exist"])
         .output()
         .expect("failed to run taim_bench");
@@ -199,8 +197,8 @@ fn unknown_scene_name_fails_cleanly_rather_than_panicking() {
 
 #[test]
 fn every_registered_scene_produces_a_schema_valid_report() {
-    let list_output = Command::new(env!("CARGO"))
-        .args(["run", "--quiet", "--package", "taim_bench", "--", "--list"])
+    let list_output = Command::new(env!("CARGO_BIN_EXE_taim_bench"))
+        .args(["--list"])
         .output()
         .expect("failed to list taim_bench scenes");
 

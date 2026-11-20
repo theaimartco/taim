@@ -1,7 +1,9 @@
 mod gradient;
+mod liquid;
 mod solid;
 
 use gradient::Gradient;
+pub use liquid::Liquid;
 use solid::Solid;
 
 use crate::core::material::SceneLight;
@@ -68,6 +70,7 @@ pub struct Quad {
 pub struct Pipeline {
     solid: solid::Pipeline,
     gradient: gradient::Pipeline,
+    liquid: liquid::Pipeline,
     constant_layout: wgpu::BindGroupLayout,
     backdrop_layout: wgpu::BindGroupLayout,
     backdrop_sampler: wgpu::Sampler,
@@ -136,6 +139,7 @@ impl State {
 
             let mut solid_offset = 0;
             let mut gradient_offset = 0;
+            let mut liquid_offset = 0;
             let mut previous_kind = None;
 
             for (kind, count) in &quads.order {
@@ -169,6 +173,17 @@ impl State {
                         );
 
                         gradient_offset += count;
+                    }
+                    Kind::Liquid => {
+                        pipeline.liquid.render(
+                            render_pass,
+                            &layer.constants,
+                            backdrop,
+                            &layer.liquid,
+                            liquid_offset..(liquid_offset + count),
+                        );
+
+                        liquid_offset += count;
                     }
                 }
             }
@@ -280,6 +295,7 @@ impl Pipeline {
         Self {
             solid: solid::Pipeline::new(device, format, &constant_layout, &backdrop_layout),
             gradient: gradient::Pipeline::new(device, format, &constant_layout, &backdrop_layout),
+            liquid: liquid::Pipeline::new(device, format, &constant_layout, &backdrop_layout),
             constant_layout,
             backdrop_layout,
             backdrop_sampler,
@@ -317,6 +333,7 @@ pub struct Layer {
     constants_buffer: wgpu::Buffer,
     solid: solid::Layer,
     gradient: gradient::Layer,
+    liquid: liquid::Layer,
 }
 
 impl Layer {
@@ -342,6 +359,7 @@ impl Layer {
             constants_buffer,
             solid: solid::Layer::new(device),
             gradient: gradient::Layer::new(device),
+            liquid: liquid::Layer::new(device),
         }
     }
 
@@ -364,6 +382,10 @@ impl Layer {
         if !quads.gradients.is_empty() {
             self.gradient
                 .prepare(device, encoder, belt, &quads.gradients);
+        }
+
+        if !quads.liquids.is_empty() {
+            self.liquid.prepare(device, encoder, belt, &quads.liquids);
         }
     }
 
@@ -397,6 +419,9 @@ pub struct Batch {
     /// The gradient quads of the [`Layer`].
     gradients: Vec<Gradient>,
 
+    /// The liquid glass quads of the [`Layer`].
+    liquids: Vec<Liquid>,
+
     /// The quad order of the [`Layer`].
     order: Order,
 
@@ -414,7 +439,7 @@ type Order = Vec<(Kind, usize)>;
 impl Batch {
     /// Returns true if there are no quads of any type in [`Quads`].
     pub fn is_empty(&self) -> bool {
-        self.solids.is_empty() && self.gradients.is_empty()
+        self.solids.is_empty() && self.gradients.is_empty() && self.liquids.is_empty()
     }
 
     /// Returns whether any quad in this batch transmits, and therefore needs
@@ -431,6 +456,7 @@ impl Batch {
         std::mem::size_of::<Self>()
             + self.solids.capacity() * std::mem::size_of::<Solid>()
             + self.gradients.capacity() * std::mem::size_of::<Gradient>()
+            + self.liquids.capacity() * std::mem::size_of::<Liquid>()
             + self.order.capacity() * std::mem::size_of::<(Kind, usize)>()
     }
 
@@ -466,6 +492,18 @@ impl Batch {
             }
         };
 
+        self.push_order(kind);
+    }
+
+    /// Adds a liquid glass quad: one that a press lights and magnifies and
+    /// that melts into its neighbours.
+    pub fn add_liquid(&mut self, liquid: Liquid) {
+        self.transmits |= liquid.quad.transmission > 0.0;
+        self.liquids.push(liquid);
+        self.push_order(Kind::Liquid);
+    }
+
+    fn push_order(&mut self, kind: Kind) {
         match self.order.last_mut() {
             Some((last_kind, count)) if kind == *last_kind => {
                 *count = count.saturating_add(1);
@@ -479,6 +517,7 @@ impl Batch {
     pub fn clear(&mut self) {
         self.solids.clear();
         self.gradients.clear();
+        self.liquids.clear();
         self.order.clear();
         self.transmits = false;
     }
@@ -489,6 +528,7 @@ impl Batch {
 
         self.solids.append(&mut batch.solids);
         self.gradients.append(&mut batch.gradients);
+        self.liquids.append(&mut batch.liquids);
 
         // Preserve painter order while coalescing the only run pair that can
         // become adjacent across the batch boundary. Draining keeps the
@@ -515,6 +555,8 @@ enum Kind {
     Solid,
     /// A gradient quad
     Gradient,
+    /// A liquid glass quad
+    Liquid,
 }
 
 fn color_target_state(format: wgpu::TextureFormat) -> [Option<wgpu::ColorTargetState>; 1] {
@@ -688,6 +730,10 @@ mod batching_tests {
                 Kind::Gradient => Background::Gradient(crate::core::Gradient::Linear(
                     crate::core::gradient::Linear::new(0.0),
                 )),
+                Kind::Liquid => {
+                    batch.add_liquid(liquid());
+                    continue;
+                }
             };
 
             batch.add(quad(), &background, 1.0);
@@ -716,6 +762,77 @@ mod batching_tests {
             actual_runs, expected_runs,
             "Batch::add's incremental order for {kinds:?} must match batch::group's result"
         );
+    }
+
+    fn liquid() -> Liquid {
+        let mut pane = quad();
+        pane.transmission = 0.8;
+        Liquid::new(
+            color::pack(Color::WHITE),
+            pane,
+            &crate::core::material::Liquid::default(),
+            crate::core::Transformation::IDENTITY,
+            1.0,
+        )
+    }
+
+    #[test]
+    fn liquid_quads_keep_painter_order_among_the_others() {
+        assert_incremental_order_matches_grouping(&[
+            Kind::Solid,
+            Kind::Liquid,
+            Kind::Liquid,
+            Kind::Gradient,
+            Kind::Liquid,
+            Kind::Solid,
+        ]);
+    }
+
+    #[test]
+    fn a_transmissive_liquid_quad_asks_for_a_backdrop() {
+        let mut batch = Batch::default();
+        batch.add_liquid(liquid());
+        assert!(batch.needs_backdrop());
+        assert!(!batch.is_empty());
+    }
+
+    #[test]
+    fn a_liquid_press_and_neighbours_follow_the_transformation() {
+        use crate::core::material::{LiquidNeighbour, LiquidTouch};
+        use crate::core::{Point, Rectangle, Size, Transformation};
+
+        let shape = crate::core::material::Liquid {
+            touch: Some(LiquidTouch {
+                position: Point::new(10.0, 20.0),
+                strength: 2.0,
+                radius: 30.0,
+            }),
+            neighbours: [
+                Some(LiquidNeighbour {
+                    bounds: Rectangle::new(Point::new(5.0, 6.0), Size::new(40.0, 20.0)),
+                    radius: 10.0,
+                }),
+                None,
+            ],
+            blend: 12.0,
+            legibility: 0.5,
+        };
+        let packed = Liquid::new(
+            color::pack(Color::WHITE),
+            quad(),
+            &shape,
+            Transformation::translate(100.0, 0.0),
+            1.0,
+        );
+
+        assert_eq!(
+            packed.touch,
+            [110.0, 20.0, 1.0, 30.0],
+            "strength is clamped"
+        );
+        assert_eq!(packed.neighbour_a, [105.0, 6.0, 40.0, 20.0]);
+        assert_eq!(packed.neighbour_b, [0.0; 4], "no second neighbour");
+        assert_eq!(packed.shape, [10.0, 0.0, 12.0, 0.5]);
     }
 
     #[test]

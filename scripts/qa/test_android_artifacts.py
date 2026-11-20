@@ -12,6 +12,18 @@ artifacts=importlib.util.module_from_spec(spec);spec.loader.exec_module(artifact
 
 
 class AndroidArtifactTests(unittest.TestCase):
+    def test_ndk_host_tools_are_selected_without_a_linux_only_assumption(self):
+        spec=importlib.util.spec_from_file_location("android_counter",ROOT/'scripts/android/counter.py')
+        counter=importlib.util.module_from_spec(spec);spec.loader.exec_module(counter)
+        with tempfile.TemporaryDirectory() as directory:
+            ndk=Path(directory)
+            for host,tag in [('linux','linux-x86_64'),('darwin','darwin-x86_64')]:
+                tools=ndk/'toolchains/llvm/prebuilt'/tag/'bin'
+                tools.mkdir(parents=True)
+                self.assertEqual(counter.ndk_tools(ndk,host),tools)
+            with self.assertRaisesRegex(RuntimeError,'supports Linux and macOS'):
+                counter.ndk_tools(ndk,'unsupported')
+
     def test_a_stale_generic_module_cannot_satisfy_the_application_output(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);output=root/'aarch64-linux-android/release';output.mkdir(parents=True)

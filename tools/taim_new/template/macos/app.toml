@@ -1,0 +1,18 @@
+[app]
+name = "{{name}}"
+bundle_id = "{{macos_bundle_id}}"
+version = "0.1.0"
+build = "1"
+minimum_system_version = "13.0"
+category = "public.app-category.productivity"
+copyright = "Copyright © {{name}} contributors"
+icon = "AppIcon.png"
+privacy_manifest = "PrivacyInfo.xcprivacy"
+
+[entitlements]
+# App Sandbox is always enabled. Add only capabilities your app uses:
+# "com.apple.security.network.client" = true
+# "com.apple.security.files.user-selected.read-write" = true
+
+# Add camera/microphone usage descriptions only when your app needs them.
+[usage_descriptions]

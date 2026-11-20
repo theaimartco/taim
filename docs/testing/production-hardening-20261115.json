@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-11-15T06:27:13.007284+00:00",
+  "scope": "Local native/shared contract verification; all-platform production release remains blocked",
+  "source_base_commit": "cc5f9a47d73b98028caeb8bc3ff70c443b40bbe5",
+  "source_dirty": true,
+  "source_sha256": {
+    "src/storage.rs": "31997c84ae265e68d0fdcde44f4a60df7ba0d8925a9cb64744dd0831e205b61a",
+    "taim-atlas/src/lib.rs": "02c8a3d7993abee5729b9c72e084f40007cd4e906487c00ffa384c0dc636c221",
+    "view/src/root.rs": "4a638d71c359ac542bb0e88abdf47caf5ee8512448763948a8b17a5bf2898683",
+    "view/src/state.rs": "1255dc72522bea96fd8064d2f72395b350d29dfccd158b8c07fdecbba7fc51e2",
+    "view/src/ime.rs": "11367515009b96c64f4e7ca83ef289169a5c2a66ca45b87e1de03bb9b848dcc1",
+    "view/src/views/navigator.rs": "00779cc071346cea5b29b5e36066ee704fa01853a75e830013cd5a76737a2d4a",
+    "tests/stress.rs": "ba3a217306c5c31972fea315ca7d1652f1438e9db4997d8a75970cc5ae7392b8",
+    "tests/stress/navigation.rs": "206998a7849d225e116b781f0564009b8c0956618c73c0e0e92c33a649d09dc3",
+    "tests/stress/resource_pressure.rs": "8d2d09b4670773dede871e85c54bec80e63da441f84fd9ed3960ec9b7c1078ea",
+    "tests/stress/window_lifecycle.rs": "c65a057898691a5d4c0bdccae2b512107b518fb1c322cb196669c621e3d3136e",
+    "scripts/release/check.sh": "7a07640225c9d157fe1c51ece3ca47e26c9725877a79b532b981b7f5f2a952cb",
+    "scripts/qa/test_release_check.py": "e7868b641011a1bf1e27eba9fd24da937e19da8f889eef1658f7c583d7e07e38",
+    "scripts/release/verify-readiness.py": "f71e90767544a4e80bf608a1c3a6a941c40544f86839c0e7ff3e4dca666e9a50",
+    "scripts/release/test_verify_readiness.py": "e441746d0d724a02c8fde4b16e317e7558f3e8ca77d049ac5801344e3cbdf3ef",
+    "scripts/web/build.sh": "be6374d0d9b2c15baf38ea66d93f981d85fe5992e572125bc932bf3932ac9334"
+  },
+  "logs": [
+    {
+      "path": "target/production-native-tests.log",
+      "sha256": "ae9dc70369e01407400543d964b6325973aa33417a8d075ce9b717768e255395",
+      "rust_test_pass_counts": [
+        50,
+        9,
+        89
+      ]
+    },
+    {
+      "path": "target/production-app-tests.log",
+      "sha256": "8c959ce513c8a9c2828a377c17c48579e0fe32571134fd830ee39d821472774f",
+      "rust_test_pass_counts": [
+        7,
+        9,
+        5
+      ]
+    },
+    {
+      "path": "target/production-qa-tests.log",
+      "sha256": "2ecb5f2f4c666847616933245c326afdd7b6b23cb3e0829231409c64d606908c",
+      "rust_test_pass_counts": []
+    },
+    {
+      "path": "target/production-release-tests.log",
+      "sha256": "4db7cbc074d776770b30d9d3bd5112cd50a14ef27b613a094aaa69fd71dfca44",
+      "rust_test_pass_counts": []
+    },
+    {
+      "path": "target/production-audit-tests.log",
+      "sha256": "7f6d674dc38c83e5df2985921ab33658727cdf69955265a530601defdf4dcbeb",
+      "rust_test_pass_counts": []
+    },
+    {
+      "path": "target/production-clippy.log",
+      "sha256": "5dae9a444468b8edb40465a4e4949274115b4093406a84500344ec108a9ef49f",
+      "rust_test_pass_counts": []
+    },
+    {
+      "path": "target/production-crate-clippy.log",
+      "sha256": "406bd394c338cb540925a85c402eabc02177d9a3cd17b5c2c89839ddd662e591",
+      "rust_test_pass_counts": []
+    },
+    {
+      "path": "target/production-contract-clippy.log",
+      "sha256": "0fe14e64e4dd87d420a11b57aae77730ec93db058acd958c2c25ead6ed46d096",
+      "rust_test_pass_counts": []
+    },
+    {
+      "path": "target/production-counter-release.log",
+      "sha256": "f4fcac6b280a1b069257566ecb1b2e48263d39014f503f9d5618dd412d8d7e77",
+      "rust_test_pass_counts": []
+    },
+    {
+      "path": "target/production-macos-package.log",
+      "sha256": "a3b929e5f04f011ad64c8b736afa95c6495686d51edf8b7dcd9318f65924d27d",
+      "rust_test_pass_counts": []
+    },
+    {
+      "path": "target/production-macos-package-icns.log",
+      "sha256": "7bdb9d0e1c275dfd518ae32f9366a549d91ad597dc70a5a2fec6201034d8ca2a",
+      "rust_test_pass_counts": []
+    },
+    {
+      "path": "target/production-pop-regression-before.log",
+      "sha256": "b5f664f8324d52c45feb64dbb7b91ffa107daf5c0447bd72b762f77853aa441d",
+      "rust_test_pass_counts": []
+    }
+  ],
+  "native_test_counts": [
+    50,
+    89,
+    9
+  ],
+  "source_harness_test_counts": [
+    7,
+    9,
+    5
+  ],
+  "source_harness_manifest_sha256": "1193a253b8b8ef147a62b060430216f52e58d3e92a1c28d0d1e8d98fac8ea208",
+  "source_harness_lock_sha256": "d33ec1687a76ef1c5a1eee9dbc7d1beeb6b5dfc79a57f3f16769021f6baec417",
+  "python_test_counts": {
+    "qa": 29,
+    "release": 16,
+    "audit": 29
+  },
+  "optimized_counter": {
+    "path": "target/release/counter",
+    "sha256": "95dc971b4c252ce45d2294d4df21dacd198429a24469bb448f6a08776ebd8f16"
+  },
+  "sandboxed_fixture": {
+    "bundle": "target/macos/production-hardening-20261115-icns/Taim Store Probe.app",
+    "executable_sha256": "e4bb3f42444e84c91584a2146e7067f2b30a71c0cecc21f61e6161c65363921b",
+    "package_report_sha256": "4a7ea5ce91091bebc7fbae4954a6f863ac09c99fbdc95f43022797dc532c3edb",
+    "signature": "ad-hoc; local validation passed",
+    "icon": "previously validated ICNS input; PNG conversion failed in iconutil",
+    "runtime_acceptance": "not rerun"
+  },
+  "full_workspace_gate": "BLOCKED: uncached rustix 1.1.6 and unavailable crates.io DNS",
+  "physical_cross_platform_acceptance": false,
+  "owner_distribution_signing": false,
+  "production_clearance": false
+}

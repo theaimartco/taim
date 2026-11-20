@@ -38,11 +38,11 @@ pub fn svg_handle(bytes: &'static [u8]) -> taim_core::svg::Handle {
     taim_core::svg::Handle::from_memory(bytes)
 }
 
-pub use cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
+pub use cx::{DescribeCx, EventCx, MeasureCx, PaintCx, VisualCx};
 pub use layout::{Axis, Constraints, Sizing};
 pub use root::{PasteToken, Response, Root, is_back};
 pub use state::{IntoProp, Invalidation, Prop, Scope, Sender, State, TaskScope, spawn};
-pub use view::{AnyView, Child, Handled, View};
+pub use view::{AnyView, Child, Handled, View, Visual};
 
 pub use taim_core::{
     Background, Border, Color, Event, Padding, Pixels, Point, Rectangle, Shadow, Size, Theme,
@@ -63,12 +63,12 @@ pub mod prelude {
     #[cfg(feature = "svg")]
     pub use crate::views::svg;
     pub use crate::views::{
-        Align, Buffer, Date, Icon, Navigator, Time, accordion, app_bar, avatar, badge, button,
-        carousel, checkbox, chip, column, container, date_picker, dialog, drawer, dropdown, each,
-        glass, grid, icon, icon_button, layers, list, list_tile, mouse_area, nav_bar, navigator,
-        pinch, progress, pull_to_refresh, radio, rebuild, row, rule, scaffold, scroll, search,
-        segmented, sheet, skeleton, slider, snackbar, space, stepper, switch, tabs, text,
-        text_editor, text_field, time_picker, tooltip, when,
+        Align, Buffer, Date, Icon, Navigator, PageTransition, Time, accordion, animated, app_bar,
+        appear, avatar, badge, button, carousel, checkbox, chip, column, container, date_picker,
+        dialog, drawer, dropdown, each, glass, glass_group, grid, hero, icon, icon_button, layers,
+        list, list_tile, mouse_area, nav_bar, navigator, pinch, progress, pull_to_refresh, radio,
+        rebuild, row, rule, scaffold, scroll, search, segmented, sheet, skeleton, slider, snackbar,
+        space, stepper, switch, tabs, text, text_editor, text_field, time_picker, tooltip, when,
     };
     pub use crate::{
         AndroidMap, AndroidVideo, AndroidView, AndroidWebContent, AnyView, CameraLens, MapMarker,

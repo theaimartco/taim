@@ -22,7 +22,7 @@ bitflags! {
         // const RALT = 0b001 << 6;
         //
         /// The "windows" key on Windows, "command" key on Mac, and
-        /// "super" key on Linux.
+    /// "super" key on Linux.
         const LOGO = 0b100 << 9;
         // const LLOGO = 0b010 << 9;
         // const RLOGO = 0b001 << 9;
@@ -36,9 +36,9 @@ impl Modifiers {
     ///
     /// This is normally the main modifier to be used for hotkeys.
     ///
-    /// On macOS, this is equivalent to `Self::LOGO`.
+    /// On macOS and iOS hardware keyboards, this is equivalent to `Self::LOGO`.
     /// Otherwise, this is equivalent to `Self::CTRL`.
-    pub const COMMAND: Self = if cfg!(target_os = "macos") {
+    pub const COMMAND: Self = if cfg!(any(target_os = "macos", target_os = "ios")) {
         Self::LOGO
     } else {
         Self::CTRL

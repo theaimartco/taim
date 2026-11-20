@@ -52,7 +52,7 @@ def verify(manifest_path, expected_commit, repo_root=None):
         if not isinstance(gate, dict) or gate.get("status") != "PASS":
             raise ValueError(f"{name}: not independently marked PASS")
         reviewer = gate.get("reviewer")
-        if not isinstance(reviewer, str) or not reviewer.strip() or reviewer.casefold() == operator.casefold():
+        if not isinstance(reviewer, str) or not reviewer.strip() or reviewer.strip().casefold() == operator.strip().casefold():
             raise ValueError(f"{name}: require reviewer independent of operator")
         time = gate.get("reviewed_at")
         if not isinstance(time, str):

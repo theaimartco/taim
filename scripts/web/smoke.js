@@ -11,20 +11,25 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('playwright');
+const engines = require('playwright');
+const browserName = process.argv[3] || 'chromium';
+if (!['chromium', 'firefox', 'webkit'].includes(browserName)) {
+  throw new Error('Choose chromium, firefox or webkit');
+}
 
 const root = path.resolve(process.argv[2] || 'target/web/counter');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm' };
 
 function fail(reason) {
-  console.error(`web smoke FAILED: ${reason}`);
-  process.exit(1);
+  throw new Error(reason);
 }
 
 const server = http.createServer((request, response) => {
-  const name = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-  const file = path.join(root, name === '/' ? 'index.html' : name);
-  if (!file.startsWith(root) || !fs.existsSync(file)) {
+  let name;
+  try { name = decodeURIComponent(new URL(request.url, 'http://localhost').pathname); }
+  catch (_) { response.writeHead(400).end(); return; }
+  const file = path.resolve(root, '.' + (name === '/' ? '/index.html' : name));
+  if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
     response.writeHead(404).end();
     return;
   }
@@ -34,10 +39,11 @@ const server = http.createServer((request, response) => {
 
 server.listen(0, '127.0.0.1', async () => {
   const url = `http://localhost:${server.address().port}/`;
-  const browser = await chromium.launch({
-    args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
-  });
+  let browser;
   try {
+    browser = await engines[browserName].launch(browserName === 'chromium' ? {
+      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+    } : {});
     const page = await browser.newPage({ viewport: { width: 640, height: 420 } });
     const errors = [];
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -46,6 +52,7 @@ server.listen(0, '127.0.0.1', async () => {
     await page.goto(url);
     await page.waitForSelector('canvas', { timeout: 20000 });
     await page.waitForTimeout(4000);
+    if (errors.length) fail(`console errors:\n  ${errors.join('\n  ')}`);
 
     const shot = () => page.locator('canvas').screenshot();
     const flat = (png) => {
@@ -68,9 +75,12 @@ server.listen(0, '127.0.0.1', async () => {
     if (third.equals(second)) fail('a second click did not change the picture');
 
     if (errors.length) fail(`console errors:\n  ${errors.join('\n  ')}`);
-    console.log('web smoke passed: drew, responded to two clicks, no console errors');
+    console.log(`${browserName} web smoke passed: drew, responded to two clicks, no console errors`);
+  } catch (error) {
+    console.error(`${browserName} web smoke FAILED: ${error.message}`);
+    process.exitCode = 1;
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
     server.close();
   }
 });

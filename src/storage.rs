@@ -9,6 +9,9 @@
 //! files, it is an entry in the page's `localStorage` instead, written in
 //! one call; the API is the same. It is meant for settings, not for
 //! large data or records: keep those in a database or files of your own.
+//! Each open store is a snapshot; concurrent writers replace the entire
+//! snapshot, so applications must coordinate read-modify-write operations.
+//! A failed write leaves the in-memory snapshot unchanged and can be retried.
 //!
 //! ```no_run
 //! use taim::storage::Store;
@@ -116,15 +119,26 @@ impl Store {
         if self.values.get(key) == Some(&value) {
             return Ok(());
         }
-        let _ = self.values.insert(key.to_owned(), value);
-        self.save()
+        let previous = self.values.insert(key.to_owned(), value);
+        if let Err(error) = self.save() {
+            if let Some(previous) = previous {
+                let _ = self.values.insert(key.to_owned(), previous);
+            } else {
+                let _ = self.values.remove(key);
+            }
+            return Err(error);
+        }
+        Ok(())
     }
 
     /// Removes `key` and writes the store. Returns the value it held.
     pub fn remove(&mut self, key: &str) -> Result<Option<String>, Error> {
         let removed = self.values.remove(key);
-        if removed.is_some() {
-            self.save()?;
+        if let Some(value) = &removed
+            && let Err(error) = self.save()
+        {
+            let _ = self.values.insert(key.to_owned(), value.clone());
+            return Err(error);
         }
         Ok(removed)
     }
@@ -153,21 +167,70 @@ impl Store {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn save(&self) -> Result<(), Error> {
-        if let Some(directory) = self.path.parent() {
+        if let Some(directory) = self.path.parent().filter(|p| !p.as_os_str().is_empty()) {
             std::fs::create_dir_all(directory)?;
         }
 
         let contents = self.contents();
 
-        let temporary = self.path.with_extension("store.tmp");
-        {
-            let mut file = std::fs::File::create(&temporary)?;
-            file.write_all(contents.as_bytes())?;
-            file.sync_all()?;
-        }
-        std::fs::rename(&temporary, &self.path)?;
+        let (temporary, mut file) = pending_write(&self.path)?;
+        file.write_all(contents.as_bytes())?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&temporary.0, &self.path)?;
         Ok(())
     }
+}
+
+// Exclusive creation prevents another writer (or a pre-existing symlink)
+// from replacing the file being written. Keep it beside the destination so
+// rename stays on the same filesystem. The guard removes failed writes too.
+#[cfg(not(target_arch = "wasm32"))]
+struct PendingWrite(PathBuf);
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Drop for PendingWrite {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn pending_write(path: &Path) -> std::io::Result<(PendingWrite, std::fs::File)> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let name = path.file_name().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "store path needs a file name",
+        )
+    })?;
+    for _ in 0..128 {
+        let mut temporary = name.to_os_string();
+        temporary.push(format!(
+            ".{}-{}.tmp",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        let temporary = path.with_file_name(temporary);
+        let mut options = std::fs::OpenOptions::new();
+        let _ = options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt as _;
+            let _ = options.mode(0o600);
+        }
+        match options.open(&temporary) {
+            Ok(file) => return Ok((PendingWrite(temporary), file)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AlreadyExists,
+        "could not reserve a temporary settings file",
+    ))
 }
 
 /// The `localStorage` key for a store: prefixed, so a page's other
@@ -282,6 +345,107 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn failed_mutations_keep_the_snapshot_and_can_be_retried() {
+        let directory = temporary("write-failure");
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).expect("test directory");
+        let path = directory.join("settings.store");
+        let backup = directory.join("saved.store");
+        let mut store = Store::open_at(&path).expect("opens");
+        store.set("theme", "light").expect("initial write");
+        store.set("removed", "keep").expect("initial write");
+
+        // Force failure at rename, after the temporary file has been written.
+        std::fs::rename(&path, &backup).expect("retain original settings");
+        std::fs::create_dir(&path).expect("block destination with a directory");
+        assert!(store.set("theme", "dark").is_err());
+        assert_eq!(store.get("theme"), Some("light"));
+        assert!(store.set("new", "retry me").is_err());
+        assert_eq!(store.get("new"), None);
+        assert!(store.remove("removed").is_err());
+        assert_eq!(store.get("removed"), Some("keep"));
+        assert_eq!(
+            std::fs::read_dir(&directory).expect("list").count(),
+            2,
+            "failed writes leave no temporary files"
+        );
+        std::fs::remove_dir(&path).expect("unblock");
+        std::fs::rename(&backup, &path).expect("restore settings");
+
+        store.set("theme", "dark").expect("retry update");
+        store.set("new", "retry me").expect("retry insertion");
+        assert_eq!(
+            store.remove("removed").expect("retry removal"),
+            Some("keep".into())
+        );
+        let reopened = Store::open_at(&path).expect("reopen");
+        assert_eq!(reopened.get("theme"), Some("dark"));
+        assert_eq!(reopened.get("new"), Some("retry me"));
+        assert_eq!(reopened.get("removed"), None);
+        std::fs::remove_dir_all(directory).expect("cleanup");
+    }
+
+    #[test]
+    fn concurrent_snapshots_publish_complete_files_without_temp_collisions() {
+        let directory = temporary("concurrent");
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).expect("test directory");
+        let path = directory.join("settings.store");
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(8));
+        let workers: Vec<_> = (0..8)
+            .map(|worker| {
+                let path = path.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    let mut store = Store::open_at(path).expect("opens");
+                    let _ = barrier.wait();
+                    for sequence in 0..40 {
+                        let value = format!("{worker}:{sequence}:{}", "नमस्ते=".repeat(128));
+                        store.set("value", value).expect("concurrent atomic write");
+                    }
+                })
+            })
+            .collect();
+        for worker in workers {
+            worker.join().expect("writer completes");
+        }
+        let store = Store::open_at(&path).expect("reopens");
+        let value = store.get("value").expect("complete value");
+        assert!((0..8).any(|worker| value == format!("{worker}:39:{}", "नमस्ते=".repeat(128))));
+        assert_eq!(std::fs::read_dir(&directory).expect("list").count(), 1);
+        std::fs::remove_dir_all(directory).expect("cleanup");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn writes_do_not_follow_legacy_temp_symlinks_and_are_private() {
+        use std::os::unix::fs::{PermissionsExt as _, symlink};
+
+        let directory = temporary("symlink");
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).expect("test directory");
+        let path = directory.join("settings.store");
+        let victim = directory.join("unrelated.txt");
+        std::fs::write(&victim, "do not overwrite").expect("victim");
+        symlink(&victim, path.with_extension("store.tmp")).expect("old temporary path");
+        let mut store = Store::open_at(&path).expect("opens");
+        store.set("key", "value").expect("writes");
+        assert_eq!(
+            std::fs::read_to_string(victim).expect("victim intact"),
+            "do not overwrite"
+        );
+        assert_eq!(
+            std::fs::metadata(path)
+                .expect("metadata")
+                .permissions()
+                .mode()
+                & 0o077,
+            0
+        );
+        std::fs::remove_dir_all(directory).expect("cleanup");
     }
 
     #[test]

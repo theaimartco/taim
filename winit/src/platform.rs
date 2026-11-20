@@ -9,7 +9,7 @@
 //! | | Android | iOS | Web | Windows, macOS, Linux |
 //! |---|---|---|---|---|
 //! | [`open_url`] | yes | yes (main thread) | new tab (after a tap) | yes |
-//! | [`share_text`] | share sheet | unsupported | Web Share, where offered | unsupported |
+//! | [`share_text`] | share sheet | share sheet | Web Share, where offered | macOS share picker; Windows, Linux unsupported |
 //! | [`vibrate`] | yes | fixed length (iPhone) | where offered (after a tap) | unsupported |
 //! | [`data_dir`] | app files | app sandbox | unsupported (`taim::storage` uses `localStorage`) | per-user data |
 //!
@@ -53,8 +53,9 @@ pub fn vibrate(duration: Duration) -> Result<(), Error> {
 
 /// A directory private to this application where it can keep files, created
 /// if it does not exist: the app's internal files directory on Android, the
-/// platform's per-user data directory (named after the executable) on
-/// desktops.
+/// platform's per-user data directory on desktops. macOS uses Foundation's
+/// Application Support directory inside the App Sandbox container when enabled;
+/// bundled apps are namespaced by bundle ID, other executables by file name.
 pub fn data_dir() -> Result<PathBuf, Error> {
     let directory = imp::data_dir()?;
     std::fs::create_dir_all(&directory).map_err(|error| Error::Failed(error.to_string()))?;
@@ -238,16 +239,18 @@ mod imp {
 mod imp {
     use super::Error;
 
+    #[cfg(not(target_os = "macos"))]
     use std::path::PathBuf;
+    #[cfg(not(target_os = "macos"))]
     use std::process::{Command, Stdio};
     use std::time::Duration;
 
+    #[cfg(target_os = "macos")]
+    pub use super::macos::{data_dir, open_url, share_text};
+
+    #[cfg(not(target_os = "macos"))]
     pub fn open_url(url: &str) -> Result<(), Error> {
-        let mut command = if cfg!(target_os = "macos") {
-            let mut command = Command::new("open");
-            let _ = command.arg(url);
-            command
-        } else if cfg!(target_os = "windows") {
+        let mut command = if cfg!(target_os = "windows") {
             // Not `cmd /C start`: cmd would split the URL at `&` and run
             // what follows as a command. The URL protocol handler takes
             // the URL as one argument, with no shell in between.
@@ -269,6 +272,7 @@ mod imp {
         Ok(())
     }
 
+    #[cfg(not(target_os = "macos"))]
     pub fn share_text(_text: &str) -> Result<(), Error> {
         Err(Error::Unsupported)
     }
@@ -277,6 +281,7 @@ mod imp {
         Err(Error::Unsupported)
     }
 
+    #[cfg(not(target_os = "macos"))]
     pub fn data_dir() -> Result<PathBuf, Error> {
         let name = std::env::current_exe()
             .ok()
@@ -289,8 +294,6 @@ mod imp {
 
         let base = if cfg!(target_os = "windows") {
             std::env::var_os("APPDATA").map(PathBuf::from)
-        } else if cfg!(target_os = "macos") {
-            home().map(|home| home.join("Library/Application Support"))
         } else {
             std::env::var_os("XDG_DATA_HOME")
                 .map(PathBuf::from)
@@ -300,6 +303,68 @@ mod imp {
 
         base.map(|base| base.join(name))
             .ok_or_else(|| Error::Failed("no home directory".to_owned()))
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[allow(unsafe_code)]
+mod macos {
+    use super::Error;
+    use objc2::rc::autoreleasepool;
+    use objc2_app_kit::NSWorkspace;
+    use objc2_foundation::{
+        NSBundle, NSSearchPathDirectory, NSSearchPathDomainMask,
+        NSSearchPathForDirectoriesInDomains, NSString, NSURL,
+    };
+    use std::path::PathBuf;
+
+    pub fn open_url(url: &str) -> Result<(), Error> {
+        // SAFETY: Foundation validates the URL string; NSWorkspace's URL opener
+        // is callable from any thread and works within App Sandbox.
+        let opened = autoreleasepool(|_| unsafe {
+            let url = NSURL::URLWithString(&NSString::from_str(url))
+                .ok_or_else(|| Error::Failed("not a URL".to_owned()))?;
+            Ok::<_, Error>(NSWorkspace::sharedWorkspace().openURL(&url))
+        })?;
+        opened
+            .then_some(())
+            .ok_or_else(|| Error::Failed("macOS could not open the URL".to_owned()))
+    }
+
+    /// `NSSharingServicePicker`, anchored to the middle of the key window.
+    /// Any thread may call it; the picker appears on the main thread.
+    pub fn share_text(text: &str) -> Result<(), Error> {
+        crate::apple::share_text(text.to_owned());
+        Ok(())
+    }
+
+    pub fn data_dir() -> Result<PathBuf, Error> {
+        // SAFETY: Foundation's path array stays alive within the autorelease
+        // pool. No Objective-C objects escape this call, even on worker threads.
+        // Unlike the HOME environment variable, the native search respects
+        // sandbox container redirection.
+        autoreleasepool(|_| unsafe {
+            let paths = NSSearchPathForDirectoriesInDomains(
+                NSSearchPathDirectory::NSApplicationSupportDirectory,
+                NSSearchPathDomainMask::NSUserDomainMask,
+                objc2::runtime::Bool::YES,
+            );
+            let base = paths
+                .as_ref()
+                .firstObject()
+                .ok_or_else(|| Error::Failed("no Application Support directory".to_owned()))?;
+            let name = NSBundle::mainBundle()
+                .bundleIdentifier()
+                .map(|id| id.to_string())
+                .or_else(|| {
+                    std::env::current_exe()
+                        .ok()?
+                        .file_stem()
+                        .map(|name| name.to_string_lossy().into_owned())
+                })
+                .unwrap_or_else(|| "taim-app".to_owned());
+            Ok(PathBuf::from(base.to_string()).join(name))
+        })
     }
 }
 
@@ -342,10 +407,12 @@ mod imp {
         Ok(())
     }
 
-    /// Presenting a share sheet needs the application's view controller,
-    /// which TAIM does not own on iOS yet.
-    pub fn share_text(_text: &str) -> Result<(), Error> {
-        Err(Error::Unsupported)
+    /// Presents `UIActivityViewController` from the key window's top view
+    /// controller (anchored mid-screen on iPad). Any thread may call it; the
+    /// sheet appears on the main thread.
+    pub fn share_text(text: &str) -> Result<(), Error> {
+        crate::apple::share_text(text.to_owned());
+        Ok(())
     }
 
     #[link(name = "AudioToolbox", kind = "framework")]

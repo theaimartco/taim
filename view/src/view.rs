@@ -3,6 +3,49 @@ use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::{Constraints, Sizing};
 use crate::{Event, Instant, Point, Rectangle, Size, Vector, mouse, semantics};
 
+/// How a view is drawn this frame, on top of where layout put it: moved,
+/// scaled about its centre and faded. It changes only the drawing, never
+/// layout or where input lands, so it is free to animate every frame.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Visual {
+    /// How far it is drawn from its laid-out position.
+    pub offset: Vector,
+    /// Its scale about its centre; `1.0` is its own size.
+    pub scale: f32,
+    /// Its opacity, with everything inside it: `1.0` is opaque.
+    pub opacity: f32,
+}
+
+impl Visual {
+    /// Drawn exactly where and as layout put it.
+    pub const IDENTITY: Self = Self {
+        offset: Vector::ZERO,
+        scale: 1.0,
+        opacity: 1.0,
+    };
+
+    /// Whether this changes nothing.
+    pub fn is_identity(&self) -> bool {
+        *self == Self::IDENTITY
+    }
+
+    /// `self` applied inside `outer`.
+    #[must_use]
+    pub fn then(self, outer: Self) -> Self {
+        Self {
+            offset: self.offset + outer.offset,
+            scale: self.scale * outer.scale,
+            opacity: self.opacity * outer.opacity,
+        }
+    }
+}
+
+impl Default for Visual {
+    fn default() -> Self {
+        Self::IDENTITY
+    }
+}
+
 /// A piece of user interface.
 ///
 /// A view measures itself, paints itself and reacts to input. It never
@@ -150,6 +193,31 @@ pub trait View: 'static {
 
     /// Hands each child to `visit`, in paint order.
     fn children(&mut self, _visit: &mut dyn FnMut(&mut Child)) {}
+
+    /// How the view, with everything inside it, is drawn: moved, scaled or
+    /// faded from where layout put it (see [`VisualCx`](crate::VisualCx)).
+    /// Return a changing value only while
+    /// [`is_animating`](Self::is_animating) says so. Only drawing changes:
+    /// pointer input still finds the view at its laid-out place.
+    fn visual(&self, _cx: &crate::VisualCx) -> Visual {
+        Visual::IDENTITY
+    }
+
+    /// Whether this view's [`visual`](Self::visual) opacity replaces the
+    /// opacity it inherits instead of multiplying it: a shared element
+    /// flying between fading pages.
+    #[doc(hidden)]
+    fn resets_opacity(&self) -> bool {
+        false
+    }
+
+    /// This view as a [`glass`](crate::views::glass) pane, so a
+    /// [`glass_group`](crate::views::glass_group) can find the panes it
+    /// draws. Only glass answers.
+    #[doc(hidden)]
+    fn as_glass(&mut self) -> Option<&mut crate::views::Glass> {
+        None
+    }
 
     /// Hands each child to `visit` in reverse paint order: topmost first,
     /// the order input is offered in.

@@ -69,6 +69,10 @@ pub struct Quad {
     ///   wrongly. `web-colors` is a default feature of the `taim` crate
     ///   today, which means the default build ignores this field.
     pub luminance: f32,
+
+    /// Touch and merging for a glass [`material`](Self::material); see
+    /// [`Liquid`](crate::material::Liquid). `None` for every other quad.
+    pub liquid: Option<crate::material::Liquid>,
 }
 
 impl Default for Quad {
@@ -80,6 +84,7 @@ impl Default for Quad {
             snap: CRISP,
             luminance: 1.0,
             material: crate::material::Material::OPAQUE,
+            liquid: None,
         }
     }
 }

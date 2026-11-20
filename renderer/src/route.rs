@@ -116,6 +116,13 @@ where
         }
     }
 
+    fn start_opacity_reset(&mut self, opacity: f32) {
+        match self {
+            Self::Preferred(renderer) => renderer.start_opacity_reset(opacity),
+            Self::Recovery(renderer) => renderer.start_opacity_reset(opacity),
+        }
+    }
+
     fn end_opacity(&mut self) {
         match self {
             Self::Preferred(renderer) => renderer.end_opacity(),

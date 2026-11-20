@@ -29,6 +29,8 @@ pub mod platform;
 
 #[cfg(any(target_os = "android", test))]
 pub mod android;
+#[cfg(any(target_os = "ios", target_os = "macos", test))]
+pub mod apple;
 mod error;
 #[cfg(all(feature = "measurement", not(target_arch = "wasm32")))]
 mod measurement;

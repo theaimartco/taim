@@ -39,34 +39,44 @@ impl Layer {
             core::material::Material::OPAQUE
         };
 
-        self.quads.add(
-            Quad {
-                position: [bounds.x, bounds.y],
-                size: [bounds.width, bounds.height],
-                border_color: color::pack(quad.border.color).scale_light(
-                    if color::GAMMA_CORRECTION {
-                        quad.luminance
-                    } else {
-                        1.0
-                    },
-                ),
-                border_radius: (quad.border.radius * uniform_scale).into(),
-                border_width: quad.border.width * uniform_scale,
-                shadow_color: color::pack(quad.shadow.color),
-                shadow_offset: (quad.shadow.offset * uniform_scale).into(),
-                shadow_blur_radius: quad.shadow.blur_radius * uniform_scale,
-                snap: u32::from(quad.snap),
-                material: [
-                    material.roughness,
-                    material.thickness_mm,
-                    material.ior,
-                    material.dispersion,
-                ],
-                transmission: material.transmission,
-            },
-            &background,
-            luminance,
-        );
+        let quad_data = Quad {
+            position: [bounds.x, bounds.y],
+            size: [bounds.width, bounds.height],
+            border_color: color::pack(quad.border.color).scale_light(if color::GAMMA_CORRECTION {
+                quad.luminance
+            } else {
+                1.0
+            }),
+            border_radius: (quad.border.radius * uniform_scale).into(),
+            border_width: quad.border.width * uniform_scale,
+            shadow_color: color::pack(quad.shadow.color),
+            shadow_offset: (quad.shadow.offset * uniform_scale).into(),
+            shadow_blur_radius: quad.shadow.blur_radius * uniform_scale,
+            snap: u32::from(quad.snap),
+            material: [
+                material.roughness,
+                material.thickness_mm,
+                material.ior,
+                material.dispersion,
+            ],
+            transmission: material.transmission,
+        };
+
+        // Liquid glass needs linear light like any material, and a flat tint.
+        if let (Some(liquid), Background::Color(tint), true) =
+            (quad.liquid, &background, color::GAMMA_CORRECTION)
+        {
+            self.quads.add_liquid(crate::quad::Liquid::new(
+                color::pack(*tint).scale_light(luminance),
+                quad_data,
+                &liquid,
+                transformation,
+                uniform_scale,
+            ));
+            return;
+        }
+
+        self.quads.add(quad_data, &background, luminance);
     }
 
     pub fn draw_paragraph(

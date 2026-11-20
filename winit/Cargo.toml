@@ -59,10 +59,12 @@ winit.workspace = true
 [target.'cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))'.dependencies]
 arboard.workspace = true
 
-# iOS services: links, the pasteboard. The same versions winit uses.
+# iOS services (see src/ios): links, the pasteboard, haptics, biometrics,
+# the keychain, notifications, location and media. The same versions winit uses.
 [target.'cfg(target_os = "ios")'.dependencies]
 objc2 = "0.5.2"
-objc2-foundation = { version = "0.2.2", features = ["NSDictionary", "NSString", "NSURL"] }
+block2 = "0.5.1"
+objc2-foundation = { version = "0.2.2", features = ["NSDictionary", "NSGeometry", "NSString", "NSURL"] }
 objc2-ui-kit = { version = "0.2.2", features = ["UIApplication", "UIPasteboard", "UIResponder", "block2"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -79,6 +81,9 @@ zbus.optional = true
 # Delete once we update to `winit 0.31`
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = { version = "0.5", features = ["relax-sign-encoding"] }
+block2 = "0.5.1"
+objc2-foundation = { version = "0.2.2", features = ["NSArray", "NSBundle", "NSGeometry", "NSPathUtilities", "NSString", "NSThread", "NSURL"] }
+objc2-app-kit = { version = "0.2.2", features = ["NSWorkspace"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.22.4"

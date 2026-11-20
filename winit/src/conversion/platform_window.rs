@@ -167,9 +167,24 @@ fn platform_attributes(
     }
 }
 
+#[cfg(target_os = "ios")]
+fn platform_attributes(
+    mut attributes: WindowAttributes,
+    _settings: &window::Settings,
+    _application_id: Option<String>,
+) -> WindowAttributes {
+    // UIKit uses this size to construct the native view and cannot resize it
+    // later. The desktop default would place a 1024-point view on a 402-point
+    // phone, clipping the content and misaligning touch coordinates. Let winit
+    // use the actual screen bounds for the mobile root window instead.
+    attributes.inner_size = None;
+    attributes
+}
+
 #[cfg(not(any(
     target_os = "windows",
     target_os = "macos",
+    target_os = "ios",
     target_os = "linux",
     target_os = "dragonfly",
     target_os = "freebsd",

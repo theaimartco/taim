@@ -8,6 +8,94 @@ break the public API.
 
 ### Added
 
+- iOS services (`taim::apple`, `docs/platform/ios.md`): the share sheet
+  (`platform::share_text`, which returned `Unsupported`), Taptic Engine
+  haptics, Face ID/Touch ID status and prompts, keychain items with
+  this-device-only and biometric access, local notifications with
+  permission, scheduling, badges and open/dismiss/foreground events (the
+  launch tap included), when-in-use location (one-shot and watch streams),
+  the system photo picker and camera capture with camera permission.
+- iOS: the root view is laid out inside the safe area, and the shell follows
+  the system light/dark appearance and Reduce Motion.
+- `scripts/ios/package.py` builds signed device apps and `.ipa` files
+  (`--target aarch64-apple-ios --mode development|ad-hoc|app-store`),
+  checking the provisioning profile against the mode, embedding it and
+  deriving entitlements from it; adds Info.plist usage descriptions
+  (`--usage`), an asset-catalog app icon (`--icon`), version and build
+  numbers, and links Simulator entitlements so the keychain works there.
+- `examples/apple_services_probe`, a Simulator/device/Mac fixture for the
+  Apple services; the release check lints it on every target.
+- macOS services under the same `taim::apple` functions
+  (`docs/platform/macos.md`): the `NSSharingServicePicker` share picker
+  (`platform::share_text`, which returned `Unsupported`), Force Touch trackpad
+  haptics, Touch ID status and prompts, the keychain (data-protection
+  keychain when signed with an access group, else the login keychain), local
+  notifications with events, location, the open panel as the media picker,
+  and camera permission. Reduce Motion is followed. `capture_media` is
+  `Unsupported` on macOS.
+- `--size` for the macOS and iOS packagers builds with `release-small`.
+  `scripts/macos/apple-services-probe.toml` packages the services probe.
+
+- Motion across the views (`docs/design/motion-language.md`). Buttons and chips
+  squish under the finger and spring back. Switches slide their knob and
+  stretch it while held. Checkbox ticks and radio dots pop in. The segmented
+  control's indicator stretches towards its target, catches up and bounces,
+  and it now follows outside changes to the selection. A slider thumb swells
+  while dragged. `scroll` and `list` rubber-band past their ends and bounce
+  when a fling hits one. New `animated(view)` glides content to wherever
+  layout moves it, and `appear(view)` fades and rises it in, with `.delay`
+  for cascades. Every one of these respects Reduce Motion.
+- `View::visual(&VisualCx)` lets a view move, scale or fade itself and its
+  subtree when drawn. `VisualCx` gives the frame time, the view's frame in
+  its parent and its window bounds.
+- Navigator transitions. `navigator(..).transition(PageTransition::…)`
+  offers `Slide` (the default), `Zoom`, `Fade`, `Rise` and `None`:
+  - `Slide` is the iOS push: the page underneath drifts with parallax and
+    darkens, and the moving page casts a shadow. A swipe from the left edge
+    drags the top page back with the finger. Let go past 40% of the width,
+    or flick it, and it goes back at the finger's speed; otherwise it
+    returns.
+  - `Zoom` grows the new page in while it fades in. `Rise` brings the new
+    page up from the bottom while the old one recedes.
+  - With Reduce Motion, pages change at once, as before.
+- Shared elements: `hero(tag, view)`. While the navigator moves between two
+  pages that both have a hero with the same tag, the hero flies from one
+  place to the other, growing or shrinking on the way, at full opacity even
+  over a fading page. It also flies during an edge swipe, following the
+  finger. `Renderer::start_opacity_reset` (wgpu, tiny-skia) lets a subtree
+  ignore the opacity it inherits.
+
+- Live liquid glass (`docs/design/liquid-glass.md`): a press lights the
+  rim nearest the finger, magnifies what is under it and swells the pane on
+  a spring; `.interactive()` panes also stretch after a drag and wobble
+  back. `glass_group` melts nearby panes into one another through a smooth
+  signed-distance union. The scene light leans towards the pointer on
+  desktops and with the device's tilt on iOS. Glass keeps text on it
+  readable over any backdrop. Reduce Motion stops the movement.
+  `SceneLight::leaned`, `material::Liquid` and `PaintCx::fill_liquid` are
+  new, and `renderer::Quad` has a `liquid` field.
+- `examples/liquid` has glass transport controls that melt together when
+  pressed.
+
+### Changed
+
+- `[profile.release]` uses fat LTO instead of thin: 13% smaller executables
+  (counter on macOS 6.05 → 5.26 MiB, iOS 6.47 → 5.77 MiB) at the same frame
+  cost. New `taim-new` projects and generated Android projects do the same.
+- `[profile.release-small]` keeps the rasterizers at `opt-level = 3`. Before,
+  everything was built for size, which made software rendering 5x slower;
+  it is now about 25% slower than `release`, for 41% smaller executables
+  (counter on macOS 3.58 MiB, iOS 4.00 MiB). New `taim-new` projects get it.
+
+### Fixed
+
+- iOS apps ran at 60 Hz on ProMotion iPhones: `scripts/ios/package.py` now
+  sets `CADisableMinimumFrameDurationOnPhone`, so they can reach 120 Hz.
+  `TAIM_FRAME_TRACE` lines now include the gap since the previous frame.
+
+- Notification scheduling and badges report `ServiceError::Denied`, not
+  `Failed`, when the user has not allowed notifications.
+
 - Web: applications run in the browser (`scripts/web/build.sh`,
   `docs/platform/web.md`). The canvas mounts into `#taim` or the page body,
   the GPU device is created asynchronously, Fira Sans is embedded, panics

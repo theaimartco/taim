@@ -48,6 +48,31 @@ const MAX_FLING: f32 = 8_000.0;
 const FRICTION: f32 = 4.0;
 /// Velocity is measured over the last this many seconds of the drag.
 const VELOCITY_WINDOW: f32 = 0.1;
+/// How far content can be pulled past an end, in logical pixels: the
+/// stretch approaches this but never reaches it.
+const STRETCH: f32 = 140.0;
+/// How much of a fling's remaining speed carries past the end it hits.
+const BOUNCE_CARRY: f32 = 0.5;
+/// The furthest past an end a fling may carry, in pixels per second.
+const MAX_BOUNCE: f32 = 2_400.0;
+
+/// Pulling past an end: critically damped, so it eases back without
+/// wobbling, like a rubber band.
+const SPRING_BACK: look::Tuning = look::Tuning {
+    omega: 13.0,
+    zeta: 1.0,
+};
+
+/// Moves a stretch of `over` past an end by `pull` pixels, with more
+/// resistance the further it already is.
+fn stretch_by(over: f32, pull: f32) -> f32 {
+    // Work in the unresisted distance `d`, where `over = STRETCH * d / (d + STRETCH)`.
+    let magnitude = over.abs().min(STRETCH * 0.999);
+    let raw = magnitude * STRETCH / (STRETCH - magnitude);
+    let raw = (raw * over.signum() + pull * 0.55).clamp(-1.0e6, 1.0e6);
+    let resisted = STRETCH * raw.abs() / (raw.abs() + STRETCH);
+    resisted * raw.signum()
+}
 
 #[derive(Debug, Clone)]
 struct Drag {
@@ -81,7 +106,7 @@ impl Fling {
 
 /// Vertical scrolling: the offset, wheel input, touch dragging with slop
 /// and flings. Shared by [`scroll`] and [`list`](super::list).
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct Scroller {
     /// A cell so a fling can advance while painting, which only borrows.
     offset: Cell<f32>,
@@ -92,9 +117,30 @@ pub(crate) struct Scroller {
     drag: Option<Drag>,
     /// Momentum after the finger left.
     fling: Cell<Option<Fling>>,
+    /// How far the content is pulled past an end, positive past the end
+    /// and negative above the start; springs back to zero.
+    over: Cell<look::Spring>,
+    /// The stretch at the last [`Scroller::advance`], for
+    /// [`Scroller::shown_offset`], which has no clock.
+    stretched: Cell<f32>,
     /// Scrolling changes which children exist (a lazy list), so it needs a
     /// layout rather than just a paint.
     relayout: bool,
+}
+
+impl Default for Scroller {
+    fn default() -> Self {
+        Self {
+            offset: Cell::new(0.0),
+            content: 0.0,
+            viewport: 0.0,
+            drag: None,
+            fling: Cell::new(None),
+            over: Cell::new(look::Spring::new(0.0, SPRING_BACK)),
+            stretched: Cell::new(0.0),
+            relayout: false,
+        }
+    }
 }
 
 impl Scroller {
@@ -120,6 +166,53 @@ impl Scroller {
         self.offset.get()
     }
 
+    /// The offset content is drawn at: [`Scroller::offset`] plus any
+    /// stretch past an end.
+    pub fn shown_offset(&self) -> f32 {
+        self.offset.get() + self.stretched.get()
+    }
+
+    /// Whether a fling or a stretch is still moving.
+    pub fn is_moving(&self, now: Instant) -> bool {
+        self.is_flinging() || self.over.get().is_moving(now)
+    }
+
+    /// Follows a dragging finger `delta` pixels (positive downwards): the
+    /// content scrolls, and past an end it stretches with resistance.
+    fn drag_by(&mut self, delta: f32, now: Instant) -> bool {
+        let mut spring = self.over.get();
+        let mut over = spring.value(now);
+        // Positive moves towards the end of the content.
+        let mut want = -delta;
+
+        // Pulling back from a stretch eases it first.
+        if over != 0.0 && want.signum() != over.signum() {
+            let back = want.abs().min(over.abs());
+            over -= back * over.signum();
+            want -= back * want.signum();
+        }
+        let before = self.offset.get();
+        let moved = self.scroll_by(-want);
+        want -= self.offset.get() - before;
+        if want.abs() > f32::EPSILON {
+            over = stretch_by(over, want);
+        }
+        let stretched = over != spring.value(now);
+        spring.set(over);
+        self.over.set(spring);
+        self.stretched.set(over);
+        moved || stretched
+    }
+
+    /// Lets a stretch spring back.
+    fn let_go(&self, now: Instant) {
+        let mut spring = self.over.get();
+        if spring.value(now) != 0.0 || spring.target() != 0.0 {
+            spring.go(0.0, now);
+            self.over.set(spring);
+        }
+    }
+
     /// Records the content and visible heights, keeping the offset in range.
     pub fn set_extent(&mut self, content: f32, viewport: f32) {
         self.content = content;
@@ -141,6 +234,7 @@ impl Scroller {
 
     /// Advances a running fling to `now`. Returns whether the offset moved.
     pub fn advance(&self, now: Instant) -> bool {
+        self.stretched.set(self.over.get().value(now));
         let Some(fling) = self.fling.get() else {
             return false;
         };
@@ -156,6 +250,14 @@ impl Scroller {
         let at_end = (next <= 0.0 && fling.velocity < 0.0) || (next >= max && fling.velocity > 0.0);
         if !moving || at_end {
             self.fling.set(None);
+        }
+        // Hitting an end at speed carries the content a little past it,
+        // and it springs back.
+        if at_end && moving {
+            let left = fling.velocity * (-FRICTION * elapsed).exp();
+            let mut spring = self.over.get();
+            spring.kick((left * BOUNCE_CARRY).clamp(-MAX_BOUNCE, MAX_BOUNCE), now);
+            self.over.set(spring);
         }
         moved
     }
@@ -195,6 +297,7 @@ impl Scroller {
         // The system took the gesture: drop the drag, never fling from it.
         if crate::tree::is_cancellation(event) {
             self.drag = None;
+            self.let_go(cx.now());
             return Handled::No;
         }
         let now = cx.now();
@@ -203,9 +306,13 @@ impl Scroller {
             Some(Gesture::Down(at)) if cx.is_hovered() => {
                 // A finger landing on a moving list stops it, and only that:
                 // it must not press whatever happened to be underneath.
-                let caught = self.fling.get().is_some();
+                let caught = self.fling.get().is_some() || self.over.get().is_moving(now);
                 let _ = self.advance(now);
                 self.fling.set(None);
+                // Hold a springing stretch where the finger caught it.
+                let mut spring = self.over.get();
+                spring.set(spring.value(now));
+                self.over.set(spring);
 
                 self.drag = Some(Drag {
                     start: at.y,
@@ -254,7 +361,7 @@ impl Scroller {
                     let _ = drag.samples.drain(..16);
                 }
 
-                if self.scroll_by(delta) {
+                if self.drag_by(delta, now) {
                     self.moved(cx);
                 }
                 Handled::Yes
@@ -264,14 +371,20 @@ impl Scroller {
                     return Handled::No;
                 };
                 if !drag.scrolling {
+                    self.let_go(now);
                     return Handled::No;
+                }
+                self.let_go(now);
+                if self.over.get().is_moving(now) {
+                    cx.request_animation();
                 }
 
                 // The finger is still where it last moved to; a finger that
                 // rested before lifting has no speed left to fling with.
                 drag.samples.push((now, drag.last));
                 let velocity = Self::release_velocity(&drag.samples);
-                if velocity.abs() >= MIN_FLING {
+                // Let go while stretched, it only springs back.
+                if velocity.abs() >= MIN_FLING && self.stretched.get() == 0.0 {
                     self.fling.set(Some(Fling {
                         started: now,
                         from: self.offset.get(),
@@ -393,14 +506,75 @@ impl View for Scroll {
     }
 
     fn scroll_offset(&self) -> Vector {
-        Vector::new(0.0, self.scroller.offset())
+        Vector::new(0.0, self.scroller.shown_offset())
     }
 
-    fn is_animating(&self, _now: Instant) -> bool {
-        self.scroller.is_flinging()
+    fn is_animating(&self, now: Instant) -> bool {
+        self.scroller.is_moving(now)
     }
 
     fn children(&mut self, visit: &mut dyn FnMut(&mut Child)) {
         visit(&mut self.content);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Duration;
+
+    #[test]
+    fn a_stretch_resists_more_the_further_it_goes_and_never_runs_away() {
+        let first = stretch_by(0.0, 40.0);
+        let second = stretch_by(first, 40.0) - first;
+        assert!(first > 0.0 && second > 0.0 && second < first);
+        assert!(stretch_by(0.0, 1.0e7) < STRETCH);
+        assert!(stretch_by(0.0, -40.0) < 0.0);
+    }
+
+    #[test]
+    fn a_fling_into_the_top_bounces_past_it_and_springs_back() {
+        let mut scroller = Scroller::default();
+        scroller.set_extent(2_000.0, 400.0);
+        scroller.offset.set(20.0);
+        let start = Instant::now();
+        scroller.fling.set(Some(Fling {
+            started: start,
+            from: 20.0,
+            velocity: -3_000.0,
+        }));
+
+        // It reaches the top within a few frames and carries on past it.
+        let mut now = start;
+        for _ in 0..4 {
+            now += Duration::from_millis(16);
+            let _ = scroller.advance(now);
+        }
+        assert!(!scroller.is_flinging() && scroller.offset() == 0.0);
+        assert!(scroller.is_moving(now));
+        let _ = scroller.advance(now + Duration::from_millis(60));
+        let past = scroller.shown_offset();
+        assert!(past < -5.0, "the content shows past the top: {past}");
+
+        let later = now + Duration::from_secs(2);
+        let _ = scroller.advance(later);
+        assert!(scroller.shown_offset().abs() < 0.01 && !scroller.is_moving(later));
+    }
+
+    #[test]
+    fn dragging_past_the_end_stretches_and_dragging_back_undoes_it_first() {
+        let mut scroller = Scroller::default();
+        scroller.set_extent(500.0, 400.0);
+        let now = Instant::now();
+        // Up by 150: 100 of scrolling, then a stretch past the end.
+        assert!(scroller.drag_by(-150.0, now));
+        assert_eq!(scroller.offset(), 100.0);
+        let stretched = scroller.shown_offset() - 100.0;
+        assert!(stretched > 0.0 && stretched < 50.0);
+
+        // Back down: the stretch goes before the content scrolls.
+        let _ = scroller.drag_by(stretched, now);
+        assert_eq!(scroller.offset(), 100.0);
+        assert!((scroller.shown_offset() - 100.0).abs() < 1.0e-3);
     }
 }

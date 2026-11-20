@@ -40,6 +40,15 @@ def require(path):
     return path
 
 
+def ndk_tools(ndk, host=None):
+    """Select the actual NDK host tools for Linux or macOS (including arm64 Macs)."""
+    host = host or sys.platform
+    tags = {"linux": "linux-x86_64", "darwin": "darwin-x86_64"}
+    if host not in tags:
+        raise RuntimeError("This APK builder supports Linux and macOS hosts")
+    return require(ndk / "toolchains/llvm/prebuilt" / tags[host] / "bin")
+
+
 def verify_apk_package(sdk, apk, expected):
     """Reject the wrong APK before an acceptance run can attribute stale app state to it."""
     tool = require(sdk / "build-tools" / os.environ.get("TAIM_ANDROID_BUILD_TOOLS", "35.0.0") / "aapt2")
@@ -102,9 +111,7 @@ def main():
     revision = next(line.split("=", 1)[1].strip() for line in version.splitlines() if line.startswith("Pkg.Revision"))
     if int(revision.split(".")[0]) < 28:
         raise RuntimeError("NDK r28+ required for the initial 16 KiB page-size packaging path")
-    if sys.platform != "linux":
-        raise RuntimeError("This initial script supports Linux hosts; Android platform code is host independent")
-    tools = require(ndk / "toolchains/llvm/prebuilt/linux-x86_64/bin")
+    tools = ndk_tools(ndk)
     target, clang_target = TARGETS[args.abi]
     env = os.environ.copy()
     linker = require(tools / f"{clang_target}26-clang")
@@ -125,7 +132,7 @@ def main():
     # Cargo may use a configured/custom target directory; query it rather than guess.
     import json
     metadata = json.loads(subprocess.check_output(
-        ["cargo", "metadata", "--no-deps", "--format-version", "1"], cwd=ROOT, env=env))
+        ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"], cwd=ROOT, env=env))
     target_dir = Path(metadata["target_directory"])
     profile = "release" if args.release else "debug"
     library = require(target_dir / target / profile / f"lib{crate}.so")

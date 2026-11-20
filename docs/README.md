@@ -64,6 +64,7 @@ Quality assurance infrastructure:
 |---|---|
 | [Golden Policy](testing/golden-policy.md) | Visual regression test approval process |
 | [Release Matrix](testing/release-matrix.md) | Device, language, and platform coverage |
+| [Production hardening evidence](testing/production-full-access-20261115.md) | Clean release candidate, runtime probes and remaining acceptance gates |
 
 ## 🔒 Security
 
@@ -72,6 +73,12 @@ Quality assurance infrastructure:
 | [Threat Model](security/threat-model.md) | Trust boundaries, protected assets, mitigations |
 
 ## 🛠️ Tools
+
+[macOS apps and Mac App Store packaging](platform/macos.md) covers sandboxed
+app bundles, distribution signing, installer validation and the runtime fixture.
+
+[iOS Simulator packaging](platform/ios.md) covers native Simulator bundles,
+the verified rendering path and the remaining device/accessibility limitations.
 
 | Document | Description |
 |---|---|

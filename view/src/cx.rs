@@ -119,6 +119,32 @@ impl PaintCx<'_> {
         );
     }
 
+    /// Like [`fill_material`](Self::fill_material), for liquid glass: a
+    /// press lights and magnifies it, and it melts into the neighbours
+    /// `liquid` lists. Without the liquid pass this is plain glass.
+    pub fn fill_liquid(
+        &mut self,
+        area: Rectangle,
+        tint: Color,
+        border: Border,
+        shadow: crate::Shadow,
+        material: taim_core::material::Material,
+        liquid: taim_core::material::Liquid,
+    ) {
+        self.renderer.fill_quad(
+            Quad {
+                bounds: area,
+                border,
+                shadow,
+                material,
+                liquid: Some(liquid),
+                snap: false,
+                ..Quad::default()
+            },
+            tint,
+        );
+    }
+
     /// Text color for secondary information: the text color faded toward
     /// the window's background as far as it can go while still reading at
     /// WCAG AA contrast (4.5:1) on it.
@@ -279,6 +305,41 @@ impl DescribeCx<'_> {
     /// Whether this view has keyboard focus.
     pub fn has_focus(&self) -> bool {
         self.focused
+    }
+}
+
+/// What [`View::visual`](crate::View::visual) is told: the time and where
+/// layout put the view.
+#[derive(Debug, Clone, Copy)]
+pub struct VisualCx {
+    pub(crate) now: crate::Instant,
+    pub(crate) frame: Rectangle,
+    pub(crate) bounds: Rectangle,
+}
+
+impl VisualCx {
+    /// A context for drawing at `now`, with the view laid out at `frame`
+    /// in its parent and at `bounds` in the window. For calling a view's
+    /// [`visual`](crate::View::visual) directly, as tests do.
+    pub fn new(now: crate::Instant, frame: Rectangle, bounds: Rectangle) -> Self {
+        Self { now, frame, bounds }
+    }
+
+    /// The frame time.
+    pub fn now(&self) -> crate::Instant {
+        self.now
+    }
+
+    /// Where layout put the view, relative to its parent: it changes when
+    /// layout moves the view, not when an ancestor scrolls.
+    pub fn frame(&self) -> Rectangle {
+        self.frame
+    }
+
+    /// Where layout put the view in window coordinates, before any
+    /// ancestor's [`Visual`](crate::Visual) moves it.
+    pub fn bounds(&self) -> Rectangle {
+        self.bounds
     }
 }
 

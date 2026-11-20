@@ -2,5 +2,6 @@
 # The Rust release TAIM is built and tested with.
 channel = "1.95.0"
 components = ["rustfmt", "clippy"]
-targets = ["aarch64-linux-android", "x86_64-linux-android"]
+# Add platform targets explicitly when needed; macOS builds need no Android SDK,
+# emulator or Rust Android targets. See README.md for Android's opt-in setup.
 profile = "minimal"

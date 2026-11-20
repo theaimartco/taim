@@ -3,7 +3,7 @@ use taim_signal::{Memo, Signal, Subscription};
 
 use futures::future::{AbortHandle, Abortable};
 use std::any::Any;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -617,18 +617,72 @@ impl IntoProp<bool> for bool {
 /// Whether transitions should be skipped, as set by the window's
 /// [`Scope::reduced_motion`].
 pub(crate) fn motion_reduced() -> bool {
-    REDUCED_MOTION.load(Ordering::Relaxed)
+    REDUCED_MOTION.with(Cell::get)
 }
 
-pub(crate) fn set_motion_reduced(reduced: bool) {
-    REDUCED_MOTION.store(reduced, Ordering::Relaxed);
+// Motion is window-local. Restore the caller when a custom view drives
+// another root, including when an application callback unwinds.
+pub(crate) struct MotionGuard(bool);
+
+impl MotionGuard {
+    pub(crate) fn enter(reduced: bool) -> Self {
+        Self(REDUCED_MOTION.with(|current| current.replace(reduced)))
+    }
 }
 
-static REDUCED_MOTION: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+impl Drop for MotionGuard {
+    fn drop(&mut self) {
+        REDUCED_MOTION.with(|current| current.set(self.0));
+    }
+}
+
+/// Notes that a glass surface was painted this frame, so the shell knows
+/// moving the scene light would change what is on screen.
+pub(crate) fn note_glass() {
+    GLASS_PAINTED.with(|painted| painted.set(true));
+}
+
+/// Clears the glass note, returning whether glass was painted since.
+pub(crate) fn take_glass() -> bool {
+    GLASS_PAINTED.with(|painted| painted.replace(false))
+}
+
+thread_local! {
+    static GLASS_PAINTED: Cell<bool> = const { Cell::new(false) };
+    static REDUCED_MOTION: Cell<bool> = const { Cell::new(false) };
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nested_motion_context_restores_the_window_after_unwinding() {
+        assert!(!motion_reduced());
+        let window = MotionGuard::enter(true);
+        let result = std::panic::catch_unwind(|| {
+            let _nested = MotionGuard::enter(false);
+            assert!(!motion_reduced());
+            panic!("application callback");
+        });
+        assert!(result.is_err());
+        assert!(motion_reduced());
+        drop(window);
+        assert!(!motion_reduced());
+    }
+
+    #[test]
+    fn motion_context_does_not_cross_ui_threads() {
+        let _window = MotionGuard::enter(true);
+        std::thread::spawn(|| {
+            assert!(!motion_reduced());
+            let _other = MotionGuard::enter(false);
+            assert!(!motion_reduced());
+        })
+        .join()
+        .expect("independent UI thread");
+        assert!(motion_reduced());
+    }
 
     #[test]
     fn mailbox_transfers_work_to_the_owner_thread_without_requiring_send_ui_state() {

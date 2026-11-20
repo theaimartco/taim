@@ -32,7 +32,9 @@ def main():
     if output.exists() and any(output.iterdir()):parser.error('Destination must be empty')
     output.mkdir(parents=True,exist_ok=True)
     for source in (ROOT/'scripts/android/templates').rglob('*'):
-        if not source.is_file() or '__pycache__' in source.parts or source.suffix=='.pyc':continue
+        # Skip caches a local Gradle or Python run leaves in the templates.
+        local={'__pycache__','.gradle','.cxx','build','.kotlin'}
+        if not source.is_file() or local.intersection(source.relative_to(ROOT/'scripts/android/templates').parts) or source.suffix=='.pyc':continue
         relative=source.relative_to(ROOT/'scripts/android/templates')
         target=output/relative
         if source.name in ('build-rust.py','gradle-bootstrap.py','artifact_paths.py'):target=output/'tools'/source.name
@@ -96,7 +98,7 @@ def main():
     # that source preserves its identity; separate generated copies cannot
     # collide even when they use the same Android application ID/cache.
     crate_name='taim_app_'+hashlib.sha256((args.package+'\0'+str(output)).encode()).hexdigest()[:16]
-    (rust/'Cargo.toml').write_text('[package]\nname='+json.dumps(crate_name)+'\nversion="0.1.0"\nedition="2024"\n[lib]\ncrate-type=["cdylib"]\n[dependencies]\ntaim={path='+json.dumps(str(ROOT))+',default-features=false,features=["wgpu-android"]}\n[features]\nmeasurement=["taim/measurement"]\n[workspace]\n[profile.release]\nlto="thin"\ncodegen-units=1\nstrip="debuginfo"\n')
+    (rust/'Cargo.toml').write_text('[package]\nname='+json.dumps(crate_name)+'\nversion="0.1.0"\nedition="2024"\n[lib]\ncrate-type=["cdylib"]\n[dependencies]\ntaim={path='+json.dumps(str(ROOT))+',default-features=false,features=["wgpu-android"]}\n[features]\nmeasurement=["taim/measurement"]\n[workspace]\n[profile.release]\nlto="fat"\ncodegen-units=1\nstrip="debuginfo"\n')
     # Cargo intentionally does not inherit dependency workspaces' patches.
     with (rust/'Cargo.toml').open('a') as manifest:
         manifest.write('\n[patch.crates-io]\nwgpu-hal={path='+json.dumps(str(ROOT/'vendor/wgpu-hal'))+'}\n')

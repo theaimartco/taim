@@ -113,9 +113,13 @@ impl Allocator {
     /// First searches the free-rectangle recycler to reuse holes left by
     /// previous deallocations. If no recycled hole fits, allocates from the
     /// skyline frontier using preallocated scratch buffers (zero heap allocations).
+    /// Empty or oversized extents are rejected without changing the allocator.
     pub fn allocate(&mut self, width: u32, height: u32) -> Option<Region> {
-        let pad_width = width + self.padding * 2 <= self.size;
-        let pad_height = height + self.padding * 2 <= self.size;
+        if width == 0 || height == 0 || width > self.size || height > self.size {
+            return None;
+        }
+        let pad_width = self.padding * 2 <= self.size - width;
+        let pad_height = self.padding * 2 <= self.size - height;
 
         let pad_w = if pad_width { self.padding } else { 0 };
         let pad_h = if pad_height { self.padding } else { 0 };
@@ -198,7 +202,7 @@ impl Allocator {
 
         for i in 0..self.skyline.len() {
             let node_x = self.skyline[i].x;
-            if node_x + alloc_w > self.size {
+            if alloc_w > self.size - node_x {
                 continue;
             }
 
@@ -213,7 +217,7 @@ impl Allocator {
                 j += 1;
             }
 
-            if y_max + alloc_h <= self.size
+            if alloc_h <= self.size - y_max
                 && (y_max < best_y || (y_max == best_y && self.skyline[i].width < best_width_waste))
             {
                 best_y = y_max;
@@ -706,6 +710,49 @@ mod tests {
     fn test_skyline_overflow() {
         let mut allocator = Allocator::new(128);
         assert!(allocator.allocate(256, 256).is_none());
+    }
+
+    #[test]
+    fn invalid_extents_do_not_panic_or_consume_space() {
+        for size in [0, 1, 128, u32::MAX] {
+            let mut allocator = Allocator::new(size);
+            for (width, height) in [(0, 0), (0, 1), (1, 0)] {
+                assert!(allocator.allocate(width, height).is_none());
+            }
+            if size < u32::MAX {
+                assert!(allocator.allocate(u32::MAX, 1).is_none());
+                assert!(allocator.allocate(1, u32::MAX).is_none());
+                assert!(allocator.allocate(size + 1, size + 1).is_none());
+            }
+            assert!(allocator.is_empty());
+            if size > 0 {
+                let region = allocator.allocate(size, size).expect("full extent fits");
+                assert_eq!(region.position(), (0, 0));
+                assert_eq!(region.size(), Extent::new(size, size));
+                assert!(allocator.allocate(1, 1).is_none());
+                allocator.deallocate(&region);
+                assert!(allocator.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn near_u32_limit_regions_stay_inside_the_atlas() {
+        let mut allocator = Allocator::unpadded(u32::MAX);
+        let wide = allocator.allocate(u32::MAX - 1, 1).expect("wide row");
+        let tall = allocator.allocate(1, u32::MAX).expect("rightmost column");
+        let rest = allocator
+            .allocate(u32::MAX - 1, u32::MAX - 1)
+            .expect("remaining area");
+        assert_eq!(wide.position(), (0, 0));
+        assert_eq!(tall.position(), (u32::MAX - 1, 0));
+        assert_eq!(rest.position(), (0, 1));
+        assert!(allocator.allocate(1, 1).is_none());
+        for region in [wide, tall, rest] {
+            allocator.deallocate(&region);
+        }
+        assert!(allocator.is_empty());
+        assert!(allocator.allocate(u32::MAX, u32::MAX).is_some());
     }
 
     #[test]

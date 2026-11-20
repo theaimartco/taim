@@ -29,6 +29,7 @@ public class TaimActivity extends NativeActivity {
     private long session;
     private long owner;
     private long connectionEpoch;
+    private long editRevision;
     private ProxyEditor editor;
     private boolean synchronizing;
     private int mutations;
@@ -52,7 +53,7 @@ public class TaimActivity extends NativeActivity {
     };
 
     private static native void nativeInsets(long session, int left, int top, int right, int bottom, boolean dark, boolean reduced);
-    private static native void nativeEdit(long session, long owner, String text, int start, int end, int composingStart, int composingEnd, boolean multiline);
+    private static native void nativeEdit(long session, long owner, long revision, String text, int start, int end, int composingStart, int composingEnd, boolean multiline);
     private static native void nativeSecure(long session, long owner, int kind, String text, int count);
     private static native void nativeSubmit(long session, long owner);
 
@@ -274,13 +275,17 @@ public class TaimActivity extends NativeActivity {
         ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).showSoftInput(editor, InputMethodManager.SHOW_IMPLICIT);
     }
 
-    public void setTaimEditor(long token, long nextOwner, boolean enabled, String text, int start, int end, boolean isMultiline, boolean isSecure, int x, int y, int width, int height) {
-        if (session != token || editor == null) return;
+    public void setTaimEditor(long token, long nextOwner, long revision, boolean enabled, String text, int start, int end, boolean isMultiline, boolean isSecure, int x, int y, int width, int height) {
+        if (session != token || editor == null || nextOwner < owner) return;
+        // UI-thread edits can overtake a queued Rust snapshot. Only overwrite
+        // this editor once Rust has consumed its latest InputConnection edit.
+        if (nextOwner == owner && revision != editRevision) return;
         if(enabled && nativeViews!=null && nativeViews.claimsInput() && nextOwner==owner)return;
         InputMethodManager manager = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
         boolean restart = owner != nextOwner || multiline != isMultiline || editorEnabled != enabled || secure != isSecure;
         synchronizing = true;
         try {
+            if (owner != nextOwner) editRevision = 0;
             owner = nextOwner;
             editorEnabled = enabled;
             multiline = isMultiline;
@@ -314,7 +319,7 @@ public class TaimActivity extends NativeActivity {
     private void snapshot() {
         if (secure || synchronizing || mutations != 0 || batchDepth != 0 || session == 0 || !editorEnabled || editor == null) return;
         Editable text = editor.getText();
-        nativeEdit(session, owner, text.toString(), Selection.getSelectionStart(text), Selection.getSelectionEnd(text), BaseInputConnection.getComposingSpanStart(text), BaseInputConnection.getComposingSpanEnd(text), multiline);
+        nativeEdit(session, owner, ++editRevision, text.toString(), Selection.getSelectionStart(text), Selection.getSelectionEnd(text), BaseInputConnection.getComposingSpanStart(text), BaseInputConnection.getComposingSpanEnd(text), multiline);
     }
 
     private void publishCursorAnchor() {

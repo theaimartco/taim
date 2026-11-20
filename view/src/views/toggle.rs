@@ -1,4 +1,6 @@
-use super::look;
+use std::cell::Cell;
+
+use super::look::{self, POP, PRESS, SNAP, Spring};
 use super::text::Text;
 use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::Constraints;
@@ -45,12 +47,22 @@ pub struct Toggle {
     /// The checkbox's tick, from the icon font.
     tick: look::Label,
     pressed: Option<look::Press>,
+    /// How far on it is drawn, `0` off and `1` on; springs between them.
+    /// A cell so paint can follow a value changed elsewhere.
+    progress: Cell<Spring>,
+    /// `1` while held: the switch's knob stretches, as on iOS.
+    hold: Spring,
     id: widget::Id,
 }
 
 impl Toggle {
     fn new(shape: Shape, label: impl IntoProp<String>, value: State<bool>) -> Self {
         let name = label.into_prop();
+        let on = f32::from(u8::from(value.get()));
+        let tuning = match shape {
+            Shape::Checkbox => POP,
+            Shape::Switch => SNAP,
+        };
 
         Self {
             shape,
@@ -62,6 +74,8 @@ impl Toggle {
             gap: 8.0,
             tick: look::Label::glyph(super::Icon::CHECK, 14.0),
             pressed: None,
+            progress: Cell::new(Spring::new(on, tuning)),
+            hold: Spring::new(0.0, PRESS),
             id: widget::Id::unique(),
         }
     }
@@ -82,13 +96,14 @@ impl Toggle {
 
     fn flip(&self, cx: &mut EventCx<'_>) {
         self.value.update(|value| *value = !*value);
-        cx.request_paint();
+        cx.request_animation();
     }
 }
 
 impl View for Toggle {
     fn cancel_interaction(&mut self) {
         self.pressed = None;
+        self.hold.set(0.0);
     }
 
     fn measure(&mut self, cx: &mut MeasureCx<'_>, constraints: Constraints) -> Size {
@@ -114,10 +129,23 @@ impl View for Toggle {
     }
 
     fn paint(&self, cx: &mut PaintCx<'_>) {
+        use taim_core::Renderer as _;
+
         let on = self.shown.get();
         let enabled = self.enabled.get();
         let palette = *cx.theme().palette();
         let area = self.indicator(cx.bounds());
+        let now = cx.now();
+
+        // Follow the value wherever it was changed from.
+        let mut progress = self.progress.get();
+        let target = f32::from(u8::from(on));
+        if (progress.target() - target).abs() > f32::EPSILON {
+            progress.go(target, now);
+            self.progress.set(progress);
+        }
+        let travel = progress.value(now);
+        let amount = travel.clamp(0.0, 1.0);
 
         let accent = if enabled {
             palette.primary.base.color
@@ -133,45 +161,52 @@ impl View for Toggle {
 
         match self.shape {
             Shape::Checkbox => {
-                let (fill, edge) = if on {
-                    (accent, accent)
-                } else {
-                    (palette.background.base.color, idle_edge)
-                };
+                let fill = palette.background.base.color.mix(accent, amount);
+                let edge = idle_edge.mix(accent, amount);
                 cx.fill(
                     area,
                     fill,
                     Border::default().width(1.5).color(edge).rounded(4.0),
                 );
 
-                if on {
+                // The tick pops in, overshooting a little, and shrinks away.
+                if travel > 0.02 {
                     let ink = if enabled {
                         palette.primary.base.text
                     } else {
                         palette.secondary.base.text
                     };
+                    let centre = area.center();
+                    let scale = travel.max(0.0);
+                    cx.renderer().start_transformation(
+                        taim_core::Transformation::translate(centre.x, centre.y)
+                            * taim_core::Transformation::scale(scale)
+                            * taim_core::Transformation::translate(-centre.x, -centre.y),
+                    );
                     self.tick.paint_centered(cx, area, ink);
+                    cx.renderer().end_transformation();
                 }
             }
             Shape::Switch => {
-                let track = if on {
-                    accent
-                } else {
-                    palette.background.strong.color
-                };
+                let track = palette.background.strong.color.mix(accent, amount);
                 let radius = area.height / 2.0;
                 cx.fill(area, track, Border::default().rounded(radius));
 
+                // The knob stretches while held and slides with a snap.
                 let knob = area.height - 4.0;
-                let x = if on {
-                    area.x + area.width - knob - 2.0
-                } else {
-                    area.x + 2.0
-                };
-                cx.fill(
-                    Rectangle::new(Point::new(x, area.y + 2.0), Size::new(knob, knob)),
+                let width = knob + 7.0 * self.hold.value(now).max(0.0);
+                let left = area.x + 2.0;
+                let right = area.x + area.width - width - 2.0;
+                let x = left + (right - left) * travel;
+                cx.fill_shadowed(
+                    Rectangle::new(Point::new(x, area.y + 2.0), Size::new(width, knob)),
                     Color::WHITE,
                     Border::default().rounded(knob / 2.0),
+                    crate::Shadow {
+                        color: Color::from_rgba(0.0, 0.0, 0.0, 0.18),
+                        offset: crate::Vector::new(0.0, 1.0),
+                        blur_radius: 3.0,
+                    },
                 );
             }
         }
@@ -181,10 +216,15 @@ impl View for Toggle {
         }
     }
 
+    fn is_animating(&self, now: crate::Instant) -> bool {
+        self.progress.get().is_moving(now) || self.hold.is_moving(now)
+    }
+
     fn event(&mut self, cx: &mut EventCx<'_>, event: &Event) -> Handled {
         if self.pressed.is_some_and(|press| press.cancelled_by(event)) {
             self.pressed = None;
-            cx.request_paint();
+            self.hold.go(0.0, cx.now());
+            cx.request_animation();
             return Handled::No;
         }
         if !self.enabled.get() {
@@ -196,12 +236,15 @@ impl View for Toggle {
             && self.pressed.is_none()
         {
             self.pressed = Some(press);
+            self.hold.go(1.0, cx.now());
             cx.request_focus();
-            cx.request_paint();
+            cx.request_animation();
             return Handled::Yes;
         }
         if self.pressed.is_some_and(|press| press.released_by(event)) {
             self.pressed = None;
+            self.hold.go(0.0, cx.now());
+            cx.request_animation();
             if cx.is_hovered() {
                 self.flip(cx);
             }

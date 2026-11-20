@@ -49,6 +49,16 @@ impl<T: Layer> Stack<T> {
         self.opacities.push(self.opacity() * opacity);
     }
 
+    /// Pushes a finite, normalized opacity that replaces the inherited one.
+    pub fn push_opacity_reset(&mut self, opacity: f32) {
+        let opacity = if opacity.is_finite() {
+            opacity.clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        self.opacities.push(opacity);
+    }
+
     /// Pops an opacity multiplier without removing the base value.
     pub fn pop_opacity(&mut self) {
         if self.opacities.len() > 1 {

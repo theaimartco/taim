@@ -26,7 +26,7 @@ pub(crate) struct Pending {
     pub native_blur: bool,
     pub native_focus: Option<(u64, u64, Option<Rectangle>)>,
     pub insets: Option<(Insets, bool, bool)>,
-    pub edits: Vec<(u64, EditorState)>,
+    pub edits: Vec<(u64, u64, EditorState)>,
     pub submit: Option<u64>,
     pub operations: Vec<(u64, taim_core::Event)>,
     pub semantics: Vec<SemanticCommand>,
@@ -40,6 +40,7 @@ struct Control {
     focus: Option<widget::Id>,
     state: Option<EditorState>,
     composing: bool,
+    applied_revision: u64,
     cursor: Option<Rectangle>,
     dark: Option<bool>,
     secure: bool,
@@ -534,6 +535,18 @@ impl Bridge {
             let _ = self.proxy.send_event(Wake::Android);
         }
     }
+    /// Acknowledge only after the view tree has consumed this native snapshot.
+    pub fn acknowledge_edit(&self, owner: u64, revision: u64) {
+        let mut control = self
+            .control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if self.owner() == owner {
+            control.applied_revision = revision;
+            // A prior queued snapshot may have been rejected by the UI thread.
+            control.state = None;
+        }
+    }
     pub fn drain(&self) -> Pending {
         self.queued.store(false, Ordering::Release);
         std::mem::take(
@@ -621,6 +634,7 @@ impl Bridge {
             control.focus = identity;
             control.state = None;
             control.composing = false;
+            control.applied_revision = 0;
             let _ = self.owner.fetch_add(1, Ordering::AcqRel);
         }
         if control.composing && !changed_focus {
@@ -647,15 +661,17 @@ impl Bridge {
         let end = utf8_to_utf16(&state.content, state.selection.end) as i32;
         let token = self.token;
         let owner = self.owner();
+        let revision = control.applied_revision;
         self.call(move |env, activity| {
             let text = JString::new(env, &state.content)?;
             let _ = env.call_method(
                 activity,
                 jni_str!("setTaimEditor"),
-                jni_sig!("(JJZLjava/lang/String;IIZZIIII)V"),
+                jni_sig!("(JJJZLjava/lang/String;IIZZIIII)V"),
                 &[
                     JValue::Long(token as i64),
                     JValue::Long(owner as i64),
+                    JValue::Long(revision as i64),
                     JValue::Bool(enabled),
                     JValue::Object(text.as_ref()),
                     JValue::Int(start),
@@ -750,6 +766,7 @@ extern "system" fn Java_com_theaimartco_taim_TaimActivity_nativeEdit(
     _class: JClass<'_>,
     token: i64,
     owner: i64,
+    revision: i64,
     text: JString<'_>,
     start: i32,
     end: i32,
@@ -786,6 +803,7 @@ extern "system" fn Java_com_theaimartco_taim_TaimActivity_nativeEdit(
         drop(control);
         let next = (
             owner as u64,
+            revision as u64,
             EditorState {
                 content,
                 selection,
@@ -800,9 +818,13 @@ extern "system" fn Java_com_theaimartco_taim_TaimActivity_nativeEdit(
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         // Coalesce only within the same composition phase. A committed snapshot
         // followed by a new preedit must reach the view in that order.
-        if pending.edits.last().is_some_and(|(previous_owner, state)| {
-            *previous_owner == next.0 && state.composing.is_some() == next.1.composing.is_some()
-        }) {
+        if pending
+            .edits
+            .last()
+            .is_some_and(|(previous_owner, _, state)| {
+                *previous_owner == next.0 && state.composing.is_some() == next.2.composing.is_some()
+            })
+        {
             let _ = pending.edits.pop();
         }
         pending.edits.push(next);

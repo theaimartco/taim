@@ -1,12 +1,12 @@
 //! Physically-grounded surface materials.
 //!
-//! Every "glass" surface shipping in a mainstream user interface today is the
-//! same trick: sample what is behind, blur it, tint it, composite. Apple's
-//! Liquid Glass, Windows Mica, and Flutter's `BackdropFilter` are all that
-//! operation. It is a screen-space approximation with no thickness, no
-//! refraction, no dispersion, and no consistent light source, and it stops
-//! being convincing the moment something moves behind it: a real pane bends
-//! what it transmits, and a blur does not.
+//! Most "glass" in user interfaces is one trick: sample what is behind, blur
+//! it, tint it, composite. Windows Mica and Flutter's `BackdropFilter` are
+//! that operation, with no thickness, no refraction and no light source, and
+//! it stops being convincing the moment something moves behind it: a real
+//! pane bends what it transmits, and a blur does not. Apple's Liquid Glass
+//! goes further, lensing at its edges and catching light, but only on
+//! Apple's systems.
 //!
 //! This module describes surfaces in terms a renderer can actually shade:
 //! how rough they are, how thick, how much they bend light, and how their
@@ -246,6 +246,82 @@ impl Default for SceneLight {
     fn default() -> Self {
         Self::KEY
     }
+}
+
+impl SceneLight {
+    /// The light leaned by `tilt`: `x` and `y` in `-1.0..=1.0`, how far the
+    /// device (or the pointer) has moved the light right and down from where
+    /// it rests. Zero is the light itself.
+    ///
+    /// The light stays in front of the screen however far it is pushed, so a
+    /// tilted surface is lit at a glancing angle but never from behind.
+    #[must_use]
+    pub fn leaned(self, tilt: [f32; 2]) -> Self {
+        let [x, y, z] = self.unit_direction();
+        let lean_x = clamp_finite(tilt[0], -1.0, 1.0, 0.0);
+        let lean_y = clamp_finite(tilt[1], -1.0, 1.0, 0.0);
+        Self {
+            direction: [x + lean_x * 0.9, y + lean_y * 0.9, z.max(0.25)],
+            ..self
+        }
+    }
+}
+
+/// What makes a glass surface liquid: how a finger presses into it and
+/// which neighbouring panes it melts into.
+///
+/// Coordinates are those of the quad's own bounds. A renderer without the
+/// liquid pass draws the quad as plain glass and ignores this.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Liquid {
+    /// Where a finger or the pointer presses, if anywhere.
+    pub touch: Option<LiquidTouch>,
+
+    /// Up to two neighbouring panes this one melts into where they come
+    /// within [`blend`](Self::blend) of each other. Every pane of a group
+    /// must list the same neighbours of one another, so that each point of
+    /// the merged shape is drawn exactly once.
+    pub neighbours: [Option<LiquidNeighbour>; 2],
+
+    /// How far apart two panes can be and still bridge, in logical pixels.
+    pub blend: f32,
+
+    /// How strongly the glass keeps text on it readable, `0.0..=1.0`: over a
+    /// backdrop that would make the pane too dark for dark text (or too
+    /// bright for light text), it lets less of the backdrop through.
+    pub legibility: f32,
+}
+
+impl Default for Liquid {
+    fn default() -> Self {
+        Self {
+            touch: None,
+            neighbours: [None, None],
+            blend: 0.0,
+            legibility: 1.0,
+        }
+    }
+}
+
+/// A press on a liquid surface.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LiquidTouch {
+    /// Where the press is.
+    pub position: crate::Point,
+    /// How hard, `0.0..=1.0`; it lights the rim nearest the finger and
+    /// magnifies what is under it.
+    pub strength: f32,
+    /// How far the press reaches, in logical pixels.
+    pub radius: f32,
+}
+
+/// Another pane a liquid surface melts into.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LiquidNeighbour {
+    /// Its bounds.
+    pub bounds: crate::Rectangle,
+    /// Its corner radius.
+    pub radius: f32,
 }
 
 /// Schlick's approximation to the Fresnel reflectance.

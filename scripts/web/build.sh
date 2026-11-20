@@ -30,12 +30,14 @@ if [ "$have" != "$want" ]; then
   exit 2
 fi
 
-cargo build --release -p "$PACKAGE" --target wasm32-unknown-unknown \
+cargo build --locked --release -p "$PACKAGE" --target wasm32-unknown-unknown \
   ${FEATURES:+--features "$FEATURES"}
 
+TARGET_DIR="$(cargo metadata --locked --no-deps --format-version 1 |
+  "${TAIM_QA_PYTHON:-python3}" -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
 mkdir -p "$OUT"
 wasm-bindgen --target web --no-typescript --out-dir "$OUT" \
-  "target/wasm32-unknown-unknown/release/$PACKAGE.wasm"
+  "$TARGET_DIR/wasm32-unknown-unknown/release/$PACKAGE.wasm"
 
 cat >"$OUT/index.html" <<HTML
 <!doctype html>

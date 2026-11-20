@@ -218,6 +218,202 @@ impl Tween {
     }
 }
 
+/// How a spring moves: its natural frequency and damping.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Tuning {
+    /// Natural frequency, radians per second.
+    pub(crate) omega: f32,
+    /// Damping ratio; below `1` it overshoots.
+    pub(crate) zeta: f32,
+}
+
+/// A quick press with a little overshoot.
+pub(crate) const PRESS: Tuning = Tuning {
+    omega: 26.0,
+    zeta: 0.62,
+};
+/// A loose wobble back into shape.
+pub(crate) const RELEASE: Tuning = Tuning {
+    omega: 22.0,
+    zeta: 0.32,
+};
+/// A calm fade for the hover light.
+pub(crate) const HOVER: Tuning = Tuning {
+    omega: 14.0,
+    zeta: 1.0,
+};
+
+/// A damped spring, solved in closed form from its last retarget, so its
+/// value at any instant needs no stepping and no mutation.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Spring {
+    tuning: Tuning,
+    /// When it was last retargeted; `None` at rest.
+    start: Option<crate::Instant>,
+    from: f32,
+    velocity: f32,
+    target: f32,
+}
+
+impl Spring {
+    pub(crate) const fn new(value: f32, tuning: Tuning) -> Self {
+        Self {
+            tuning,
+            start: None,
+            from: value,
+            velocity: 0.0,
+            target: value,
+        }
+    }
+
+    /// `(value, velocity)` at `now`.
+    pub(crate) fn sample(&self, now: crate::Instant) -> (f32, f32) {
+        let Some(start) = self.start else {
+            return (self.target, 0.0);
+        };
+        let t = now.saturating_duration_since(start).as_secs_f32();
+        let Tuning { omega, zeta } = self.tuning;
+        let offset = self.from - self.target;
+
+        if zeta < 1.0 {
+            let damped = omega * (1.0 - zeta * zeta).sqrt();
+            let a = offset;
+            let b = (self.velocity + zeta * omega * a) / damped;
+            let decay = (-zeta * omega * t).exp();
+            let (sin, cos) = (damped * t).sin_cos();
+            let value = self.target + decay * (a * cos + b * sin);
+            let velocity =
+                decay * ((-zeta * omega) * (a * cos + b * sin) + damped * (b * cos - a * sin));
+            (value, velocity)
+        } else {
+            // Critically damped.
+            let a = offset;
+            let b = self.velocity + omega * a;
+            let decay = (-omega * t).exp();
+            let value = self.target + (a + b * t) * decay;
+            let velocity = (b - omega * (a + b * t)) * decay;
+            (value, velocity)
+        }
+    }
+
+    pub(crate) fn value(&self, now: crate::Instant) -> f32 {
+        self.sample(now).0
+    }
+
+    pub(crate) fn go(&mut self, target: f32, now: crate::Instant) {
+        if crate::state::motion_reduced() {
+            *self = Self::new(target, self.tuning);
+            return;
+        }
+        let (value, velocity) = self.sample(now);
+        self.start = Some(now);
+        self.from = value;
+        self.velocity = velocity;
+        self.target = target;
+    }
+
+    pub(crate) fn is_moving(&self, now: crate::Instant) -> bool {
+        let (value, velocity) = self.sample(now);
+        self.start.is_some() && ((value - self.target).abs() > 1.0e-3 || velocity.abs() > 1.0e-2)
+    }
+}
+
+/// A firm snap with almost no overshoot: indicators, thumbs.
+pub(crate) const SNAP: Tuning = Tuning {
+    omega: 30.0,
+    zeta: 0.82,
+};
+/// A lively pop that overshoots: ticks, dots, badges appearing.
+pub(crate) const POP: Tuning = Tuning {
+    omega: 24.0,
+    zeta: 0.45,
+};
+/// The trailing edge of a stretchy indicator: slower than [`SNAP`], so the
+/// indicator stretches towards its target and catches up.
+pub(crate) const TRAIL: Tuning = Tuning {
+    omega: 17.0,
+    zeta: 0.9,
+};
+/// A soft glide for layout changes and entrances.
+pub(crate) const GLIDE: Tuning = Tuning {
+    omega: 18.0,
+    zeta: 0.86,
+};
+
+impl Spring {
+    /// Jumps to `value` with no motion.
+    pub(crate) fn set(&mut self, value: f32) {
+        *self = Self::new(value, self.tuning);
+    }
+
+    /// Where the spring is heading.
+    pub(crate) fn target(&self) -> f32 {
+        self.target
+    }
+
+    /// Flicks the spring with `velocity` from where it is, so it bumps away
+    /// from its target and settles back: a bounce.
+    pub(crate) fn kick(&mut self, velocity: f32, now: crate::Instant) {
+        if crate::state::motion_reduced() {
+            return;
+        }
+        let (value, current) = self.sample(now);
+        self.start = Some(now);
+        self.from = value;
+        self.velocity = current + velocity;
+    }
+
+    /// Its speed at `now`, in units per second.
+    pub(crate) fn velocity(&self, now: crate::Instant) -> f32 {
+        self.sample(now).1
+    }
+}
+
+/// The springy press every tappable view shares: it sinks a little under
+/// the finger and springs back, overshooting slightly, when let go.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Squish {
+    spring: Spring,
+    /// How far it shrinks when fully pressed, as a fraction of its size.
+    depth: f32,
+}
+
+impl Squish {
+    /// A squish for a control: about 4% smaller under the finger.
+    pub(crate) const fn new() -> Self {
+        Self::with_depth(0.04)
+    }
+
+    /// A squish `depth` deep: `0.02` for a wide row, `0.08` for a small
+    /// icon.
+    pub(crate) const fn with_depth(depth: f32) -> Self {
+        Self {
+            spring: Spring::new(0.0, PRESS),
+            depth,
+        }
+    }
+
+    pub(crate) fn press(&mut self, now: crate::Instant) {
+        self.spring.go(1.0, now);
+    }
+
+    pub(crate) fn release(&mut self, now: crate::Instant) {
+        self.spring.go(0.0, now);
+    }
+
+    pub(crate) fn is_moving(&self, now: crate::Instant) -> bool {
+        self.spring.is_moving(now)
+    }
+
+    /// The scale to draw at `now`.
+    pub(crate) fn visual(&self, now: crate::Instant) -> crate::Visual {
+        crate::Visual {
+            scale: 1.0 - self.depth * self.spring.value(now),
+            ..crate::Visual::IDENTITY
+        }
+    }
+}
+
 /// WCAG AA contrast for text, with a little margin for rounding.
 pub(crate) const TEXT_CONTRAST: f32 = 4.6;
 /// WCAG contrast for graphics and controls that are not text.

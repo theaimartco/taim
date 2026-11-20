@@ -1,5 +1,5 @@
 //! Views for phone-style layouts.
-use super::look::{self, Label, Tween};
+use super::look::{self, Label};
 use super::{button, column, container, layers, row, text_field, when};
 use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::{Axis, Constraints, Sizing};
@@ -69,7 +69,15 @@ pub struct Segments {
     segments: Vec<Segment>,
     selected: State<usize>,
     shown: Prop<usize>,
-    indicator: Tween,
+    /// The indicator's leading and trailing edges, as fractional segment
+    /// indices. The leading edge is quicker, so the indicator stretches
+    /// towards a new choice like a drop and gathers itself there.
+    lead: std::cell::Cell<look::Spring>,
+    trail: std::cell::Cell<look::Spring>,
+    /// The chosen item's bounce when it is chosen.
+    bounce: std::cell::Cell<look::Spring>,
+    /// `1` while an item is held: it sinks a little.
+    hold: look::Spring,
     pressed: Option<usize>,
     id: widget::Id,
 }
@@ -97,7 +105,10 @@ impl Segments {
                 .collect(),
             selected,
             shown: selected.into_prop(),
-            indicator: Tween::new(selected.get() as f32),
+            lead: std::cell::Cell::new(look::Spring::new(selected.get() as f32, look::SNAP)),
+            trail: std::cell::Cell::new(look::Spring::new(selected.get() as f32, look::TRAIL)),
+            bounce: std::cell::Cell::new(look::Spring::new(0.0, look::POP)),
+            hold: look::Spring::new(0.0, look::PRESS),
             pressed: None,
             id: widget::Id::unique(),
         }
@@ -180,7 +191,30 @@ impl View for Segments {
         let bounds = cx.bounds();
         let palette = *cx.theme().palette();
         let selected = self.shown.get();
-        let indicator = self.slot(bounds, self.indicator.value(cx.now()));
+        let now = cx.now();
+
+        // Follow the choice wherever it was made from.
+        let (mut lead, mut trail, mut bounce) =
+            (self.lead.get(), self.trail.get(), self.bounce.get());
+        let target = selected as f32;
+        if (lead.target() - target).abs() > f32::EPSILON {
+            lead.go(target, now);
+            trail.go(target, now);
+            bounce.kick(7.0, now);
+            self.lead.set(lead);
+            self.trail.set(trail);
+            self.bounce.set(bounce);
+        }
+        let (a, b) = (lead.value(now), trail.value(now));
+        let first = self.slot(bounds, a.min(b));
+        let last = self.slot(bounds, a.max(b));
+        // Stretched, it thins a little, as a drop does.
+        let stretch = (a - b).abs().min(1.0);
+        let thin = first.height * 0.12 * stretch;
+        let indicator = Rectangle::new(
+            Point::new(first.x, first.y + thin / 2.0),
+            Size::new(last.x + last.width - first.x, first.height - thin),
+        );
 
         match self.look {
             Look::Underline => {
@@ -272,9 +306,29 @@ impl View for Segments {
             }
         }
 
+        let held = self.hold.value(now);
         for (index, segment) in self.segments.iter().enumerate() {
             let slot = self.slot(bounds, index as f32);
             let chosen = index == selected;
+
+            // The chosen item bounces as it is chosen; a held one sinks.
+            let mut scale = 1.0;
+            if chosen {
+                scale += bounce.value(now);
+            }
+            if self.pressed == Some(index) {
+                scale -= 0.08 * held;
+            }
+            let scaled = (scale - 1.0).abs() > 1.0e-3;
+            if scaled {
+                use taim_core::Renderer as _;
+                let centre = slot.center();
+                cx.renderer().start_transformation(
+                    taim_core::Transformation::translate(centre.x, centre.y)
+                        * taim_core::Transformation::scale(scale)
+                        * taim_core::Transformation::translate(-centre.x, -centre.y),
+                );
+            }
             let color = match (self.look, chosen) {
                 (Look::Boxed, true) => cx.text_color(),
                 // The accent: the deeper shade on bright glass, the lighter
@@ -300,6 +354,11 @@ impl View for Segments {
                 }
                 None => segment.label.paint_centered(cx, slot, color),
             }
+
+            if scaled {
+                use taim_core::Renderer as _;
+                cx.renderer().end_transformation();
+            }
         }
     }
 
@@ -309,17 +368,21 @@ impl View for Segments {
         match look::gesture(event, cx.pointer()) {
             Some(look::Gesture::Down(at)) => {
                 self.pressed = self.index_at(bounds, at);
+                if self.pressed.is_some() {
+                    self.hold.go(1.0, cx.now());
+                    cx.request_animation();
+                }
                 Handled::from(self.pressed.is_some())
             }
             Some(look::Gesture::Up(at)) => {
                 let Some(pressed) = self.pressed.take() else {
                     return Handled::No;
                 };
+                self.hold.set(0.0);
                 if at.and_then(|at| self.index_at(bounds, at)) == Some(pressed) {
                     let _ = self.selected.set(pressed);
-                    self.indicator.go(pressed as f32, cx.now());
-                    cx.request_animation();
                 }
+                cx.request_animation();
                 Handled::Yes
             }
             _ => Handled::No,
@@ -359,7 +422,10 @@ impl View for Segments {
     }
 
     fn is_animating(&self, now: Instant) -> bool {
-        self.indicator.is_moving(now)
+        self.lead.get().is_moving(now)
+            || self.trail.get().is_moving(now)
+            || self.bounce.get().is_moving(now)
+            || self.hold.is_moving(now)
     }
 }
 
@@ -370,6 +436,7 @@ pub fn chip(label: impl Into<String>, selected: State<bool>) -> Chip {
         selected,
         shown: selected.into_prop(),
         pressed: false,
+        squish: look::Squish::with_depth(0.06),
         id: widget::Id::unique(),
     }
 }
@@ -380,12 +447,14 @@ pub struct Chip {
     selected: State<bool>,
     shown: Prop<bool>,
     pressed: bool,
+    squish: look::Squish,
     id: widget::Id,
 }
 
 impl View for Chip {
     fn cancel_interaction(&mut self) {
         self.pressed = false;
+        self.squish = look::Squish::with_depth(0.06);
     }
 
     fn measure(&mut self, cx: &mut MeasureCx<'_>, _constraints: Constraints) -> Size {
@@ -426,10 +495,12 @@ impl View for Chip {
         match look::gesture(event, cx.pointer()) {
             Some(look::Gesture::Down(at)) if cx.bounds().contains(at) => {
                 self.pressed = true;
+                self.squish.press(cx.now());
                 Handled::Yes
             }
             Some(look::Gesture::Up(at)) if self.pressed => {
                 self.pressed = false;
+                self.squish.release(cx.now());
                 if at.is_some_and(|at| cx.bounds().contains(at)) {
                     self.selected.update(|on| *on = !*on);
                 }
@@ -451,6 +522,14 @@ impl View for Chip {
 
     fn cursor(&self) -> Option<mouse::Interaction> {
         Some(mouse::Interaction::Pointer)
+    }
+
+    fn is_animating(&self, now: Instant) -> bool {
+        self.squish.is_moving(now)
+    }
+
+    fn visual(&self, cx: &crate::VisualCx) -> crate::Visual {
+        self.squish.visual(cx.now())
     }
 }
 

@@ -57,10 +57,18 @@ vibration and files.
 | Linux (X11, Wayland) | Runs; checked under a virtual X11 display |
 | Android | Builds; not yet run on a device |
 | Web (WebAssembly) | Runs in Chromium with WebGL2, with clipboard, storage and links; see [docs/platform/web.md](docs/platform/web.md) |
-| Windows, macOS | Type-check and lint clean; not run |
+| Windows | Type-check and lint clean; not run |
+| macOS | Native arm64 app and sandboxed release storage/restart/input smoke verified on one Mac; owner distribution signing pending |
 | iOS | Type-checks and lints clean, with clipboard, links, vibration and storage; no app-bundle tooling or device run yet |
 
 `bash scripts/release/check.sh` lints every one of these targets.
+
+On macOS, build a sandboxed `.app` with
+`python3 scripts/macos/package.py build --config scripts/macos/counter.toml --package counter --binary counter --output target/macos/counter-local`.
+Generated `taim-new` projects include the same packaging workflow. With the
+owner's Apple distribution certificates and profile, App Store mode produces a
+signed `.pkg` for Transporter. See [macOS packaging and acceptance](docs/platform/macos.md)
+for configuration, sandbox testing and the remaining owner/account steps.
 
 ## TAIM view API
 
@@ -156,7 +164,7 @@ The table below contains historical internal benchmark reports from `benchmarks/
 | **Cold Startup to First Presentation** | **24 ms** | Native binary launch to first presented GPU surface |
 | **Keystroke-to-Raster Lag** | **< 1.8 ms** | Total time from physical keyboard interrupt to GPU presentation |
 | **Hardware Frame Presentation** | **0.28 ms** | Linear-light compute-raster pass on Metal / Vulkan |
-| **Stripped Minimal Binary Size** | **~2.1 MiB** | Aggressive dead-code elimination via `profile.release-small` |
+| **Stripped Binary Size (counter)** | **3.58 MiB macOS / 4.00 MiB iOS** | `profile.release-small`; 5.26 / 5.77 MiB with the default `release` profile (measured 2026-11-20) |
 
 ---
 
@@ -330,15 +338,22 @@ Taim enforces minimal developer disk usage through aggressive symbol pruning and
   ./scripts/clean-target.sh          # Prunes stale duplicates, keeps build cache intact
   ./scripts/clean-target.sh --ultra  # Slashes target directory down to ~280 MB
   ```
-- **Compact Release Profile (`release-small`)**:
-  ```toml
-  [profile.release-small]
-  opt-level = "z"
-  lto = "fat"
-  codegen-units = 1
-  panic = "abort"
-  strip = "symbols"
-  ```
+- **Compact Release Profile (`release-small`)**: `opt-level = "z"` with fat
+  LTO, while the rasterizers (`tiny-skia`, `taim_tiny_skia`, `zeno`, `swash`,
+  `taim_wgpu`) stay at `opt-level = 3`. Pass `--size` to the macOS or iOS
+  packager to use it.
+
+  | `counter`, stripped | thin LTO (old `release`) | `release` (fat LTO) | `release-small` |
+  |---|---|---|---|
+  | macOS arm64 | 6.05 MiB | 5.26 MiB | 3.58 MiB |
+  | iOS arm64 | 6.47 MiB | 5.77 MiB | 4.00 MiB |
+  | iOS arm64, gzip -9 | 2.87 MiB | 2.65 MiB | 2.07 MiB |
+
+  `release` keeps the old frame cost. `release-small` makes software
+  rendering about 25% slower (`taim_bench`, tiny-skia, p50 latency for
+  `text_heavy`: 3.6 → 4.1 ms; `blur_layers`: 5.1 → 6.6 ms); GPU rendering is
+  unaffected. Optimizing the rasterizers for size too made them 5x slower,
+  and `opt-level = "s"` 3x slower, so neither is used.
 
 ---
 

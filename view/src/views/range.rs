@@ -41,6 +41,7 @@ pub fn slider(range: RangeInclusive<f32>, value: State<f32>) -> Slider {
         step: None,
         dragging: None,
         hovered: false,
+        grip: look::Spring::new(0.0, look::POP),
         id: widget::Id::unique(),
     }
 }
@@ -53,6 +54,8 @@ pub struct Slider {
     step: Option<f32>,
     dragging: Option<look::Press>,
     hovered: bool,
+    /// 0 at rest, 1 while held: the thumb swells under the finger.
+    grip: look::Spring,
     id: widget::Id,
 }
 
@@ -105,6 +108,7 @@ impl View for Slider {
     fn cancel_interaction(&mut self) {
         self.dragging = None;
         self.hovered = false;
+        self.grip.set(0.0);
     }
 
     fn sizing(&self) -> Sizing {
@@ -136,9 +140,12 @@ impl View for Slider {
             Size::new(usable, TRACK),
         );
         let filled = Rectangle::new(track.position(), Size::new(usable * fraction, TRACK));
+        // Held, the thumb swells by up to a third around its centre.
+        let grown = THUMB * (1.0 + 0.35 * self.grip.value(cx.now()).max(-0.2));
+        let thumb_x = bounds.x + usable * fraction + THUMB / 2.0;
         let thumb = Rectangle::new(
-            Point::new(bounds.x + usable * fraction, center_y - THUMB / 2.0),
-            Size::new(THUMB, THUMB),
+            Point::new(thumb_x - grown / 2.0, center_y - grown / 2.0),
+            Size::new(grown, grown),
         );
 
         let rounded = Border::default().rounded(TRACK / 2.0);
@@ -156,11 +163,11 @@ impl View for Slider {
             Border::default()
                 .width(2.0)
                 .color(edge)
-                .rounded(THUMB / 2.0),
+                .rounded(grown / 2.0),
         );
 
         if cx.has_focus() {
-            look::focus_ring(cx, thumb, THUMB / 2.0);
+            look::focus_ring(cx, thumb, grown / 2.0);
         }
     }
 
@@ -168,6 +175,7 @@ impl View for Slider {
         if self.dragging.is_some_and(|press| press.cancelled_by(event)) {
             self.dragging = None;
             self.hovered = false;
+            self.grip.go(0.0, cx.now());
             cx.request_paint();
             return Handled::No;
         }
@@ -177,6 +185,7 @@ impl View for Slider {
             && self.dragging.is_none()
         {
             self.dragging = Some(press);
+            self.grip.go(1.0, cx.now());
             cx.request_focus();
             if let Some(at) = cx.pointer() {
                 self.set_from_pointer(bounds, at.x);
@@ -191,6 +200,7 @@ impl View for Slider {
             }
             if press.released_by(event) {
                 self.dragging = None;
+                self.grip.go(0.0, cx.now());
                 cx.request_paint();
                 return Handled::Yes;
             }
@@ -248,6 +258,10 @@ impl View for Slider {
 
     fn focusable(&self) -> bool {
         true
+    }
+
+    fn is_animating(&self, now: crate::Instant) -> bool {
+        self.grip.is_moving(now)
     }
 }
 

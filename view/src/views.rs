@@ -7,6 +7,7 @@ mod dynamic;
 mod editor;
 mod forms;
 mod glass;
+mod hero;
 mod icon;
 mod layers;
 mod list;
@@ -14,6 +15,7 @@ pub(crate) mod look;
 #[cfg(any(feature = "image", feature = "svg", test))]
 mod media;
 mod mobile;
+mod motion;
 mod navigator;
 mod overlays;
 mod pickers;
@@ -37,7 +39,8 @@ pub use editor::{Buffer, TextEditor, text_editor};
 pub use forms::{
     Dialog, Dropdown, Grid, Radio, app_bar, dialog, dropdown, grid, icon_button, list_tile, radio,
 };
-pub use glass::{Glass, glass};
+pub use glass::{Glass, GlassGroup, glass, glass_group};
+pub use hero::{Hero, hero};
 pub use icon::{Icon, icon};
 pub use layers::{Layers, layers};
 pub use list::{List, list};
@@ -49,7 +52,8 @@ pub use mobile::{
     Avatar, Badge, Chip, Segments, Skeleton, avatar, badge, chip, nav_bar, scaffold, search,
     segmented, skeleton, tabs,
 };
-pub use navigator::{Navigator, NavigatorView, navigator};
+pub use motion::{Animated, Appear, animated, appear};
+pub use navigator::{Navigator, NavigatorView, PageTransition, navigator};
 pub use overlays::{
     Drawer, PullToRefresh, Sheet, Snackbar, drawer, pull_to_refresh, sheet, snackbar,
 };

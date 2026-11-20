@@ -52,8 +52,11 @@ def main():
     parser.add_argument('--tap', type=int, nargs=2, help='Normal text field, initially empty')
     parser.add_argument('--secure-tap', type=int, nargs=2, help='Password field; coordinates while IME is shown')
     parser.add_argument('--multiline-tap', type=int, nargs=2, help='Multiline editor while test IME is shown')
+    parser.add_argument('--composition-cycles', type=int, default=10, help='Repeated queued commit/preedit/finish regression cycles')
     parser.add_argument('--output', type=Path, default=ROOT / 'target/android/runtime-smoke' / datetime.now(timezone.utc).strftime('ime-%Y%m%dT%H%M%S%fZ'))
     args = parser.parse_args()
+    if not 1 <= args.composition_cycles <= 100:
+        parser.error('--composition-cycles must be between 1 and 100')
     sdk = Path(os.environ.get('ANDROID_HOME') or os.environ.get('ANDROID_SDK_ROOT') or '')
     apk = build(sdk)
     if args.command == 'build':
@@ -94,6 +97,13 @@ def main():
             time.sleep(.2)
         call('shell', 'ime', 'enable', COMPONENT)
         call('shell', 'ime', 'set', COMPONENT)
+        installed = call('shell', 'pm', 'path', COUNTER_PACKAGE).splitlines()
+        if len(installed) != 1 or not installed[0].startswith('package:/data/app/'):
+            raise RuntimeError('Expected one installed counter APK')
+        installed_bytes = subprocess.check_output(adb + ['exec-out', 'cat', installed[0][8:]], timeout=30)
+        report['counter_apk_sha256'] = hashlib.sha256(installed_bytes).hexdigest()
+        report['android_fingerprint'] = call('shell', 'getprop', 'ro.build.fingerprint')
+        report['composition_cycles'] = args.composition_cycles
         call('shell', 'am', 'force-stop', COUNTER_PACKAGE)
         call('shell', 'am', 'start', '-W', '-n', COUNTER_PACKAGE + '/' + APPS['counter'][2])
         deadline = time.monotonic() + 25
@@ -123,6 +133,16 @@ def main():
         image('composition')
         command('finish')
         command('assert', 'مرحبا日本')
+        # A queued app snapshot must not overwrite newer native composition.
+        # Allow a frame between compose and finish, then verify committed text.
+        for _ in range(args.composition_cycles):
+            command('select-all')
+            command('commit', 'مرحبا')
+            command('compose', '日本')
+            time.sleep(.1)
+            command('finish')
+            time.sleep(.1)
+            command('assert', 'مرحبا日本')
         command('save')
         if args.secure_tap:
             call('shell', 'input', 'tap', *map(str, args.secure_tap))

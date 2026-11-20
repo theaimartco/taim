@@ -74,6 +74,10 @@ pub(crate) struct Surface {
 
     look: Look,
     pointer: Option<PhysicalPosition<f64>>,
+    /// How far the pointer or the device's tilt leans the scene light.
+    lean: [f32; 2],
+    /// When the last traced frame started, for `TAIM_FRAME_TRACE`.
+    traced: std::cell::Cell<Option<Instant>>,
     modifiers: keyboard::Modifiers,
     cursor: mouse::Interaction,
     hidden: Hidden,
@@ -191,6 +195,8 @@ impl Surface {
                 mode: theme::Mode::None,
             },
             pointer: None,
+            lean: [0.0, 0.0],
+            traced: std::cell::Cell::new(None),
             modifiers: keyboard::Modifiers::empty(),
             cursor: mouse::Interaction::None,
             hidden: Hidden::default(),
@@ -312,10 +318,23 @@ impl Surface {
                 #[cfg(target_os = "android")]
                 self.android
                     .hover(position.x as f32, position.y as f32, false);
+                // On a desktop the light leans a little towards the pointer,
+                // so glass answers the hand moving over it.
+                #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                {
+                    let size = self.raw.inner_size();
+                    if size.width > 0 && size.height > 0 {
+                        let x = (position.x / f64::from(size.width)) as f32 * 2.0 - 1.0;
+                        let y = (position.y / f64::from(size.height)) as f32 * 2.0 - 1.0;
+                        self.lean_light([x * 0.45, y * 0.45]);
+                    }
+                }
             }
             WindowEvent::Touch(touch) => self.pointer = Some(touch.location),
             WindowEvent::CursorLeft { .. } => {
                 self.pointer = None;
+                #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                self.lean_light([0.0, 0.0]);
                 #[cfg(target_os = "android")]
                 self.android.hover(0.0, 0.0, true);
             }
@@ -565,7 +584,38 @@ impl Surface {
 
     /// Re-resolves the theme after the application or the desktop changed
     /// it.
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "ios", target_os = "macos"))]
+    /// Leans the scene light by `lean` (each axis `-1.0..=1.0`): from the
+    /// pointer on a desktop, from the device's tilt on a phone. Redraws only
+    /// when glass is on screen and the change is visible, and not at all
+    /// while motion is reduced.
+    pub fn lean_light(&mut self, lean: [f32; 2]) {
+        let lean = if self.root.motion_reduced() {
+            [0.0, 0.0]
+        } else {
+            lean
+        };
+        let moved = (lean[0] - self.lean[0])
+            .abs()
+            .max((lean[1] - self.lean[1]).abs());
+        if moved < 0.01 {
+            return;
+        }
+        self.lean = lean;
+        self.renderer
+            .set_light(self.look.theme.light().leaned(lean));
+        if self.root.painted_glass() {
+            self.request_frame();
+        }
+    }
+
+    /// Whether this window wants the device's tilt: glass is on screen,
+    /// the window is in front and motion is not reduced.
+    #[cfg(target_os = "ios")]
+    pub fn wants_tilt(&self) -> bool {
+        self.focused && self.root.painted_glass() && !self.root.motion_reduced()
+    }
+
     pub fn set_system_motion_reduced(&mut self, reduced: bool) {
         if self.root.set_system_motion_reduced(reduced) {
             self.request_frame();
@@ -586,7 +636,7 @@ impl Surface {
 
         #[cfg(target_os = "android")]
         self.android.appearance(wanted == theme::Mode::Dark);
-        self.renderer.set_light(theme.light());
+        self.renderer.set_light(theme.light().leaned(self.lean));
         self.look.style = theme.base();
         log::info!(
             "Taim theme {}: background={:?}, primary={:?}",
@@ -617,7 +667,7 @@ impl Surface {
         self.clock
             .set_animation_interval(animation_interval(refresh));
         let now = Instant::now();
-        let started = std::time::Instant::now();
+        let started = Instant::now();
 
         if self.clock.is_suspended() || self.target.is_none() {
             return Ok(());
@@ -690,13 +740,20 @@ impl Surface {
 
         if trace_frames() {
             let total = started.elapsed();
+            // The time since the previous frame started: the frame rate
+            // actually reached, whatever each frame cost.
+            let gap = self
+                .traced
+                .replace(Some(started))
+                .map_or(0, |previous| started.duration_since(previous).as_micros());
             eprintln!(
-                "frame {:?}: tree {:>5} us | semantics {:>5} us | present {:>6} us | total {:>6} us",
+                "frame {:?}: tree {:>5} us | semantics {:>5} us | present {:>6} us | total {:>6} us | gap {:>6} us",
                 self.id,
                 painted.as_micros(),
                 (described - painted).as_micros(),
                 (total - described).as_micros(),
                 total.as_micros(),
+                gap,
             );
         }
 
@@ -1017,7 +1074,8 @@ impl Surface {
         self.renderer = compositor.create_renderer(self.renderer_settings);
         // Renderer construction restores backend defaults, not the application's
         // lighting. Keep memory-pressure recovery visually equivalent to startup.
-        self.renderer.set_light(self.look.theme.light());
+        self.renderer
+            .set_light(self.look.theme.light().leaned(self.lean));
         #[cfg(feature = "hinting")]
         self.renderer.hint(self.viewport.scale_factor());
         self.present_failures = 0;
@@ -1052,6 +1110,10 @@ impl Surface {
             #[cfg(target_os = "android")]
             {
                 self.content = self.insets.area(physical, scale);
+            }
+            #[cfg(target_os = "ios")]
+            {
+                self.content = crate::apple::window::safe_content(&self.raw, physical, scale);
             }
             self.stale_layout = true;
             self.request_frame();

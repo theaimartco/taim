@@ -1,4 +1,4 @@
-use super::look::{Press, Tween};
+use super::look::{Press, Squish, Tween};
 use super::text::Text;
 use crate::cx::{DescribeCx, EventCx, MeasureCx, PaintCx};
 use crate::layout::Constraints;
@@ -21,6 +21,7 @@ pub fn button(label: impl IntoProp<String>) -> Button {
         hover: Tween::new(0.0),
         hovered: false,
         pressed: None,
+        squish: Squish::new(),
         id: widget::Id::unique(),
     }
 }
@@ -49,6 +50,8 @@ pub struct Button {
     hover: Tween,
     hovered: bool,
     pressed: Option<Press>,
+    /// Sinks under the finger and springs back.
+    squish: Squish,
     id: widget::Id,
 }
 
@@ -115,6 +118,7 @@ impl View for Button {
         self.pressed = None;
         self.hovered = false;
         self.hover = Tween::new(0.0);
+        self.squish = Squish::new();
     }
 
     fn measure(&mut self, cx: &mut MeasureCx<'_>, constraints: Constraints) -> Size {
@@ -233,6 +237,7 @@ impl View for Button {
             self.pressed = None;
             self.hovered = false;
             self.hover.go(0.0, cx.now());
+            self.squish.release(cx.now());
             cx.request_animation();
             return Handled::No;
         }
@@ -264,15 +269,17 @@ impl View for Button {
                 if hovered && self.pressed.is_none() =>
             {
                 self.pressed = Some(Press::Mouse);
+                self.squish.press(cx.now());
                 cx.request_focus();
-                cx.request_paint();
+                cx.request_animation();
                 Handled::Yes
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
                 if self.pressed == Some(Press::Mouse) =>
             {
                 self.pressed = None;
-                cx.request_paint();
+                self.squish.release(cx.now());
+                cx.request_animation();
                 if hovered {
                     self.fire();
                 }
@@ -282,8 +289,9 @@ impl View for Button {
                 if hovered && self.pressed.is_none() =>
             {
                 self.pressed = Some(Press::Touch(*id));
+                self.squish.press(cx.now());
                 cx.request_focus();
-                cx.request_paint();
+                cx.request_animation();
                 Handled::Yes
             }
             Event::Touch(touch::Event::FingerLifted { id, .. })
@@ -292,6 +300,7 @@ impl View for Button {
                 self.pressed = None;
                 self.hovered = false;
                 self.hover.go(0.0, cx.now());
+                self.squish.release(cx.now());
                 cx.request_animation();
                 if hovered {
                     self.fire();
@@ -303,7 +312,11 @@ impl View for Button {
     }
 
     fn is_animating(&self, now: crate::Instant) -> bool {
-        self.hover.is_moving(now)
+        self.hover.is_moving(now) || self.squish.is_moving(now)
+    }
+
+    fn visual(&self, cx: &crate::VisualCx) -> crate::Visual {
+        self.squish.visual(cx.now())
     }
 
     fn accessibility_action(

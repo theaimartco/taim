@@ -90,6 +90,14 @@ pub trait Renderer {
     /// Pops the current opacity multiplier.
     fn end_opacity(&mut self) {}
 
+    /// Pushes `opacity` in place of the inherited multiplier, so what
+    /// follows ignores the fading of whatever it is drawn inside; popped by
+    /// [`end_opacity`](Self::end_opacity). Renderers without it multiply,
+    /// as [`start_opacity`](Self::start_opacity) does.
+    fn start_opacity_reset(&mut self, opacity: f32) {
+        self.start_opacity(opacity);
+    }
+
     /// Attempts to replay a retained display list for a stable subtree.
     fn replay_retained_layer(&mut self, key: u64, revision: u64, bounds: Rectangle) -> bool {
         let _ = (key, revision, bounds);

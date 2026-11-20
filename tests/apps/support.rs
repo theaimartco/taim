@@ -118,6 +118,48 @@ impl App {
         self.frame();
     }
 
+    /// A finger dragged sideways from `from` by `distance` pixels over
+    /// `millis`, in steps a frame apart, then lifted where it stopped.
+    pub fn swipe(&mut self, from: Point, distance: f32, millis: u64) {
+        let steps = (millis / 16).max(1);
+        let mut at = from;
+        let send = |app: &mut Self, event: Event, at: Point| {
+            let _ = app.root.handle_input(&event, Some(at), app.now, true);
+        };
+        send(
+            self,
+            Event::Mouse(mouse::Event::CursorMoved { position: at }),
+            at,
+        );
+        send(
+            self,
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            at,
+        );
+        for _ in 0..steps {
+            at.x += distance / steps as f32;
+            self.now += Duration::from_millis(16);
+            send(
+                self,
+                Event::Mouse(mouse::Event::CursorMoved { position: at }),
+                at,
+            );
+            self.frame();
+        }
+        send(
+            self,
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+            at,
+        );
+        let _ = self.root.handle_input(
+            &Event::Mouse(mouse::Event::CursorLeft),
+            None,
+            self.now,
+            true,
+        );
+        self.frame();
+    }
+
     /// A quick finger flick from `from` up by `distance` pixels, released
     /// while moving.
     pub fn flick(&mut self, from: Point, distance: f32) {

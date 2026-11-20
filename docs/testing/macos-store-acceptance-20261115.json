@@ -1,0 +1,122 @@
+{
+  "recorded_utc": "2026-11-14T20:28:36.835061+00:00",
+  "scope": "macOS-only local packaging and sandbox acceptance; no upload",
+  "source_base_commit": "cc5f9a47d73b98028caeb8bc3ff70c443b40bbe5",
+  "source_dirty": true,
+  "source_sha256": {
+    "Cargo.toml": "e190ac3ac414103423833d6a2d09bcaf39aa240923e3a514eabf0d99bd7b03a8",
+    "Cargo.lock": "30bff7aaba6633ba83b28a5806844f1143d7f292e976a6a979c3e83e8d8fd34a",
+    "winit/Cargo.toml": "841eeff194125adb14bb0ee5c8f2adb789965d5f643dcca2fcb54190d7b89f4c",
+    "winit/src/platform.rs": "d8e1a8a53b06ce99098735ee91c5cea648920013b9d8f08e4f5250326b30fb42",
+    "scripts/macos/package.py": "cd3f5f7f4d14791099d963e5d4fcb97d0cf391322f07f059c35fc76e8d563f2b",
+    "scripts/macos/smoke.py": "8ec4da12942c0dd14286276790cfd05fccf2db6fff2f61eb9599e2491e2ba859",
+    "scripts/macos/store-probe.toml": "f25c2cad3cb81b84f5fbe4c52eb011e579c8a99fa1fa89a95a67390f318f3fb6",
+    "scripts/macos/AppIcon.png": "780b08ac25ac06433b0c64e3ed54b39430ba79bd59f6b30d0ce8cbe17a47daa9",
+    "scripts/macos/PrivacyInfo.xcprivacy": "5f4c244e0e27b3ad29e2062649ac74dd5c06f899968f2d2da9ffed5aa73e9631",
+    "examples/macos_store_probe/Cargo.toml": "94a6226f729a781fff9a520fc221263f47c73e55cb00c3cafe2aa9a013b1da29",
+    "examples/macos_store_probe/src/main.rs": "1ecd83885ac2a7cf185c74d75cf2d678fb76e465a5ac5db18eea85cae2096a49",
+    "tools/taim_new/src/main.rs": "06e470ec6346e1e7b61d763f2184d2e8b659188f9f276a746be77e49cceba4f2",
+    "tools/taim_new/template/macos/app.toml": "49ddbc75629dcffeb9fcd3b960a7120ced9fe9a72ed3041b05aa53136df1a41e",
+    "tools/taim_new/template/rust-toolchain.toml": "e9447ad58ca63ea503b00819ef8cde720ed586bc269ebd4eda8d39a985295842",
+    "scripts/qa/test_macos_package.py": "e0842c009ba8bb8ef626536d0ae1be7fc8eeea4f1bc76831c527bd897949736b"
+  },
+  "host": {
+    "architecture": "arm64",
+    "macos": "26.6.2",
+    "os_build": "25G83",
+    "sdk": "26.2",
+    "rustc": "1.95.0"
+  },
+  "checks": {
+    "packaging_python_tests_passed": 11,
+    "native_host_tests_passed": 89,
+    "generator_tests_passed": 4,
+    "targeted_all_targets_strict_clippy": "passed",
+    "rustfmt": "passed",
+    "whitespace": "passed"
+  },
+  "fixture_build": {
+    "bundle": "target/macos/store-probe-release-final/Taim Store Probe.app",
+    "bundle_id": "com.theaimartco.taim.storeprobe",
+    "architectures": [
+      "arm64"
+    ],
+    "sandbox": true,
+    "signature_verified": true,
+    "app_store_local_checks": false,
+    "executable_sha256": "4fa399c738d8ddf7ea87f770ef562e858e0d81fbc9caeaf73a5d14127f0c2589",
+    "mode": "development",
+    "profile": "release",
+    "package": "macos_store_probe",
+    "binary": "macos_store_probe",
+    "built_utc": "2026-11-14T20:25:11.825607+00:00",
+    "cargo_lock_sha256": "30bff7aaba6633ba83b28a5806844f1143d7f292e976a6a979c3e83e8d8fd34a",
+    "config_sha256": "f25c2cad3cb81b84f5fbe4c52eb011e579c8a99fa1fa89a95a67390f318f3fb6",
+    "apple_upload": "not attempted",
+    "runtime_acceptance": "not performed by packaging tool",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "sdk_version": "26.2",
+    "source_commit": "cc5f9a47d73b98028caeb8bc3ff70c443b40bbe5",
+    "source_dirty": true
+  },
+  "fixture_runtime": {
+    "status": "passed",
+    "started_utc": "2026-11-14T20:25:53.621067+00:00",
+    "checks": [
+      "launch 1: signed App Sandbox, private settings roundtrip, wgpu frame presented",
+      "launch 2: signed App Sandbox, private settings roundtrip, wgpu frame presented",
+      "settings survive a new process; launch count increments exactly once"
+    ],
+    "bundle": {
+      "bundle": "target/macos/store-probe-release-final/Taim Store Probe.app",
+      "bundle_id": "com.theaimartco.taim.storeprobe",
+      "architectures": [
+        "arm64"
+      ],
+      "sandbox": true,
+      "signature_verified": true,
+      "app_store_local_checks": false,
+      "executable_sha256": "4fa399c738d8ddf7ea87f770ef562e858e0d81fbc9caeaf73a5d14127f0c2589"
+    },
+    "visual_input_acceptance": "requires user confirmation; frame presentation does not prove correct pixels",
+    "finished_utc": "2026-11-14T20:25:59.880808+00:00"
+  },
+  "standalone_consumer_build": {
+    "bundle": "target/macos/generated-notes-release-01/Taim Notes.app",
+    "bundle_id": "com.theaimartco.taim.notes",
+    "architectures": [
+      "arm64"
+    ],
+    "sandbox": true,
+    "signature_verified": true,
+    "app_store_local_checks": false,
+    "executable_sha256": "8828d15150b4d808db6f8fb9eb4616bbc0b73c1ccac95090a838971e9b1f83a7",
+    "mode": "development",
+    "profile": "release",
+    "package": "generated_notes_macos",
+    "binary": "generated_notes_macos",
+    "built_utc": "2026-11-14T20:22:33.473974+00:00",
+    "cargo_lock_sha256": "6c1818477c1c0c8f903b8f2506f36f588f5af9d8f54f3f39632eda885fd577c3",
+    "config_sha256": "abc61af602106560c961b7e07edb16839f1cf308dff343c79dcb552d9f24a836",
+    "apple_upload": "not attempted",
+    "runtime_acceptance": "not performed by packaging tool",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "sdk_version": "26.2",
+    "source_commit": "cc5f9a47d73b98028caeb8bc3ff70c443b40bbe5",
+    "source_dirty": true
+  },
+  "manual_visual_input": {
+    "result": "user confirmed visible UI, typing and button response",
+    "fixture_executable_sha256": "d812d58179e31db09d2ef51e4a28494956395d2d0d631b9007bd2192235ccb99"
+  },
+  "unsigned_installer_qa": {
+    "path": "target/macos/store-probe-unsigned-test.pkg",
+    "sha256": "5e7296b8b1f7f25bddbc277dd0cfbfebe7af8edde895489fc098eda62b8fa02a",
+    "signature": "none; deliberately local packaging QA only"
+  },
+  "owner_distribution_signing": "not executed; no valid signing identities installed",
+  "apple_server_validation": "not executed",
+  "upload": "not attempted; user explicitly requested no upload",
+  "android_emulator_installed": false,
+  "production_clearance": false
+}

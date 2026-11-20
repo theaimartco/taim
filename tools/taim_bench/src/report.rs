@@ -2,7 +2,7 @@
 //!
 //! `phase.md`'s exit gate requires "JSON report is schema-tested"; the
 //! schema version here is a plain integer bumped on any breaking field
-//! change, checked by `tests/bench/report_schema.rs`.
+//! change, checked by `tools/taim_bench/tests/report_schema.rs`.
 
 use crate::config::{CacheState, Config, RefreshRate};
 use crate::metrics::allocations::AllocationSnapshot;
@@ -14,7 +14,7 @@ use crate::metrics::pacing::PacingSummary;
 use std::time::Duration;
 
 /// The current report schema version. Bump this and update
-/// `tests/bench/report_schema.rs` whenever a field is removed, renamed,
+/// `tools/taim_bench/tests/report_schema.rs` whenever a field is removed, renamed,
 /// required, or changes meaning. Version 2 includes UI build/diff/layout
 /// in headline frame time; version 1 baselines are not comparable.
 pub const SCHEMA_VERSION: u32 = 2;

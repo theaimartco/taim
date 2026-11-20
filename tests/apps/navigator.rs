@@ -3,6 +3,7 @@ use crate::support::App;
 
 use taim::prelude::*;
 use taim::view::Root;
+use taim_core::Point;
 use taim_core::time::Duration;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -145,4 +146,120 @@ fn back_closes_a_dialog_on_the_page_before_popping_the_page() {
     assert!(app.back(), "the second back pops the page");
     app.wait(Duration::from_millis(400));
     assert!(!app.shows("Second"));
+}
+
+#[test]
+fn a_swipe_from_the_left_edge_drags_the_page_back() {
+    let mut app = App::new(mail());
+    app.tap("Open 7");
+    app.wait(Duration::from_millis(400));
+    app.tap("Like");
+
+    // Halfway across, slowly: the inbox shows underneath while dragging.
+    app.swipe(Point::new(4.0, 300.0), 220.0, 400);
+    app.wait(Duration::from_millis(400));
+    assert!(app.shows("Inbox"), "a long swipe goes back");
+    assert!(!app.shows("Message 7"));
+    assert!(!app.root.is_animating(app.now));
+}
+
+#[test]
+fn a_short_swipe_lets_the_page_return() {
+    let mut app = App::new(mail());
+    app.tap("Open 7");
+    app.wait(Duration::from_millis(400));
+    app.tap("Like");
+
+    // A little way, slowly, then let go: the page springs back.
+    app.swipe(Point::new(4.0, 300.0), 60.0, 400);
+    assert!(app.root.is_animating(app.now), "it returns, moving");
+    app.wait(Duration::from_millis(400));
+    assert!(app.shows("Likes 1"), "the page stayed, with its state");
+    assert!(!app.shows("Inbox"));
+    assert!(!app.root.is_animating(app.now));
+
+    // A swipe that does not start at the edge is the page's.
+    app.swipe(Point::new(120.0, 300.0), 220.0, 400);
+    app.wait(Duration::from_millis(400));
+    assert!(app.shows("Message 7"));
+}
+
+#[test]
+fn a_quick_flick_from_the_edge_goes_back_even_if_short() {
+    let mut app = App::new(mail());
+    app.tap("Open 7");
+    app.wait(Duration::from_millis(400));
+    app.swipe(Point::new(4.0, 300.0), 90.0, 48);
+    app.wait(Duration::from_millis(400));
+    assert!(app.shows("Inbox"));
+}
+
+#[test]
+fn every_page_transition_comes_in_settles_and_goes_back() {
+    for style in [
+        PageTransition::Slide,
+        PageTransition::Zoom,
+        PageTransition::Fade,
+        PageTransition::Rise,
+        PageTransition::None,
+    ] {
+        let mut app = App::new(Root::new(move |cx| {
+            let nav = Navigator::new(cx, 0_u8);
+            navigator(nav, move |_, page| {
+                if *page == 0 {
+                    button("Next").on_press(move || nav.push(1)).into()
+                } else {
+                    text("Second").into()
+                }
+            })
+            .transition(style)
+        }));
+        app.tap("Next");
+        assert_eq!(
+            app.root.is_animating(app.now),
+            style != PageTransition::None,
+            "{style:?} moves"
+        );
+        app.wait(Duration::from_millis(400));
+        assert!(app.shows("Second") && !app.shows("Next"), "{style:?}");
+        assert!(!app.root.is_animating(app.now), "{style:?} settles");
+        assert!(app.back());
+        app.wait(Duration::from_millis(400));
+        assert!(app.shows("Next") && !app.shows("Second"), "{style:?} back");
+    }
+}
+
+#[test]
+fn heroes_on_both_pages_fly_and_the_pages_stay_usable() {
+    let mut app = App::new(Root::new(|cx| {
+        let nav = Navigator::new(cx, 0_u8);
+        navigator(nav, move |_, page| {
+            if *page == 0 {
+                column(views![
+                    space().height(300.0),
+                    hero("photo", button("Thumb").on_press(move || nav.push(1))),
+                ])
+                .into()
+            } else {
+                column(views![
+                    hero("photo", text("Photo").size(40.0)),
+                    button("Close").on_press(move || {
+                        let _ = nav.pop();
+                    }),
+                ])
+                .into()
+            }
+        })
+        .transition(PageTransition::Zoom)
+    }));
+    app.tap("Thumb");
+    assert!(app.root.is_animating(app.now));
+    app.wait(Duration::from_millis(400));
+    assert!(app.shows("Photo") && !app.shows("Thumb"));
+    app.tap("Close");
+    app.wait(Duration::from_millis(400));
+    assert!(app.shows("Thumb"));
+    app.tap("Thumb");
+    app.wait(Duration::from_millis(400));
+    assert!(app.shows("Photo"), "and again");
 }

@@ -200,11 +200,21 @@ fn glass_shows_what_is_behind_it() {
     // Across the pane the backdrop changes from the cyan disc on the left
     // to the warm gradient on the right; an opaque pane would be flat.
     let across = row(&pixels, 140, 130, 350);
-    assert!(
-        spread(&across) > 25.0,
-        "the pane is flat ({}): it is not showing the scene behind it",
-        spread(&across)
-    );
+    if cfg!(feature = "web-colors") {
+        // Gamma-space compatibility deliberately uses the opaque material
+        // fallback. Verify that contract instead of asking it to transmit.
+        assert!(spread(&across) < 1.0, "legacy fallback must be flat");
+        assert!(
+            across.iter().all(|green| *green > 200.0),
+            "legacy fallback must retain the readable light tint"
+        );
+    } else {
+        assert!(
+            spread(&across) > 25.0,
+            "the pane is flat ({}): it is not showing the scene behind it",
+            spread(&across)
+        );
+    }
 }
 
 #[test]

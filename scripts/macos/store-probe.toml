@@ -1,0 +1,12 @@
+[app]
+name = "Taim Store Probe"
+bundle_id = "com.theaimartco.taim.storeprobe"
+version = "0.1.0"
+build = "1"
+minimum_system_version = "13.0"
+category = "public.app-category.developer-tools"
+copyright = "Copyright © 2026 VYOM Taim contributors"
+icon = "AppIcon.png"
+privacy_manifest = "PrivacyInfo.xcprivacy"
+
+[entitlements]

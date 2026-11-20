@@ -1,0 +1,13 @@
+[app]
+name = "Taim Counter"
+bundle_id = "com.theaimartco.taim.counter"
+version = "0.1.0"
+build = "1"
+minimum_system_version = "13.0"
+category = "public.app-category.developer-tools"
+copyright = "Copyright © 2026 VYOM Taim contributors"
+icon = "AppIcon.png"
+privacy_manifest = "PrivacyInfo.xcprivacy"
+
+# No network, user-file, camera, microphone, or debugging entitlements by default.
+[entitlements]

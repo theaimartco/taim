@@ -1,8 +1,114 @@
 # TAIM engineering status
 
-**Version:** 0.15.0-dev (experimental).
+**Version:** 0.15.0-rc.1 (release candidate).
 **Production release verdict:** NO-GO until every evidence gate in
 docs/release/production-gates.md is approved on a reviewed release commit.
+
+## iOS services checkpoint (2026-11-20)
+
+iOS now has a service layer comparable to the Android one's core: share
+sheet, haptics, Face ID/Touch ID, keychain, local notifications (with launch
+tap events), location, photo picker and camera, plus safe-area layout and
+live light/dark/Reduce Motion following. `scripts/ios/package.py` builds
+signed device `.app`/`.ipa` products for development, ad-hoc and App Store
+profiles. On an iPhone 17 Simulator (iOS 26.2), with taps driven
+through the Simulator window, the `apple_services_probe` fixture passed every
+service including the Face ID prompt (match, mismatch, cancel), notification
+and location permission prompts, foreground, background and cold-launch
+notification taps, and photo-picker selection and cancel; a release
+`aarch64-apple-ios` binary links. The keychain biometric read prompt, camera
+capture (no Simulator frames), physical devices and device-signed
+installation remain unverified. See [iOS](platform/ios.md).
+
+## Full-access verification follow-up (2026-11-15)
+
+The complete local automated release gate now passes from an isolated clean
+candidate, including Android linking and Chromium/Firefox/WebKit interaction.
+Strict cross-target checks cover Windows x64/ARM64, macOS Intel/arm64,
+iOS device/Simulator, Linux x64/ARM64, Android arm64/x86_64 and Web/WASM.
+Fresh default/all-feature dependency audits pass after clipboard-win/wasmtimer
+updates remove a yanked version and the unmaintained pin-utils dependency.
+
+Runtime tests exposed and fixed the browser clock panic, iOS clipped layout
+and missing fonts, and an Android race that let stale app snapshots discard
+newer IME composition. Native Android now acknowledges editor revisions only
+after the view consumes the edit. The emulator verifies Unicode/codepoint
+editing, composition, secure surrounding-text privacy, stale connections,
+multiline input, background/resume and OS process-death restoration. These
+are emulator results, not physical-device or human screen-reader acceptance.
+
+macOS optimized sandbox/storage/restart/GPU-present checks and an iOS Simulator
+counter also pass. Reproducible source bundles, an SPDX inventory and an
+external consumer of the extracted source artifact are available locally.
+See [full-access evidence and remaining gates](testing/production-full-access-20261115.md)
+and [iOS limitations](platform/ios.md). Owner distribution signing, physical
+platform QA and independent review remain open. Earlier dated checkpoints
+below are historical; their environment blockers have been superseded.
+
+## Shared production hardening (2026-11-15)
+
+Settings mutations now roll back on failed persistence, use exclusively created
+temporary files per writer, clean up failures, and create private Unix files.
+The atlas rejects empty/oversized extents without overflow. A completed pop
+requests layout to release its outgoing page; reduced-motion settings are
+scoped to each root instead of shared globally. Empty stress tests now exercise
+navigation/state release, editor lifetimes and cache pressure. Release checks
+require a clean checkout, locked workspace commands, QA/release tooling tests,
+external consumers and dependency auditing; diagnostic/skipped runs cannot pass.
+
+At that earlier checkpoint, an uncached dependency and unavailable network
+blocked the full workspace gate. The full-access follow-up above supersedes
+those environment blockers; physical acceptance remains open. See [the scoped hardening report](testing/production-hardening-20261115.md)
+for results, reproduction commands and outstanding platform work.
+
+## macOS packaging checkpoint (2026-11-15)
+
+Native arm64 app builds and a sandboxed optimized fixture have now run on a real
+Mac. Private settings survive process restart, wgpu presents frames, and the
+user confirmed visible UI, typing and button input. A fresh generated notes
+project also builds its own sandboxed `.app`. `taim-new` includes macOS packaging;
+owner certificate/profile validation and signed installer construction are
+implemented. Actual owner signing and Apple upload remain unexecuted; no store
+upload was requested. See [macOS acceptance](testing/macos-store-acceptance-20261115.md)
+and [packaging instructions](platform/macos.md). The older unrun macOS status
+below is historical; broad production gates remain open.
+
+## Page transitions and heroes (2026-11-20)
+
+The navigator has five transitions: slide (the iOS push, with parallax,
+dimming, a shadow and an edge swipe back that follows the finger), zoom,
+fade, rise and none. `hero(tag, view)` flies shared content between pages
+while they move. Tested headlessly: swipe commit, swipe cancel, flick, every
+style settling, and heroes paired across pushes and pops. A GPU test on Metal
+checks the hero's path, that it grows, and that it stays opaque over a
+fading page. Limits:
+- A flight scales the hero uniformly; it is not laid out again at each size.
+- The flight stays inside the clips of any scroll view it sits in.
+- The flight draws the top page's hero in both directions.
+- Not yet tried by hand on a phone.
+
+## Motion across the views (2026-11-20)
+
+The views move like physical objects. They run on one shared closed-form
+spring, so a retarget mid-motion keeps the speed it had. Buttons and chips
+squish. Switches, checkboxes, radios and sliders spring. The segmented
+indicator stretches and bounces. Scrolling rubber-bands and bounces at its
+ends. `animated` glides content when layout moves it and `appear` brings it
+in. Unit-tested, and the transform/opacity path is rendered and tested on
+Metal. Not yet felt on a physical phone. The rubber band at the top shows
+only once a drag is already scrolling, because a drag that starts at the top
+goes to `pull_to_refresh`.
+
+## Live liquid glass (2026-11-20)
+
+Glass answers touch and light: a press lights the rim nearest the finger,
+magnifies what is under it and swells the pane on a spring; interactive
+panes stretch after a drag and wobble back; `glass_group` melts nearby
+panes together through a smooth SDF union drawn once per point; the light
+leans towards the pointer (desktop) or with the device's tilt (iOS); and
+glass keeps its text readable over any backdrop. Rendered and tested on
+Metal on macOS, and run in the iOS Simulator. Not yet rendered on WebGL,
+Vulkan or DirectX, and tilt is untried on a physical iPhone.
 
 ## Liquid glass and visual checkpoint (2026-11-03)
 

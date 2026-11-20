@@ -44,6 +44,8 @@ pub struct Root {
     /// Edges the platform covers (status bar, navigation bar, notch,
     /// on-screen keyboard); views are laid out inside them.
     insets: crate::Padding,
+    /// Whether the last paint drew glass.
+    painted_glass: bool,
 }
 
 /// Opaque single-use identity for one asynchronous clipboard read.
@@ -176,6 +178,7 @@ impl Root {
             applied: None,
             text_input: None,
             insets: crate::Padding::ZERO,
+            painted_glass: false,
             id: widget::Id::unique(),
             preedit: None,
             composition: crate::ime::Composition::default(),
@@ -199,6 +202,7 @@ impl Root {
 
     /// Dismisses the active modal first, then invokes enabled app navigation.
     pub fn back(&mut self, now: Instant) -> Response {
+        let _motion = crate::state::MotionGuard::enter(self.motion_reduced());
         self.reconcile_focus();
         if !self.modal_focus.is_empty() {
             let key = keyboard::Key::Named(keyboard::key::Named::Escape);
@@ -289,19 +293,11 @@ impl Root {
         }
     }
 
-    /// Applies the application's motion preference and reports whether its
-    /// theme or zoom changed since the last call.
+    /// Receives pending application messages and reports whether the theme
+    /// or zoom changed. Motion preferences are applied per window when driven.
     pub fn settings_changed(&mut self) -> bool {
         let _ = self.scope.receive();
         use taim_core::theme::Base as _;
-
-        crate::state::set_motion_reduced(
-            self.scope
-                .settings
-                .reduced_motion
-                .as_ref()
-                .map_or(self.system_motion_reduced, crate::Prop::get),
-        );
 
         let current = (
             self.theme()
@@ -320,14 +316,22 @@ impl Root {
             return false;
         }
         self.system_motion_reduced = reduced;
-        crate::state::set_motion_reduced(
-            self.scope
-                .settings
-                .reduced_motion
-                .as_ref()
-                .map_or(reduced, crate::Prop::get),
-        );
         true
+    }
+
+    /// Whether the last [`paint`](Self::paint) drew glass: only then does
+    /// moving the scene light change anything on screen.
+    pub fn painted_glass(&self) -> bool {
+        self.painted_glass
+    }
+
+    /// Whether motion is reduced, by the application or the system.
+    pub fn motion_reduced(&self) -> bool {
+        self.scope
+            .settings
+            .reduced_motion
+            .as_ref()
+            .map_or(self.system_motion_reduced, crate::Prop::get)
     }
 
     /// Stable identity of the focused view, without disclosing editor contents.
@@ -411,6 +415,7 @@ impl Root {
 
     /// Lays the tree out to fill `size`, inside the platform's insets.
     pub fn layout(&mut self, renderer: &Renderer, size: Size) {
+        let _motion = crate::state::MotionGuard::enter(self.motion_reduced());
         // A rebuilt subtree can put a different view at the focused path.
         self.text_input = None;
         let mut cx = MeasureCx {
@@ -493,6 +498,8 @@ impl Root {
         pointer: Option<Point>,
         now: Instant,
     ) {
+        let _motion = crate::state::MotionGuard::enter(self.motion_reduced());
+        let _ = crate::state::take_glass();
         let mut painter = tree::Painter {
             renderer,
             theme: &self.theme,
@@ -509,6 +516,7 @@ impl Root {
             &mut Vec::new(),
             &mut painter,
         );
+        self.painted_glass = crate::state::take_glass();
         self.reconcile_focus();
         if let InputMethod::Enabled {
             cursor,
@@ -548,6 +556,7 @@ impl Root {
 
     /// Whether anything is still moving at `now`.
     pub fn is_animating(&mut self, now: Instant) -> bool {
+        let _motion = crate::state::MotionGuard::enter(self.motion_reduced());
         tree::any_animating(&mut self.child, now)
     }
 
@@ -644,6 +653,7 @@ impl Root {
         now: Instant,
         touch: bool,
     ) -> Response {
+        let _motion = crate::state::MotionGuard::enter(self.motion_reduced());
         // Native finger events are touch too, whichever way the shell reports them.
         let touch = touch || matches!(event, Event::Touch(_));
         self.reconcile_focus();
@@ -871,6 +881,7 @@ impl Root {
         action: &semantics::Action,
         now: Instant,
     ) -> Response {
+        let _motion = crate::state::MotionGuard::enter(self.motion_reduced());
         self.pending_paste = None;
         self.reconcile_focus();
         let previous_focus = self.focus.current.clone();

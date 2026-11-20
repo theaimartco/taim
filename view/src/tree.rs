@@ -223,6 +223,74 @@ fn paint_view(
     path: &mut Vec<u16>,
     painter: &mut Painter<'_>,
 ) {
+    let bounds = place(child, origin, visible).bounds;
+    let visual = child.view().visual(&crate::VisualCx {
+        now: painter.now,
+        frame: child.frame(),
+        bounds,
+    });
+    let resets = child.view().resets_opacity();
+    if visual.is_identity() && !resets {
+        paint_placed(child, origin, visible, path, painter);
+        return;
+    }
+
+    if visual.opacity <= 0.0 {
+        return;
+    }
+    let centre = bounds.center();
+    let scale = visual.scale.max(0.0);
+    let transformation = taim_core::Transformation::translate(
+        centre.x + visual.offset.x,
+        centre.y + visual.offset.y,
+    ) * taim_core::Transformation::scale(scale)
+        * taim_core::Transformation::translate(-centre.x, -centre.y);
+
+    let Painter {
+        renderer,
+        theme,
+        pointer,
+        text_color,
+        focus,
+        now,
+    } = painter;
+    let opacity = visual.opacity.min(1.0);
+    {
+        use taim_core::Renderer as _;
+        if resets {
+            renderer.start_opacity_reset(opacity);
+        } else {
+            renderer.start_opacity(opacity);
+        }
+    }
+    {
+        renderer.with_transformation(transformation, |renderer| {
+            paint_placed(
+                child,
+                origin,
+                visible,
+                path,
+                &mut Painter {
+                    renderer,
+                    theme,
+                    pointer: *pointer,
+                    text_color: *text_color,
+                    focus: *focus,
+                    now: *now,
+                },
+            );
+        });
+    }
+    taim_core::Renderer::end_opacity(*renderer);
+}
+
+fn paint_placed(
+    child: &mut Child,
+    origin: Point,
+    visible: Option<Rectangle>,
+    path: &mut Vec<u16>,
+    painter: &mut Painter<'_>,
+) {
     let at = place(child, origin, visible);
 
     child.view().paint(&mut PaintCx {
