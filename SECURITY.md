@@ -8,7 +8,7 @@ has been announced.
 
 Do not publish exploit reproduction details, proof-of-concept payloads,
 secrets or sensitive traces in public GitHub issues. Reach the maintainer
-via the workspace metadata contact dev@theaimartco.com if deliverable,
+via the workspace metadata contact theaimartco@gmail.com if deliverable,
 or use GitHub private vulnerability reporting if enabled. If no private
 route is available, request a private reporting channel without disclosing
 the exploit publicly.
