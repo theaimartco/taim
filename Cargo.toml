@@ -166,18 +166,7 @@ taim_tiny_skia.workspace = true
 #
 # Features are listed explicitly. Adding one here changes what every
 # integration test exercises, so it should be a deliberate act.
-taim.workspace = true
-taim.features = [
-    "wgpu",
-    "tiny-skia",
-    "crisp",
-    "hinting",
-    "fira-sans",
-    "linux-theme-detection",
-    "x11",
-    "wayland",
-    "raster",
-]
+taim = { path = ".", default-features = false, features = ["wgpu", "tiny-skia", "crisp", "hinting", "fira-sans", "linux-theme-detection", "x11", "wayland", "raster"] }
 
 # Used by native view integration tests for typed platform payloads.
 serde_json = "1.0"
