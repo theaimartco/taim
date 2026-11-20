@@ -130,6 +130,10 @@ impl Query {
 }
 
 /// Stores `secret` under `service`/`account`, replacing any existing item.
+///
+/// The existing item is kept when the new one cannot be stored: a trial
+/// copy is added under a staging account first, so a missing passcode or
+/// entitlement fails before anything is deleted.
 pub fn keychain_set(
     service: &str,
     account: &str,
@@ -137,7 +141,37 @@ pub fn keychain_set(
     access: KeychainAccess,
 ) -> Result<(), ServiceError> {
     validate_keychain(service, account, Some(secret))?;
-    let _ = keychain_delete(service, account)?;
+    let staging = format!("{account}.taim-staging");
+    let _ = delete_item(service, &staging);
+    add_item(service, &staging, secret, access)?;
+    let _ = delete_item(service, &staging);
+    let _ = delete_item(service, account)?;
+    add_item(service, account, secret, access)
+}
+
+fn delete_item(service: &str, account: &str) -> Result<bool, ServiceError> {
+    attempt_lookup(
+        |store| {
+            objc2::rc::autoreleasepool(|_| {
+                let query = Query::new(service, account, store);
+                // SAFETY: a query dictionary built from Security constants.
+                let status = unsafe { SecItemDelete(query.as_ptr()) };
+                if status == NOT_FOUND {
+                    return Ok(false);
+                }
+                keychain_status(status).map(|()| true)
+            })
+        },
+        |existed| *existed,
+    )
+}
+
+fn add_item(
+    service: &str,
+    account: &str,
+    secret: &[u8],
+    access: KeychainAccess,
+) -> Result<(), ServiceError> {
     attempt(|store| {
         objc2::rc::autoreleasepool(|_| {
             // The login keychain has no per-item access control.
@@ -250,18 +284,5 @@ pub fn keychain_get(
 /// Deletes the item under `service`/`account`. Returns whether one existed.
 pub fn keychain_delete(service: &str, account: &str) -> Result<bool, ServiceError> {
     validate_keychain(service, account, None)?;
-    attempt_lookup(
-        |store| {
-            objc2::rc::autoreleasepool(|_| {
-                let query = Query::new(service, account, store);
-                // SAFETY: a query dictionary built from Security constants.
-                let status = unsafe { SecItemDelete(query.as_ptr()) };
-                if status == NOT_FOUND {
-                    return Ok(false);
-                }
-                keychain_status(status).map(|()| true)
-            })
-        },
-        |existed| *existed,
-    )
+    delete_item(service, account)
 }

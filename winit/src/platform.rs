@@ -353,18 +353,68 @@ mod macos {
                 .as_ref()
                 .firstObject()
                 .ok_or_else(|| Error::Failed("no Application Support directory".to_owned()))?;
-            let name = NSBundle::mainBundle()
-                .bundleIdentifier()
-                .map(|id| id.to_string())
-                .or_else(|| {
-                    std::env::current_exe()
-                        .ok()?
-                        .file_stem()
-                        .map(|name| name.to_string_lossy().into_owned())
-                })
-                .unwrap_or_else(|| "taim-app".to_owned());
-            Ok(PathBuf::from(base.to_string()).join(name))
+            let base = PathBuf::from(base.to_string());
+            let stem = std::env::current_exe().ok().and_then(|path| {
+                path.file_stem()
+                    .map(|name| name.to_string_lossy().into_owned())
+            });
+            let Some(id) = NSBundle::mainBundle().bundleIdentifier() else {
+                return Ok(base.join(stem.as_deref().unwrap_or("taim-app")));
+            };
+            Ok(migrated(
+                base.join(id.to_string()),
+                stem.map(|stem| base.join(stem)),
+            ))
         })
+    }
+
+    /// Bundled apps kept their data under the executable's name before it
+    /// was namespaced by bundle ID; moves it across once, and keeps using the
+    /// old directory if it cannot be moved, so an update never strands it.
+    fn migrated(directory: PathBuf, legacy: Option<PathBuf>) -> PathBuf {
+        match legacy {
+            Some(legacy) if legacy != directory && legacy.is_dir() && !directory.exists() => {
+                match std::fs::rename(&legacy, &directory) {
+                    Ok(()) => directory,
+                    Err(error) => {
+                        log::warn!("app data left in {}: {error}", legacy.display());
+                        legacy
+                    }
+                }
+            }
+            _ => directory,
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::migrated;
+
+        #[test]
+        fn legacy_data_moves_once_to_the_bundle_directory() {
+            let root = std::env::temp_dir().join(format!("taim-migrate-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&root);
+            let legacy = root.join("Notes");
+            let directory = root.join("dev.taim.notes");
+            std::fs::create_dir_all(&legacy).expect("legacy directory");
+            std::fs::write(legacy.join("settings.store"), "theme=dark").expect("legacy file");
+
+            assert_eq!(migrated(directory.clone(), Some(legacy.clone())), directory);
+            assert!(!legacy.exists());
+            assert_eq!(
+                std::fs::read_to_string(directory.join("settings.store")).expect("moved"),
+                "theme=dark"
+            );
+
+            // A later legacy directory never replaces existing data.
+            std::fs::create_dir_all(&legacy).expect("new legacy directory");
+            assert_eq!(migrated(directory.clone(), Some(legacy)), directory);
+            assert_eq!(
+                std::fs::read_to_string(directory.join("settings.store")).expect("kept"),
+                "theme=dark"
+            );
+            std::fs::remove_dir_all(root).expect("cleanup");
+        }
     }
 }
 
