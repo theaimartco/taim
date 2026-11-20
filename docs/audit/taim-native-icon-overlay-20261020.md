@@ -1,9 +1,9 @@
 # TAIM native window icon and overlay safety checkpoint
 
 Date: 20 October 2026
-Implementation commit: `2ba2b47fa5c20ff4f1375e9558239d7ac4061f47`
+Implementation commit: `3c08197b03e84818c1e6fcd5881d54680c409203`
 Branch: `feature/taim-bounded-icon-decoder-20261020`
-Original Iced fork baseline: `81afda72f374386036a5b96a55f57a3dcfb0b653`
+Original Iced fork baseline: `6db551046abd02eadee9f6bbcfa103bc4a9fadd5`
 Release verdict: **NO-GO** — tests and original source conformance not verified
 
 ## Functional changes

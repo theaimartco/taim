@@ -1,6 +1,6 @@
 # Taim Readiness Audit — UI, Components, Speed
 
-**Commit:** `17bde4a1-dirty` · **Date:** 13 August 2026
+**Commit:** `bc2f476e-dirty` · **Date:** 13 August 2026
 **Method:** `cargo check --workspace --all-targets`, `cargo test --workspace`,
 `taim_bench` (6 scenes × 5 runs), source inventory of `widget/`, `taim-design/`, `tools/taim_bench/`
 

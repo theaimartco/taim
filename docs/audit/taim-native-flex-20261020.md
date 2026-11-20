@@ -3,7 +3,7 @@
 Date: 2026-10-20
 Branch: `feature/taim-native-flex-allocation-20261020`
 Parent: `feature/taim-native-wrapping-layout-20261020`
-Original Iced fork checkpoint: `81afda72f374386036a5b96a55f57a3dcfb0b653`
+Original Iced fork checkpoint: `6db551046abd02eadee9f6bbcfa103bc4a9fadd5`
 Status: **source implemented / uncompiled / release NO-GO**
 
 ## What changed in live code

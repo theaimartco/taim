@@ -6,7 +6,7 @@ number has not been measured, this page says so instead of estimating it.
 
 ## Quality
 
-From the release check of commit `0571d48` (2026-11-20, Apple M1, macOS,
+From the release check of commit `a7973a9` (2026-11-20, Apple M1, macOS,
 Rust 1.95.0), `scripts/release/check.sh`, report in
 `target/release-check-<commit>/report.md`:
 
@@ -34,7 +34,7 @@ rest of the 8.33 ms (120 Hz) or 16.67 ms (60 Hz) budget is left for.
 
 Measured by `tools/taim_bench` on an Apple M1 (8 GB, macOS 26.6, Metal, on
 battery; device `apple-m1-dev` in `benchmarks/devices.toml`),
-commit `c3af138` (2026-11-20), release build with allocation counting,
+commit `cad71dc` (2026-11-20), release build with allocation counting,
 30 s warm-up, 5 runs × 180 frames per scene, median run. Raw data:
 [`benchmarks/runs/2026-11-20-apple-m1/`](../../benchmarks/runs/2026-11-20-apple-m1/).
 
@@ -74,9 +74,9 @@ entry in `benchmarks/devices.toml`, or one scene:
 ### Earlier baseline
 
 [`benchmarks/baseline/`](../../benchmarks/baseline/) holds a run from
-2026-08-23 (commit `b67fd3f`, Intel Core i7-12700H, Ubuntu). Its frame
+2026-08-23 (commit `0fe59af`, Intel Core i7-12700H, Ubuntu). Its frame
 cost was `update + draw` only, before the harness began timing `build`
-(view construction and layout) in commit `b6d62bf`, so its numbers are
+(view construction and layout) in commit `e1bf44c`, so its numbers are
 lower than the full-frame figures above and are not comparable with
 them. Use the table above.
 

@@ -4,7 +4,7 @@ The five `.github/workflows/{ci,fuzz,golden,licenses,perf}.yml` files
 in the base tree contained **comments only** and did not execute their
 declared jobs. They were removed from the workflows directory to prevent
 invalid empty-job workflow noise. Their exact historical content is retained
-in Git history at base commit `9c950f81a3faebbadbe47eb493327e0c9fb3aacf`.
+in Git history at base commit `b9cd78784a8ede572b1d688c2808e0478bdecec1`.
 
 The supported replacement is `.github/workflows/verification.yml`, which
 now owns formatting, compilation, tests, visual goldens, AT-SPI, dependency

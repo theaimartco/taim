@@ -1,6 +1,6 @@
 # Phase 3 Production Call Graph Audit: Current Reality (Before Phase 3)
 
-**Baseline Commit**: `766adda1591b5706fbf903fd92c78ebd94bdffe8`  
+**Baseline Commit**: `3eaaa0c0cf952e2b9c91466a8d641ed8f1ed9282`  
 **Date**: September 2026  
 **Auditor**: TAIM Architectural Independence Verification
 

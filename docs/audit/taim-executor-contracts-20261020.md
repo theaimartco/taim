@@ -2,8 +2,8 @@
 
 Date: 20 October 2026
 Branch: `feature/taim-executor-contracts-20261020`
-Candidate implementation: `8b59fd9c13f9f7782f35fe0a7c26af0638d0a499`
-Baseline original Iced fork: `81afda72f374386036a5b96a55f57a3dcfb0b653`
+Candidate implementation: `49eb9235eea47510a81d1d67452e1fc105b78847`
+Baseline original Iced fork: `6db551046abd02eadee9f6bbcfa103bc4a9fadd5`
 Verdict: **NO-GO** — source independence and production not proven.
 
 ## Correctness regression found and fixed

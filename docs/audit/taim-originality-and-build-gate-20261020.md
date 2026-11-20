@@ -2,7 +2,7 @@
 
 Date: 2026-10-20
 Candidate branch: `feature/taim-release-hardening-20261020`
-Baseline historical Iced fork: `81afda72f374386036a5b96a55f57a3dcfb0b653`
+Baseline historical Iced fork: `6db551046abd02eadee9f6bbcfa103bc4a9fadd5`
 Parent candidate: `feature/taim-native-contracts-batch-20261020`
 Decision: **NO-GO for production and 100% independent authorship claims**
 

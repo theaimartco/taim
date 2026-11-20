@@ -1,6 +1,6 @@
 # TAIM Architectural Independence & Divergence Report: Phase 1 Audit
 
-**Baseline Commit**: `81afda72f374386036a5b96a55f57a3dcfb0b653`  
+**Baseline Commit**: `6db551046abd02eadee9f6bbcfa103bc4a9fadd5`  
 **Date**: September 2026  
 **Scope**: Entire Workspace (27 Crates, 714 Audited Source Files, 189,199 LOC)  
 **Standard**: Strict architectural divergence on critical paths, zero unnecessary clone-obfuscation, full legal attribution preserved.
@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary
 
-TAIM has executed a ground-up architectural divergence from the recorded upstream Iced fork point (`81afda72`). Rather than cosmetic renames or superficial refactors, the hot paths and core subsystems have been systematically transformed into performance-first, TAIM-native architectures:
+TAIM has executed a ground-up architectural divergence from the recorded upstream Iced fork point (`6db55104`). Rather than cosmetic renames or superficial refactors, the hot paths and core subsystems have been systematically transformed into performance-first, TAIM-native architectures:
 
 1. **Zero-Allocation Layout Resolution**: Replaced dynamic heap allocations during layout node resolution and bounding box caching in `taim_core` with cache-friendly small-vector primitives (`SmallVec<[NodeId; 8]>` and `SmallVec<[Entry; 4]>`), guaranteeing zero heap allocations during steady-state frame layout.
 2. **Native Generational Skyline Atlas Allocator**: Fully replaced the inherited third-party `guillotiere` guillotine-tree allocator in `taim_wgpu` with a custom, cache-local skyline allocator featuring generational allocation IDs, padding, and edge-run defragmentation. Completely removed `guillotiere` from the workspace dependency graph.

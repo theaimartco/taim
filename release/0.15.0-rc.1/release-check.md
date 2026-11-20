@@ -1,6 +1,6 @@
 # TAIM release check
 
-- Commit: 7f9b26685654e097460525011fda9138e649f387
+- Commit: 4e3592d1028d0655901f7c86f7be35f091ec1205
 - Clean tree: yes
 - Date: 2026-11-03T12:17:47Z
 - Rust: rustc 1.95.0 (59807616e 2026-04-14)

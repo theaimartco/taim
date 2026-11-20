@@ -1,7 +1,7 @@
 {
   "date": "2026-10-30",
   "milestone": "System media selection, delegated photo/video capture, viewer dispatch and URI lifecycle",
-  "git_head": "13121da901b0a711b5e94df20ae30246423a282b",
+  "git_head": "9a412b4f71cbf6d5d56327cf8aa3b2a6037c5e3b",
   "working_tree_dirty": true,
   "runtime": {
     "status": "passed",

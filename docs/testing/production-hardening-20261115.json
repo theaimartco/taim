@@ -2,7 +2,7 @@
   "schema_version": 1,
   "recorded_utc": "2026-11-15T06:27:13.007284+00:00",
   "scope": "Local native/shared contract verification; all-platform production release remains blocked",
-  "source_base_commit": "d1429e50a65cdb535407272100e6d8739b505165",
+  "source_base_commit": "e0aaf631e8e6b4a021cd6fc58c259ed81ce0c910",
   "source_dirty": true,
   "source_sha256": {
     "src/storage.rs": "31997c84ae265e68d0fdcde44f4a60df7ba0d8925a9cb64744dd0831e205b61a",

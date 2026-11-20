@@ -1,8 +1,8 @@
 # TAIM input delivery, gesture cleanup and native Windows shell
 
 **Date:** 2026-10-20
-**Code candidate commit:** `692dc7b10ac51238fd3a8d07aa21f013547a12d5`
-**Historical original Iced fork:** `81afda72f374386036a5b96a55f57a3dcfb0b653`
+**Code candidate commit:** `ffd2a50087f9d7897212907def0ed0f4ce329ecc`
+**Historical original Iced fork:** `6db551046abd02eadee9f6bbcfa103bc4a9fadd5`
 **Release decision:** NO-GO — not independently sourced end to end and not production-certified
 
 ## Functional implementation in current candidate

@@ -4,8 +4,8 @@ Last audited: 2026-09-19
 
 ## October 19, 2026 — independent-source checkpoint (not 100%)
 
-At branch commit 19147669a4028189c7ace66aff37e61be41e40f6 the complete
-recursive Git trees for upstream Iced fork 81afda72 and TAIM were compared
+At branch commit 9320f69519cff745329a933f6d361cd69b070237 the complete
+recursive Git trees for upstream Iced fork 6db55104 and TAIM were compared
 using exact Git blob SHA. 67 .rs/.wgsl/.toml files were still byte-identical
 at identical paths; the exact file inventory is preserved in
 docs/audit/exact-iced-blob-ledger.md.
@@ -56,7 +56,7 @@ Status meanings:
 | Active Iced-owned build images/assets | 0 | inherited images and documentation artwork removed/replaced |
 | Removed direct `iced-rs` Git dependencies in current TAIM work | 2 | `winit` and `cryoglyph` replaced |
 | Historical Iced-owned build/runtime dependencies | 2 groups | `glutin` and cross-build images |
-| Source lineage baseline | 1 | `iced-rs/iced` at `81afda72` |
+| Source lineage baseline | 1 | `iced-rs/iced` at `6db55104` |
 | Normalized token independence | 97.39% | 5,152 estimated inherited LOC remain across 197,679 audited LOC; **not** 100% source ownership |
 
 ### Latest source-ownership checkpoint (2026-09-19)
@@ -808,7 +808,7 @@ not accepted as the final solution.
 ### 4. `iced-rs/iced`
 
 - **Status:** SOURCE LINEAGE, not a current Cargo dependency
-- **Recorded baseline:** commit `81afda72`
+- **Recorded baseline:** commit `6db55104`
 - **Why it is listed:** TAIM began from an Iced source baseline, so removing Git
   packages alone does not achieve the 0% goal.
 - **TAIM replacement target:** progressively replace inherited runtime, renderer,

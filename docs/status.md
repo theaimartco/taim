@@ -186,7 +186,7 @@ builds again and its automated checks are green on Linux x86-64:
 - Tests of removed code (`AppRunner`/`Program`/`FrameGate`) were deleted
   with it: `tests/runtime/phase3_inversion.rs`, `benches/phase3_production.rs`.
 - Widget-gallery goldens were re-adopted for the TAIM palette introduced in
-  13121da. Before that, 25 of them had also drifted by sub-perceptual
+  9a412b4. Before that, 25 of them had also drifted by sub-perceptual
   border antialiasing (max channel delta 12); the source of that drift was
   not identified.
 - `taim_wgpu` built with `svg` but without `image` failed to compile; fixed.
@@ -207,7 +207,7 @@ golden tests, pointer/IME/accessibility modules, profiling and benchmarks.
 An implemented module, a passing unit test, a virtual screenshot and
 physical hardware acceptance are four different milestones.
 
-## Source origin checkpoint (candidate 7cf498d3)
+## Source origin checkpoint (candidate de12b771)
 
 On the identity continuation branch, a full fork-tree Git SHA comparison
 finds **58 byte-identical same-path `.rs/.wgsl/.toml` files** against
@@ -217,7 +217,7 @@ The new bounded-stream and overlay-cursor implementations have committed
 regression tests, but their Rust execution has not been certified.
 See docs/audit/taim-stream-overlay-native-20261020.md.
 
-## Native geometry and navigation checkpoint (candidate fdbe2153)
+## Native geometry and navigation checkpoint (candidate feff3ff8)
 
 A complete Git-tree comparison finds **55 byte-identical same-path
 `.rs/.wgsl/.toml` files** at the Iced fork baseline, down from 58.
@@ -238,7 +238,7 @@ window presentation semantics, workspace IDs and Linux application-ID
 sanitization. Neither compilation nor production acceptance is verified.
 See `docs/audit/taim-remaining-source-20261020.md`.
 
-## Rendering and executor safety checkpoint (candidate 2d0061a6)
+## Rendering and executor safety checkpoint (candidate 3e9b4294)
 
 The native-render/executor branch now has **39 byte-identical same-path
 `.rs/.wgsl/.toml` paths** against the recorded original Iced fork,
@@ -253,7 +253,7 @@ eight added regression tests and whole-workspace builds are **unexecuted**.
 Provenance review and release acceptance remain NO-GO. See
 `docs/audit/taim-native-render-executor-20261020.md`.
 
-## Widget event and drag arbitration checkpoint (candidate c7b51661)
+## Widget event and drag arbitration checkpoint (candidate 6910dd4b)
 
 The latest untruncated historical Iced-fork Git-tree comparison reports
 **37 byte-identical same-path .rs/.wgsl/.toml files**, down from 39.
@@ -265,7 +265,7 @@ but **not executed**. Historical code provenance, build verification and
 production release are still NO-GO. See
 `docs/audit/taim-widget-action-drag-20261020.md`.
 
-## Executor compatibility and lifecycle correctness (candidate 8b59fd9c)
+## Executor compatibility and lifecycle correctness (candidate 49eb9235)
 
 The current full fork-tree comparison finds **35 byte-identical same-path
 `.rs/.wgsl/.toml` files**, down from 37. Original Iced-derived code also
@@ -314,9 +314,9 @@ tests and independent source-lineage review remain open. Do not merge
 to main or describe the framework as production ready.
 See `docs/audit/taim-native-icon-overlay-20261020.md`.
 
-## All 31 formerly exact inherited paths addressed — code candidate 65886c11
+## All 31 formerly exact inherited paths addressed — code candidate 77a87105
 
-Against the complete historical Iced Git tree `81afda72`, the current
+Against the complete historical Iced Git tree `6db55104`, the current
 TAIM candidate has **zero byte-identical files at the same original path**
 with extensions `.rs`, `.wgsl`, `.toml`, down from 31 in the
 previous checkpoint. This is **NOT** proof of 100% independent TAIM
@@ -360,7 +360,7 @@ Further substantive framework architecture and widget implementation
 rewrites are needed to establish TAIM's distinct implementation.
 See `docs/audit/taim-originality-and-build-gate-20261020.md`.
 
-## TAIM-native wrapping Row/Column engines (candidate 08a3f432)
+## TAIM-native wrapping Row/Column engines (candidate ef3882c0)
 
 The interactive `Column::wrap` and `Row::wrap` layout paths now
 use a TAIM-specific explicit group planner, rather than detecting

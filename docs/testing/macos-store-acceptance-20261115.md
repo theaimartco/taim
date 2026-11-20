@@ -6,7 +6,7 @@ macOS only, no Android emulator, and no upload.
 
 Host: Apple Silicon arm64, macOS 26.6.2 (25G83), Xcode macOS SDK 26.2,
 rustc 1.95.0 (59807616e 2026-04-14). Source is a dirty working tree based on
-`d1429e50a65cdb535407272100e6d8739b505165`; this is not an immutable release.
+`e0aaf631e8e6b4a021cd6fc58c259ed81ce0c910`; this is not an immutable release.
 The accompanying [JSON record](macos-store-acceptance-20261115.json) preserves
 source/artifact hashes and the actual runtime report.
 

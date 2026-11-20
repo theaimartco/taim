@@ -1,7 +1,7 @@
 {
   "recorded_utc": "2026-11-14T20:28:36.835061+00:00",
   "scope": "macOS-only local packaging and sandbox acceptance; no upload",
-  "source_base_commit": "d1429e50a65cdb535407272100e6d8739b505165",
+  "source_base_commit": "e0aaf631e8e6b4a021cd6fc58c259ed81ce0c910",
   "source_dirty": true,
   "source_sha256": {
     "Cargo.toml": "e190ac3ac414103423833d6a2d09bcaf39aa240923e3a514eabf0d99bd7b03a8",
@@ -56,7 +56,7 @@
     "runtime_acceptance": "not performed by packaging tool",
     "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
     "sdk_version": "26.2",
-    "source_commit": "d1429e50a65cdb535407272100e6d8739b505165",
+    "source_commit": "e0aaf631e8e6b4a021cd6fc58c259ed81ce0c910",
     "source_dirty": true
   },
   "fixture_runtime": {
@@ -102,7 +102,7 @@
     "runtime_acceptance": "not performed by packaging tool",
     "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
     "sdk_version": "26.2",
-    "source_commit": "d1429e50a65cdb535407272100e6d8739b505165",
+    "source_commit": "e0aaf631e8e6b4a021cd6fc58c259ed81ce0c910",
     "source_dirty": true
   },
   "manual_visual_input": {

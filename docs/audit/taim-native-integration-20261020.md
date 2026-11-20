@@ -4,7 +4,7 @@
 
 **Status: INTEGRATED IN REVIEW BRANCH — NOT PRODUCTION-CERTIFIED.**
 
-This branch combines the native development lineage through Draft PR #17 with current main commit `ee8bc654fded1e1453c4913459223cff1f3cc263`. It makes no assertion of full source independence, clean-room authorship, or readiness to publish.
+This branch combines the native development lineage through Draft PR #17 with current main commit `f2dd3b785e0fe6ec9e28a1792930393a13c07729`. It makes no assertion of full source independence, clean-room authorship, or readiness to publish.
 
 ### Preserved from main
 

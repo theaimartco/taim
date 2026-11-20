@@ -1,8 +1,8 @@
 # TAIM widget/frame and pane-drag contract checkpoint
 
 - Date: 20 October 2026
-- Code candidate: `c7b516613d34b7a53a1e4682da07e55063fb8994`
-- Iced fork baseline: `81afda72f374386036a5b96a55f57a3dcfb0b653`
+- Code candidate: `6910dd4b3e6f8fb22557feed572352fa0fdd58a2`
+- Iced fork baseline: `6db551046abd02eadee9f6bbcfa103bc4a9fadd5`
 - Release gate: **NO-GO**
 - Branch: `feature/taim-widget-actions-hit-testing-20261020`
 
@@ -29,7 +29,7 @@ No runnable Cargo/Rust toolchain was available in this environment.
 
 ## Exact byte SHA source-lineage evidence (not originality percentage)
 
-Recursive Git trees for Iced fork `81afda72` and new candidate
+Recursive Git trees for Iced fork `6db55104` and new candidate
 tree `d81663d69709005a3b18dda276e765a13780179d`
 were complete (neither truncated). Counting exact matching Git blob
 SHA1 values at the same path with `.rs`, `.wgsl`, `.toml` extensions:

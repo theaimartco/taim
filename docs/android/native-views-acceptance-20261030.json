@@ -1,7 +1,7 @@
 {
   "date": "2026-10-30",
   "milestone": "Retained Android native hierarchy slots, InputQueue gesture handoff, hardware composition and TextureView producer",
-  "git_head": "13121da901b0a711b5e94df20ae30246423a282b",
+  "git_head": "9a412b4f71cbf6d5d56327cf8aa3b2a6037c5e3b",
   "working_tree_dirty": true,
   "reports": {
     "native-view-accepted": {
@@ -54,7 +54,7 @@
         "page_size": 16384
       },
       "source": {
-        "git_head": "13121da901b0a711b5e94df20ae30246423a282b",
+        "git_head": "9a412b4f71cbf6d5d56327cf8aa3b2a6037c5e3b",
         "working_tree_dirty": true,
         "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
       },

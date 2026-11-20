@@ -1,6 +1,6 @@
 # Phase 3 Production Call Graph Audit: The Inverted Native Engine (After Phase 3)
 
-**Baseline Fork Baseline**: `81afda72f374386036a5b96a55f57a3dcfb0b653`  
+**Baseline Fork Baseline**: `6db551046abd02eadee9f6bbcfa103bc4a9fadd5`  
 **Phase 3 Completion Commit**: Current HEAD  
 **Date**: September 2026  
 **Auditor**: TAIM Architectural Independence & Runtime Verification  

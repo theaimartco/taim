@@ -6,8 +6,8 @@
 source provenance, compatibility, safety and performance. **Status: NO-GO**,
 neither 100% independently authored nor production-certified.
 
-Baseline Iced fork commit: `81afda72f374386036a5b96a55f57a3dcfb0b653`.
-Latest candidate before this report: `68089c4b38dc9b7b32c16aa4954202d31b555c90`.
+Baseline Iced fork commit: `6db551046abd02eadee9f6bbcfa103bc4a9fadd5`.
+Latest candidate before this report: `5c21710d28cf480ea5c0e9678feb7490a16ca9f1`.
 Complete GitHub recursive trees returned `truncated: false`.
 
 ### Narrow *exact same-path blob* comparison

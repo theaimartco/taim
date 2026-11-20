@@ -1,7 +1,7 @@
 # TAIM native layout: independent semantic migration checkpoint
 
-**Candidate implementation commit:** `fdbe21533011bed8e4b9c8687a04b1704f973f93`
-**Baseline:** Iced fork `81afda72f374386036a5b96a55f57a3dcfb0b653`
+**Candidate implementation commit:** `feff3ff8695d8b2847b617a71a9aa2484958ef6b`
+**Baseline:** Iced fork `6db551046abd02eadee9f6bbcfa103bc4a9fadd5`
 **Branch:** `feature/taim-native-layout-20261020`
 **Release verdict:** NO-GO
 

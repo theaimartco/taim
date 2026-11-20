@@ -1,6 +1,6 @@
 # TAIM source independence promotion policy
 
-TAIM began as an Iced fork at 81afda72. Preserve its complete MIT license,
+TAIM began as an Iced fork at 6db55104. Preserve its complete MIT license,
 CREDITS.md and Git history, even after all inherited active source is rewritten.
 A 100%-TAIM current implementation is an engineering objective, not permission
 to conceal historical authorship.

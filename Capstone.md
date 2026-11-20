@@ -1,6 +1,6 @@
 # Taim Capstone — Competitive Audit and the Path Past Flutter and React Native
 
-**Repository:** `taim` · **Audited at:** `d2895699` ("ui components added") · **Date:** 2026-08-23
+**Repository:** `taim` · **Audited at:** `90ef5b91` ("ui components added") · **Date:** 2026-08-23
 **Toolchain:** rustc 1.95.0 (59807616e 2026-04-14), cargo 1.95.0 · **Host:** Linux 7.0.0-30-generic, 20 cores, 14 GiB
 
 ---
@@ -101,7 +101,7 @@ is still M3 work.
    whose contents do not change when you commit on a branch, so the commit
    baked into the binary went stale until a branch switch. The new
    dirty-tree guard surfaced this on its first run: a clean tree still
-   produced a `-dirty` report. Fixed in `b67fd3f0`.
+   produced a `-dirty` report. Fixed in `0fe59afb`.
 
 **The re-captured baselines are worse than the numbers this audit quoted**,
 because they come from a different machine (Linux/Iris Xe, `powersave`
@@ -140,7 +140,7 @@ and is not what the code does.
 `wgpu/src/image/cache.rs:355-379` routes every compressed handle to
 `worker.load(handle, false)`, and the worker thread calls
 `graphics::image::load` at `cache.rs:520`. Decoding has been off-thread for
-as long as the `worker` module has existed (`0a656286`), which predates this
+as long as the `worker` module has existed (`bb2ff5f3`), which predates this
 audit. `decode.rs` was a *second*, unused decoder duplicating that path;
 deleting it in M0 was correct, and wiring it in — as F-11's fix section
 instructed — would have added a competing decode path alongside a working
@@ -242,9 +242,9 @@ There are three documents in this repository that overlap with this one:
 
 | File | What it is | Status |
 |---|---|---|
-| `audit.md` (removed; in git history) | Competitive audit written at `d1db7111` | Superseded — P0-6, P0-10 have since been closed |
+| `audit.md` (removed; in git history) | Competitive audit written at `4f56a625` | Superseded — P0-6, P0-10 have since been closed |
 | `phase.md` | 18-phase execution roadmap | Still the authoritative build order |
-| `docs/audit/ui-component-speed-audit.md` | UI/component/speed audit at `d2895699` | Current, narrower scope |
+| `docs/audit/ui-component-speed-audit.md` | UI/component/speed audit at `90ef5b91` | Current, narrower scope |
 
 This document supersedes the *findings* in `audit.md` (which were re-tested, not assumed) and
 extends `docs/audit/ui-component-speed-audit.md` with the head-to-head framework analysis, the
@@ -374,7 +374,7 @@ the rest of the document.
 | `tests` | Integration suites | 17,238 | — | — |
 
 **Finding:** the README's crate table understates `widget` by 12,431 lines and omits six crates
-entirely. It was written before `d2895699` and not refreshed. Minor on its own; part of a
+entirely. It was written before `90ef5b91` and not refreshed. Minor on its own; part of a
 pattern (§6.1).
 
 ### 3.2 Test suite — the strongest thing in this repository
@@ -477,7 +477,7 @@ different machines. `docs/performance/methodology.md` explicitly forbids compari
 unlike environments; these reports cannot be placed in any environment at all.
 
 **P-3 — The baselines were captured from a dirty tree, two commits behind HEAD.** Every file
-records `git_commit = "17bde4a1dc0b23003c027cd21e92f1e80c3f4de5-dirty"`. HEAD is `d2895699`.
+records `git_commit = "bc2f476e31ce6baaf3ef3ec2dd2da8e1b79f6f89-dirty"`. HEAD is `90ef5b91`.
 The `-dirty` suffix means uncommitted changes were present, so the tree that produced these
 numbers cannot be reconstructed by anyone, including its author.
 
@@ -588,7 +588,7 @@ one path where it matters most. That is a profiling task, not a redesign.
 | | **Taim** | **Flutter** | **React Native** |
 |---|---|---|---|
 | Model | Elm: `boot` / `update` / `view`, messages | `StatefulWidget` + `setState`; Provider/Riverpod/Bloc externally | React function components + hooks |
-| Identity/keying | **Keyed structural reconciliation** (`runtime/src/reconcile.rs`, `dd736b89`) | `Key`, `GlobalKey` | React `key` |
+| Identity/keying | **Keyed structural reconciliation** (`runtime/src/reconcile.rs`, `b53a6abd`) | `Key`, `GlobalKey` | React `key` |
 | Type safety | **Compile-time exhaustive** — messages are enums, `match` is checked | Sound null safety; runtime widget-type errors possible | TypeScript optional; runtime errors common |
 | Learning curve | Steep — Rust ownership + Elm | Moderate | Low for React developers |
 | Hiring pool | **Very small** | Large | **Very large** |
@@ -779,7 +779,7 @@ point until re-captured.
 
 **F-03 · P0 · Baselines were captured from a dirty tree two commits behind HEAD**
 
-*Evidence:* `git_commit = "17bde4a1…-dirty"` in all 13 files; HEAD is `d2895699`.
+*Evidence:* `git_commit = "bc2f476e…-dirty"` in all 13 files; HEAD is `90ef5b91`.
 
 *Fix:* Teach `--save` to refuse a `-dirty` commit outright. The harness already refuses reports
 with unattributable identity fields (`tools/taim_bench/src/report.rs:119-124`); extend that
@@ -900,7 +900,7 @@ zero, and `RetainedLayerCache`'s budget, LRU, generation-purge, and telemetry ma
 
 *Fix:* Push retention down to subtree boundaries. `container`, `scaffold`, `scrollable`
 viewports, and list items are the natural boundaries. Reuse the existing dirty-flag propagation
-(`120e21ab`) to decide which subtrees kept their revision. Then wire `RetainedLayerCache` in
+(`3efebbd3`) to decide which subtrees kept their revision. Then wire `RetainedLayerCache` in
 place of the single-slot `Option`.
 
 ---
@@ -1433,8 +1433,8 @@ Legend: ✅ done · 🟡 partial · ❌ missing
 
 | Item | Status | Note |
 |---|:--:|---|
-| Widget tree + keyed reconciliation | ✅ | `runtime/src/reconcile.rs`, commit `dd736b89` |
-| Incremental layout with cache | ✅ | `Tree::layout_with_cache`, `b1f97a0d` |
+| Widget tree + keyed reconciliation | ✅ | `runtime/src/reconcile.rs`, commit `b53a6abd` |
+| Incremental layout with cache | ✅ | `Tree::layout_with_cache`, `3bbdd59a` |
 | Damage tracking & invalidation | 🟡 | Computed and correct; **discarded on GPU present** (F-08) |
 | Retained layers | 🟡 | Whole-frame granularity only (F-09) |
 | Frame scheduler + presentation feedback | ✅ | `runtime/src/frame_scheduler.rs`, suspend/resume, motion registry |
@@ -1761,7 +1761,7 @@ lead with the supportable ones.
 
 ## Appendix A — Raw measurements
 
-### A.1 Commands run, 2026-08-23, at `d2895699`
+### A.1 Commands run, 2026-08-23, at `90ef5b91`
 
 ```
 cargo check --workspace --all-targets       → exit 0, 19.61s, 11 warnings (taim_wgpu dead code)
@@ -1824,7 +1824,7 @@ Benchmark budget
 ### A.5 Baseline provenance (all 13 files, identical)
 
 ```
-environment.git_commit                = 17bde4a1dc0b23003c027cd21e92f1e80c3f4de5-dirty   (HEAD is d2895699)
+environment.git_commit                = bc2f476e31ce6baaf3ef3ec2dd2da8e1b79f6f89-dirty   (HEAD is 90ef5b91)
 environment.device                    = dev-workstation-01                                (registered as Linux)
 environment.os                        = macos                                             (contradicts the registry)
 environment.renderer_backend          = wgpu

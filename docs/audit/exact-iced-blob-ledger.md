@@ -1,6 +1,6 @@
 # TAIM current exact Git SHA source lineage
 
-**Candidate:** `77698ee4ac8a5c8374db87414ba48d4c34b60d0b`. **Iced fork point:** `81afda72`.
+**Candidate:** `46d7d0bbf1f79053a09f82e6c493e92a513205fa`. **Iced fork point:** `6db55104`.
 Both GitHub recursive Git-tree inventories were untruncated. These are exact SHA matches at inherited paths for .rs / .wgsl / .toml files.
 
 ## 60 byte-identical files still remaining

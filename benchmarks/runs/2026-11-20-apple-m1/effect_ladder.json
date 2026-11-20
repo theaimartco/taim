@@ -10,7 +10,7 @@
   ],
   "scale_factor": 1.0,
   "environment": {
-    "git_commit": "c3af138048f87f7fd673e1113300fc37aaea91f0",
+    "git_commit": "cad71dc7379fd41061c967665b50cc7213eadd92",
     "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
     "renderer_backend": "wgpu",
     "build_profile": "release",

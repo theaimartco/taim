@@ -1,7 +1,7 @@
 # TAIM native-runtime migration: bounded streams and overlay arbitration
 
 Candidate branch: `feature/taim-stream-overlay-native-20261020`.
-Parent: `46204efa02d4b04fc86a71a91d43b9288e42b048`.
+Parent: `7f5379485e05a223402a3ec065c6d895e622d1f5`.
 
 ## This patch actually changes runtime behavior
 
@@ -49,10 +49,10 @@ evidence before integration into main.
 
 ## Exact Git-tree checkpoint
 
-At commit `7cf498d3eaf9ad9d3f520e1d3175c4fa5c09217f`
+At commit `de12b7717796b5db49238a914e8ac9edf4b37302`
 (candidate tree `06a2ddd5ddf5889fe45fb99f97ca967370a1d0aa`)
 a complete, nontruncated GitHub recursive-tree enumeration was compared
-with fork baseline `81afda72f374386036a5b96a55f57a3dcfb0b653`.
+with fork baseline `6db551046abd02eadee9f6bbcfa103bc4a9fadd5`.
 Among `.rs`, `.wgsl`, and `.toml` files at the **same paths**:
 
 | Item | Result |

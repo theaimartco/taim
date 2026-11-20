@@ -1,6 +1,6 @@
 # TAIM Architectural Independence & Divergence Report: Phase 2 Audit
 
-**Baseline Commit**: `81afda72f374386036a5b96a55f57a3dcfb0b653`  
+**Baseline Commit**: `6db551046abd02eadee9f6bbcfa103bc4a9fadd5`  
 **Date**: September 2026  
 **Scope**: Entire Workspace (27 Crates, 714 Audited Source Files, 188,994 LOC)  
 **Standard**: True architectural independence on hot paths, empirical performance verification, zero disguised copies, full legal attribution preserved.
@@ -45,7 +45,7 @@ Phase 2 advances TAIM beyond initial facade divergence into true execution-path 
 
 ## 2. Quantitative Independence Metrics
 
-Measured via the hardened scanner (`scripts/audit/check-independence.py`) against fork baseline `81afda72`:
+Measured via the hardened scanner (`scripts/audit/check-independence.py`) against fork baseline `6db55104`:
 
 | Metric | Phase 1 Audit | Phase 2 Audit | Delta / Significance |
 | :--- | :---: | :---: | :---: |
