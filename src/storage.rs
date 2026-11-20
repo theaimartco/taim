@@ -178,6 +178,19 @@ impl Store {
         file.sync_all()?;
         drop(file);
         std::fs::rename(&temporary.0, &self.path)?;
+        // Make the rename itself durable, so power loss right after a save
+        // cannot bring back the previous file. Best effort: the new file is
+        // already in place, and failing here would leave the in-memory
+        // snapshot behind what is on disk.
+        #[cfg(unix)]
+        if let Ok(directory) = std::fs::File::open(
+            self.path
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or(Path::new(".")),
+        ) {
+            let _ = directory.sync_all();
+        }
         Ok(())
     }
 }
