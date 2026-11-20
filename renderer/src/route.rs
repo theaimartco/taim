@@ -436,15 +436,15 @@ where
         window: impl compositor::Window + Clone,
         width: u32,
         height: u32,
-    ) -> Self::Surface {
-        match self {
+    ) -> Result<Self::Surface, backend::Error> {
+        Ok(match self {
             Self::Preferred(compositor) => {
-                Route::Preferred(compositor.create_surface(window, width, height))
+                Route::Preferred(compositor.create_surface(window, width, height)?)
             }
             Self::Recovery(compositor) => {
-                Route::Recovery(compositor.create_surface(window, width, height))
+                Route::Recovery(compositor.create_surface(window, width, height)?)
             }
-        }
+        })
     }
 
     fn configure_surface(&mut self, surface: &mut Self::Surface, width: u32, height: u32) {

@@ -25,7 +25,8 @@ impl Compositor for () {
         _window: impl Window + Clone,
         _width: u32,
         _height: u32,
-    ) -> Self::Surface {
+    ) -> Result<Self::Surface, backend::Error> {
+        Ok(())
     }
 
     fn configure_surface(&mut self, _surface: &mut Self::Surface, _width: u32, _height: u32) {}

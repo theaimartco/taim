@@ -51,9 +51,9 @@ pub(super) fn create_surface(
     window: impl compositor::Window + Clone,
     width: u32,
     height: u32,
-) -> Surface {
+) -> Result<Surface, backend::Error> {
     let window = softbuffer::Surface::new(&compositor.context, Box::new(window.clone()) as _)
-        .expect("TAIM software window surface creation failed");
+        .map_err(|error| backend::Error::BackendError(error.to_string()))?;
     let mut surface = Surface {
         window,
         clip_mask: tiny_skia::Mask::new(1, 1).expect("1x1 clip mask must fit"),
@@ -62,7 +62,7 @@ pub(super) fn create_surface(
         working: Vec::new(),
     };
     configure(&mut surface, width, height);
-    surface
+    Ok(surface)
 }
 
 pub(super) fn configure(surface: &mut Surface, width: u32, height: u32) {

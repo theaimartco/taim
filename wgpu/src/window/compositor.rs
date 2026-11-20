@@ -637,17 +637,17 @@ impl graphics::Compositor for Compositor {
         window: impl compositor::Window,
         width: u32,
         height: u32,
-    ) -> Self::Surface {
+    ) -> Result<Self::Surface, backend::Error> {
         let mut surface = self
             .instance
             .create_surface(wgpu::SurfaceTarget::Window(Box::new(window)))
-            .expect("Create surface");
+            .map_err(|error| backend::Error::BackendError(error.to_string()))?;
 
         if width > 0 && height > 0 {
             self.configure_surface(&mut surface, width, height);
         }
 
-        surface
+        Ok(surface)
     }
 
     fn configure_surface(&mut self, surface: &mut Self::Surface, width: u32, height: u32) {

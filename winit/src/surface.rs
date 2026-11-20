@@ -123,8 +123,11 @@ impl Surface {
         changes: ChangeSignal,
         system: theme::Mode,
         #[cfg(target_os = "android")] android: Arc<crate::android::Bridge>,
-    ) -> Self {
+    ) -> Result<Self, crate::Error> {
         let physical = raw.inner_size();
+        let target = compositor
+            .create_surface(raw.clone(), physical.width, physical.height)
+            .map_err(crate::Error::GraphicsCreationFailed)?;
         let viewport = Viewport::with_physical_size(
             Size::new(physical.width, physical.height),
             zoomed(raw.scale_factor(), root.scale()),
@@ -162,7 +165,7 @@ impl Surface {
 
         let mut surface = Self {
             id,
-            target: Some(compositor.create_surface(raw.clone(), physical.width, physical.height)),
+            target: Some(target),
             renderer: compositor.create_renderer(renderer_settings),
             #[cfg(target_os = "android")]
             renderer_settings,
@@ -221,7 +224,7 @@ impl Surface {
         #[cfg(feature = "hinting")]
         surface.renderer.hint(surface.viewport.scale_factor());
 
-        surface
+        Ok(surface)
     }
 
     /// Releases the native presentation target before Android destroys it.
@@ -250,8 +253,14 @@ impl Surface {
             return;
         }
         let physical = self.raw.inner_size();
-        self.target =
-            Some(compositor.create_surface(self.raw.clone(), physical.width, physical.height));
+        match compositor.create_surface(self.raw.clone(), physical.width, physical.height) {
+            Ok(target) => self.target = Some(target),
+            // The next resume tries again.
+            Err(error) => {
+                log::error!("Android presentation surface not recreated: {error}");
+                return;
+            }
+        }
         #[cfg(feature = "measurement")]
         {
             self.awaiting_present = true;
@@ -793,8 +802,11 @@ impl Surface {
             }
             Err(compositor::SurfaceError::Lost) => {
                 let size = self.viewport.physical_size();
-                self.target =
-                    Some(compositor.create_surface(self.raw.clone(), size.width, size.height));
+                self.target = Some(
+                    compositor
+                        .create_surface(self.raw.clone(), size.width, size.height)
+                        .map_err(crate::Error::GraphicsCreationFailed)?,
+                );
                 #[cfg(all(target_os = "android", feature = "measurement"))]
                 {
                     self.awaiting_present = true;
@@ -1096,8 +1108,11 @@ impl Surface {
         self.release_memory(compositor);
         if active {
             let size = self.viewport.physical_size();
-            self.target =
-                Some(compositor.create_surface(self.raw.clone(), size.width, size.height));
+            match compositor.create_surface(self.raw.clone(), size.width, size.height) {
+                Ok(target) => self.target = Some(target),
+                // Without a surface the window waits for the next resume.
+                Err(error) => log::error!("graphics surface not recreated: {error}"),
+            }
         }
         self.request_frame();
     }

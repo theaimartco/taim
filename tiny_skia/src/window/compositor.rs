@@ -39,7 +39,7 @@ impl crate::graphics::Compositor for Compositor {
         window: impl compositor::Window + Clone,
         width: u32,
         height: u32,
-    ) -> Self::Surface {
+    ) -> Result<Self::Surface, backend::Error> {
         state::create_surface(self, window, width, height)
     }
 

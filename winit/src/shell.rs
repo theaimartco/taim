@@ -298,8 +298,7 @@ impl Shell {
         };
 
         if self.compositor.is_some() {
-            self.attach(opening);
-            return Ok(());
+            return self.attach(opening);
         }
 
         // Native targets wait for the GPU; a browser cannot block, so the
@@ -310,7 +309,7 @@ impl Shell {
             self.compositor = Some(futures::executor::block_on(
                 self.compositor_future(&opening.raw),
             )?);
-            self.attach(opening);
+            self.attach(opening)?;
         }
 
         #[cfg(target_arch = "wasm32")]
@@ -330,7 +329,7 @@ impl Shell {
     }
 
     /// Gives an opened window its GPU surface and view tree.
-    fn attach(&mut self, opening: Opening) {
+    fn attach(&mut self, opening: Opening) -> Result<(), Error> {
         let Opening {
             raw,
             root,
@@ -339,7 +338,7 @@ impl Shell {
             visible,
         } = opening;
         let Some(compositor) = self.compositor.as_mut() else {
-            return;
+            return Ok(());
         };
 
         let id = window::Id::unique();
@@ -354,7 +353,7 @@ impl Shell {
             self.system,
             #[cfg(target_os = "android")]
             self.android.clone(),
-        );
+        )?;
 
         if visible {
             surface.raw.set_visible(true);
@@ -363,6 +362,7 @@ impl Shell {
         self.windows.push(surface);
         #[cfg(target_os = "android")]
         self.android.refresh_insets();
+        Ok(())
     }
 
     /// Creates the compositor for `window`, with the application's fonts
@@ -701,8 +701,12 @@ impl winit::application::ApplicationHandler<Wake> for Shell {
                 match created {
                     Some(Ok(compositor)) => {
                         self.compositor = Some(compositor);
-                        if let Some(opening) = self.opening.take() {
-                            self.attach(opening);
+                        if let Some(opening) = self.opening.take()
+                            && let Err(error) = self.attach(opening)
+                        {
+                            log::error!("the window could not draw: {error}");
+                            self.failure = Some(error);
+                            event_loop.exit();
                         }
                     }
                     Some(Err(error)) => {

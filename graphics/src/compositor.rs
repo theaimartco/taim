@@ -35,7 +35,10 @@ pub trait Compositor: Sized {
     /// Creates a [`Self::Renderer`] for the [`Compositor`].
     fn create_renderer(&self, settings: renderer::Settings) -> Self::Renderer;
 
-    /// Crates a new [`Surface`] for the given window.
+    /// Creates a new [`Surface`] for the given window.
+    ///
+    /// Fails when the platform will not give the window a surface: a
+    /// browser canvas that already holds another kind of context, for one.
     ///
     /// [`Surface`]: Self::Surface
     fn create_surface(
@@ -43,7 +46,7 @@ pub trait Compositor: Sized {
         window: impl Window + Clone,
         width: u32,
         height: u32,
-    ) -> Self::Surface;
+    ) -> Result<Self::Surface, backend::Error>;
 
     /// Configures a new [`Surface`] with the given dimensions.
     ///
