@@ -86,9 +86,21 @@ break the public API.
   everything was built for size, which made software rendering 5x slower;
   it is now about 25% slower than `release`, for 41% smaller executables
   (counter on macOS 3.58 MiB, iOS 4.00 MiB). New `taim-new` projects get it.
+- **Breaking:** `graphics::Compositor::create_surface` returns
+  `Result<Surface, backend::Error>`. A window the platform will not give a
+  surface now fails with `Error::GraphicsCreationFailed` instead of
+  panicking.
 
 ### Fixed
 
+- Web: the counter crashed in every browser. The liquid glass pass needs
+  more vertex attributes than WebGL2 has, its shader failed, and the
+  software fallback panicked on the canvas. Where the pass does not fit,
+  liquid glass is drawn as plain glass.
+- Android builds failed `-D warnings`: a misplaced `#[cfg]` left
+  `lean_light` unused there.
+- Quad and text pipelines were compiled twice at startup.
+- Font data with no usable face is logged instead of dropped silently.
 - iOS apps ran at 60 Hz on ProMotion iPhones: `scripts/ios/package.py` now
   sets `CADisableMinimumFrameDurationOnPhone`, so they can reach 120 Hz.
   `TAIM_FRAME_TRACE` lines now include the gap since the previous frame.
