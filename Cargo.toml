@@ -1,6 +1,6 @@
 [package]
 name = "taim"
-description = "A next-generation, zero-rebuild reactive GUI framework with compute-raster rendering and SIMD layout"
+description = "Taim.rs: a GPU-native, fine-grained reactive GUI framework for Rust, for desktop, mobile and the web. By theaimartco."
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -335,14 +335,15 @@ members = [
 [workspace.package]
 version = "0.15.0-rc.1"
 authors = [
-    "VYOM Taim contributors <dev@theaimartco.com>",
+    "Satpal Singh",
+    "theaimartco <dev@theaimartco.com>",
 ]
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/theaimartco/taim"
 homepage = "https://github.com/theaimartco/taim"
-categories = ["gui"]
-keywords = ["gui", "ui", "graphics", "vyom", "wayland"]
+categories = ["gui", "graphics", "rendering"]
+keywords = ["gui", "ui", "gpu", "reactive", "cross-platform"]
 rust-version = "1.92"
 
 [workspace.dependencies]

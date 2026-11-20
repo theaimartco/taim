@@ -4,7 +4,7 @@
 //! ![The native path of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/native.svg?raw=true)
 //!
 //! [`taim`]: https://github.com/theaimartco/taim
-#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo-256.png")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 mod antialiasing;
 #[path = "error.rs"]

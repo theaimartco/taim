@@ -1,11 +1,13 @@
 <div align="center">
 
-<img src="docs/logo.svg" alt="Taim" width="120">
+<img src="docs/logo.png" alt="Taim.rs logo" width="180">
 
-# Taim
+# Taim.rs
 
 **A GPU-native, fine-grained reactive GUI framework for Rust.**
 One codebase for macOS, Windows, Linux, Android, iOS and the web.
+
+Built by **[theaimartco](https://github.com/theaimartco)** · Created by **Satpal Singh**
 
 [![Rust 1.95+](https://img.shields.io/badge/rust-1.95%2B%20·%202024%20edition-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -272,6 +274,14 @@ Companies using Taim in a product can sponsor to have their name or logo
 listed here: sponsor, then
 [open an issue](https://github.com/theaimartco/taim/issues/new?title=Sponsor%20listing)
 with the name, logo and link you want shown.
+
+## About
+
+**Taim.rs** is developed and maintained by
+**[theaimartco](https://github.com/theaimartco)**. It was created by
+**Satpal Singh**, who leads its design and development. Taim began as a
+fork of Iced and has grown its own view API, fine-grained signals, liquid
+glass, Android and iOS hosts and store packaging.
 
 ## Credits and license
 

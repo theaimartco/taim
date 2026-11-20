@@ -16,7 +16,7 @@
 //! [Taim]: https://github.com/theaimartco/taim
 //! [`wgpu`]: https://github.com/gfx-rs/wgpu-rs
 //! [WebGPU API]: https://gpuweb.github.io/gpuweb/
-#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo-256.png")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(missing_docs)]
 // On the web wgpu's handles are neither `Send` nor `Sync`. A page runs on

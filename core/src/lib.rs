@@ -6,7 +6,7 @@
 //! ![The foundations of the Taim ecosystem](https://github.com/theaimartco/taim/blob/main/docs/graphs/foundations.svg?raw=true)
 //!
 //! [Taim]: https://github.com/theaimartco/taim
-#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo-256.png")]
 macro_rules! modules {
     (public: $($public:ident),+; private: $($private:ident),+ $(;)?) => {
         $(pub mod $public;)+

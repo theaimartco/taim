@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use Taim.rs, please cite it as below."
+title: "Taim.rs: a GPU-native, fine-grained reactive GUI framework for Rust"
+type: software
+authors:
+  - given-names: Satpal
+    family-names: Singh
+  - name: theaimartco
+repository-code: "https://github.com/theaimartco/taim"
+license: MIT
+version: 0.15.0-rc.1
+keywords:
+  - rust
+  - gui
+  - gpu
+  - reactive
+  - cross-platform

@@ -1,5 +1,5 @@
 //! Use the built-in widgets or create your own.
-#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo-256.png")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 pub use taim_renderer as renderer;
 pub use taim_renderer::core;

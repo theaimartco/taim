@@ -70,7 +70,8 @@ grid, RTL mirroring, and licence.
 
 ### TAIM-owned visual identity
 
-`docs/logo.svg`, `docs/logo-no-shadow.svg`, and `docs/graphs/*.svg` are original
+`docs/logo.png`, `docs/logo-256.png` and `docs/social-preview.png` are the
+Taim.rs logo by theaimartco. `docs/logo.svg`, `docs/logo-no-shadow.svg`, and `docs/graphs/*.svg` are original
 TAIM vector assets. The inherited placeholder logo and raster architecture
 graphs have been removed.
 

@@ -10,7 +10,7 @@
 //! [`frame_gate`] exposes the per-window frame-production policy.
 //!
 //! [`winit`]: https://github.com/rust-windowing/winit
-#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo.svg")]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/theaimartco/taim/main/docs/logo-256.png")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // Built with no renderer (as `cargo clippy -p taim_winit` alone builds it),
 // the compositor and its surfaces are `()`; binding or passing them is
