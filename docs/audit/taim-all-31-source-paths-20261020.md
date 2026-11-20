@@ -1,10 +1,10 @@
 # TAIM.rs — original fork exact-source completion checkpoint
 
 Date: 2026-10-20
-Candidate commit: `d8f600306fccf06158ae43264111f40356ecde56`
+Candidate commit: `65886c11d6fb5eaef0fe15014740f6be3f4d6a37`
 Candidate branch: `feature/taim-native-contracts-batch-20261020`
 Previous branch / CI-disabled base: `feature/taim-image-culling-ci-disabled-20261020`
-Historical original Iced fork: `56b706fcd35aa881baede77a696bbb842773fdc6`
+Historical original Iced fork: `81afda72f374386036a5b96a55f57a3dcfb0b653`
 
 ## Finding
 

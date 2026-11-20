@@ -1,7 +1,7 @@
 {
   "date": "2026-10-30",
   "milestone": "Durable JobScheduler work, protected headless Rust entry, constraints, retry/cancel/reconcile and process restart",
-  "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+  "git_head": "13121da901b0a711b5e94df20ae30246423a282b",
   "working_tree_dirty": true,
   "runtime": {
     "status": "passed",

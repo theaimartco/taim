@@ -2,8 +2,8 @@
 
 Date: 2026-10-20
 Branch: `feature/taim-native-wrapping-layout-20261020`
-Latest implementation checkpoint: `f303f299674eade1d31052f0c02145458b2e8cc0`
-Historical Iced baseline: `56b706fcd35aa881baede77a696bbb842773fdc6`
+Latest implementation checkpoint: `08a3f432dfa784060480e662481628ccbc90d9a0`
+Historical Iced baseline: `81afda72f374386036a5b96a55f57a3dcfb0b653`
 Release decision: **NO-GO**
 
 ## Substantive implementation

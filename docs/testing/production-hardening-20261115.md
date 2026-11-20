@@ -3,7 +3,7 @@
 Scope: shared Rust correctness and release tooling across the advertised
 platforms. Production verdict remains **NO-GO** until the remaining release and
 device gates are accepted. Work is on an uncommitted tree based on
-`cc5f9a47d73b98028caeb8bc3ff70c443b40bbe5`; it is not an immutable release.
+`d1429e50a65cdb535407272100e6d8739b505165`; it is not an immutable release.
 The earlier macOS acceptance record describes its own source/artifacts and
 does not certify this newer code.
 The accompanying [JSON inventory](production-hardening-20261115.json) records

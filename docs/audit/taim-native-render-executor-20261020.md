@@ -1,7 +1,7 @@
 # TAIM runtime/renderer independence checkpoint — 20 October 2026
 
-Candidate code commit: `706a05757feb18a882d14e6a810507d0feafd44d`
-Fork-point commit: `56b706fcd35aa881baede77a696bbb842773fdc6`
+Candidate code commit: `2d0061a64cc335f7936f55997134c028679af8d0`
+Fork-point commit: `81afda72f374386036a5b96a55f57a3dcfb0b653`
 Status: **NO-GO — source-independence and production acceptance incomplete**
 
 ## Observable runtime changes
@@ -30,7 +30,7 @@ Status: **NO-GO — source-independence and production acceptance incomplete**
 ## Source-lineage evidence
 
 Two GitHub recursive Git-tree inventories were complete (`truncated=false`):
-baseline `56b706fc`, candidate tree
+baseline `81afda72`, candidate tree
 `22c83c20b6194d900f4dc4a59e6766e2140bbac0`.
 
 | Stage | Exact same-path source/config Git blob matches |

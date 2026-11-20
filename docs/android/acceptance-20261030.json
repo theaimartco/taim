@@ -1,7 +1,7 @@
 {
   "date": "2026-10-30",
   "scope": "Experimental API35 x86_64 emulator platform acceptance; no physical-device or Flutter performance superiority acceptance",
-  "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+  "git_head": "13121da901b0a711b5e94df20ae30246423a282b",
   "working_tree_dirty": true,
   "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
   "artifacts": {
@@ -61,7 +61,7 @@
         "page_size": 16384
       },
       "source": {
-        "git_head": "37a7097ae2ba59241e82ca5bf84b98a9fe642a6a",
+        "git_head": "13121da901b0a711b5e94df20ae30246423a282b",
         "working_tree_dirty": true,
         "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
       },

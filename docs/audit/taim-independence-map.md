@@ -1,7 +1,7 @@
 # TAIM Independence & Architectural Audit Map
 
-> Baseline Fork Point: `56b706fc` (iced upstream)
-> Current HEAD: `3daa733c`
+> Baseline Fork Point: `81afda72` (iced upstream)
+> Current HEAD: `c88d0605`
 > Date: 2026-09-13
 
 ## 1. Executive Summary

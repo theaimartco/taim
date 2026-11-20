@@ -95,7 +95,7 @@
 #       # and `deny.toml`'s `wasm32-unknown-unknown` entry were all inherited
 #       # from iced and never built by any workflow, so whether the target
 #       # still compiled was unknown rather than true (Capstone.md F-19).
-#       # Verified compiling at 9f9167e4; this job is what keeps it that way.
+#       # Verified compiling at b097cd48; this job is what keeps it that way.
 #       #
 #       # Default features are off deliberately: `x11`, `wayland` and
 #       # `thread-pool` are meaningless on the web and would fail the build

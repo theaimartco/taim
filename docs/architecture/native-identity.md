@@ -7,7 +7,7 @@ rename or replacement of attribution. Work in this branch is incremental and
 
 ## Starting facts (September 19, 2026 inherited code audit)
 
-- TAIM began as an Iced fork at 56b706fc. Preserve LICENSE, CREDITS.md
+- TAIM began as an Iced fork at 81afda72. Preserve LICENSE, CREDITS.md
   and complete Git history. Any public representation must acknowledge the
   actual code lineage when relevant.
 - Existing source audit estimated 97.39% normalized-token independence,

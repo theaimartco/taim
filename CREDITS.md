@@ -14,10 +14,10 @@ Taim is a fork of [iced](https://github.com/iced-rs/iced), created by
 **Héctor Ramón Jiménez** and the iced contributors.
 
 The fork point is upstream commit
-[`56b706fc`](https://github.com/iced-rs/iced/commit/56b706fc) ("Fix lints for
+[`81afda72`](https://github.com/iced-rs/iced/commit/81afda72) ("Fix lints for
 Rust 1.97", 2026-07-09). Every commit before it in this repository's history is
 iced's; there are 6,831 of them, against 11 of Taim's own at the time of
-writing. Run `git log 56b706fc..HEAD` to see exactly what Taim has added.
+writing. Run `git log 81afda72..HEAD` to see exactly what Taim has added.
 
 **The following originate with iced and remain substantially its work:**
 
@@ -33,7 +33,7 @@ writing. Run `git log 56b706fc..HEAD` to see exactly what Taim has added.
 - The `winit` shell integration, the `futures` executors, and `program/`
 - The theme and palette system
 
-**What Taim adds** (see `git log 56b706fc..HEAD`, and `Capstone.md` §3 for a
+**What Taim adds** (see `git log 81afda72..HEAD`, and `Capstone.md` §3 for a
 verified inventory): the damage and invalidation model, keyed structural
 reconciliation, retained layers, the frame scheduler, `taim-gesture`,
 `taim-accessibility`, `taim-design`, `taim-motion`, `taim-profiler`,

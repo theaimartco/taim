@@ -1,6 +1,6 @@
 # Taim Future — The Twenty-Five Year Architecture
 
-**Repository:** `taim` · **Audit baseline:** `capstone-open-findings` @ `9f9167e4` · **Current head:** `main` @ `69be2af4`
+**Repository:** `taim` · **Audit baseline:** `capstone-open-findings` @ `b097cd48` · **Current head:** `main` @ `326d33ea`
 **Written:** 2026-08-24 · **Revised:** 2026-09-02 · **Horizon:** 2051
 **Original toolchain verification:** `cargo test --workspace` → **1,851 passed, 0 failed**, 64 binaries.
 **Current verification:** `cargo test --workspace --all-targets -- --test-threads=1` → **exit 0**; all CI budgets pass *(2026-09-02)*.

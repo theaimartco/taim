@@ -1,6 +1,6 @@
 # TAIM Architectural Independence & Divergence Report: Phase 3 Audit
 
-**Baseline Commit**: `56b706fcd35aa881baede77a696bbb842773fdc6`  
+**Baseline Commit**: `81afda72f374386036a5b96a55f57a3dcfb0b653`  
 **Phase 3 Completion Commit**: Current HEAD  
 **Date**: September 2026  
 **Scope**: Entire Workspace (27 Crates, 720 Audited Source Files, 191,973 LOC)  
@@ -74,7 +74,7 @@ The legacy `Program` architecture is now quarantined in compatibility layers, ad
 
 ## 3. Quantitative Independence Metrics
 
-Measured with `scripts/audit/check-independence.py` against fork baseline `56b706fc`:
+Measured with `scripts/audit/check-independence.py` against fork baseline `81afda72`:
 
 | Metric | Baseline | Phase 1 | Phase 2 | Phase 3 | Status |
 | :--- | :---: | :---: | :---: | :---: | :--- |

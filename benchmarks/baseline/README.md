@@ -4,7 +4,7 @@ One `<scene>.json` report per `taim_bench` scene, written by
 `scripts/perf/run-baseline.sh`. 13 scenes are currently checked in.
 
 All 13 were captured on **2026-08-23** on `dev-workstation-01`, from a clean
-worktree at commit `5e2d7896dbe4`, with the `profiling` feature on so
+worktree at commit `b67fd3f0206c`, with the `profiling` feature on so
 allocation counting is live.
 
 These files use report schema v1. That schema omitted UI build/diff/layout

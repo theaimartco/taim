@@ -1,7 +1,7 @@
 # Desktop hardening evidence — 2026-10-24
 
 Requested targets are Linux, Windows and macOS. Work remains uncommitted;
-these results describe a working tree based on `37a7097ae`, not a signed
+these results describe a working tree based on `13121da90`, not a signed
 release candidate. No stable tag, publication or production approval exists.
 
 ## Functional verification (updated 2026-10-25)
@@ -39,7 +39,7 @@ source blob was detected; source provenance still requires semantic review.
 
 ## Visual baseline review
 
-The existing HEAD commit `37a7097ae` intentionally changed built-in light
+The existing HEAD commit `13121da90` intentionally changed built-in light
 and dark palette seeds to TAIM blue/ink. It did not update the widget
 snapshots. All 34 gallery cases consequently differed in both themes.
 The harness now collects failures/artifacts for both themes instead of
