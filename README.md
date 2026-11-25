@@ -14,7 +14,7 @@ Built by **[theaimartco](https://github.com/theaimartco)** · Created by **Satpa
 [![Tests](https://img.shields.io/badge/tests-2%2C542%20passing-brightgreen.svg)](docs/performance/numbers.md#quality)
 [![Platforms](https://img.shields.io/badge/platforms-6-8a2be2.svg)](#platforms)
 [![Release](https://img.shields.io/badge/release-0.15.0--rc.1-yellow.svg)](CHANGELOG.md)
-[![Sponsor](https://img.shields.io/badge/%E2%9D%A4_sponsor-Taim-ea4aaa.svg)](https://rzp.io/rzp/theaimart-taimrs)
+[![Sponsor](https://img.shields.io/badge/%E2%9D%A4_sponsor-Taim-ea4aaa.svg)](https://github.com/sponsors/theaimartco)
 
 <sub>Taim is independent and funded by its users.
 **[Sponsor its development →](#sponsor-taim)**</sub>
