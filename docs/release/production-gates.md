@@ -53,7 +53,7 @@ Packaging for each store, and what the owner supplies, is in
 
 ## Public compatibility contract
 
-Version 0.15.0-rc.1 is a release candidate, with no stable API guarantee.
+Version 0.15.0-rc.2 is a release candidate, with no stable API guarantee.
 Before 1.0, publish the stable public API and target matrix, freeze
 the API for an independent consumer test, and include a migration guide.
 After 1.0, use major versions for breaking changes, minor versions for

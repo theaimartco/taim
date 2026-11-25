@@ -15,11 +15,12 @@ running on every platform; its examples are compiled by the test suite.
 | [Gestures](guide/gestures.md) | Gesture arena, tap, pan, swipe, pinch, rotate, nested scroll |
 | [Design System](guide/design-system.md) | Color tokens, typography, spacing, radius, elevation, motion tokens |
 | [Accessibility](guide/accessibility.md) | Semantic tree, focus, screen readers per platform, live regions |
-
-Being rewritten for the view API (their code targets the pre-0.15 API):
-[Widgets](guide/widgets.md), [Layout](guide/layout.md),
-[Styling](guide/styling.md), [Tasks & Subscriptions](guide/tasks-and-subscriptions.md),
-[Canvas Drawing](guide/canvas-drawing.md), [Scaling](guide/scaling.md).
+| [Views](guide/widgets.md) | Every built-in view, props, input callbacks and overlays |
+| [Layout](guide/layout.md) | Rows, columns, containers, grids, scrolling and lists |
+| [Styling](guide/styling.md) | Themes, variants, borders, backgrounds and liquid glass |
+| [Background work](guide/tasks-and-subscriptions.md) | Tasks, channels and platform services |
+| [Custom drawing](guide/canvas-drawing.md) | Implementing `View`: measure, paint and describe |
+| [Structuring larger apps](guide/scaling.md) | Components, models, navigation and module layout |
 
 ## 📦 Platforms and release
 

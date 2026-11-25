@@ -49,8 +49,8 @@ unsafe extern "C" fn run_job(context: *mut c_void) {
         objc2::rc::autoreleasepool(|_| job(mtm));
     }));
     if result.is_err() {
-        log::error!("an iOS main-thread service job panicked");
-        eprintln!("TAIM: an iOS main-thread service job panicked");
+        log::error!("an Apple main-thread service job panicked");
+        eprintln!("TAIM: an Apple main-thread service job panicked");
     }
 }
 

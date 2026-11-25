@@ -322,7 +322,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.15.0-rc.1"
+version = "0.15.0-rc.2"
 authors = [
     "Satpal Singh",
     "theaimartco <dev@theaimartco.com>",
@@ -337,32 +337,32 @@ rust-version = "1.92"
 
 [workspace.dependencies]
 zbus = "6.1"
-taim-accessibility = { version = "0.15.0-rc.1", path = "taim-accessibility" }
-taim_atlas = { version = "0.15.0-rc.1", path = "taim-atlas" }
-taim-design = { version = "0.15.0-rc.1", path = "taim-design" }
-taim-gesture = { version = "0.15.0-rc.1", path = "taim-gesture" }
-taim-highlighter = { version = "0.15.0-rc.1", path = "taim-highlighter" }
-taim-motion = { version = "0.15.0-rc.1", path = "taim-motion", default-features = false }
-taim-platform-vyom = { version = "0.15.0-rc.1", path = "taim-platform-vyom" }
-taim-profiler = { version = "0.15.0-rc.1", path = "taim-profiler" }
-taim-raster = { version = "0.15.0-rc.1", path = "taim-raster" }
-taim-signal = { version = "0.15.0-rc.1", path = "taim-signal" }
-taim-view = { version = "0.15.0-rc.1", path = "view" }
-taim_text_gpu = { version = "0.15.0-rc.1", path = "taim-text-gpu" }
+taim-accessibility = { version = "0.15.0-rc.2", path = "taim-accessibility" }
+taim_atlas = { version = "0.15.0-rc.2", path = "taim-atlas" }
+taim-design = { version = "0.15.0-rc.2", path = "taim-design" }
+taim-gesture = { version = "0.15.0-rc.2", path = "taim-gesture" }
+taim-highlighter = { version = "0.15.0-rc.2", path = "taim-highlighter" }
+taim-motion = { version = "0.15.0-rc.2", path = "taim-motion", default-features = false }
+taim-platform-vyom = { version = "0.15.0-rc.2", path = "taim-platform-vyom" }
+taim-profiler = { version = "0.15.0-rc.2", path = "taim-profiler" }
+taim-raster = { version = "0.15.0-rc.2", path = "taim-raster" }
+taim-signal = { version = "0.15.0-rc.2", path = "taim-signal" }
+taim-view = { version = "0.15.0-rc.2", path = "view" }
+taim_text_gpu = { version = "0.15.0-rc.2", path = "taim-text-gpu" }
 # `default-features = false` here rather than at the dev-dependency, because
 # Cargo forbids an inherited dependency from overriding it. See the
 # dev-dependencies section for why it matters.
-taim = { version = "0.15.0-rc.1", path = ".", default-features = false }
-taim_core = { version = "0.15.0-rc.1", path = "core" }
-taim_debug = { version = "0.15.0-rc.1", path = "debug" }
-taim_futures = { version = "0.15.0-rc.1", path = "futures" }
-taim_graphics = { version = "0.15.0-rc.1", path = "graphics" }
-taim_renderer = { version = "0.15.0-rc.1", path = "renderer" }
-taim_runtime = { version = "0.15.0-rc.1", path = "runtime" }
-taim_tiny_skia = { version = "0.15.0-rc.1", path = "tiny_skia", default-features = false }
-taim_wgpu = { version = "0.15.0-rc.1", path = "wgpu", default-features = false }
-taim_widget = { version = "0.15.0-rc.1", path = "widget" }
-taim_winit = { version = "0.15.0-rc.1", path = "winit", default-features = false }
+taim = { version = "0.15.0-rc.2", path = ".", default-features = false }
+taim_core = { version = "0.15.0-rc.2", path = "core" }
+taim_debug = { version = "0.15.0-rc.2", path = "debug" }
+taim_futures = { version = "0.15.0-rc.2", path = "futures" }
+taim_graphics = { version = "0.15.0-rc.2", path = "graphics" }
+taim_renderer = { version = "0.15.0-rc.2", path = "renderer" }
+taim_runtime = { version = "0.15.0-rc.2", path = "runtime" }
+taim_tiny_skia = { version = "0.15.0-rc.2", path = "tiny_skia", default-features = false }
+taim_wgpu = { version = "0.15.0-rc.2", path = "wgpu", default-features = false }
+taim_widget = { version = "0.15.0-rc.2", path = "widget" }
+taim_winit = { version = "0.15.0-rc.2", path = "winit", default-features = false }
 
 arboard = { version = "3.6", default-features = false }
 bitflags = "2.0"

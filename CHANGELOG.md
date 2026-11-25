@@ -6,8 +6,23 @@ break the public API.
 
 ## [Unreleased]
 
+## [0.15.0-rc.2] - 2026-11-25
+
 ### Added
 
+- `text_field(...).on_change(|text| ...)` runs a callback with the new text
+  on every user edit. Changes made to the bound state from code do not call
+  it.
+- `taim::ContentFit` (also in the prelude and `taim::view`), so
+  `image(...).fit(...)` and `svg(...).fit(...)` can be used from an app.
+- `taim::widget::Id` (also `taim::view::widget::Id`), so a custom view can
+  build the `semantics::Node` its `describe` returns and be read by screen
+  readers.
+- Rewritten guides for the view API: Views (`widgets.md`), Layout,
+  Styling, Background work (`tasks-and-subscriptions.md`), Custom drawing
+  (`canvas-drawing.md`) and Structuring larger apps (`scaling.md`), with
+  the code samples in Accessibility replaced. Every Rust sample in them is
+  now compiled by the doctest suite.
 - iOS services (`taim::apple`, `docs/platform/ios.md`): the share sheet
   (`platform::share_text`, which returned `Unsupported`), Taptic Engine
   haptics, Face ID/Touch ID status and prompts, keychain items with
@@ -100,6 +115,8 @@ break the public API.
 
 ### Fixed
 
+- Apple `ServiceError` messages no longer say "iOS" on macOS; they read
+  "Apple …" on both platforms.
 - The getting-started guide taught the removed `Message`/`update` API and
   `cargo add taim`, which fails; it is rewritten for the view API and its
   examples are now compiled as doctests. The README's performance table

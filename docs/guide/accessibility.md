@@ -1,6 +1,6 @@
-# Accessibility in Vyom-Taim
+# Accessibility in Taim
 
-Accessibility (a11y) is a foundational pillar of the Vyom-Taim UI framework. This guide details how our accessibility architecture works, how to use it, and why it is critical for building inclusive applications.
+Accessibility (a11y) is a foundational pillar of the Taim UI framework. This guide details how our accessibility architecture works, how to use it, and why it is critical for building inclusive applications.
 
 ## 1. Why Accessibility Matters
 
@@ -12,15 +12,15 @@ Accessibility is not a feature; it is a fundamental human right. Designing for a
 
 ## 2. The Semantic Tree
 
-Under the hood, Vyom-Taim maintains a **Semantic Tree** that runs parallel to the standard Widget Tree. This tree contains all the semantic information required by assistive technologies, stripped of visual and layout details.
+Under the hood, Taim maintains a **Semantic Tree** that runs parallel to the standard Widget Tree. This tree contains all the semantic information required by assistive technologies, stripped of visual and layout details.
 
 ### Retained Semantic Forest
 The Semantic Tree is a retained structure. It doesn't rebuild from scratch every frame. Instead, it maintains a persistent representation of the UI's semantics, organized as a "Semantic Forest" to handle multiple windows or disparate UI roots seamlessly.
 
 ### Incremental Diffs (Change)
-When the Widget Tree updates, it emits incremental `Change` objects to the Semantic Tree. This diffing mechanism ensures high performance. Instead of sending the entire tree to the OS accessibility APIs, Vyom-Taim only sends what changed (e.g., a node's label updated, a checkbox was toggled, or a node was removed).
+When the Widget Tree updates, it emits incremental `Change` objects to the Semantic Tree. This diffing mechanism ensures high performance. Instead of sending the entire tree to the OS accessibility APIs, Taim only sends what changed (e.g., a node's label updated, a checkbox was toggled, or a node was removed).
 
-```rust
+```rust,ignore
 // Example of how changes are propagated internally
 pub struct Change {
     pub node_id: NodeId,
@@ -34,33 +34,48 @@ Action routing is handled by the `Router` and `Dispatch` system. When an assisti
 
 ## 3. Automatic Semantics
 
-In Vyom-Taim, accessibility is built-in by default. All standard widgets (buttons, checkboxes, sliders, text inputs) automatically contribute their semantic information to the tree.
+In Taim, accessibility is built-in by default. All standard widgets (buttons, checkboxes, sliders, text inputs) automatically contribute their semantic information to the tree.
 
-For instance, when you use a `Button` widget, you don't need to manually tag it as a button. The framework handles it.
-
-```rust
-// Automatic semantics out of the box
-Button::new("Submit")
-    .on_click(|| println!("Clicked!"))
-```
-
-However, if you build a custom widget, you can manually inject semantics using the `.semantics()` modifier.
+For instance, a `button` is announced as a button with its label; you don't tag it yourself. Images and SVGs take a `.label(...)` so they can be announced, and are treated as decorative without one.
 
 ```rust
-MyCustomWidget::new()
-    .semantics(|s| {
-        s.role(Role::Button)
-         .label("Custom Action")
-         .disabled(false);
-    })
+use taim::prelude::*;
+
+fn submit() -> impl View {
+    button("Submit").on_press(|| println!("Submitted"))
+}
 ```
+
+A custom view describes itself in `View::describe`, returning a `semantics::Node` keyed by a stable `taim::widget::Id`:
+
+```rust
+use taim::view::{DescribeCx, semantics};
+use taim::widget;
+
+struct Gauge {
+    percent: f32,
+    id: widget::Id, // widget::Id::unique(), created once when the view is built
+}
+
+impl Gauge {
+    fn describe(&self, cx: &DescribeCx<'_>) -> Option<semantics::Node> {
+        Some(
+            semantics::Node::new(self.id.clone(), cx.bounds(), semantics::Role::Image)
+                .with_name("Battery")
+                .with_description(format!("{:.0} percent", self.percent)),
+        )
+    }
+}
+```
+
+[Custom drawing](canvas-drawing.md) shows this inside a complete `View` implementation.
 
 ## 4. The Focus System
 
 Focus management is crucial for accessibility, especially for keyboard and screen reader users.
 
 ### Focus and Scope
-Vyom-Taim uses a sophisticated focus system.
+Taim uses a sophisticated focus system.
 - **Focus**: The currently active element receiving input.
 - **Scope**: A bounded region for focus. Scopes can be used to trap focus within a specific area, like a modal dialog.
 
@@ -72,12 +87,7 @@ Navigation through focusable elements has a defined `Direction`:
 ### Trapping and Restoration
 When opening a modal, focus should be trapped within the modal (`Scope`). When the modal closes, focus must be restored to the element that originally triggered it.
 
-```rust
-// Example of focus trapping
-Dialog::new()
-    .trap_focus(true)
-    .restore_focus(true)
-```
+Taim's `dialog`, `sheet` and `drawer` do both automatically: while one is open, focus stays inside it, and closing it returns focus to where it was.
 
 ## 5. Screen Readers and Platform Adapters
 
@@ -108,10 +118,7 @@ When triggering a live region update, you define an `Announcement` and its `Urge
 - `Urgency::Polite`: The screen reader will wait until it finishes its current speech before announcing the update.
 - `Urgency::Assertive`: The screen reader will interrupt its current speech to announce the update immediately.
 
-```rust
-// Announcing a dynamic change
-LiveRegion::announce("File uploaded successfully", Urgency::Polite);
-```
+In Taim these are `semantics::Live::Polite` and `semantics::Live::Assertive`. `snackbar` announces its message politely by itself. A custom view marks a node as live with `.with_live(...)` in `describe`, and the new text is announced whenever it changes.
 
 ### Privacy Considerations
 When announcing sensitive data (like passwords or secure tokens), ensure you use appropriate masking or privacy flags in the semantic tree to prevent unintended readout by screen readers in public spaces.
@@ -124,85 +131,70 @@ Keyboard navigation is fully supported and customizable.
 - **Enter/Space**: Activates the focused element (e.g., clicking a button or toggling a checkbox).
 - **Arrow Keys**: Navigates within complex widgets like lists, grids, menus, and sliders.
 
-Developers can intercept or augment keyboard events using the `on_key` modifier.
-
-```rust
-widget.on_key(|event| {
-    if event.key == Key::Escape {
-        close_dialog();
-        EventResult::Handled
-    } else {
-        EventResult::Ignored
-    }
-})
-```
+Built-in overlays close on Escape. A custom view handles keys in `View::event`, matching `Event::Keyboard` and returning `Handled::Yes` for keys it uses so they stop there.
 
 ## 8. Reduced Motion
 
-Many users experience motion sickness or vestibular disorders triggered by UI animations. Vyom-Taim respects the OS-level "Reduce Motion" preference.
+Many users experience motion sickness or vestibular disorders triggered by UI animations. Taim respects the OS-level "Reduce Motion" preference.
 
 The `MotionPolicy` defines how animations should behave. If the user prefers reduced motion, animations can be automatically snapped to their end state or replaced with simple crossfades.
 
-```rust
-// Example of motion policy checking
-if env.motion_policy() == MotionPolicy::Reduced {
-    // Skip animation
-    snap_to_state();
-} else {
-    // Play animation
-    play_spring_animation();
+Built-in transitions follow the system setting by themselves. An app can also bind it to its own setting:
+
+```rust,no_run
+use taim::prelude::*;
+
+fn main() -> taim::Result {
+    taim::launch("Motion", |cx| {
+        let calm = cx.signal(false);
+        cx.reduced_motion(calm);
+
+        switch("Reduce motion", calm)
+    })
 }
 ```
 
 ## 9. High Contrast
 
-For users with low vision, a high contrast UI is essential. Vyom-Taim's color system supports a `HighContrast` color scheme alongside `Light` and `Dark`.
+For users with low vision, a high contrast UI is essential. Taim's color system supports a `HighContrast` color scheme alongside `Light` and `Dark`.
 
 When the OS is set to High Contrast mode, the application automatically switches to the `HighContrast` theme, maximizing legibility with stark contrasting colors and pronounced borders.
 
-## 10. Complete Example: Accessible Form with Dialog Focus Trapping
+## 10. Complete Example: An Accessible Form
 
-Here is a comprehensive example demonstrating accessibility in action, including a form and a modal dialog with focus management and live regions.
+Every view here describes itself: the field has its placeholder as a name, the switch announces its state, and the dialog keeps focus while open and returns it on close.
 
 ```rust
 use taim::prelude::*;
 
-pub fn accessible_form_example() -> impl Widget {
-    let show_dialog = use_state(|| false);
-    let name = use_state(|| String::new());
+fn profile(cx: &mut Scope) -> impl View {
+    let name = cx.signal(String::new());
+    let newsletter = cx.signal(false);
+    let saved = cx.signal(false);
 
-    Column::new()
-        .spacing(16.0)
-        .push(
-            Text::new("User Profile")
-                .semantics(|s| s.heading_level(1))
-        )
-        .push(
-            TextInput::new(name.clone())
-                .label("Full Name")
-                .placeholder("Enter your full name")
-                // Semantics are automatically handled by TextInput
-        )
-        .push(
-            Button::new("Save Profile")
-                .on_click(move || {
-                    show_dialog.set(true);
+    layers(views![
+        column(views![
+            text("User profile").size(24),
+            text_field("Full name", name),
+            switch("Email me the newsletter", newsletter),
+            button("Save profile")
+                .on_press(move || {
+                    saved.set(true);
                 })
-        )
-        .push_if(show_dialog.get(), || {
-            Dialog::new()
-                .trap_focus(true)
-                .restore_focus(true)
-                .content(
-                    Column::new()
-                        .push(Text::new("Profile Saved!").semantics(|s| s.live_region(Urgency::Assertive)))
-                        .push(
-                            Button::new("Close")
-                                .on_click(move || show_dialog.set(false))
-                        )
-                )
-        })
+                .enabled(move || !name.get().trim().is_empty()),
+        ])
+        .gap(16.0)
+        .padding(24.0),
+        dialog(
+            saved,
+            column(views![
+                text("Profile saved"),
+                button("Close").on_press(move || {
+                    saved.set(false);
+                }),
+            ])
+            .gap(12.0),
+        ),
+    ])
 }
 ```
-
-This example demonstrates how easy it is to build accessible UIs with Vyom-Taim. The framework handles the heavy lifting, allowing you to focus on creating great experiences for all users.

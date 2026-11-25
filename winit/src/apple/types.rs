@@ -10,48 +10,48 @@ use taim_core::{Point, Rectangle, Size};
 /// Why an iOS service request did not produce a result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum ServiceError {
-    /// This device or iOS version has no such capability (no camera, no
-    /// biometric sensor, an iOS release before the API existed).
-    #[error("iOS capability unavailable on this device")]
+    /// This device or OS version has no such capability (no camera, no
+    /// biometric sensor, an OS release before the API existed).
+    #[error("Apple capability unavailable on this device")]
     Unsupported,
     /// No window or view controller is available to present system UI.
-    #[error("iOS application window unavailable")]
+    #[error("Apple application window unavailable")]
     Unavailable,
     /// The user refused, or a permission is denied or restricted.
-    #[error("iOS operation denied")]
+    #[error("Apple operation denied")]
     Denied,
     /// The system cancelled the operation (another app came forward, the
     /// request was dropped).
-    #[error("iOS operation cancelled")]
+    #[error("Apple operation cancelled")]
     Cancelled,
     /// Another picker or prompt of the same kind is already showing.
-    #[error("iOS service busy")]
+    #[error("Apple service busy")]
     Busy,
     /// Input failed validation or exceeded a documented limit.
-    #[error("iOS request invalid or too large")]
+    #[error("Apple request invalid or too large")]
     Invalid,
     /// No result arrived before the request's deadline.
-    #[error("iOS request timed out")]
+    #[error("Apple request timed out")]
     Timeout,
     /// No biometric or passcode satisfying the policy is set up.
-    #[error("iOS biometric or passcode not enrolled")]
+    #[error("Apple biometric or passcode not enrolled")]
     NotEnrolled,
     /// Too many failed biometric attempts; the passcode unlocks it again.
-    #[error("iOS biometric authentication locked")]
+    #[error("Apple biometric authentication locked")]
     Lockout,
     /// Location services are switched off for the whole device.
-    #[error("iOS capability disabled in Settings")]
+    #[error("Apple capability disabled in Settings")]
     Disabled,
     /// The keychain is locked (the device has not been unlocked since boot,
     /// or is locked now for a when-unlocked item).
-    #[error("iOS keychain locked")]
+    #[error("Apple keychain locked")]
     Locked,
     /// The app lacks an entitlement the service requires.
-    #[error("iOS entitlement missing")]
+    #[error("Apple entitlement missing")]
     MissingEntitlement,
     /// The operating system failed. Its error text is withheld because it
     /// can contain user data.
-    #[error("iOS platform operation failed")]
+    #[error("Apple platform operation failed")]
     Failed,
 }
 

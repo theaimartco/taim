@@ -73,11 +73,17 @@ pub use launch::{App, app, launch, prelude};
 pub use taim_view as view;
 
 pub use crate::core::{
-    Background, Border, Color, Degrees, Font, Gradient, Padding, Pixels, Point, Radians, Rectangle,
-    Settings, Shadow, Size, Theme, Transformation, Vector, alignment, border, color, font,
-    gradient, keyboard, mouse, padding, semantics, theme, time,
+    Background, Border, Color, ContentFit, Degrees, Font, Gradient, Padding, Pixels, Point,
+    Radians, Rectangle, Settings, Shadow, Size, Theme, Transformation, Vector, alignment, border,
+    color, font, gradient, keyboard, mouse, padding, semantics, theme, time,
 };
 pub use taim_signal::{Memo, Signal};
+
+/// Widget identity, for custom views that describe themselves to
+/// assistive technology through [`semantics::Node`].
+pub mod widget {
+    pub use taim_core::widget::Id;
+}
 
 /// The renderer views draw with, chosen when TAIM is compiled.
 pub type Renderer = taim_renderer::Renderer;
@@ -152,3 +158,22 @@ pub mod android {
 #[cfg(doctest)]
 #[doc = include_str!("../docs/guide/getting-started.md")]
 pub struct GettingStarted;
+
+/// Compiles the Rust examples in the other view-API guides.
+#[cfg(doctest)]
+pub mod guides {
+    #[doc = include_str!("../docs/guide/widgets.md")]
+    pub struct Views;
+    #[doc = include_str!("../docs/guide/layout.md")]
+    pub struct Layout;
+    #[doc = include_str!("../docs/guide/styling.md")]
+    pub struct Styling;
+    #[doc = include_str!("../docs/guide/tasks-and-subscriptions.md")]
+    pub struct BackgroundWork;
+    #[doc = include_str!("../docs/guide/canvas-drawing.md")]
+    pub struct CustomDrawing;
+    #[doc = include_str!("../docs/guide/scaling.md")]
+    pub struct Structuring;
+    #[doc = include_str!("../docs/guide/accessibility.md")]
+    pub struct Accessibility;
+}

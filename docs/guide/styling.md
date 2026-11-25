@@ -1,346 +1,146 @@
-# Styling in Vyom Taim
+# Styling
 
-> **This guide describes the pre-0.15 API** (`Element`, `Message`,
-> `Task`, `taim::widget`), which the `taim` crate no longer exports. Its
-> code does not compile against this release. For applications, use the
-> view API in [Getting started](getting-started.md). This page is kept for
-> its concepts while it is rewritten.
+Taim views style themselves from the window's theme, so an app looks
+consistent and follows light and dark mode without extra work. You change
+the look in three ways: choose the theme, pick a view's variant, and
+decorate containers.
 
-Vyom Taim takes a unique, highly structured approach to styling that ensures your application always looks consistent, professional, and accessible. Instead of manually specifying hex codes and pixel borders on every widget, Taim uses a comprehensive **Theme** and **Style Catalog** system.
+## Themes
 
-This guide will take you from applying basic built-in themes to building complex custom styling engines.
+`Theme::Light`, `Theme::Dark` and `Theme::HighContrast` are built in. Bind
+the window's theme to state with `cx.theme`, and it follows that state:
 
----
-
-## 1. The 22+ Built-in Themes
-
-Taim ships with a vast array of high-quality, pre-built themes out of the box. They are carefully designed with proper contrast ratios and aesthetic harmony.
-
-You can categorize them roughly into:
-
-### Light Themes
-- **Light**: The default clean, crisp light interface.
-- **CatppuccinLatte**: Soft, pastel light theme.
-- **GruvboxLight**: Warm, retro, earthy tones.
-- **SolarizedLight**: Classic low-contrast reading theme.
-- **TokyoNightLight**: Bright and vibrant.
-
-### Dark Themes
-- **Dark**: The standard sleek, modern dark mode.
-- **Dracula**: High-contrast, vibrant dark theme with pinks and purples.
-- **CatppuccinMocha / Macchiato / Frappe**: Extremely popular soft dark themes.
-- **TokyoNight**: Deep blues and neon accents.
-- **Nord**: Arctic, cold, bluish-gray dark theme.
-- **GruvboxDark**: Warm, earthy, retro dark theme.
-- **SolarizedDark**: Classic low-contrast dark theme.
-- **Oxocarbon**: Ultra-minimalist, high-contrast dark theme (IBM Carbon inspired).
-
-### Colorful & Unique
-- **FairyFloss**: Pastel pinks and purples.
-- **Kanagawa**: Inspired by Japanese woodblock prints.
-- **Moonfly**: Deep night sky theme.
-
----
-
-## 2. Setting the Theme
-
-### Static Theming
-If your app only needs one theme, return it from your `Application::theme` method:
-
-```rust
+```rust,no_run
+use taim::prelude::*;
 use taim::Theme;
 
-impl Application for MyApp {
-    // ... other methods ...
+fn main() -> taim::Result {
+    taim::launch("Themes", |cx| {
+        let dark = cx.signal(false);
+        cx.theme(move || if dark.get() { Theme::Dark } else { Theme::Light });
 
-    fn theme(&self) -> Theme {
-        Theme::TokyoNight
-    }
+        column(views![
+            text("Appearance").size(22),
+            switch("Dark mode", dark),
+        ])
+        .gap(12.0)
+        .padding(24.0)
+    })
 }
 ```
 
-### Dynamic Theming (State-Based)
-Most modern apps allow users to toggle themes. Store the active theme in your application state:
+Without a `cx.theme` call the window follows the operating system's
+appearance.
+
+### A custom theme
+
+`Theme::custom` generates a full palette from six seed colours:
 
 ```rust
-struct MyApp {
-    active_theme: Theme,
-}
+use taim::theme::palette::Seed;
+use taim::{Color, Theme};
 
-impl Application for MyApp {
-    fn theme(&self) -> Theme {
-        self.active_theme.clone()
-    }
-}
-```
-
-### Environment Variable (`TAIM_THEME`)
-For quick testing without recompiling, users can override the default theme by setting an environment variable:
-`TAIM_THEME=dracula cargo run`
-
----
-
-## 3. Custom Themes
-
-If none of the 22 built-in themes match your brand, you can create a completely custom theme.
-
-### `Theme::custom(name, palette)`
-You can define a theme by providing a `Palette`.
-
-```rust
-use taim::theme::{Theme, Palette};
-use taim::color;
-
-let my_palette = Palette {
-    primary: color!(0x3b82f6),
-    secondary: color!(0x8b5cf6),
-    success: color!(0x22c55e),
-    danger: color!(0xef4444),
-    background: color!(0x0f172a),
-    text: color!(0xf8fafc),
-};
-
-let my_theme = Theme::custom("MyBrand".into(), my_palette);
-```
-
-### `Theme::custom_with_fn`
-For extreme control, you can define exactly how styles are generated based on the palette, overriding the default style generators.
-
----
-
-## 4. The Palette Deep Dive
-
-Every `Theme` is driven by a `Palette`. The palette defines semantic colors rather than specific widget colors.
-
-- **Primary**: The main brand color (used for active buttons, focused inputs).
-- **Secondary**: Accents and alternative actions.
-- **Success**: Positive actions (saving, completing).
-- **Danger**: Destructive actions (deleting, errors).
-- **Background**: The base canvas color.
-- **Text**: Default text color.
-
-### Extracting Colors
-Sometimes you need to draw something manually (like on a Canvas) and need the theme's colors:
-
-```rust
-let current_theme = Theme::Dracula;
-let palette = current_theme.palette();
-
-let brand_color = palette.primary;
-```
-
----
-
-## 5. Widget Styling: The Style + Status Pattern
-
-This is the most critical concept in Taim's styling engine.
-
-Widgets in Taim do not have methods like `.background_color()` or `.border_radius()`. Instead, they take a **Style Function**.
-
-### How `.style(fn)` works
-
-When Taim draws a widget, it needs to know what it looks like in different states (Hovered, Pressed, Disabled, Active).
-
-A Style Function has this signature (conceptually):
-`fn(theme: &Theme, status: Status) -> Appearance`
-
-For example, a Button's style function looks like:
-`fn button_style(theme: &Theme, status: button::Status) -> button::Appearance`
-
-The `button::Status` enum defines the states:
-```rust
-pub enum Status {
-    Active,
-    Hovered,
-    Pressed,
-    Disabled,
-}
-```
-
-The `button::Appearance` struct defines the actual visual properties:
-```rust
-pub struct Appearance {
-    pub background: Option<Background>,
-    pub text_color: Color,
-    pub border: Border,
-    pub shadow: Shadow,
-}
-```
-
-### Using Pre-built Style Functions
-Taim's default `Theme` implements hundreds of these style functions for you. You apply them to widgets using the `.style()` method.
-
-```rust
-use taim::widget::button;
-use taim::theme::Theme;
-
-// Uses the default 'primary' style
-button("Submit").style(button::primary)
-```
-
----
-
-## 6. Style Functions for Every Widget
-
-Here are the most common pre-built style functions available for standard widgets:
-
-### Button
-```rust
-button::primary    // Solid brand color
-button::secondary  // Outlined or alternative color
-button::success    // Green/Positive
-button::danger     // Red/Destructive
-button::text       // No background, just text (like a link)
-```
-
-### Container
-Containers are the most frequently styled widgets.
-```rust
-container::background    // Standard app background color
-container::transparent   // No background (default)
-container::rounded_box   // Background with rounded corners
-container::bordered_box  // Transparent with a border
-container::dark          // Darker variant of background
-container::primary       // Solid primary color
-```
-
-### Text
-```rust
-text::default      // Standard body text
-text::primary      // Brand colored text
-text::danger       // Error text
-```
-
-### Other Widgets
-Checkbox, ProgressBar, Slider, Toggler, PickList, etc., all have `primary`, `success`, and `danger` variants.
-
----
-
-## 7. Container Styling Deep Dive
-
-If you want to create a totally unique looking element (like a glassy card), you create a custom style function for a `Container`.
-
-```rust
-use taim::widget::container;
-use taim::{Color, Border, Shadow, Theme};
-use taim::widget::container::Appearance;
-
-fn glassmorphism_style(theme: &Theme) -> Appearance {
-    Appearance {
-        // Semi-transparent white
-        background: Some(Color::from_rgba8(255, 255, 255, 0.1).into()),
-        border: Border {
-            color: Color::from_rgba8(255, 255, 255, 0.2),
-            width: 1.0,
-            radius: 12.0.into(), // Rounded corners
+fn ocean() -> Theme {
+    Theme::custom(
+        "Ocean",
+        Seed {
+            background: Color::from_rgb8(0x0B, 0x1A, 0x2A),
+            text: Color::from_rgb8(0xE6, 0xF1, 0xFF),
+            primary: Color::from_rgb8(0x3A, 0x9B, 0xFF),
+            success: Color::from_rgb8(0x2E, 0xC2, 0x7E),
+            warning: Color::from_rgb8(0xF5, 0xB0, 0x41),
+            danger: Color::from_rgb8(0xF0, 0x55, 0x55),
         },
-        shadow: Shadow {
-            color: Color::from_rgba8(0, 0, 0, 0.1),
-            offset: taim::Vector::new(0.0, 4.0),
-            blur_radius: 16.0,
-        },
-        text_color: Some(theme.palette().text),
-    }
+    )
 }
-
-// Apply it
-container(text("Glass Card")).style(glassmorphism_style)
 ```
 
----
+Colours are blended in linear light. The `web-colors` feature restores
+browser-style gamma blending for apps that must match a web page exactly;
+see `docs/architecture/color-pipeline.md`.
 
-## 8. The `.class()` Method
+## Variants
 
-While `.style(fn)` is powerful, passing function pointers can be tedious. Taim introduced `.class()` as a cleaner alternative.
-
-Every theme maintains a "Catalog" of classes.
+Views offer variants rather than free-form style closures:
 
 ```rust
-// Instead of this:
-button("Save").style(button::success)
+use taim::prelude::*;
 
-// You can do this:
-button("Save").class(taim::theme::ButtonClass::Success)
+fn actions() -> impl View {
+    row(views![
+        button("Save"),
+        button("Cancel").secondary(),
+        button("More").ghost(),
+        button("Delete").danger(),
+    ])
+    .gap(8.0)
+}
 ```
 
-Classes are enums, making them easier to store in state, pass around, or serialize.
-
----
-
-## 9. Root Application Style
-
-By default, an Taim window has a neutral background. To ensure your entire application respects the Theme's background color, apply a style to the root node of your `view()` method:
+Text takes `.size`, `.font` and `.color`:
 
 ```rust
-impl Application for MyApp {
-    fn view(&self) -> Element<Message> {
-        let content = text("Hello World");
-        
-        // Wrap everything in a container styled with the background
-        container(content)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .style(container::background)
-            .into()
-    }
+use taim::prelude::*;
+use taim::{Color, Font, font};
+
+fn heading() -> impl View {
+    text("Taim")
+        .size(32)
+        .font(Font {
+            weight: font::Weight::Bold,
+            ..Font::DEFAULT
+        })
+        .color(Color::from_rgb8(0x3A, 0x9B, 0xFF))
 }
 ```
 
----
-
-## 10. Complete Example: Dark Mode Toggle
-
-Here is how you wire up a fully working Light/Dark mode toggle:
+## Decorating containers
 
 ```rust
-use taim::{Application, Theme, Element, Length};
-use taim::widget::{column, button, text, container};
+use taim::prelude::*;
+use taim::{Color, border};
 
-struct App {
-    is_dark: bool,
-}
-
-#[derive(Clone, Debug)]
-enum Message {
-    ToggleTheme,
-}
-
-impl Application for App {
-    type Message = Message;
-    // ...
-
-    fn theme(&self) -> Theme {
-        if self.is_dark {
-            Theme::TokyoNight
-        } else {
-            Theme::Light
-        }
-    }
-
-    fn update(&mut self, message: Message) {
-        match message {
-            Message::ToggleTheme => {
-                self.is_dark = !self.is_dark;
-            }
-        }
-    }
-
-    fn view(&self) -> Element<Message> {
-        let toggle_btn = button("Toggle Theme")
-            .on_press(Message::ToggleTheme)
-            .style(button::primary);
-
-        let content = column![
-            text("Welcome to Taim!").size(40),
-            toggle_btn,
-        ].spacing(20);
-
-        container(content)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .center(Length::Fill)
-            .style(container::background) // Crucial for background color updates
-            .into()
-    }
+fn card() -> impl View {
+    container(text("A card"))
+        .padding(16.0)
+        .background_themed(Color::WHITE, Color::from_rgb8(0x1E, 0x1E, 0x22))
+        .border(
+            border::rounded(12.0)
+                .width(1.0)
+                .color(Color::from_rgba8(0, 0, 0, 0.08)),
+        )
 }
 ```
+
+| Method | Effect |
+|---|---|
+| `.background(color)` | One colour in every theme |
+| `.background_themed(light, dark)` | A colour per appearance |
+| `.border(Border)` | Built with `border::rounded`, `border::width`, `border::color` |
+| `.glass()`, `.frosted_glass()` | Liquid glass material |
+| `.reduce_transparency(true)` | An opaque fallback for the glass |
+
+## Liquid glass
+
+`glass(view)` draws its content on a refractive glass panel:
+
+```rust
+use taim::prelude::*;
+
+fn floating_bar() -> impl View {
+    glass(row(views![button("Play").ghost(), button("Next").ghost()]).gap(8.0))
+        .radius(24.0)
+        .padding(8.0)
+        .interactive()
+}
+```
+
+Nearby glass panels inside a `glass_group` merge into one shape as they
+approach. The [liquid example](../../examples/liquid) and
+[Liquid glass](../design/liquid-glass.md) cover the material in depth.
+
+## Reading the theme in a custom view
+
+A custom view's `paint` reads the active palette through
+`cx.theme().palette()`, so it follows theme changes like the built-in views
+do. See [Canvas drawing](canvas-drawing.md).

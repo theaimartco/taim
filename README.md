@@ -238,7 +238,7 @@ image cache's allocator and development-only hot reload.
 
 ## Status
 
-0.15.0-rc.1 is a **release candidate**. The release gate (formatting,
+0.15.0-rc.2 is a **release candidate**. The release gate (formatting,
 lints on every target, 2,542 tests, a new-project build, an external
 consumer build, a dependency and license audit, browser tests in three
 engines and an Android link) passes in full. Before 1.0 we are completing

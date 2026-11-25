@@ -21,6 +21,7 @@ pub fn text_field(placeholder: impl IntoProp<String>, value: State<String>) -> T
         value,
         shown: value.into_prop(),
         on_submit: None,
+        on_change: None,
         secret: false,
         autofill: None,
         plain: false,
@@ -40,6 +41,7 @@ pub struct TextField {
     value: State<String>,
     shown: Prop<String>,
     on_submit: Option<Box<dyn Fn()>>,
+    on_change: Option<Box<dyn Fn(&str)>>,
     secret: bool,
     autofill: Option<semantics::Autofill>,
     /// No frame of its own: the field sits in a surface that draws one.
@@ -152,6 +154,28 @@ impl TextField {
         self
     }
 
+    /// Runs `action` with the new text whenever the user edits the field.
+    ///
+    /// Changes made to the bound state elsewhere do not call it.
+    pub fn on_change(mut self, action: impl Fn(&str) + 'static) -> Self {
+        self.on_change = Some(Box::new(action));
+        self
+    }
+
+    /// Stores a user edit in the bound state and reports it to `on_change`.
+    fn commit(&self, next: String) {
+        match &self.on_change {
+            Some(change) => {
+                if self.value.set(next.clone()) {
+                    change(&next);
+                }
+            }
+            None => {
+                let _ = self.value.set(next);
+            }
+        }
+    }
+
     /// Opts this field into a native autofill purpose. Secret values remain redacted.
     pub fn autofill(mut self, purpose: semantics::Autofill) -> Self {
         self.autofill = Some(purpose);
@@ -186,9 +210,7 @@ impl TextField {
         let to = to.min(edit::count(&current));
         let from = from.min(to);
 
-        let _ = self
-            .value
-            .replace(edit::replace(&current, from, to, inserted));
+        self.commit(edit::replace(&current, from, to, inserted));
         self.caret = Caret::at(from + edit::count(inserted));
     }
 
@@ -204,7 +226,7 @@ impl TextField {
             return;
         }
 
-        let _ = self.value.replace(edit::replace(&current, from, to, ""));
+        self.commit(edit::replace(&current, from, to, ""));
         self.caret = Caret::at(from);
     }
 
@@ -532,7 +554,7 @@ impl View for TextField {
                 let anchor = state.content[..state.selection.start]
                     .graphemes(true)
                     .count();
-                let _ = self.value.set(state.content);
+                self.commit(state.content);
                 self.caret = Caret {
                     position,
                     anchor: (anchor != position).then_some(anchor),
@@ -593,7 +615,7 @@ impl View for TextField {
                     .caret
                     .anchor
                     .is_some_and(|anchor| self.caret.position < anchor);
-                let _ = self.value.set(next);
+                self.commit(next);
                 self.caret = Caret {
                     position: if reversed { left } else { right },
                     anchor: (left != right).then_some(if reversed { right } else { left }),

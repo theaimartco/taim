@@ -45,9 +45,15 @@ pub use state::{IntoProp, Invalidation, Prop, Scope, Sender, State, TaskScope, s
 pub use view::{AnyView, Child, Handled, View, Visual};
 
 pub use taim_core::{
-    Background, Border, Color, Event, Padding, Pixels, Point, Rectangle, Shadow, Size, Theme,
-    Vector, keyboard, mouse, semantics,
+    Background, Border, Color, ContentFit, Event, Padding, Pixels, Point, Rectangle, Shadow, Size,
+    Theme, Vector, keyboard, mouse, semantics,
 };
+
+/// Widget identity: the stable key a [`semantics::Node`] carries, so a
+/// custom view can describe itself to assistive technology.
+pub mod widget {
+    pub use taim_core::widget::Id;
+}
 
 /// A point in time, as used for animation.
 pub use taim_core::time::{Duration, Instant};
@@ -71,10 +77,10 @@ pub mod prelude {
         space, stepper, switch, tabs, text, text_editor, text_field, time_picker, tooltip, when,
     };
     pub use crate::{
-        AndroidMap, AndroidVideo, AndroidView, AndroidWebContent, AnyView, CameraLens, MapMarker,
-        MapType, Scope, State, TaskScope, VideoFit, VideoSource, View, android_camera_preview,
-        android_map_view, android_video_view, android_view, android_web_view,
-        android_web_view_with_script, spawn,
+        AndroidMap, AndroidVideo, AndroidView, AndroidWebContent, AnyView, CameraLens, ContentFit,
+        MapMarker, MapType, Scope, State, TaskScope, VideoFit, VideoSource, View,
+        android_camera_preview, android_map_view, android_video_view, android_view,
+        android_web_view, android_web_view_with_script, spawn,
     };
 }
 
